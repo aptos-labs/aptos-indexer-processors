@@ -11,7 +11,9 @@ previewnet: 104.154.118.201:50051
 mainnet: 34.30.218.153:50051
 
 ## Request
- - When making a request to the indexer, setting the transaction version `starting_version` is required. In the example code, we use `starting_version=10000`. You can update this with `starting_version=0` to start from genesis or the last transaction that you have successfully indexed. 
+ - When making a request to the indexer, setting the transaction version `starting_version` is required. In the example code, we use `starting_version=10000`. You can update this with `starting_version=0` to start from genesis or the next transaction version you want to index. 
+## Response
+- The response is guaranteed to return a stream of sequential transactions. Keep track of the latest transaction version your indexer has already processed, so you can easily restart your indexer and continue from the latest transaction version by setting `starting_version`. 
 
 # Quickstart
 ## Python
