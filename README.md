@@ -11,9 +11,15 @@ previewnet: 104.154.118.201:50051
 mainnet: 34.30.218.153:50051
 
 ## Request
- - When making a request to the indexer, setting the transaction version `starting_version` is required. In the example code, we use `starting_version=10000`. You can update this with `starting_version=0` to start from genesis or the next transaction version you want to index. 
+ - `config.yaml`
+   - `chain_id`
+   - `indexer_endpoint`
+   - `x-aptos-data-authorization`
+   - `starting-version`
+     - When making a request to the indexer, setting the transaction version `starting_version` is required. In the example code, we use `starting-version=10000`. You can update this with `starting_version=0` to start from genesis or the next transaction version you want to index. 
+     - If you want to auto restart the client in case of an error, you should cache the latest processed transaction version, and start the next run with the transaction version from cache instead of manually specifying it in `config.yaml`.
 ## Response
-- The response is guaranteed to return a stream of sequential transactions. Keep track of the latest transaction version your indexer has already processed, so you can easily restart your indexer and continue from the latest transaction version by setting `starting_version`. 
+- The response is guaranteed to return a stream of sequential transactions. 
 
 # Quickstart
 ## Python
