@@ -1,4 +1,4 @@
 chain-id: 1
 indexer-endpoint: "34.30.218.153:50051"
-x-aptos-data-authorization: "_8_GouCXjufqay9OTNZnN8J8zafdYDfnfZ9E6ZSzTnyYsGCW3bnAAXRnlZdLEfBR"
+x-aptos-data-authorization: "YOUR_TOKEN"
 starting-version: 10000
