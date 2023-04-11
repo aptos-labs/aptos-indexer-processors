@@ -9,13 +9,17 @@ from google import auth as google_auth
 from google.auth.transport import grpc as google_auth_transport_grpc
 from google.auth.transport import requests as google_auth_transport_requests
 
-metadata = (("x-aptos-data-authorization", "YOUR_TOKEN"),)
-options = [('grpc.max_receive_message_length', -1)]
-MAINNET_INDEXER_ENDPOINT = '34.70.26.67:50051'
+import yaml
 
-with grpc.insecure_channel(MAINNET_INDEXER_ENDPOINT, options=options) as channel:
+with open('config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+
+metadata = (("x-aptos-data-authorization", config["x-aptos-data-authorization"]),)
+options = [('grpc.max_receive_message_length', -1)]
+
+with grpc.insecure_channel(config["indexer-endpoint"], options=options) as channel:
     stub = datastream_pb2_grpc.IndexerStreamStub(channel)
-    for response in stub.RawDatastream(datastream_pb2.RawDatastreamRequest(starting_version=10000), metadata=metadata):
+    for response in stub.RawDatastream(datastream_pb2.RawDatastreamRequest(starting_version=config["starting-version"]), metadata=metadata):
         transactions_output = response.data
         for transaction_output in transactions_output.transactions:
             # Decode transaction data
