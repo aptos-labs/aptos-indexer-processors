@@ -23,6 +23,7 @@ def parse(transaction: transaction_pb2.Transaction):
         data = event.data
 
         # Insert transaction into database
+        print(transaction_version)
         insert_into_db(
             creation_number, 
             sequence_number, 
