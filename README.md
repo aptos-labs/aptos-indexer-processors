@@ -24,11 +24,15 @@ mainnet: 34.30.218.153:50051
 
 # Quickstart
 ## Python
-1. Follow the quickstart guide to install gRPC and tooling for Python
-```
-python -m pip install grpcio
-python -m pip install grpcio-tools
-```
+### Prerequisite
+- Python 3.7 or higher
+- `pip` version 9.0.1 or higher
+### Guide
+1. Install the latest version of gRPC and tooling for Python:
+  ```
+  python -m pip install grpcio
+  python -m pip install grpcio-tools
+  ```
 2. Download the example
 ```
 # Clone the repository to get the example code:
@@ -42,5 +46,14 @@ $ cd aptos-indexer-client-examples/python
    - Implement the `insert_into_db` function to insert the data into your DB of choice. 
 4. Run `python grpc_client.py` to start indexing! 
 
-## Typescript 
+## Typescript / Node
+### Prerequisite
+- `node`: This requires Node 0.12.x or greater.
+### Guide
+1. Install the latest version of gRPC and tooling for Typescript:
+  ```
+  npm install -g @grpc/grpc-js
+  npm install -g grpc-tools
+  ```
+2. 
 ## Rust
