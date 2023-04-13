@@ -2,6 +2,8 @@ from sqlalchemy import BigInteger, Column, create_engine, DateTime, String
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.dialects.postgresql import JSONB
 
+import yaml
+
 Base = declarative_base()
 
 class Event(Base):
@@ -17,5 +19,8 @@ class Event(Base):
     inserted_at = Column(DateTime)
     event_index = Column(BigInteger)
 
-engine = create_engine('postgresql://postgres:postgres@localhost:5432/example')
+with open('config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+
+engine = create_engine(config['tablename'])
 Base.metadata.create_all(engine)

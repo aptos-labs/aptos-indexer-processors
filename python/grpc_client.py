@@ -9,6 +9,9 @@ from google import auth as google_auth
 from google.auth.transport import grpc as google_auth_transport_grpc
 from google.auth.transport import requests as google_auth_transport_requests
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
 import yaml
 
 with open('config.yaml', 'r') as file:
@@ -16,6 +19,7 @@ with open('config.yaml', 'r') as file:
 
 metadata = (("x-aptos-data-authorization", config["x-aptos-data-authorization"]),)
 options = [('grpc.max_receive_message_length', -1)]
+engine = create_engine(config['tablename'])
 
 with grpc.insecure_channel(config["indexer-endpoint"], options=options) as channel:
     stub = datastream_pb2_grpc.IndexerStreamStub(channel)
@@ -38,4 +42,9 @@ with grpc.insecure_channel(config["indexer-endpoint"], options=options) as chann
                 raise Exception("Transaction version mismatch. Expected transaction version is: " + str(current_transaction_version) + ", but received transaction version is: " + str(transaction_version))
 
             current_transaction_version += 1
-            parsed_transaction = parse(transaction)
+            parsed_objs = parse(transaction)
+
+            if parsed_objs is not None:
+                # Insert objects into database
+                with Session(engine) as session, session.begin():
+                    session.add_all(parsed_objs)
