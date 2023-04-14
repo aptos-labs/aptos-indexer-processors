@@ -1,4 +1,3 @@
-import base64
 from grpc_parser import parse
 from aptos.datastream.v1 import datastream_pb2_grpc
 
@@ -13,6 +12,8 @@ from google.auth.transport import requests as google_auth_transport_requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import base64
+import datetime
 import yaml
 
 with open('../config.yaml', 'r') as file:
@@ -50,3 +51,9 @@ with grpc.insecure_channel(config["indexer-endpoint"], options=options) as chann
                 # Insert objects into database
                 with Session(engine) as session, session.begin():
                     session.add_all(parsed_objs)
+
+            # Keep track of last successfully processed transaction version
+            cursor_file = open(config["cursor-filename"], 'w+')
+            cursor_file.write("last_success_transaction_version=" + str(current_transaction_version) + "\n")
+            cursor_file.write("last_updated=" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))
+            cursor_file.close()                

@@ -3,3 +3,4 @@ indexer-endpoint: "34.30.218.153:50051"
 x-aptos-data-authorization: "YOUR_TOKEN"
 starting-version: 10000
 tablename: "YOUR_TABLENAME"
+cursor-filename: "cursor.txt"
