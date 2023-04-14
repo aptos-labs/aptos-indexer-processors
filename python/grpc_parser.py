@@ -8,7 +8,7 @@ def parse(transaction: transaction_pb2.Transaction):
     # Here we filter out all transactions that are not of type TRANSACTION_TYPE_USER
     if transaction.type != transaction_pb2.Transaction.TRANSACTION_TYPE_USER:
         return
-    
+        
     # Parse Transaction struct
     transaction_version = transaction.version
     transaction_block_height = transaction.block_height
@@ -20,21 +20,21 @@ def parse(transaction: transaction_pb2.Transaction):
     for event_index, event in enumerate(user_transaction.events):
         creation_number = event.key.creation_number
         sequence_number = event.sequence_number
-        account_address = event.key.account_address
+        account_address = standardize_address(event.key.account_address)
         type = event.type_str
         data = event.data
 
         # Create an instance of Event
         event_db_obj = Event(
-            creation_number, 
-            sequence_number, 
-            account_address, 
-            type, 
-            transaction_version, 
-            transaction_block_height, 
-            data, 
-            inserted_at, 
-            event_index,
+            creation_number=creation_number,
+            sequence_number=sequence_number,
+            account_address=account_address,
+            transaction_version=transaction_version,
+            transaction_block_height=transaction_block_height,
+            type=type,
+            data=data,
+            inserted_at=inserted_at,
+            event_index=event_index,
         )
         event_db_objs.append(event_db_obj)
     
@@ -43,3 +43,6 @@ def parse(transaction: transaction_pb2.Transaction):
 def parse_timestamp(timestamp: timestamp_pb2.Timestamp):
     datetime_obj = datetime.datetime.fromtimestamp(timestamp.seconds + timestamp.nanos * 1e-9)
     return datetime_obj.strftime('%Y-%m-%d %H:%M:%S.%f')
+
+def standardize_address(address: str):
+    return "0x" + address

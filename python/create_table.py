@@ -15,11 +15,11 @@ class Event(Base):
     transaction_version = Column(BigInteger)
     transaction_block_height = Column(BigInteger)
     type = Column(String)
-    data = Column(JSONB)
+    data = Column(String)
     inserted_at = Column(DateTime)
     event_index = Column(BigInteger)
 
-with open('config.yaml', 'r') as file:
+with open('../config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
 engine = create_engine(config['tablename'])
