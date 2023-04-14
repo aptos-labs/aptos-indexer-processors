@@ -1,8 +1,12 @@
 from sqlalchemy import BigInteger, Column, create_engine, DateTime, String
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.dialects.postgresql import JSONB
 
+import argparse
 import yaml
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-c', '--config', help='Path to config file', required=True)
+args = parser.parse_args()
 
 Base = declarative_base()
 
@@ -19,7 +23,7 @@ class Event(Base):
     inserted_at = Column(DateTime)
     event_index = Column(BigInteger)
 
-with open('../config.yaml', 'r') as file:
+with open(args.config, 'r') as file:
     config = yaml.safe_load(file)
 
 engine = create_engine(config['tablename'])

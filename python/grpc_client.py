@@ -5,18 +5,19 @@ import grpc
 from aptos.datastream.v1 import datastream_pb2
 from aptos.transaction.testing1.v1 import transaction_pb2
 
-from google import auth as google_auth
-from google.auth.transport import grpc as google_auth_transport_grpc
-from google.auth.transport import requests as google_auth_transport_requests
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import argparse
 import base64
 import datetime
 import yaml
 
-with open('../config.yaml', 'r') as file:
+parser = argparse.ArgumentParser()
+parser.add_argument('-c', '--config', help='Path to config file', required=True)
+args = parser.parse_args()
+
+with open(args.config, 'r') as file:
     config = yaml.safe_load(file)
 
 metadata = (("x-aptos-data-authorization", config["x-aptos-data-authorization"]),)
