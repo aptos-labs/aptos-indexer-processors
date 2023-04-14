@@ -32,19 +32,34 @@ mainnet: 34.30.218.153:50051
   ```
   python -m pip install grpcio
   python -m pip install grpcio-tools
+
   ```
-2. Download the example
+2. Download the example:
 ```
 # Clone the repository to get the example code:
 $ git clone https://github.com/aptos-labs/aptos-indexer-client-examples
 # Navigate to the python folder
 $ cd aptos-indexer-client-examples/python
 ```
-3. Update `grpc_parser.py`
+In this example, we are creating an event parser.
+3. Create a client.
+   - First you need to create a gRPC client that reads the stream of data.
+   - We've create an example client in `grpc_client.py`. This client
+     - Connects to the gRPC server and reads a stream of transaction data.
+     - Calls the function `parse` to parse the transaction
+     - Validates the chain ID and transaction version.
+4. Create a parser.
    - In `grpc_parser.py`, we have implemented a `parse` function which accepts a `Transaction` as a parameter.
    - The example code shows how to implement custom filtering and parse a `Transaction` and the associated `Event`'s.
-   - Implement the `insert_into_db` function to insert the data into your DB of choice. 
-4. Run `python grpc_client.py` to start indexing! 
+   - The function returns t.
+5. Insert data rows into database.
+   - In the example, we use Postgres for the database and SQLAlchemy as the ORM. To run the example code, install the following:
+     ```
+     python -m pip install psycopg2
+     python -m pip install sqlalchemy
+     ```
+   - In `grpc_client.py`, after the events are parsed, all the event objects are then added to the database.
+6. Run `python grpc_client.py` to start indexing! 
 
 ## Typescript / Node
 ### Prerequisite
