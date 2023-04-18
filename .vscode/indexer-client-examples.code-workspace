@@ -1,0 +1,26 @@
+{
+  "folders": [
+    {
+      "name": "ROOT",
+      "path": "../"
+    },
+    {
+      "name": "typescript",
+      "path": "../typescript"
+    },
+    {
+      "name": "python",
+      "path": "../python"
+    }
+  ],
+  "settings": {
+    "python.formatting.provider": "black",
+    "typescript.preferences.importModuleSpecifierEnding": "js",
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
+  },
+  "extensions": {
+    "recommendations": ["ms-python.python", "esbenp.prettier-vscode"]
+  }
+}

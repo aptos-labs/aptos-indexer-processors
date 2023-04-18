@@ -1,0 +1,19 @@
+version: '3'
+services:
+  index-processor:
+    build: .
+    environment:
+      DB_CONNECTION_URI: postgresql://postgres:postgres@db:5432/postgres
+    depends_on:
+      - db
+    volumes:
+      - ../config.yaml:/app/config/config.yaml
+  db:
+    image: postgres:15.2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:

@@ -2,16 +2,20 @@ from sqlalchemy import BigInteger, Column, create_engine, DateTime, String
 from sqlalchemy.orm import declarative_base
 
 import argparse
-import yaml
+
+from config import Config
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', help='Path to config file', required=True)
+parser.add_argument("-c", "--config", help="Path to config file", required=True)
 args = parser.parse_args()
+
+config = Config.from_yaml_file(args.config)
 
 Base = declarative_base()
 
+
 class Event(Base):
-    __tablename__ = 'events'
+    __tablename__ = "events"
 
     sequence_number = Column(BigInteger, primary_key=True)
     creation_number = Column(BigInteger, primary_key=True)
@@ -23,8 +27,6 @@ class Event(Base):
     inserted_at = Column(DateTime)
     event_index = Column(BigInteger)
 
-with open(args.config, 'r') as file:
-    config = yaml.safe_load(file)
 
-engine = create_engine(config['tablename'])
+engine = create_engine(config.db_connection_uri)
 Base.metadata.create_all(engine)
