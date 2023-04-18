@@ -28,5 +28,13 @@ class Event(Base):
     event_index = Column(BigInteger)
 
 
+class LatestProcessedVersion(Base):
+    __tablename__ = "latest_processed_versions"
+
+    indexer_name = Column(String, primary_key=True)
+    latest_processed_version = Column(BigInteger)
+    updated_at = Column(DateTime)
+
+
 engine = create_engine(config.db_connection_uri)
 Base.metadata.create_all(engine)

@@ -3,4 +3,4 @@ indexer_endpoint: "34.30.218.153:50051"
 indexer_api_key: "<INDEXER_API_KEY>"
 starting_version: 10000
 db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"
-cursor_filename: "cursor.txt"
+indexer_name: "<your_indexer_name>"
