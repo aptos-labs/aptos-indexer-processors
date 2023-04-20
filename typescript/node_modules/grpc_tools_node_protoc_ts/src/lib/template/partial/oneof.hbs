@@ -1,0 +1,7 @@
+
+{{{indent}}}export enum {{{oneofName}}}Case {
+{{{indent}}}    {{{oneofNameUpper}}}_NOT_SET = 0,
+{{#each fields ~}}
+{{{../indent}}}    {{{@key}}} = {{{this}}},
+{{/each ~}}
+{{{indent}}}{{curlyRight}}

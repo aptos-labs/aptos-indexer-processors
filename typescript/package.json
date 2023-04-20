@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "@grpc/grpc-js": "^1.8.14",
+    "@types/argparse": "^2.0.10",
+    "@types/google-protobuf": "^3.15.6",
+    "@types/js-yaml": "^4.0.5",
+    "@types/node": "^18.15.11",
+    "argparse": "^2.0.1",
+    "google-protobuf": "^3.21.2",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "grpc_tools_node_protoc_ts": "^5.3.3",
+    "grpc-tools": "^1.12.4"
+  }
+}
