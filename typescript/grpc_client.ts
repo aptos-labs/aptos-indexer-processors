@@ -30,7 +30,7 @@ const metadata = new grpc.Metadata();
 metadata.set("x-aptos-data-authorization", config.indexer_api_key);
 
 // Create and start the streaming RPC
-const currentTransactionVersion = config.starting_version;
+let currentTransactionVersion = config.starting_version;
 const stream = client.rawDatastream(request, metadata);
 stream.on(
   "data",
@@ -74,6 +74,8 @@ stream.on(
       }
 
       parse(transaction);
+
+      currentTransactionVersion += 1;
     }
   }
 );
