@@ -7,7 +7,10 @@
     "@types/node": "^18.15.11",
     "argparse": "^2.0.1",
     "google-protobuf": "^3.21.2",
+<<<<<<< HEAD
     "js-base64": "^3.7.5",
+=======
+>>>>>>> f85003c (Boilerplate ts client)
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
