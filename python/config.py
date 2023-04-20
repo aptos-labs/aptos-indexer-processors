@@ -9,7 +9,6 @@ class Config(BaseSettings):
     indexer_api_key: str
     starting_version: int
     db_connection_uri: str
-    indexer_name: str
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings

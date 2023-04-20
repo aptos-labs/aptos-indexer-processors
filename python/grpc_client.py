@@ -1,6 +1,6 @@
 from config import Config
 from create_table import LatestProcessedVersion
-from grpc_parser import parse
+from grpc_parser import INDEXER_NAME, parse
 from aptos.datastream.v1 import datastream_pb2_grpc
 
 import grpc
@@ -14,6 +14,7 @@ import argparse
 import base64
 import datetime
 import json
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)
@@ -70,11 +71,8 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
                 # Update latest processed version
                 session.merge(
                     LatestProcessedVersion(
-                        indexer_name=config.indexer_name,
+                        indexer_name=INDEXER_NAME,
                         latest_processed_version=current_transaction_version,
-                        updated_at=datetime.datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S.%f"
-                        ),
                     )
                 )
 

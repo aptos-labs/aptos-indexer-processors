@@ -3,6 +3,9 @@ from aptos.transaction.testing1.v1 import transaction_pb2
 from create_table import Event
 import datetime
 
+# INDEXER_NAME is used to track the latest processed version
+INDEXER_NAME = "python_example_indexer"
+
 
 def parse(transaction: transaction_pb2.Transaction):
     # Custom filtering
