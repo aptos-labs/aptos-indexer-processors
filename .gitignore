@@ -10,3 +10,4 @@ __pycache__.DS_Store
 __pycache__
 config.yaml
 cursor.txt
+node_modules
