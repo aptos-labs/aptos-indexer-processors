@@ -1,8 +1,10 @@
 import { ArgumentParser } from "argparse";
+import {parse} from "./grpc_parser";
+import * as services from "./aptos/indexer/v1/raw_data_grpc_pb";
+import * as indexerRawDataMessages from "./aptos/indexer/v1/raw_data_pb";
+import * as transactionMessages from "./aptos/transaction/testing1/v1/transaction_pb";
 import { Config } from "./config";
-import * as messages from "./aptos/datastream/v1/datastream_pb";
 import * as grpc from "@grpc/grpc-js";
-import * as services from "./aptos/datastream/v1/datastream_grpc_pb";
 
 // Parse the config file
 const parser = new ArgumentParser({
@@ -16,7 +18,7 @@ const args = parser.parse_args();
 const config = Config.from_yaml_file(args.config);
 
 // Create client and request
-const client = new services.IndexerStreamClient(
+const client = new services.RawDataClient(
   config.indexer_endpoint,
   grpc.credentials.createInsecure(),
   {
@@ -25,23 +27,24 @@ const client = new services.IndexerStreamClient(
   }
 );
 
-const request = new messages.RawDatastreamRequest();
+const request = new indexerRawDataMessages.GetTransactionsRequest();
 request.setStartingVersion(config.starting_version);
 const metadata = new grpc.Metadata();
 metadata.set("x-aptos-data-authorization", config.indexer_api_key);
 
 // Create and start the streaming RPC
-const stream = client.rawDatastream(request, metadata);
+let currentTransactionVersion = config.starting_version;
+const stream = client.getTransactions(request, metadata);
 
 let start = performance.now();
 let total = 0;
 let count = 0;
 stream.on(
   "data",
-  function (response: datastreamMessages.RawDatastreamResponse) {
-    const transactionsOutput = response.getData();
+  function (response: indexerRawDataMessages.TransactionsResponse) {
+    const transactionsList = response.getTransactionsList();
 
-    if (transactionsOutput == null) {
+    if (transactionsList == null) {
       return;
     }
 
@@ -61,22 +64,11 @@ stream.on(
       );
     }
 
-    if (transactionsOutput == null) {
+    if (transactionsList == null) {
       return;
     }
 
-    for (const transactionOutput of transactionsOutput.getTransactionsList()) {
-      // Decode transaction object
-      const serializedTransactionString = Base64.decode(
-        transactionOutput.getEncodedProtoData_asB64()
-      );
-      const serializedTransactionBytes = Base64.toUint8Array(
-        serializedTransactionString
-      );
-      const transaction = transactionMessages.Transaction.deserializeBinary(
-        serializedTransactionBytes
-      );
-
+    for (const transaction of transactionsList) {
       // Validate transaction version is correct
       if (transaction.getVersion() != currentTransactionVersion) {
         throw new Error(
