@@ -62,13 +62,13 @@ export function parse(transaction: Transaction): void {
       case WriteSetChange.Type.TYPE_UNSPECIFIED:
         return;
     }
-    console.log(
-      transactionVersion,
-      transactionBlockHeight,
-      type,
-      address,
-      stateKeyHash,
-      index
-    );
+    // console.log(
+    //   transactionVersion,
+    //   transactionBlockHeight,
+    //   type,
+    //   address,
+    //   stateKeyHash,
+    //   index
+    // );
   });
 }
