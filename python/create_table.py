@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, create_engine, DateTime, String
+from sqlalchemy import BigInteger, Column, create_engine, DateTime, func, String
 from sqlalchemy.orm import declarative_base
 
 import argparse
@@ -24,8 +24,20 @@ class Event(Base):
     transaction_block_height = Column(BigInteger)
     type = Column(String)
     data = Column(String)
-    inserted_at = Column(DateTime)
+    inserted_at = Column(DateTime(timezone=True))
     event_index = Column(BigInteger)
+
+
+class LatestProcessedVersion(Base):
+    __tablename__ = "latest_processed_versions"
+
+    indexer_name = Column(String, primary_key=True)
+    latest_processed_version = Column(BigInteger)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 engine = create_engine(config.db_connection_uri)
