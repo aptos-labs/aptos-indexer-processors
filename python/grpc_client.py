@@ -23,16 +23,17 @@ config = Config.from_yaml_file(args.config)
 metadata = (("x-aptos-data-authorization", config.indexer_api_key),)
 options = [("grpc.max_receive_message_length", -1)]
 engine = create_engine(config.db_connection_uri)
-starting_version = config.starting_version
 
-# Use latest processed version from db if it's larger than config's starting version
-with Session(engine) as session, session.begin():
-    latest_processed_version_from_db = session.get(LatestProcessedVersion, INDEXER_NAME)
-    if latest_processed_version_from_db != None:
-        starting_version = max(
-            starting_version,
-            latest_processed_version_from_db.latest_processed_version,
-        )
+starting_version = 0
+if config.starting_version != None:
+    # Start from config's starting version if set
+    starting_version = config.starting_version
+else:
+    # Start from latest processed version in db
+    with Session(engine) as session, session.begin():
+        latest_processed_version_from_db = session.get(LatestProcessedVersion, INDEXER_NAME)
+        if latest_processed_version_from_db != None:
+            starting_version = latest_processed_version_from_db.latest_processed_version
 
 
 # Connect to grpc

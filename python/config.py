@@ -1,5 +1,5 @@
 import yaml
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
 from pydantic.env_settings import SettingsSourceCallable
 
 
@@ -7,7 +7,7 @@ class Config(BaseSettings):
     chain_id: int
     indexer_endpoint: str
     indexer_api_key: str
-    starting_version: int
+    starting_version: int = None
     db_connection_uri: str
 
     class Config:
@@ -26,4 +26,5 @@ class Config(BaseSettings):
     def from_yaml_file(cls, path: str):
         with open(path, "r") as file:
             config = yaml.safe_load(file)
+
         return cls(**config)
