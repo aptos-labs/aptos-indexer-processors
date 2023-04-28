@@ -1,5 +1,6 @@
 from config import Config
-from grpc_parser import parse
+from create_table import LatestProcessedVersion
+from grpc_parser import INDEXER_NAME, parse
 from aptos.datastream.v1 import datastream_pb2_grpc
 
 import grpc
@@ -13,6 +14,7 @@ import argparse
 import base64
 import datetime
 import json
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)
@@ -59,13 +61,20 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
                     + str(transaction_version)
                 )
 
-            current_transaction_version += 1
             parsed_objs = parse(transaction)
 
-            if parsed_objs is not None:
-                # Insert objects into database
-                with Session(engine) as session, session.begin():
+            with Session(engine) as session, session.begin():
+                # Insert Events into database
+                if parsed_objs is not None:
                     session.add_all(parsed_objs)
+
+                # Update latest processed version
+                session.merge(
+                    LatestProcessedVersion(
+                        indexer_name=INDEXER_NAME,
+                        latest_processed_version=current_transaction_version,
+                    )
+                )
 
             if (current_transaction_version % 1000) == 0:
                 print(
@@ -76,15 +85,5 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
                         }
                     )
                 )
-            # Keep track of last successfully processed transaction version
-            cursor_file = open(config.cursor_filename, "w+")
-            cursor_file.write(
-                "last_success_transaction_version="
-                + str(current_transaction_version)
-                + "\n"
-            )
-            cursor_file.write(
-                "last_updated="
-                + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-            )
-            cursor_file.close()
+
+            current_transaction_version += 1
