@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 
 import argparse
 import base64
-import datetime
 import json
 
 
@@ -24,13 +23,25 @@ config = Config.from_yaml_file(args.config)
 metadata = (("x-aptos-data-authorization", config.indexer_api_key),)
 options = [("grpc.max_receive_message_length", -1)]
 engine = create_engine(config.db_connection_uri)
+starting_version = config.starting_version
 
+# Use latest processed version from db if it's larger than config's starting version
+with Session(engine) as session, session.begin():
+    latest_processed_version_from_db = session.get(LatestProcessedVersion, INDEXER_NAME)
+    if latest_processed_version_from_db != None:
+        starting_version = max(
+            starting_version,
+            latest_processed_version_from_db.latest_processed_version,
+        )
+
+
+# Connect to grpc
 with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
     stub = datastream_pb2_grpc.IndexerStreamStub(channel)
-    current_transaction_version = config.starting_version
+    current_transaction_version = starting_version
 
     for response in stub.RawDatastream(
-        datastream_pb2.RawDatastreamRequest(starting_version=config.starting_version),
+        datastream_pb2.RawDatastreamRequest(starting_version=starting_version),
         metadata=metadata,
     ):
         chain_id = response.chain_id

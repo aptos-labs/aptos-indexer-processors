@@ -1,0 +1,5 @@
+chain_id: 1
+indexer_endpoint: "34.30.218.153:50051"
+indexer_api_key: "***REMOVED***"
+starting_version: 10000
+db_connection_uri: "postgresql://postgres:postgres@localhost:5432/example"

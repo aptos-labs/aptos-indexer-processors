@@ -7,7 +7,7 @@ services:
     depends_on:
       - db
     volumes:
-      - ../config.yaml:/app/config/config.yaml
+      - ./config.yaml:/app/config/config.yaml
   db:
     image: postgres:15.2
     environment:
