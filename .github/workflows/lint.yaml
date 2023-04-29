@@ -1,0 +1,30 @@
+name: "Lint"
+on:
+  # Allow us to run this specific workflow without a PR
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# cancel redundant builds
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4 
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.4.2
+      - run: poetry install
+      - run: poetry run poe lint
