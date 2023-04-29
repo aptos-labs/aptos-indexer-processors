@@ -35,12 +35,17 @@ else:
         if latest_processed_version_from_db != None:
             starting_version = latest_processed_version_from_db.latest_processed_version
 
-print("[Info] Ready to connect to the indexer grpc, starting_version: {}".format(starting_version))
+print(json.dumps(
+    {
+        "message" : "Connected to the indexer grpc",
+        "starting_version": starting_version
+    })
+)
 # Connect to grpc
 with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
     stub = raw_data_pb2_grpc.RawDataStub(channel)
     current_transaction_version = starting_version
-
+    
     for response in stub.GetTransactions(
         raw_data_pb2.GetTransactionsRequest(starting_version=starting_version),
         metadata=metadata,
@@ -54,7 +59,14 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
                 + ", but received chain ID is: "
                 + str(chain_id)
             )
-        print("[info] Response received: current starting version in this response {}".format(response.transactions[0].version))
+        print(
+            json.dumps(
+                {
+                    "message": "Response received",
+                    "starting_version": response.transactions[0].version,
+                }
+            )
+        )
         transactions_output = response
         for transaction in transactions_output.transactions:
             transaction_version = transaction.version
