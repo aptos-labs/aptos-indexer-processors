@@ -10,7 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import argparse
-import base64
 import json
 
 

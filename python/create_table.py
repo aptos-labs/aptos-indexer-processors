@@ -1,10 +1,13 @@
-from sqlalchemy import BigInteger, Column, create_engine, DateTime, func, String
+from sqlalchemy import BigInteger, create_engine, DateTime, func, String
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from datetime import datetime
-
 import argparse
-
 from config import Config
+
+
+class Base(DeclarativeBase):
+    pass
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)
@@ -13,7 +16,7 @@ args = parser.parse_args()
 config = Config.from_yaml_file(args.config)
 
 
-class Event(DeclarativeBase):
+class Event(Base):
     __tablename__ = "events"
 
     sequence_number: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -27,7 +30,7 @@ class Event(DeclarativeBase):
     event_index: Mapped[int] = mapped_column(BigInteger)
 
 
-class LatestProcessedVersion(DeclarativeBase):
+class LatestProcessedVersion(Base):
     __tablename__ = "latest_processed_versions"
 
     indexer_name: Mapped[str] = mapped_column(primary_key=True)
@@ -40,4 +43,4 @@ class LatestProcessedVersion(DeclarativeBase):
 
 
 engine = create_engine(config.db_connection_uri)
-DeclarativeBase.metadata.create_all(engine)
+Base.metadata.create_all(engine)
