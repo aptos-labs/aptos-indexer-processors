@@ -5,7 +5,6 @@ from aptos.indexer.v1 import raw_data_pb2_grpc
 
 import grpc
 from aptos.indexer.v1 import raw_data_pb2
-from aptos.transaction.testing1.v1 import transaction_pb2
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -37,17 +36,19 @@ else:
         if latest_processed_version_from_db != None:
             starting_version = latest_processed_version_from_db.latest_processed_version
 
-print(json.dumps(
-    {
-        "message" : "Connected to the indexer grpc",
-        "starting_version": starting_version
-    })
+print(
+    json.dumps(
+        {
+            "message": "Connected to the indexer grpc",
+            "starting_version": starting_version,
+        }
+    )
 )
 # Connect to grpc
 with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
     stub = raw_data_pb2_grpc.RawDataStub(channel)
     current_transaction_version = starting_version
-    
+
     for response in stub.GetTransactions(
         raw_data_pb2.GetTransactionsRequest(starting_version=starting_version),
         metadata=metadata,
