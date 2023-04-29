@@ -1,10 +1,10 @@
 from config import Config
 from create_table import LatestProcessedVersion
 from grpc_parser import INDEXER_NAME, parse
-from aptos.datastream.v1 import datastream_pb2_grpc
+from aptos.indexer.v1 import raw_data_pb2_grpc
 
 import grpc
-from aptos.datastream.v1 import datastream_pb2
+from aptos.indexer.v1 import raw_data_pb2
 from aptos.transaction.testing1.v1 import transaction_pb2
 
 from sqlalchemy import create_engine
@@ -35,14 +35,14 @@ else:
         if latest_processed_version_from_db != None:
             starting_version = latest_processed_version_from_db.latest_processed_version
 
-
+print("[Info] Ready to connect to the indexer grpc, starting_version: {}".format(starting_version))
 # Connect to grpc
 with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
-    stub = datastream_pb2_grpc.IndexerStreamStub(channel)
+    stub = raw_data_pb2_grpc.RawDataStub(channel)
     current_transaction_version = starting_version
 
-    for response in stub.RawDatastream(
-        datastream_pb2.RawDatastreamRequest(starting_version=starting_version),
+    for response in stub.GetTransactions(
+        raw_data_pb2.GetTransactionsRequest(starting_version=starting_version),
         metadata=metadata,
     ):
         chain_id = response.chain_id
@@ -54,16 +54,9 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
                 + ", but received chain ID is: "
                 + str(chain_id)
             )
-
-        transactions_output = response.data
-        for transaction_output in transactions_output.transactions:
-            # Decode transaction data
-            decoded_transaction = base64.b64decode(
-                transaction_output.encoded_proto_data
-            )
-            transaction = transaction_pb2.Transaction()
-            transaction.ParseFromString(decoded_transaction)
-
+        print("[info] Response received: current starting version in this response {}".format(response.transactions[0].version))
+        transactions_output = response
+        for transaction in transactions_output.transactions:
             transaction_version = transaction.version
             if transaction_version != current_transaction_version:
                 raise Exception(
