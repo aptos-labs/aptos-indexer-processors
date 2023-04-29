@@ -1,5 +1,6 @@
 from sqlalchemy import BigInteger, Column, create_engine, DateTime, func, String
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
+from datetime import datetime
 
 import argparse
 
@@ -11,29 +12,27 @@ args = parser.parse_args()
 
 config = Config.from_yaml_file(args.config)
 
-Base = declarative_base()
 
-
-class Event(Base):
+class Event(DeclarativeBase):
     __tablename__ = "events"
 
-    sequence_number = Column(BigInteger, primary_key=True)
-    creation_number = Column(BigInteger, primary_key=True)
-    account_address = Column(String, primary_key=True)
-    transaction_version = Column(BigInteger)
-    transaction_block_height = Column(BigInteger)
-    type = Column(String)
-    data = Column(String)
-    inserted_at = Column(DateTime(timezone=True))
-    event_index = Column(BigInteger)
+    sequence_number: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    creation_number: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    account_address: Mapped[str] = mapped_column(String, primary_key=True)
+    transaction_version: Mapped[int] = mapped_column(BigInteger)
+    transaction_block_height: Mapped[int] = mapped_column(BigInteger)
+    type: Mapped[str]
+    data: Mapped[str]
+    inserted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    event_index: Mapped[int] = mapped_column(BigInteger)
 
 
-class LatestProcessedVersion(Base):
+class LatestProcessedVersion(DeclarativeBase):
     __tablename__ = "latest_processed_versions"
 
-    indexer_name = Column(String, primary_key=True)
-    latest_processed_version = Column(BigInteger)
-    updated_at = Column(
+    indexer_name: Mapped[str] = mapped_column(primary_key=True)
+    latest_processed_version: Mapped[int] = mapped_column(BigInteger)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),
         onupdate=func.now(),
@@ -41,4 +40,4 @@ class LatestProcessedVersion(Base):
 
 
 engine = create_engine(config.db_connection_uri)
-Base.metadata.create_all(engine)
+DeclarativeBase.metadata.create_all(engine)
