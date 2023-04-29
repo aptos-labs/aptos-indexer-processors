@@ -15,4 +15,4 @@ RUN poetry config virtualenvs.create false \
 COPY *.py /app/
 COPY /aptos /app/aptos
 
-CMD ["poetry", "run", "python", "grpc_client.py", "--config", "/app/config/config.yaml"]
+CMD ["poetry", "run", "python", "processor.py", "--config", "/app/config/config.yaml"]

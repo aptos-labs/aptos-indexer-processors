@@ -7,7 +7,7 @@ class Config(BaseSettings):
     chain_id: int
     indexer_endpoint: str
     indexer_api_key: str
-    starting_version: int = None
+    starting_version: int | None = None
     db_connection_uri: str
 
     class Config:

@@ -1,6 +1,6 @@
 from config import Config
 from create_table import LatestProcessedVersion
-from grpc_parser import INDEXER_NAME, parse
+from event_parser import INDEXER_NAME, parse
 from aptos.indexer.v1 import raw_data_pb2_grpc
 
 import grpc
@@ -31,7 +31,9 @@ if config.starting_version != None:
 else:
     # Start from latest processed version in db
     with Session(engine) as session, session.begin():
-        latest_processed_version_from_db = session.get(LatestProcessedVersion, INDEXER_NAME)
+        latest_processed_version_from_db = session.get(
+            LatestProcessedVersion, INDEXER_NAME
+        )
         if latest_processed_version_from_db != None:
             starting_version = latest_processed_version_from_db.latest_processed_version
 
