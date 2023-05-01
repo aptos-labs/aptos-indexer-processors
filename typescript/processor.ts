@@ -1,5 +1,5 @@
 import { ArgumentParser } from "argparse";
-import {parse} from "./grpc_parser";
+import { parse } from "./grpc_parser";
 import * as services from "./aptos/indexer/v1/raw_data_grpc_pb";
 import * as indexerRawDataMessages from "./aptos/indexer/v1/raw_data_pb";
 import * as transactionMessages from "./aptos/transaction/testing1/v1/transaction_pb";
@@ -36,9 +36,6 @@ metadata.set("x-aptos-data-authorization", config.indexer_api_key);
 let currentTransactionVersion = config.starting_version;
 const stream = client.getTransactions(request, metadata);
 
-let start = performance.now();
-let total = 0;
-let count = 0;
 stream.on(
   "data",
   function (response: indexerRawDataMessages.TransactionsResponse) {
@@ -47,12 +44,6 @@ stream.on(
     if (transactionsList == null) {
       return;
     }
-
-    console.log("transaction version", currentTransactionVersion);
-    const time = performance.now();
-    const diff = time - start;
-    total += diff;
-    count += 1;
 
     // Validate response chain ID matches expected chain ID
     if (response.getChainId() != config.chain_id) {
@@ -81,10 +72,15 @@ stream.on(
 
       parse(transaction);
 
+      if (currentTransactionVersion % 1000 == 0) {
+        console.log({
+          message: "Successfully processed transaction",
+          last_success_transaction_version: currentTransactionVersion,
+        });
+      }
+
       currentTransactionVersion += 1;
     }
-
-    start = performance.now();
   }
 );
 
@@ -93,9 +89,4 @@ stream.on("error", function (e) {
 });
 stream.on("status", function (status) {
   // process status
-});
-
-process.on("SIGINT", function () {
-  console.log("Average time:", total / count);
-  process.exit();
 });
