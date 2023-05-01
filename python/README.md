@@ -1,20 +1,58 @@
-### run locally
+## Python Quickstart
+### Prerequisite
+- Python 3.7 or higher
+- `pip` version 9.0.1 or higher
+### Tutorial
+1. Install the latest version of gRPC and tooling for Python:
+  ```
+  python -m pip install grpcio
+  python -m pip install grpcio-tools
 
-```bash
-docker compose up --build --force-recreate
+  ```
+2. Download the example:
 ```
+# Clone the repository to get the example code:
+$ git clone https://github.com/aptos-labs/aptos-indexer-client-examples
+# Navigate to the python folder
+$ cd aptos-indexer-client-examples/python
+```
+In this example, we are creating an event parser.
+3. Create a processer.
+   - First you need to create an indexer processor that reads the stream of data.
+   - We've create an example client in `processor.py`. This client
+     - Connects to the gRPC server and reads a stream of transaction data.
+     - Calls the function `parse` to parse the transaction
+     - Validates the chain ID and transaction version.
+4. Create a parser.
+   - In `grpc_parser.py`, we have implemented a `parse` function which accepts a `Transaction` as a parameter.
+   - The example code shows how to implement custom filtering and parse a `Transaction` and the associated `Event`'s.
+   - The function returns t.
+5. Insert data rows into database.
+   - In the example, we use Postgres for the database and SQLAlchemy as the ORM. To run the example code, install the following:
+     ```
+     python -m pip install psycopg2
+     python -m pip install sqlalchemy
+     ```
+   - In `grpc_client.py`, after the events are parsed, all the event objects are then added to the database.
+6. Run `python grpc_client.py` to start indexing! 
 
 ## Development
 
-### Install
+### Install all dependencies
 
 ```bash
 poetry install
 ```
 
-### linting and autoformatting
+### Linting & autoformatting
 
 ```bash
 poetry run poe pyright # typecheck
 poetry run poe format # autoformat via black
+```
+
+### Run locally in Docker
+
+```bash
+docker compose up --build --force-recreate
 ```
