@@ -30,11 +30,11 @@ class Event(Base):
     event_index: Mapped[int] = mapped_column(BigInteger)
 
 
-class LatestProcessedVersion(Base):
-    __tablename__ = "latest_processed_versions"
+class NextVersionToProcess(Base):
+    __tablename__ = "next_versions_to_process"
 
     indexer_name: Mapped[str] = mapped_column(primary_key=True)
-    latest_processed_version: Mapped[int] = mapped_column(BigInteger)
+    next_version: Mapped[int] = mapped_column(BigInteger)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),

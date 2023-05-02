@@ -1,5 +1,5 @@
 from config import Config
-from create_table import LatestProcessedVersion
+from create_table import NextVersionToProcess
 from event_parser import INDEXER_NAME, parse
 from aptos.indexer.v1 import raw_data_pb2_grpc
 
@@ -27,13 +27,13 @@ if config.starting_version != None:
     # Start from config's starting version if set
     starting_version = config.starting_version
 else:
-    # Start from latest processed version in db
+    # Start from next version to process in db
     with Session(engine) as session, session.begin():
-        latest_processed_version_from_db = session.get(
-            LatestProcessedVersion, INDEXER_NAME
+        next_version_to_process_from_db = session.get(
+            NextVersionToProcess, INDEXER_NAME
         )
-        if latest_processed_version_from_db != None:
-            starting_version = latest_processed_version_from_db.latest_processed_version
+        if next_version_to_process_from_db != None:
+            starting_version = next_version_to_process_from_db.next_version
 
 print(
     json.dumps(
@@ -89,9 +89,9 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
 
                 # Update latest processed version
                 session.merge(
-                    LatestProcessedVersion(
+                    NextVersionToProcess(
                         indexer_name=INDEXER_NAME,
-                        latest_processed_version=current_transaction_version,
+                        next_version=current_transaction_version + 1,
                     )
                 )
 
