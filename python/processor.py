@@ -18,7 +18,10 @@ parser.add_argument("-c", "--config", help="Path to config file", required=True)
 args = parser.parse_args()
 config = Config.from_yaml_file(args.config)
 
-metadata = (("x-aptos-data-authorization", config.indexer_api_key),)
+metadata = (
+    ("x-aptos-data-authorization", config.indexer_api_key),
+    ("x-aptos-request-name", "python-custome-parser"),
+)
 options = [("grpc.max_receive_message_length", -1)]
 engine = create_engine(config.db_connection_uri)
 
