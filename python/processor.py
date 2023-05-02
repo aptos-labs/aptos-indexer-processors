@@ -20,7 +20,7 @@ config = Config.from_yaml_file(args.config)
 
 metadata = (
     ("x-aptos-data-authorization", config.indexer_api_key),
-    ("x-aptos-request-name", "python-custome-parser"),
+    ("x-aptos-request-name", INDEXER_NAME),
 )
 options = [("grpc.max_receive_message_length", -1)]
 engine = create_engine(config.db_connection_uri)
