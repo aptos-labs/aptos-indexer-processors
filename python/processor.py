@@ -19,7 +19,7 @@ args = parser.parse_args()
 config = Config.from_yaml_file(args.config)
 
 metadata = (
-    ("x-aptos-data-authorization", config.indexer_api_key),
+    ("x-aptos-data-authorization", config.processor_api_key),
     ("x-aptos-request-name", INDEXER_NAME),
 )
 options = [("grpc.max_receive_message_length", -1)]
@@ -47,7 +47,7 @@ print(
     )
 )
 # Connect to grpc
-with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
+with grpc.insecure_channel(config.processor_endpoint, options=options) as channel:
     stub = raw_data_pb2_grpc.RawDataStub(channel)
     current_transaction_version = starting_version
 
