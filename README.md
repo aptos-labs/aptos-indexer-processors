@@ -13,16 +13,18 @@ mainnet: 34.30.218.153:50051
 ## Request
  - `config.yaml`
    - `chain_id`: ID of the chain used for validation purposes. 
-   - `indexer_endpoint`: You can replace this with the endpoints for devnet, testnet, or previewnet. 
-   - `x-aptos-data-authorization`: Replace `YOUR_TOKEN` with your auth token.
-   - `starting-version`
-     - When making a request to the indexer, setting the transaction version `starting_version` is required. In the example code, we use `starting-version=10000`. You can update this with `starting_version=0` to start from genesis or the next transaction version you want to index. 
-     - If you want to auto restart the client in case of an error, you should cache the latest processed transaction version, and start the next run with the transaction version from cache instead of manually specifying it in `config.yaml`.
+   - `indexer_endpoint`: Replace with the indexer endpoints for mainnet, devnet, testnet, or previewnet. 
+   - `indexer_api_key`: Replace `YOUR_TOKEN` with your auth token.
+   - `db_connection_uri`: The DB connection used to write the processed data 
+   - (optional) `starting-version`
+     - If `starting-version` is set, the processor will begin indexing from transaction version = `starting_version`.
+     - To auto restart the client in case of an error, you can cache the latest processed transaction version. In the example, the processor restarts from cached transaction version that is stored in a table, and if neither `starting_version` nor cached version are set, the processor defaults starting version to 0. 
+
 ## Response
 - The response is a stream of `RawDatastreamResponse` objects.
 - For each supported language, there is an `aptos` folder which contains the auto-generate protobuf files in that language. You can check out the files to see the stream response format and figure out how to parse the response. 
 
-## Typescript / Node
+## [WIP] Typescript / Node 
 ### Prerequisite
 - `node`: This requires Node 0.12.x or greater.
 ### Guide
@@ -32,4 +34,4 @@ mainnet: 34.30.218.153:50051
   npm install -g grpc-tools
   ```
 2. 
-## Rust
+## [WIP] Rust
