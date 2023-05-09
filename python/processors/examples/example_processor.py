@@ -1,6 +1,6 @@
 from config import Config
 from create_table import NextVersionToProcess
-from event_parser import INDEXER_NAME, parse
+from example_event_parser import INDEXER_NAME, parse
 from aptos.indexer.v1 import raw_data_pb2_grpc
 
 import grpc
