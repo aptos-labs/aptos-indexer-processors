@@ -33,9 +33,9 @@ topazMarketplaceEventTypes = set(
 
 
 def parseTopazMarketplaceEvents(
-    tranaction: transaction_pb2.Transaction,
-) -> List[MarketplaceEvent]:
-    topazEvents = getMarketplaceEvents(tranaction, MarketplaceName.TOPAZ)
+    transaction: transaction_pb2.Transaction,
+) -> List[ParsedMarketplaceEvent]:
+    topazEvents = getMarketplaceEvents(transaction, MarketplaceName.TOPAZ)
     parsedEvents = []
 
     for event in topazEvents:
@@ -49,17 +49,10 @@ def parseTopazMarketplaceEvents(
         data = json.loads(event.jsonData)
 
         # Collection, token, and creator parsing
-        collection = (
-            data.get("token_id", []).get("token_data_id", []).get("collection")
-            | data.get("collection_name")
-            | ""
-        )
-        token = data.get("token_id", []).get("token_data_id", []).get("token") | ""
-        creator = (
-            data.get("token_id", []).get("token_data_id", []).get("creator")
-            | data.get("creator")
-            | ""
-        )
+        tokenDataID = data.get("token_id", []).get("token_data_id", [])
+        collection = tokenDataID.get("collection") | data.get("collection_name") | ""
+        token = tokenDataID.get("token") | ""
+        creator = tokenDataID.get("creator") | data.get("creator") | ""
         tokenID = hashlib.sha256((f"{creator}{collection}{token}").encode()).hexdigest()
 
         # Price parsing

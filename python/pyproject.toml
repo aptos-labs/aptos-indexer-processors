@@ -8,8 +8,8 @@ readme = "README.md"
 [tool.poe.tasks]
 lint = ["pyright", "format-check"]
 pyright = "pyright"
-format-check = "black --diff --check --exclude aptos ."
-format = "black --exclude aptos ."
+format-check = "black --diff --check --exclude aptos models/proto_autogen ."
+format = "black --exclude aptos models/proto_autogen ."
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -21,6 +21,8 @@ grpcio-tools = "^1.53.0"
 protobuf = "^4.22.3"
 pydantic = "^1.10.7"
 postgres = "^4.0"
+google-cloud-bigquery-storage = "^2.19.1"
+google-cloud-bigquery = "^3.10.0"
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.53.0"
@@ -33,4 +35,4 @@ requires = ["poetry-core>=1.4.2"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
-exclude = ["aptos"]
+exclude = ["aptos", "models/proto_autogen"]
