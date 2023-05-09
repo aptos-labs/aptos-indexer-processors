@@ -16,4 +16,4 @@ COPY *.py /app/
 COPY /aptos /app/aptos
 COPY /processors/examples/* /app/
 
-CMD ["poetry", "run", "python", "/processors/examples/example_processor.py", "--config", "/app/config/config.yaml"]
+CMD ["poetry", "run", "python", "/processors/examples/processor.py", "--config", "/app/config/config.yaml"]
