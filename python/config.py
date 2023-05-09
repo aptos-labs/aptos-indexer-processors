@@ -5,8 +5,8 @@ from pydantic.env_settings import SettingsSourceCallable
 
 class Config(BaseSettings):
     chain_id: int
-    processor_endpoint: str
-    processor_api_key: str
+    indexer_endpoint: str
+    indexer_api_key: str
     starting_version: int | None = None
     db_connection_uri: str
 
