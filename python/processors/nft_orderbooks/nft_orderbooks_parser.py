@@ -34,6 +34,25 @@ MARKETPLACE_ADDRESS_MATCH_REGEX_STRINGS = {
 
 @dataclass
 class MarketplaceEvent:
+    # transactionVersion: int
+    # eventIndex: int
+    # eventType: str
+    # standardEventType: str
+    # creatorAddress: str
+    # collection: str
+    # tokenName: str
+    # tokenDataID: str
+    # collectionID: str
+    # price: int
+    # amount: int
+    # buyer: str
+    # seller: str
+    # jsonData: str
+    # marketplace: str
+    # contractAddress: str
+    # entryFunctionIDStr: str
+    # transactionTimestamp:
+
     sequenceNumber: int
     creationNumber: int
     accountAddress: str
@@ -118,7 +137,15 @@ def getMarketplaceEvents(
     return marketplaceEvents
 
 
-def parse(transaction: transaction_pb2.Transaction):
+def parse(transaction: transaction_pb2.Transaction) -> List[ParsedMarketplaceEvent]:
+    nftActivities = []
+    nftListings = []
+    currentNFTListings = []
+    nftBids = []
+    currentNFTBids = []
+    nftCollectionBids = []
+    currentNFTCollectionBids = []
+
     parsedMarketplaceEvents = []
     parsedMarketplaceEvents += parseTopazMarketplaceEvents(transaction)
 
