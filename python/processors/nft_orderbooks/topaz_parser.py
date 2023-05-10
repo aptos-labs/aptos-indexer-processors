@@ -1,15 +1,15 @@
 from aptos.transaction.testing1.v1 import transaction_pb2
 import json
-import hashlib
 from typing import List
-from nft_orderbooks_parser import (
-    getMarketplaceEvents,
+from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
+    get_marketplace_events,
     MarketplaceName,
-    MarketplaceEvent,
-    ParsedMarketplaceEvent,
+    StandardMarketplaceEventType,
 )
+from models.proto_autogen import nft_marketplace_activities_pb2
+from utils.token_utils import TokenDataIdType, standardize_address
 
-topazMarketplaceEventTypes = set(
+TOPAZ_MARKETPLACE_EVENT_TYPES = set(
     [
         # these are trade-related events
         # trade-related events are by nature also orderbook-related events
@@ -32,74 +32,92 @@ topazMarketplaceEventTypes = set(
 )
 
 
-def parseTopazMarketplaceEvents(
+def parse_topaz_marketplace_events(
     transaction: transaction_pb2.Transaction,
-) -> List[ParsedMarketplaceEvent]:
-    topazEvents = getMarketplaceEvents(transaction, MarketplaceName.TOPAZ)
-    parsedEvents = []
+) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
+    topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.TOPAZ)
+    nft_activities = []
 
-    for event in topazEvents:
+    for event in topaz_raw_events:
         # Readable transaction event type
-        type2 = event.type.replace(
+        display_event_type = event.event_type.replace(
             "0x2c7bccf7b31baf770fdbcc768d9e9cb3d87805e255355df5db32ac9a669010a2::", ""
         )
-        if type2 not in topazMarketplaceEventTypes:
+        if display_event_type not in TOPAZ_MARKETPLACE_EVENT_TYPES:
             continue
 
-        data = json.loads(event.jsonData)
+        data = json.loads(event.json_data)
+
+        print(data)
 
         # Collection, token, and creator parsing
-        tokenDataID = data.get("token_id", []).get("token_data_id", [])
-        collection = tokenDataID.get("collection") | data.get("collection_name") | ""
-        token = tokenDataID.get("token") | ""
-        creator = tokenDataID.get("creator") | data.get("creator") | ""
-        tokenID = hashlib.sha256((f"{creator}{collection}{token}").encode()).hexdigest()
+        token_data_id_struct = data.get("token_id", {}).get("token_data_id", {})
+        collection = (
+            token_data_id_struct.get("collection", None)
+            or data.get("collection_name", None)
+            or ""
+        )
+        token_name = token_data_id_struct.get("name") or ""
+        creator = token_data_id_struct.get("creator") or data.get("creator") or ""
+
+        token_data_id_type = TokenDataIdType(creator, collection, token_name)
 
         # Price parsing
         price = (
             float(
-                data.get("price") | data.get("min_price") | data.get("coin_amount") | 0
+                data.get("price") or data.get("min_price") or data.get("coin_amount") or 0
             )
             / 10**8
         )
 
         # Amount parsing
-        amount = float(data.get("amount") | data.get("token_amount") | 0)
+        amount = int(data.get("amount") or data.get("token_amount") or 0)
 
         # Buyer and seller parsing
-        buyer = data.get("buyer") | data.get("token_buyer") | ""
-        seller = data.get("seller") | ""
+        buyer = str(data.get("buyer") or data.get("token_buyer") or None)
+        seller = str(data.get("seller") or None)
 
-        # bid_id is a unique identifier assigned by Topaz to each bid on an item. there are no batch bids.
-        bidID = data.get("bid_id", "")
-        if "CollectionBidEvent" in type2:
-            bidID = "topaz_collection_bid_id:" + bidID
-        else:
-            bidID = "topaz_bid_id:" + bidID
-
-        # listing_id is a unique identifier assigned by Topaz to each listing on an item. each distinct listing within a batch listing has it"s own bid_id
-        listingID = "topaz_listing_id:" + data.get("listing_id", "")
-
-        parsedEvents.append(
-            ParsedMarketplaceEvent(
-                jsonData=event.jsonData,
-                marketplace=str(MarketplaceName.TOPAZ),
-                contractAddr=event.contractAddr,
-                func=event.func,
-                transactionVersion=event.transactionVersion,
-                transactionBlockHeight=event.transactionBlockHeight,
-                type2=type2,
-                creator=creator,
-                collection=collection,
-                token=token,
-                tokenID=tokenID,
-                bidID=bidID,
-                listingID=listingID,
-                price=price,
-                amount=amount,
-                buyer=buyer,
-                seller=seller,
-            )
+        activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
+            transaction_version=event.transaction_version,
+            event_index=event.event_index,
+            event_type=display_event_type,
+            standard_event_type=standardize_marketplace_event_type(display_event_type).value,
+            creator_address=standardize_address(creator),
+            collection=token_data_id_type.get_collection_trunc(),
+            token_name=token_data_id_type.get_name_trunc(),
+            token_data_id=token_data_id_type.to_hash(),
+            collection_id=token_data_id_type.get_collection_data_id_hash(),
+            price=price,
+            amount=amount,
+            buyer=standardize_address(buyer),
+            seller=standardize_address(seller),
+            json_data=event.json_data,
+            marketplace=MarketplaceName.TOPAZ.value,
+            contract_address=event.contract_address,
+            entry_function_id_str=event.entry_function_name,
+            transaction_timestamp=event.transaction_timestamp,
         )
 
-    return parsedEvents
+        nft_activities.append(activity)
+
+    return nft_activities
+
+
+def standardize_marketplace_event_type(
+    marketplace_event_type: str,
+) -> StandardMarketplaceEventType:
+    match marketplace_event_type:
+        case "events::BuyEvent":
+            return StandardMarketplaceEventType.LISTING_FILLED
+        case "events::ListEvent":
+            return StandardMarketplaceEventType.LISTING_PLACE
+        case "events::DelistEvent":
+            return StandardMarketplaceEventType.LISTING_CANCEL
+        case "events::SellEvent" | "events::FillCollectionBidEvent":
+            return StandardMarketplaceEventType.BID_FILLED
+        case "events::BidEvent" | "events::CollectionBidEvent":
+            return StandardMarketplaceEventType.BID_PLACE
+        case "events::CancelBidEvent" | "events::CancelCollectionBidEvent":
+            return StandardMarketplaceEventType.BID_CANCEL
+        case _:
+            return StandardMarketplaceEventType.UNKNOWN
