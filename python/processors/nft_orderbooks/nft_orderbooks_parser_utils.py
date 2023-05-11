@@ -1,9 +1,9 @@
 import re
 
 from aptos.transaction.testing1.v1 import transaction_pb2
+from aptos.util.timestamp import timestamp_pb2
 from enum import Enum
 from dataclasses import dataclass
-from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from typing import List
 
 
@@ -23,8 +23,8 @@ class StandardMarketplaceEventType(Enum):
     BID_PLACE = "bid place"
     LISTING_CANCEL = "listing cancel"
     LISTING_CHANGE = "listing change"
-    LISTING_FILLED = "listing_filled"
-    LISTING_PLACE = "listing_place"
+    LISTING_FILLED = "listing filled"
+    LISTING_PLACE = "listing place"
     UNKNOWN = "unknown"
 
 
@@ -47,7 +47,7 @@ class RawMarketplaceEvent:
     json_data: str
     contract_address: str
     entry_function_name: str
-    transaction_timestamp: _timestamp_pb2.Timestamp
+    transaction_timestamp: int
 
 
 def get_marketplace_events(
@@ -58,10 +58,7 @@ def get_marketplace_events(
         return []
 
     transaction_version = transaction.version
-    transaction_timestamp = transaction.timestamp
-    transaction_timestamp_pb = _timestamp_pb2.Timestamp()
-    transaction_timestamp_pb.seconds = transaction_timestamp.seconds
-    transaction_timestamp_pb.nanos = transaction_timestamp.nanos
+    transaction_timestamp = convert_timestamp_to_int64(transaction.timestamp)
 
     user_transaction = transaction.user
     user_transaction_request = user_transaction.request
@@ -99,9 +96,13 @@ def get_marketplace_events(
             json_data=event.data,
             contract_address=contract_addr,
             entry_function_name=entry_function_name,
-            transaction_timestamp=transaction_timestamp_pb,
+            transaction_timestamp=transaction_timestamp,
         )
 
         raw_marketplace_events.append(raw_marketplace_event)
 
     return raw_marketplace_events
+
+
+def convert_timestamp_to_int64(timestamp: timestamp_pb2.Timestamp) -> int:
+    return timestamp.seconds * 1000000 + int(timestamp.nanos / 1000)

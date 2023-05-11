@@ -48,8 +48,6 @@ def parse_topaz_marketplace_events(
 
         data = json.loads(event.json_data)
 
-        print(data)
-
         # Collection, token, and creator parsing
         token_data_id_struct = data.get("token_id", {}).get("token_data_id", {})
         collection = (
@@ -65,7 +63,10 @@ def parse_topaz_marketplace_events(
         # Price parsing
         price = (
             float(
-                data.get("price") or data.get("min_price") or data.get("coin_amount") or 0
+                data.get("price")
+                or data.get("min_price")
+                or data.get("coin_amount")
+                or 0
             )
             / 10**8
         )
@@ -81,7 +82,9 @@ def parse_topaz_marketplace_events(
             transaction_version=event.transaction_version,
             event_index=event.event_index,
             event_type=display_event_type,
-            standard_event_type=standardize_marketplace_event_type(display_event_type).value,
+            standard_event_type=standardize_marketplace_event_type(
+                display_event_type
+            ).value,
             creator_address=standardize_address(creator),
             collection=token_data_id_type.get_collection_trunc(),
             token_name=token_data_id_type.get_name_trunc(),

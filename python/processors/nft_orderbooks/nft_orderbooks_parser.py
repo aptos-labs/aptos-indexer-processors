@@ -10,9 +10,5 @@ def parse(
     transaction: transaction_pb2.Transaction,
 ) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
     nftActivities: List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow] = []
-    nftActivities.extend(parse_topaz_marketplace_events(transaction)) 
-
-    if len(nftActivities) > 0:
-        print(nftActivities)
-
+    nftActivities.extend(parse_topaz_marketplace_events(transaction))
     return nftActivities

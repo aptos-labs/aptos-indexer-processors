@@ -1,11 +1,21 @@
 import yaml
 
 from processors.example_event_processor.models.models import NextVersionToProcess
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 from pydantic.env_settings import SettingsSourceCallable
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+
+class ProcessorConfig(BaseModel):
+    chain_id: int
+    indexer_endpoint: str
+    starting_version: int | None = None
+    db_connection_uri: str = ""
+    project_id: str = ""
+    database: str = ""
+    table_name: str = ""
 
 
 class Config(BaseSettings):
@@ -15,6 +25,7 @@ class Config(BaseSettings):
     db_connection_uri: str
     starting_version_default: Optional[int] = None
     starting_version_override: Optional[int] = None
+    processors: dict[str, ProcessorConfig]
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings
