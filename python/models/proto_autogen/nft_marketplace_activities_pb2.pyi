@@ -5,27 +5,7 @@ from typing import ClassVar as _ClassVar, Optional as _Optional
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class NFTMarketplaceActivityRow(_message.Message):
-    __slots__ = [
-        "_CHANGE_TYPE",
-        "amount",
-        "buyer",
-        "collection",
-        "collection_id",
-        "contract_address",
-        "creator_address",
-        "entry_function_id_str",
-        "event_index",
-        "event_type",
-        "json_data",
-        "marketplace",
-        "price",
-        "seller",
-        "standard_event_type",
-        "token_data_id",
-        "token_name",
-        "transaction_timestamp",
-        "transaction_version",
-    ]
+    __slots__ = ["_CHANGE_TYPE", "amount", "buyer", "collection", "collection_id", "contract_address", "creator_address", "entry_function_id_str", "event_index", "event_type", "json_data", "marketplace", "price", "seller", "standard_event_type", "token_data_id", "token_name", "transaction_timestamp", "transaction_version"]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
     BUYER_FIELD_NUMBER: _ClassVar[int]
     COLLECTION_FIELD_NUMBER: _ClassVar[int]
@@ -64,25 +44,4 @@ class NFTMarketplaceActivityRow(_message.Message):
     token_name: str
     transaction_timestamp: int
     transaction_version: int
-    def __init__(
-        self,
-        transaction_version: _Optional[int] = ...,
-        event_index: _Optional[int] = ...,
-        event_type: _Optional[str] = ...,
-        standard_event_type: _Optional[str] = ...,
-        creator_address: _Optional[str] = ...,
-        collection: _Optional[str] = ...,
-        token_name: _Optional[str] = ...,
-        token_data_id: _Optional[str] = ...,
-        collection_id: _Optional[str] = ...,
-        price: _Optional[float] = ...,
-        amount: _Optional[int] = ...,
-        buyer: _Optional[str] = ...,
-        seller: _Optional[str] = ...,
-        json_data: _Optional[str] = ...,
-        marketplace: _Optional[str] = ...,
-        contract_address: _Optional[str] = ...,
-        entry_function_id_str: _Optional[str] = ...,
-        transaction_timestamp: _Optional[int] = ...,
-        _CHANGE_TYPE: _Optional[str] = ...,
-    ) -> None: ...
+    def __init__(self, transaction_version: _Optional[int] = ..., event_index: _Optional[int] = ..., event_type: _Optional[str] = ..., standard_event_type: _Optional[str] = ..., creator_address: _Optional[str] = ..., collection: _Optional[str] = ..., token_name: _Optional[str] = ..., token_data_id: _Optional[str] = ..., collection_id: _Optional[str] = ..., price: _Optional[float] = ..., amount: _Optional[int] = ..., buyer: _Optional[str] = ..., seller: _Optional[str] = ..., json_data: _Optional[str] = ..., marketplace: _Optional[str] = ..., contract_address: _Optional[str] = ..., entry_function_id_str: _Optional[str] = ..., transaction_timestamp: _Optional[int] = ..., _CHANGE_TYPE: _Optional[str] = ...) -> None: ...
