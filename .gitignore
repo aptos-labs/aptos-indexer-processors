@@ -11,3 +11,5 @@ __pycache__
 config.yaml
 cursor.txt
 node_modules
+build
+venv

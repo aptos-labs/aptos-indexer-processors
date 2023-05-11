@@ -1,0 +1,12 @@
+diff --git a/node_modules/@grpc/grpc-js/build/src/transport.js b/node_modules/@grpc/grpc-js/build/src/transport.js
+index 1d861eb..fae5283 100644
+--- a/node_modules/@grpc/grpc-js/build/src/transport.js
++++ b/node_modules/@grpc/grpc-js/build/src/transport.js
+@@ -505,6 +505,7 @@ class Http2SubchannelConnector {
+             this.session = session;
+             session.unref();
+             session.once('connect', () => {
++                session.setLocalWindowSize(1024*1024);
+                 session.removeAllListeners();
+                 resolve(new Http2Transport(session, address, options));
+                 this.session = null;
