@@ -3,10 +3,9 @@ import { parse } from './grpc_parser';
 import * as services from './aptos/indexer/v1/raw_data_grpc_pb';
 import * as indexerRawDataMessages from './aptos/indexer/v1/raw_data_pb';
 import { Config } from './config';
-import * as grpc from '@grpc/grpc-js';
 import { Timer } from 'timer-node';
 import { exit } from 'process';
-import { ChannelCredentials, CallCredentials } from '@grpc/grpc-js';
+import { ChannelCredentials, CallCredentials, Metadata } from '@grpc/grpc-js';
 
 // A hack to override the http2 settings
 class CustomChannelCred extends ChannelCredentials {
@@ -23,11 +22,11 @@ class CustomChannelCred extends ChannelCredentials {
       settings: {
         // This will increase the http2 frame size. Default is 16384, which is too small.
         maxFrameSize: 4194304,
+        // The initial window size is overridden. We need to patch the grpc-js library to allow this.
         initialWindowSize: 4194304,
         maxHeaderListSize: 8192,
         enablePush: false,
         maxConcurrentStreams: 0,
-        enableConnectProtocol: true,
       },
     };
   }
@@ -49,6 +48,10 @@ parser.add_argument('-c', '--config', {
   help: 'Path to config file',
   required: true,
 });
+parser.add_argument('-p', '--perf', {
+  help: 'Show performance metrics. Takes one value: number of transactions to process e.g. -p 1000',
+  required: false,
+});
 const args = parser.parse_args();
 const config = Config.from_yaml_file(args.config);
 
@@ -67,7 +70,7 @@ const client = new services.RawDataClient(
 
 const request = new indexerRawDataMessages.GetTransactionsRequest();
 request.setStartingVersion(config.starting_version);
-const metadata = new grpc.Metadata();
+const metadata = new Metadata();
 metadata.set('x-aptos-data-authorization', config.indexer_api_key);
 
 // Create and start the streaming RPC
@@ -109,17 +112,20 @@ stream.on(
 
       parse(transaction);
 
-      if (currentTransactionVersion - config.starting_version + 1 >= 25000) {
+      if (currentTransactionVersion % 1000 == 0) {
         console.log({
           message: 'Successfully processed transaction',
           last_success_transaction_version: currentTransactionVersion,
         });
-        // TODO: remove this
+      }
+
+      const totalTransactions =
+        currentTransactionVersion - config.starting_version + 1;
+
+      if (args.perf && totalTransactions >= args.perf) {
         timer.stop();
         console.log(
-          `Time elapsed: ${timer.ms()} ms for ${
-            currentTransactionVersion - config.starting_version + 1
-          } txns`
+          `Takes ${timer.ms()} ms to receive ${totalTransactions} txns`
         );
         exit(0);
       }
