@@ -8,8 +8,8 @@ readme = "README.md"
 [tool.poe.tasks]
 lint = ["pyright", "format-check"]
 pyright = "pyright"
-format-check = "black --diff --check --exclude aptos models/proto_autogen ."
-format = "black --exclude aptos models/proto_autogen ."
+format-check = "black --diff -v --check --exclude aptos|models/proto_autogen ."
+format = "black --exclude aptos|models/proto_autogen ."
 
 [tool.poetry.dependencies]
 python = "^3.11"
