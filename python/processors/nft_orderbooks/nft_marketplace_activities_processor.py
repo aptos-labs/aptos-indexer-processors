@@ -9,7 +9,6 @@ from aptos.indexer.v1 import raw_data_pb2_grpc
 from aptos.indexer.v1 import raw_data_pb2
 from utils.config import Config
 from processors.nft_orderbooks import nft_orderbooks_parser
-from models import nft_marketplace_activities
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)

@@ -64,21 +64,10 @@ def get_marketplace_events(
     user_transaction_request = user_transaction.request
     transaction_payload = user_transaction_request.payload
     entry_function_payload = transaction_payload.entry_function_payload
-    entry_function_id_str = entry_function_payload.entry_function_id_str
-
-    contract_addr_match = re.search("([^:]*)::.*?", entry_function_id_str)
-    if contract_addr_match == None:
-        contract_addr = ""
-    else:
-        contract_addr = contract_addr_match.group(1)
-
-    entry_function_name_match = re.search(
-        "[^:]*?::([^:]*::[^:]*)", entry_function_id_str
-    )
-    if entry_function_name_match == None:
-        entry_function_name = ""
-    else:
-        entry_function_name = entry_function_name_match.group(1)
+    entry_function = entry_function_payload.function
+    module = entry_function.module
+    contract_addr = module.address
+    entry_function_name = f"{module.name}::{entry_function.name}"
 
     raw_marketplace_events = []
     for event_index, event in enumerate(user_transaction.events):
