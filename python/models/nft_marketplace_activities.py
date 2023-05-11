@@ -1,12 +1,7 @@
+import argparse
 from google.cloud.bigquery import Client, SchemaField, Table
-
-project_id = "rtso-playground"
-database = "custom_processor"
-table_name = "nft_marketplace_activities"
-
-stream_id = (
-    f"projects/{project_id}/datasets/{database}/tables/{table_name}/streams/_default"
-)
+from models.nft_marketplace_activities import nft_orderbooks_parser
+from config import Config
 
 schema = [
     SchemaField(name="transaction_version", field_type="INTEGER", mode="REQUIRED"),
@@ -39,7 +34,7 @@ schema = [
 ]
 
 
-def create_table():
+def create_table(project_id: str, database: str, table_name: str):
     client = Client()
     table = Table(
         f"{project_id}.{database}.{table_name}",
@@ -57,15 +52,22 @@ def create_table():
                 event_index) NOT ENFORCED
             ;
 
-
+        ALTER TABLE
+            `{project_id}.{database}.{table_name}`
+        SET
+            OPTIONS( max_staleness = INTERVAL 10 MINUTE );
     """
     query_job = client.query(table_update_query)
     return query_job.result
 
-    # ALTER TABLE
-    #     `{project_id}.{database}.{table_name}`
-    # SET
-    #     OPTIONS( max_staleness = INTERVAL 10 MINUTE );
 
-
-# create_table()
+parser = argparse.ArgumentParser()
+parser.add_argument("-c", "--config", help="Path to config file", required=True)
+args = parser.parse_args()
+config = Config.from_yaml_file(args.config)
+processor_config = config.processors[nft_orderbooks_parser.INDEXER_NAME]
+create_table(
+    project_id=processor_config.project_id,
+    database=processor_config.database,
+    table_name=processor_config.table_name,
+)
