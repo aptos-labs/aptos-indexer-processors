@@ -1,7 +1,5 @@
 syntax = "proto2";
 
-import "google/protobuf/timestamp.proto";
-
 package indexer_models;
 
 message NFTMarketplaceActivityRow {
@@ -22,7 +20,6 @@ message NFTMarketplaceActivityRow {
     optional string marketplace = 15;
     optional string contract_address = 16;
     optional string entry_function_id_str = 17;
-    optional google.protobuf.Timestamp transaction_timestamp = 18;
-    optional int64 inserted_at = 19;
+    optional int64 transaction_timestamp = 18;
     optional string _CHANGE_TYPE = 20;
 }

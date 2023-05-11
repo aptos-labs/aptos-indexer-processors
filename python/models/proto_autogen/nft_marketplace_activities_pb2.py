@@ -6,21 +6,22 @@ from google.protobuf.internal import builder as _builder
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import symbol_database as _symbol_database
+
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n nft_marketplace_activities.proto\x12\x0eindexer_models\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf2\x03\n\x19NFTMarketplaceActivityRow\x12\x1b\n\x13transaction_version\x18\x01 \x01(\x03\x12\x13\n\x0b\x65vent_index\x18\x02 \x01(\x03\x12\x12\n\nevent_type\x18\x03 \x01(\t\x12\x1b\n\x13standard_event_type\x18\x04 \x01(\t\x12\x17\n\x0f\x63reator_address\x18\x05 \x01(\t\x12\x12\n\ncollection\x18\x06 \x01(\t\x12\x12\n\ntoken_name\x18\x07 \x01(\t\x12\x15\n\rtoken_data_id\x18\x08 \x01(\t\x12\x15\n\rcollection_id\x18\t \x01(\t\x12\r\n\x05price\x18\n \x01(\x02\x12\x0e\n\x06\x61mount\x18\x0b \x01(\x03\x12\r\n\x05\x62uyer\x18\x0c \x01(\t\x12\x0e\n\x06seller\x18\r \x01(\t\x12\x11\n\tjson_data\x18\x0e \x01(\t\x12\x13\n\x0bmarketplace\x18\x0f \x01(\t\x12\x18\n\x10\x63ontract_address\x18\x10 \x01(\t\x12\x1d\n\x15\x65ntry_function_id_str\x18\x11 \x01(\t\x12\x39\n\x15transaction_timestamp\x18\x12 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x13\n\x0binserted_at\x18\x13 \x01(\x03\x12\x14\n\x0c_CHANGE_TYPE\x18\x14 \x01(\t')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n nft_marketplace_activities.proto\x12\x0eindexer_models"\xc1\x03\n\x19NFTMarketplaceActivityRow\x12\x1b\n\x13transaction_version\x18\x01 \x01(\x03\x12\x13\n\x0b\x65vent_index\x18\x02 \x01(\x03\x12\x12\n\nevent_type\x18\x03 \x01(\t\x12\x1b\n\x13standard_event_type\x18\x04 \x01(\t\x12\x17\n\x0f\x63reator_address\x18\x05 \x01(\t\x12\x12\n\ncollection\x18\x06 \x01(\t\x12\x12\n\ntoken_name\x18\x07 \x01(\t\x12\x15\n\rtoken_data_id\x18\x08 \x01(\t\x12\x15\n\rcollection_id\x18\t \x01(\t\x12\r\n\x05price\x18\n \x01(\x02\x12\x0e\n\x06\x61mount\x18\x0b \x01(\x03\x12\r\n\x05\x62uyer\x18\x0c \x01(\t\x12\x0e\n\x06seller\x18\r \x01(\t\x12\x11\n\tjson_data\x18\x0e \x01(\t\x12\x13\n\x0bmarketplace\x18\x0f \x01(\t\x12\x18\n\x10\x63ontract_address\x18\x10 \x01(\t\x12\x1d\n\x15\x65ntry_function_id_str\x18\x11 \x01(\t\x12\x1d\n\x15transaction_timestamp\x18\x12 \x01(\x03\x12\x14\n\x0c_CHANGE_TYPE\x18\x14 \x01(\t'
+)
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'nft_marketplace_activities_pb2', globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "nft_marketplace_activities_pb2", globals()
+)
 if _descriptor._USE_C_DESCRIPTORS == False:
-
-  DESCRIPTOR._options = None
-  _NFTMARKETPLACEACTIVITYROW._serialized_start=86
-  _NFTMARKETPLACEACTIVITYROW._serialized_end=584
+    DESCRIPTOR._options = None
+    _NFTMARKETPLACEACTIVITYROW._serialized_start = 53
+    _NFTMARKETPLACEACTIVITYROW._serialized_end = 502
 # @@protoc_insertion_point(module_scope)

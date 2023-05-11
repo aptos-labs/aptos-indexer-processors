@@ -10,6 +10,9 @@ from google.protobuf import descriptor_pb2
 from google.protobuf.descriptor import Descriptor
 
 
+WRITE_ROWS_BATCH_SIZE = 1000
+
+
 class DefaultStreamManager:  # pragma: no cover
     """Manage access to the _default stream write streams."""
 
@@ -103,21 +106,28 @@ class BigqueryWriteManager:
             project_id, dataset_id, table_id
         )
         self.pb2_descriptor = pb2_descriptor
+        self.proto_rows = types.ProtoRows()
 
-    def write_rows(self, pb_rows: Iterable[Any]) -> None:
+    def batch_rows(self, pb_rows: Iterable[Any]) -> None:
+        # Create a batch of row data by appending proto2 serialized bytes to the
+        # serialized_rows repeated field.
+        for row in pb_rows:
+            self.proto_rows.serialized_rows.append(row.SerializeToString())
+
+        if len(self.proto_rows.serialized_rows) > WRITE_ROWS_BATCH_SIZE:
+            self.write_rows()
+            # Reset proto_rows after write
+            self.proto_rows = types.ProtoRows()
+
+    def write_rows(self) -> None:
         """Write data rows."""
         with DefaultStreamManager(
             self.table_path, self.pb2_descriptor, self.bigquery_storage_write_client
         ) as target_stream_manager:
-            proto_rows = types.ProtoRows()
-            # Create a batch of row data by appending proto2 serialized bytes to the
-            # serialized_rows repeated field.
-            for row in pb_rows:
-                proto_rows.serialized_rows.append(row.SerializeToString())
             # Create an append row request containing the rows
             request = types.AppendRowsRequest()
             proto_data = types.AppendRowsRequest.ProtoData()
-            proto_data.rows = proto_rows
+            proto_data.rows = self.proto_rows
             request.proto_rows = proto_data
 
             future = target_stream_manager.send_appendrowsrequest(request)
