@@ -1,6 +1,6 @@
 import argparse
 from google.cloud.bigquery import Client, SchemaField, Table
-from models.nft_marketplace_activities import nft_orderbooks_parser
+from processors.nft_orderbooks import nft_orderbooks_parser
 from config import Config
 
 schema = [
