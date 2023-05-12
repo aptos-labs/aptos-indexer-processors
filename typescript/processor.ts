@@ -1,11 +1,17 @@
-import { ArgumentParser } from 'argparse';
-import { parse } from './grpc_parser';
 import * as services from './aptos/indexer/v1/raw_data_grpc_pb';
-import * as indexerRawDataMessages from './aptos/indexer/v1/raw_data_pb';
+import {
+  GetTransactionsRequest,
+  TransactionsResponse,
+} from './aptos/indexer/v1/raw_data_pb';
 import { Config } from './config';
 import { Timer } from 'timer-node';
 import { exit } from 'process';
 import { ChannelCredentials, CallCredentials, Metadata } from '@grpc/grpc-js';
+import { parse as pgConnParse } from 'pg-connection-string';
+import { program } from 'commander';
+import { createDataSource } from './data-source';
+import { INDEXER_NAME, parse } from './event-parser';
+import { NextVersionToProcess } from './entity/NextVersionToProcess';
 
 // A hack to override the http2 settings
 class CustomChannelCred extends ChannelCredentials {
@@ -22,7 +28,7 @@ class CustomChannelCred extends ChannelCredentials {
       settings: {
         // This will increase the http2 frame size. Default is 16384, which is too small.
         maxFrameSize: 4194304,
-        // The initial window size is overridden. We need to patch the grpc-js library to allow this.
+        // The initial window size set here is overridden later. We need to patch the grpc-js library to allow this.
         initialWindowSize: 4194304,
         maxHeaderListSize: 8192,
         enablePush: false,
@@ -40,106 +46,161 @@ class CustomChannelCred extends ChannelCredentials {
   }
 }
 
-// Parse the config file
-const parser = new ArgumentParser({
-  description: 'Indexer Stream Client arguments',
-});
-parser.add_argument('-c', '--config', {
-  help: 'Path to config file',
-  required: true,
-});
-parser.add_argument('-p', '--perf', {
-  help: 'Show performance metrics. Takes one value: number of transactions to process e.g. -p 1000',
-  required: false,
-});
-const args = parser.parse_args();
-const config = Config.from_yaml_file(args.config);
+program
+  .command('process')
+  .description('')
+  .requiredOption('--config <config>', 'Config file')
+  .option(
+    '--perf <number-transactions>',
+    'Show perf metrics for processing <number-transactions>'
+  )
+  .action(async ({ config: conf, perf }) => {
+    const config = Config.from_yaml_file(conf);
 
-// Create client and request
-const client = new services.RawDataClient(
-  config.indexer_endpoint,
-  new CustomChannelCred(),
-  {
-    'grpc.keepalive_time_ms': 1000,
-    'grpc.default_compression_algorithm': 2,
-    'grpc.default_compression_level': 3,
-    'grpc.max_receive_message_length': -1,
-    'grpc.max_send_message_length': -1,
-  }
-);
-
-const request = new indexerRawDataMessages.GetTransactionsRequest();
-request.setStartingVersion(config.starting_version);
-const metadata = new Metadata();
-metadata.set('x-aptos-data-authorization', config.indexer_api_key);
-
-// Create and start the streaming RPC
-let currentTransactionVersion = config.starting_version;
-const stream = client.getTransactions(request, metadata);
-
-const timer = new Timer();
-timer.start();
-
-stream.on(
-  'data',
-  function (response: indexerRawDataMessages.TransactionsResponse) {
-    const transactionsList = response.getTransactionsList();
-
-    if (transactionsList == null) {
-      return;
-    }
-
-    // Validate response chain ID matches expected chain ID
-    if (response.getChainId() != config.chain_id) {
+    // Initialize the database connection
+    const options = pgConnParse(config.db_connection_uri);
+    const port = options.port || '5432';
+    if (!options.host || !options.database) {
       throw new Error(
-        `Chain ID mismatch. Expected ${
-          config.chain_id
-        } but got ${response.getChainId()}`
+        'Invalid postgres connection string. e.g. postgres://someuser:somepassword@somehost:5432/somedatabase'
       );
     }
 
-    if (transactionsList == null) {
-      return;
-    }
+    const dataSource = createDataSource(
+      options.host!,
+      Number(port),
+      options.user,
+      options.password,
+      options.database,
+      options.ssl as boolean
+    );
 
-    for (const transaction of transactionsList) {
-      // Validate transaction version is correct
-      if (transaction.getVersion() != currentTransactionVersion) {
+    await dataSource.initialize();
+
+    // Create the grpc client
+    const client = new services.RawDataClient(
+      config.indexer_endpoint,
+      new CustomChannelCred(),
+      {
+        'grpc.keepalive_time_ms': 1000,
+        // 0 - No compression
+        // 1 - Compress with DEFLATE algorithm
+        // 2 - Compress with GZIP algorithm
+        // 3 - Stream compression with GZIP algorithm
+        'grpc.default_compression_algorithm': 2,
+        // 0 - No compression
+        // 1 - Low compression level
+        // 2 - Medium compression level
+        // 3 - High compression level
+        'grpc.default_compression_level': 3,
+        // -1 means unlimited
+        'grpc.max_receive_message_length': -1,
+        // -1 means unlimited
+        'grpc.max_send_message_length': -1,
+      }
+    );
+
+    const request = new GetTransactionsRequest();
+    request.setStartingVersion(config.starting_version);
+    const metadata = new Metadata();
+    metadata.set('x-aptos-data-authorization', config.indexer_api_key);
+
+    // Create and start the streaming RPC
+    let currentTxnVersion = config.starting_version;
+    const stream = client.getTransactions(request, metadata);
+
+    const timer = new Timer();
+    timer.start();
+
+    stream.on('data', async function (response: TransactionsResponse) {
+      stream.pause();
+      const transactionsList = response.getTransactionsList();
+
+      if (transactionsList == null) {
+        return;
+      }
+
+      console.log({
+        message: 'Response received',
+        starting_version: transactionsList[0].getVersion(),
+      });
+
+      // Validate response chain ID matches expected chain ID
+      if (response.getChainId() != config.chain_id) {
         throw new Error(
-          `Transaction version mismatch. Expected ${currentTransactionVersion} but got ${transaction.getVersion()}`
+          `Chain ID mismatch. Expected ${
+            config.chain_id
+          } but got ${response.getChainId()}`
         );
       }
 
-      parse(transaction);
-
-      if (currentTransactionVersion % 1000 == 0) {
-        console.log({
-          message: 'Successfully processed transaction',
-          last_success_transaction_version: currentTransactionVersion,
-        });
+      if (transactionsList == null) {
+        return;
       }
 
-      const totalTransactions =
-        currentTransactionVersion - config.starting_version + 1;
+      for (const transaction of transactionsList) {
+        // Validate transaction version is correct
+        if (transaction.getVersion() != currentTxnVersion) {
+          throw new Error(
+            `Transaction version mismatch. Expected ${currentTxnVersion} but got ${transaction.getVersion()}`
+          );
+        }
 
-      if (args.perf && totalTransactions >= args.perf) {
-        timer.stop();
-        console.log(
-          `Takes ${timer.ms()} ms to receive ${totalTransactions} txns`
-        );
-        exit(0);
+        const parsedObjs = parse(transaction);
+        if (parsedObjs.length > 0) {
+          await dataSource.transaction(async (txnManager) => {
+            await txnManager.save(parsedObjs);
+            const nextVersionToProcess = createNextVersionToProcess(
+              currentTxnVersion + 1
+            );
+            await txnManager.save(nextVersionToProcess);
+          });
+        } else if (currentTxnVersion % 1000 == 0) {
+          // check point
+          const nextVersionToProcess = createNextVersionToProcess(
+            currentTxnVersion + 1
+          );
+          await dataSource
+            .getRepository(NextVersionToProcess)
+            .save(nextVersionToProcess);
+
+          console.log({
+            message: 'Successfully processed transaction',
+            last_success_transaction_version: currentTxnVersion,
+          });
+        }
+
+        const totalTransactions =
+          currentTxnVersion - config.starting_version + 1;
+
+        if (perf && totalTransactions >= Number(perf)) {
+          timer.stop();
+          console.log(
+            `Takes ${timer.ms()} ms to receive ${totalTransactions} txns`
+          );
+          exit(0);
+        }
+
+        currentTxnVersion += 1;
       }
+      stream.resume();
+    });
 
-      currentTransactionVersion += 1;
-    }
-  }
-);
+    stream.on('error', function (e) {
+      console.error(e);
+      // An error has occurred and the stream has been closed.
+    });
+    stream.on('status', function (status) {
+      console.log(status);
+      // process status
+    });
+  });
 
-stream.on('error', function (e) {
-  console.log(e);
-  // An error has occurred and the stream has been closed.
-});
-stream.on('status', function (status) {
-  console.log(status);
-  // process status
-});
+function createNextVersionToProcess(version: number) {
+  const nextVersionToProcess = new NextVersionToProcess();
+  nextVersionToProcess.nextVersion = version.toString();
+  nextVersionToProcess.indexerName = INDEXER_NAME;
+  return nextVersionToProcess;
+}
+
+program.parse();
