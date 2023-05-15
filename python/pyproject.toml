@@ -20,6 +20,7 @@ SQLAlchemy = "^2.0.9"
 grpcio-tools = "^1.53.0"
 protobuf = "^4.22.3"
 pydantic = "^1.10.7"
+postgres = "^4.0"
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.53.0"
