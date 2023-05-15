@@ -15,6 +15,7 @@ $ git clone https://github.com/aptos-labs/aptos-indexer-client-examples
 $ cd aptos-indexer-processors/python
 ```
 In this example, we have created an example event parser.
+
 3. Create a processer.
    - First you need to create an indexer processor that reads the stream of data.
    - We've created an example client in `processor.py`. This client
