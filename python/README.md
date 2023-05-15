@@ -5,7 +5,7 @@
 ### Tutorial
 1. Install all dependencies
   ```
-  postry install
+  poetry install
   ```
 2. Download the example:
 ```
