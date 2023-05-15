@@ -10,6 +10,7 @@ import { ChannelCredentials, CallCredentials, Metadata } from '@grpc/grpc-js';
 import { parse as pgConnParse } from 'pg-connection-string';
 import { program } from 'commander';
 import { createDataSource } from './data-source';
+import { Event } from './entity/Event';
 import { INDEXER_NAME, parse } from './event-parser';
 import { NextVersionToProcess } from './entity/NextVersionToProcess';
 
@@ -106,7 +107,7 @@ program
     metadata.set('x-aptos-data-authorization', config.indexer_api_key);
 
     // Create and start the streaming RPC
-    let currentTxnVersion = config.starting_version;
+    let currentTxnVersion = config.starting_version || 0;
     const stream = client.getTransactions(request, metadata);
 
     const timer = new Timer();
@@ -149,11 +150,15 @@ program
         const parsedObjs = parse(transaction);
         if (parsedObjs.length > 0) {
           await dataSource.transaction(async (txnManager) => {
-            await txnManager.save(parsedObjs);
+            await txnManager.insert(Event, parsedObjs);
             const nextVersionToProcess = createNextVersionToProcess(
               currentTxnVersion + 1
             );
-            await txnManager.save(nextVersionToProcess);
+            await txnManager.upsert(
+              NextVersionToProcess,
+              nextVersionToProcess,
+              ['indexerName']
+            );
           });
         } else if (currentTxnVersion % 1000 == 0) {
           // check point
@@ -162,7 +167,7 @@ program
           );
           await dataSource
             .getRepository(NextVersionToProcess)
-            .save(nextVersionToProcess);
+            .upsert(nextVersionToProcess, ['indexerName']);
 
           console.log({
             message: 'Successfully processed transaction',
