@@ -85,20 +85,29 @@ with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
 
             parsed_objs = parse(transaction)
 
-            with Session(engine) as session, session.begin():
-                # Insert Events into database
-                if parsed_objs is not None:
+            # If we find relevant transactions add them and update latest processed version
+            if parsed_objs is not None:
+                with Session(engine) as session, session.begin():
+                    # Insert Events into database
                     session.add_all(parsed_objs)
 
-                # Update latest processed version
-                session.merge(
-                    NextVersionToProcess(
-                        indexer_name=INDEXER_NAME,
-                        next_version=current_transaction_version + 1,
+                    # Update latest processed version
+                    session.merge(
+                        NextVersionToProcess(
+                            indexer_name=INDEXER_NAME,
+                            next_version=current_transaction_version + 1,
+                        )
                     )
-                )
-
-            if (current_transaction_version % 1000) == 0:
+            # If we don't find any relevant transactions, at least update latest processed version every 1000
+            elif (current_transaction_version % 1000) == 0:
+                with Session(engine) as session, session.begin():
+                    # Update latest processed version
+                    session.merge(
+                        NextVersionToProcess(
+                            indexer_name=INDEXER_NAME,
+                            next_version=current_transaction_version + 1,
+                        )
+                    )
                 print(
                     json.dumps(
                         {
