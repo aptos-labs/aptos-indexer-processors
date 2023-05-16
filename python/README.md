@@ -10,7 +10,7 @@
 2. Download the example:
 ```
 # Clone the repository to get the example code:
-$ git clone https://github.com/aptos-labs/aptos-indexer-client-examples
+$ git clone https://github.com/aptos-labs/aptos-indexer-processors
 # Navigate to the python folder
 $ cd aptos-indexer-processors/python
 ```
