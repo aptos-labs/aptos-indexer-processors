@@ -2,3 +2,7 @@ chain_id: 1
 indexer_endpoint: "34.30.218.153:50051"
 indexer_api_key: "<INDEXER_API_KEY>"
 db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"
+# If there is no version in the DB, start processor from starting_version_default
+# starting_version_default: <starting_version_default>
+# Even if there is a version stored in the DB, start processor from starting_version_override
+# starting_version_override: 113880

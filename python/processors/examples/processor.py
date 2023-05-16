@@ -25,18 +25,22 @@ metadata = (
 options = [("grpc.max_receive_message_length", -1)]
 engine = create_engine(config.db_connection_uri)
 
+# By default, if nothing is set, start from 0
 starting_version = 0
-if config.starting_version != None:
-    # Start from config's starting version if set
-    starting_version = config.starting_version
+if config.starting_version_override != None:
+    # Start from config's starting_version_override if set
+    starting_version = config.starting_version_override
 else:
-    # Start from next version to process in db
     with Session(engine) as session, session.begin():
         next_version_to_process_from_db = session.get(
             NextVersionToProcess, INDEXER_NAME
         )
         if next_version_to_process_from_db != None:
+            # Start from next version to process in db
             starting_version = next_version_to_process_from_db.next_version
+        elif config.starting_version_default != None:
+            # Start from config's starting_version_default if set
+            starting_version = config.starting_version_default
 
 print(
     json.dumps(
