@@ -100,11 +100,21 @@ generate_python_code() {
   echo "Python code generated successfully!"
 }
 
+ensure_protobuf_codegen_installed() {
+  # Check if protoc-gen-rust is installed
+  if ! command -v protoc-gen-rust &> /dev/null; then
+      echo "protoc-gen-rust is not installed. Installing protoc-gen-rust..."
+      cargo install protobuf-codegen
+      echo "protoc-gen-rust installed successfully."
+  fi
+}
+
 # Generate Rust code
 generate_rust_code() {
-  RUST_DIR="$OUT_DIR/RUST"
+  RUST_DIR="$OUT_DIR/rust"
   mkdir -p $RUST_DIR
 
+  ensure_protobuf_codegen_installed
   ensure_protoc_installed
 
   # Generate Rust code from protobuf files
