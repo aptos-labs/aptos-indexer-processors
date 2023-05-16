@@ -3,6 +3,7 @@
 This directory contains examples of processors written in Python. Below you can find a brief description of each processor.
 
 ## Aptos Tontine
+
 This example demonstrates the simplest possible variant of a processor. There are three parts:
 
 - Processor: Processes transactions and writes to the DB based on events.

@@ -1,14 +1,15 @@
 import yaml
-from pydantic import BaseSettings, Field
+from pydantic import BaseSettings
 from pydantic.env_settings import SettingsSourceCallable
+from typing import Optional
 
 
 class Config(BaseSettings):
     chain_id: int
     indexer_endpoint: str
     indexer_api_key: str
-    starting_version_default: int | None = None
-    starting_version_override: int | None = None
+    starting_version_default: Optional[int] = None
+    starting_version_override: Optional[int] = None
     db_connection_uri: str
 
     class Config:

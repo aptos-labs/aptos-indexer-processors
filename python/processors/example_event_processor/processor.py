@@ -1,16 +1,14 @@
-from config import Config
-from create_table import NextVersionToProcess
-from event_parser import INDEXER_NAME, parse
-from aptos.indexer.v1 import raw_data_pb2_grpc
-
+import argparse
 import grpc
-from aptos.indexer.v1 import raw_data_pb2
+import json
 
+from processors.example_event_processor.event_parser import INDEXER_NAME, parse
+from processors.example_event_processor.models.create_table import NextVersionToProcess
+from aptos.indexer.v1 import raw_data_pb2_grpc
+from aptos.indexer.v1 import raw_data_pb2
+from utils.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
-import argparse
-import json
 
 
 parser = argparse.ArgumentParser()
@@ -27,7 +25,7 @@ engine = create_engine(config.db_connection_uri)
 
 # By default, if nothing is set, start from 0
 starting_version = 0
-if config.starting_version_override != None:
+if getattr(config, "starting_version_override", None) != None:
     # Start from config's starting_version_override if set
     starting_version = config.starting_version_override
 else:
@@ -38,7 +36,7 @@ else:
         if next_version_to_process_from_db != None:
             # Start from next version to process in db
             starting_version = next_version_to_process_from_db.next_version
-        elif config.starting_version_default != None:
+        elif getattr(config, "starting_version_default", None) != None:
             # Start from config's starting_version_default if set
             starting_version = config.starting_version_default
 
