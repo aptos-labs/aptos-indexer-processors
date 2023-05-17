@@ -15,6 +15,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)
 args = parser.parse_args()
 config = Config.from_yaml_file(args.config)
+starting_version_override = getattr(config, "starting_version_override", None)
+starting_version_default = getattr(config, "starting_version_default", None)
 
 metadata = (
     ("x-aptos-data-authorization", config.indexer_api_key),
@@ -25,9 +27,9 @@ engine = create_engine(config.db_connection_uri)
 
 # By default, if nothing is set, start from 0
 starting_version = 0
-if getattr(config, "starting_version_override", None) != None:
+if starting_version_override != None:
     # Start from config's starting_version_override if set
-    starting_version = config.starting_version_override
+    starting_version = starting_version_override
 else:
     with Session(engine) as session, session.begin():
         next_version_to_process_from_db = session.get(
@@ -36,9 +38,9 @@ else:
         if next_version_to_process_from_db != None:
             # Start from next version to process in db
             starting_version = next_version_to_process_from_db.next_version
-        elif getattr(config, "starting_version_default", None) != None:
+        elif starting_version_default != None:
             # Start from config's starting_version_default if set
-            starting_version = config.starting_version_default
+            starting_version = starting_version_default
 
 print(
     json.dumps(

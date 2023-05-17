@@ -8,9 +8,9 @@ class Config(BaseSettings):
     chain_id: int
     indexer_endpoint: str
     indexer_api_key: str
+    db_connection_uri: str
     starting_version_default: Optional[int] = None
     starting_version_override: Optional[int] = None
-    db_connection_uri: str
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings
