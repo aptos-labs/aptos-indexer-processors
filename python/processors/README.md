@@ -2,6 +2,13 @@
 
 This directory contains examples of processors written in Python. Below you can find a brief description of each processor.
 
+## Example Event Processor
+
+This is a simple example that processes transaction events and inserts the event's data to a database. This example includes
+
+- Processor: Shows an example of processing and parsing events from a transaction
+- Database: Writes event's data to a Postgres DB
+
 ## Aptos Tontine
 
 This example demonstrates the simplest possible variant of a processor. There are three parts:
