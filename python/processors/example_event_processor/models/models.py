@@ -2,8 +2,6 @@ from sqlalchemy import BigInteger, create_engine, DateTime, func, String
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from datetime import datetime
 from typing_extensions import Annotated
-import argparse
-from utils.config import Config
 
 
 class Base(DeclarativeBase):
@@ -44,14 +42,3 @@ class NextVersionToProcess(Base):
     indexer_name: Mapped[stringPkType]
     next_version: Mapped[bigintType]
     updated_at: Mapped[updatedAtType]
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", help="Path to config file", required=True)
-    args = parser.parse_args()
-
-    config = Config.from_yaml_file(args.config)
-
-    engine = create_engine(config.db_connection_uri)
-    Base.metadata.create_all(engine)

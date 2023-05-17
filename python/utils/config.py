@@ -1,6 +1,10 @@
 import yaml
+
+from processors.example_event_processor.models.models import NextVersionToProcess
 from pydantic import BaseSettings
 from pydantic.env_settings import SettingsSourceCallable
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 from typing import Optional
 
 
@@ -30,3 +34,25 @@ class Config(BaseSettings):
             config = yaml.safe_load(file)
 
         return cls(**config)
+
+    def get_starting_version(self, indexer_name: str) -> int:
+        engine = create_engine(self.db_connection_uri)
+
+        # By default, if nothing is set, start from 0
+        starting_version = 0
+        if self.starting_version_override != None:
+            # Start from config's starting_version_override if set
+            starting_version = self.starting_version_override
+        else:
+            with Session(engine) as session, session.begin():
+                next_version_to_process_from_db = session.get(
+                    NextVersionToProcess, indexer_name
+                )
+                if next_version_to_process_from_db != None:
+                    # Start from next version to process in db
+                    starting_version = next_version_to_process_from_db.next_version
+                elif self.starting_version_default != None:
+                    # Start from config's starting_version_default if set
+                    starting_version = self.starting_version_default
+
+        return starting_version

@@ -38,13 +38,13 @@ In this example, we have created an example event parser.
    - The function returns a list of event objects, which we’ll need to add to the database..
 5. Insert data rows into database.
    - In the example, we use Postgres and SQLAlchemy to help us interact with the database.
-   - If you’re running the Python client locally, you’ll first need to create the table. Run `poetry run python create_table.py`.
+   - If you’re running the Python client locally, you’ll first need to create the table. Run `poetry run python -m processors.example_event_processor.models.create_tables -c config.yaml`.
    - In `processor.py`, after the events are parsed, all the event objects are then added to the database.
 6. Update `config.yaml` with your values
    - Set `db_connection_uri`
    - Set `indexer_api_key`
    - (Optional) Set `starting_version_default` and/or `starting_version_override`
-7. Run `poetry run python processors.example_event_processor.processor -c config.yaml` to start indexing!
+7. Run `poetry run python -m processors.example_event_processor.processor -c config.yaml` to start indexing!
 8. (Optional) Run locally in Docker
    - The included `Dockerfile` is already set up for you to run the example event processor in Docker.
    - Run `docker compose up --build --force-recreate`.
