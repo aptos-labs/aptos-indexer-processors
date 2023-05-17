@@ -10,7 +10,7 @@ from google.protobuf import descriptor_pb2
 from google.protobuf.descriptor import Descriptor
 
 
-WRITE_ROWS_BATCH_SIZE = 1000
+WRITE_ROWS_BATCH_SIZE = 100
 
 
 class DefaultStreamManager:  # pragma: no cover

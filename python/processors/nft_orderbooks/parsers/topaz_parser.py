@@ -6,8 +6,10 @@ from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
     MarketplaceName,
     StandardMarketplaceEventType,
 )
-from models.proto_autogen import nft_marketplace_activities_pb2
-from utils.token_utils import TokenDataIdType, standardize_address
+from processors.nft_orderbooks.models.proto_autogen import (
+    nft_marketplace_activities_pb2,
+)
+from utils.token_utils import CollectionDataIdType, TokenDataIdType, standardize_address
 
 TOPAZ_MARKETPLACE_EVENT_TYPES = set(
     [
@@ -50,15 +52,19 @@ def parse_topaz_marketplace_events(
 
         # Collection, token, and creator parsing
         token_data_id_struct = data.get("token_id", {}).get("token_data_id", {})
-        collection = (
-            token_data_id_struct.get("collection", None)
-            or data.get("collection_name", None)
-            or ""
+        collection = token_data_id_struct.get("collection", None) or data.get(
+            "collection_name", None
         )
-        token_name = token_data_id_struct.get("name") or ""
-        creator = token_data_id_struct.get("creator") or data.get("creator") or ""
+        token_name = token_data_id_struct.get("name", None)
+        creator = token_data_id_struct.get("creator", None) or data.get("creator", None)
 
-        token_data_id_type = TokenDataIdType(creator, collection, token_name)
+        token_name_trunc = None
+        token_data_id = None
+        collection_data_id_type = CollectionDataIdType(creator, collection)
+        if token_name != None:
+            token_data_id_type = TokenDataIdType(creator, collection, token_name)
+            token_name_trunc = token_data_id_type.get_name_trunc()
+            token_data_id = token_data_id_type.to_hash()
 
         # Price parsing
         price = (
@@ -75,8 +81,8 @@ def parse_topaz_marketplace_events(
         amount = int(data.get("amount") or data.get("token_amount") or 0)
 
         # Buyer and seller parsing
-        buyer = str(data.get("buyer") or data.get("token_buyer") or None)
-        seller = str(data.get("seller") or None)
+        buyer = str(data.get("buyer", None) or data.get("token_buyer", None))
+        seller = str(data.get("seller", None))
 
         activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
             transaction_version=event.transaction_version,
@@ -86,10 +92,10 @@ def parse_topaz_marketplace_events(
                 display_event_type
             ).value,
             creator_address=standardize_address(creator),
-            collection=token_data_id_type.get_collection_trunc(),
-            token_name=token_data_id_type.get_name_trunc(),
-            token_data_id=token_data_id_type.to_hash(),
-            collection_id=token_data_id_type.get_collection_data_id_hash(),
+            collection=collection_data_id_type.get_name_trunc(),
+            token_name=token_name_trunc,
+            token_data_id=token_data_id,
+            collection_id=collection_data_id_type.to_hash(),
             price=price,
             amount=amount,
             buyer=standardize_address(buyer),

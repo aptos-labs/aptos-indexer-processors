@@ -8,8 +8,8 @@ readme = "README.md"
 [tool.poe.tasks]
 lint = ["pyright", "format-check"]
 pyright = "pyright"
-format-check = "black --diff -v --check --exclude aptos|models/proto_autogen ."
-format = "black --exclude aptos|models/proto_autogen ."
+format-check = "black --diff -v --check --exclude (aptos|proto_autogen) ."
+format = "black --exclude (aptos|proto_autogen) ."
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -35,4 +35,4 @@ requires = ["poetry-core>=1.4.2"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
-exclude = ["aptos", "models/proto_autogen"]
+exclude = ["aptos", "**/proto_autogen"]
