@@ -12,8 +12,8 @@ RUN poetry config virtualenvs.create false \
     && poetry install --only main
 
 # Copy files and folders
-COPY *.py /app/
 COPY /aptos /app/aptos
-COPY /processors/examples/* /app/
+COPY /utils/ /app/utils
+COPY /processors/ /app/processors
 
-CMD ["poetry", "run", "python", "/processors/examples/processor.py", "--config", "/app/config/config.yaml"]
+CMD ["poetry", "run", "python", "-m", "processors.example_event_processor.processor", "--config", "/app/config/config.yaml"]
