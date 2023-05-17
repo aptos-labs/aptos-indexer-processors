@@ -23,15 +23,3 @@ mainnet: 34.30.218.153:50051
 ## Response
 - The response is a stream of `RawDatastreamResponse` objects.
 - For each supported language, there is an `aptos` folder which contains the auto-generate protobuf files in that language. You can check out the files to see the stream response format and figure out how to parse the response. 
-
-## [WIP] Typescript / Node 
-### Prerequisite
-- `node`: This requires Node 0.12.x or greater.
-### Guide
-1. Install the latest version of gRPC and tooling for Typescript:
-  ```
-  npm install -g @grpc/grpc-js
-  npm install -g grpc-tools
-  ```
-2. 
-## [WIP] Rust
