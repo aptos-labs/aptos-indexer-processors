@@ -1,7 +1,7 @@
 import argparse
 from google.cloud.bigquery import Client, SchemaField, Table
-from processors.nft_orderbooks import nft_orderbooks_parser
-from config import Config
+from processors.nft_orderbooks.parsers import nft_orderbooks_parser
+from utils.config import Config
 
 schema = [
     SchemaField(name="transaction_version", field_type="INTEGER", mode="REQUIRED"),
@@ -61,13 +61,14 @@ def create_table(project_id: str, database: str, table_name: str):
     return query_job.result
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help="Path to config file", required=True)
-args = parser.parse_args()
-config = Config.from_yaml_file(args.config)
-processor_config = config.processors[nft_orderbooks_parser.INDEXER_NAME]
-create_table(
-    project_id=processor_config.project_id,
-    database=processor_config.database,
-    table_name=processor_config.table_name,
-)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", help="Path to config file", required=True)
+    args = parser.parse_args()
+    config = Config.from_yaml_file(args.config)
+    processor_config = config.processors[nft_orderbooks_parser.INDEXER_NAME]
+    create_table(
+        project_id=processor_config.project_id,
+        database=processor_config.database,
+        table_name=processor_config.table_name,
+    )

@@ -3,12 +3,14 @@ import json
 import grpc
 
 from google.cloud.bigquery_storage_v1beta2 import BigQueryWriteClient
-from models.proto_autogen import nft_marketplace_activities_pb2
-from db_adapters.bigquery_stream_manager import BigqueryWriteManager
+from utils.db_adapters.bigquery_stream_manager import BigqueryWriteManager
 from aptos.indexer.v1 import raw_data_pb2_grpc
 from aptos.indexer.v1 import raw_data_pb2
 from utils.config import Config
-from processors.nft_orderbooks import nft_orderbooks_parser
+from processors.nft_orderbooks.models.proto_autogen import (
+    nft_marketplace_activities_pb2,
+)
+from processors.nft_orderbooks.parsers import nft_orderbooks_parser
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)

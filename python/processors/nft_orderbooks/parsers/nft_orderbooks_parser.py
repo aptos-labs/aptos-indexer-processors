@@ -1,7 +1,11 @@
 from typing import List
 from aptos.transaction.testing1.v1 import transaction_pb2
-from processors.nft_orderbooks.topaz_parser import parse_topaz_marketplace_events
-from models.proto_autogen import nft_marketplace_activities_pb2
+from processors.nft_orderbooks.parsers.topaz_parser import (
+    parse_topaz_marketplace_events,
+)
+from processors.nft_orderbooks.models.proto_autogen import (
+    nft_marketplace_activities_pb2,
+)
 
 INDEXER_NAME = "nft_orderbooks"
 
