@@ -20,11 +20,12 @@
     "grpc_tools_node_protoc_ts": "^5.3.3",
     "grpc-tools": "^1.12.4",
     "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.6",
     "typescript": "^5.0.4"
   },
   "scripts": {
     "postinstall": "patch-package",
-    "build": "rm -rf build && tsc -p tsconfig.json && cp -r ./aptos build/",
+    "build": "rm -rf build && tsc -p tsconfig.json && cp -r ./aptos build/ && tsc-alias",
     "orm": "npx typeorm -d ./migration.ts"
   }
 }

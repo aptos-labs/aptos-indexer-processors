@@ -1,4 +1,9 @@
-import {CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Index} from "typeorm";
+import {
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Index,
+} from "typeorm";
 
 export abstract class BaseEntity {
   @CreateDateColumn()
