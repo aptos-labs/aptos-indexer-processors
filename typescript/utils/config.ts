@@ -1,5 +1,5 @@
-import * as yaml from 'js-yaml';
-import * as fs from 'fs';
+import * as yaml from "js-yaml";
+import * as fs from "fs";
 
 class Config {
   constructor(
@@ -12,7 +12,7 @@ class Config {
   ) {}
 
   public static from_yaml_file(path: string): Config {
-    const contents = fs.readFileSync(path, 'utf8');
+    const contents = fs.readFileSync(path, "utf8");
     return yaml.load(contents) as Config;
   }
 }

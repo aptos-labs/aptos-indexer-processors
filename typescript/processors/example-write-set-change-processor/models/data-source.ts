@@ -1,8 +1,8 @@
-import 'reflect-metadata';
-import { DataSource } from 'typeorm';
-import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
-import { Event } from './entity/Event';
-import { NextVersionToProcess } from './entity/NextVersionToProcess';
+import "reflect-metadata";
+import { DataSource } from "typeorm";
+import { SnakeNamingStrategy } from "typeorm-naming-strategies";
+import { Event } from "@/processors/example-write-set-change-processor/models/Event";
+import { NextVersionToProcess } from "@/utils/common_models/NextVersionToProcess";
 
 export function createDataSource(
   host: string,
@@ -14,7 +14,7 @@ export function createDataSource(
 ) {
   return new DataSource({
     namingStrategy: new SnakeNamingStrategy(),
-    type: 'postgres',
+    type: "postgres",
     host,
     port,
     username,
@@ -23,7 +23,7 @@ export function createDataSource(
     synchronize: true,
     logging: false,
     entities: [Event, NextVersionToProcess],
-    migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
+    migrations: [__dirname + "/migrations/**/*{.ts,.js}"],
     subscribers: [],
     ssl: enableSSL,
     migrationsRun: false,

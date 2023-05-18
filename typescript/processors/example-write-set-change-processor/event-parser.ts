@@ -1,8 +1,8 @@
-import { Transaction } from './aptos/transaction/testing1/v1/transaction_pb';
-import { Timestamp } from './aptos/util/timestamp/timestamp_pb';
-import { Event } from './entity/Event';
+import { Transaction } from "@/aptos/transaction/testing1/v1/transaction_pb";
+import { Timestamp } from "@/aptos/util/timestamp/timestamp_pb";
+import { Event } from "@/processors/example-write-set-change-processor/models/Event";
 
-export const INDEXER_NAME = 'ts_example_indexer';
+export const INDEXER_NAME = "ts_example_indexer";
 
 function grpcTimestampToDate(timestamp: Timestamp) {
   const seconds = timestamp.getSeconds();

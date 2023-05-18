@@ -1,18 +1,21 @@
-import * as services from './aptos/indexer/v1/raw_data_grpc_pb';
+import * as services from "@/aptos/indexer/v1/raw_data_grpc_pb";
 import {
   GetTransactionsRequest,
   TransactionsResponse,
-} from './aptos/indexer/v1/raw_data_pb';
-import { Config } from './config';
-import { Timer } from 'timer-node';
-import { exit } from 'process';
-import { ChannelCredentials, CallCredentials, Metadata } from '@grpc/grpc-js';
-import { parse as pgConnParse } from 'pg-connection-string';
-import { program } from 'commander';
-import { createDataSource } from './data-source';
-import { Event } from './entity/Event';
-import { INDEXER_NAME, parse } from './event-parser';
-import { NextVersionToProcess } from './entity/NextVersionToProcess';
+} from "@/aptos/indexer/v1/raw_data_pb";
+import { Config } from "@/utils/config";
+import { Timer } from "timer-node";
+import { exit } from "process";
+import { ChannelCredentials, CallCredentials, Metadata } from "@grpc/grpc-js";
+import { parse as pgConnParse } from "pg-connection-string";
+import { program } from "commander";
+import { createDataSource } from "@/processors/example-write-set-change-processor/models/data-source";
+import { Event } from "@/processors/example-write-set-change-processor/models/Event";
+import {
+  INDEXER_NAME,
+  parse,
+} from "@/processors/example-write-set-change-processor/event-parser";
+import { NextVersionToProcess } from "@/utils/common_models/NextVersionToProcess";
 
 // A hack to override the http2 settings
 class CustomChannelCred extends ChannelCredentials {
@@ -21,7 +24,7 @@ class CustomChannelCred extends ChannelCredentials {
   }
 
   compose(callCredentials: CallCredentials): never {
-    throw new Error('Cannot compose insecure credentials');
+    throw new Error("Cannot compose insecure credentials");
   }
 
   _getConnectionOptions(): any {
@@ -48,22 +51,22 @@ class CustomChannelCred extends ChannelCredentials {
 }
 
 program
-  .command('process')
-  .description('')
-  .requiredOption('--config <config>', 'Config file')
+  .command("process")
+  .description("")
+  .requiredOption("--config <config>", "Config file")
   .option(
-    '--perf <number-transactions>',
-    'Show perf metrics for processing <number-transactions>'
+    "--perf <number-transactions>",
+    "Show perf metrics for processing <number-transactions>"
   )
   .action(async ({ config: conf, perf }) => {
     const config = Config.from_yaml_file(conf);
 
     // Initialize the database connection
     const options = pgConnParse(config.db_connection_uri);
-    const port = options.port || '5432';
+    const port = options.port || "5432";
     if (!options.host || !options.database) {
       throw new Error(
-        'Invalid postgres connection string. e.g. postgres://someuser:somepassword@somehost:5432/somedatabase'
+        "Invalid postgres connection string. e.g. postgres://someuser:somepassword@somehost:5432/somedatabase"
       );
     }
 
@@ -83,28 +86,28 @@ program
       config.indexer_endpoint,
       new CustomChannelCred(),
       {
-        'grpc.keepalive_time_ms': 1000,
+        "grpc.keepalive_time_ms": 1000,
         // 0 - No compression
         // 1 - Compress with DEFLATE algorithm
         // 2 - Compress with GZIP algorithm
         // 3 - Stream compression with GZIP algorithm
-        'grpc.default_compression_algorithm': 2,
+        "grpc.default_compression_algorithm": 2,
         // 0 - No compression
         // 1 - Low compression level
         // 2 - Medium compression level
         // 3 - High compression level
-        'grpc.default_compression_level': 3,
+        "grpc.default_compression_level": 3,
         // -1 means unlimited
-        'grpc.max_receive_message_length': -1,
+        "grpc.max_receive_message_length": -1,
         // -1 means unlimited
-        'grpc.max_send_message_length': -1,
+        "grpc.max_send_message_length": -1,
       }
     );
 
     const request = new GetTransactionsRequest();
     request.setStartingVersion(config.starting_version);
     const metadata = new Metadata();
-    metadata.set('x-aptos-data-authorization', config.indexer_api_key);
+    metadata.set("x-aptos-data-authorization", config.indexer_api_key);
 
     // Create and start the streaming RPC
     let currentTxnVersion = config.starting_version || 0;
@@ -113,7 +116,7 @@ program
     const timer = new Timer();
     timer.start();
 
-    stream.on('data', async function (response: TransactionsResponse) {
+    stream.on("data", async function (response: TransactionsResponse) {
       stream.pause();
       const transactionsList = response.getTransactionsList();
 
@@ -122,7 +125,7 @@ program
       }
 
       console.log({
-        message: 'Response received',
+        message: "Response received",
         starting_version: transactionsList[0].getVersion(),
       });
 
@@ -157,7 +160,7 @@ program
             await txnManager.upsert(
               NextVersionToProcess,
               nextVersionToProcess,
-              ['indexerName']
+              ["indexerName"]
             );
           });
         } else if (currentTxnVersion % 1000 == 0) {
@@ -167,10 +170,10 @@ program
           );
           await dataSource
             .getRepository(NextVersionToProcess)
-            .upsert(nextVersionToProcess, ['indexerName']);
+            .upsert(nextVersionToProcess, ["indexerName"]);
 
           console.log({
-            message: 'Successfully processed transaction',
+            message: "Successfully processed transaction",
             last_success_transaction_version: currentTxnVersion,
           });
         }
@@ -191,11 +194,11 @@ program
       stream.resume();
     });
 
-    stream.on('error', function (e) {
+    stream.on("error", function (e) {
       console.error(e);
       // An error has occurred and the stream has been closed.
     });
-    stream.on('status', function (status) {
+    stream.on("status", function (status) {
       console.log(status);
       // process status
     });

@@ -1,9 +1,6 @@
 {
   "compilerOptions": {
-    "lib": [
-      "es5",
-      "es6"
-   ],
+    "lib": ["es5", "es6"],
     "target": "ES2021",
     "module": "commonjs",
     "moduleResolution": "node",
@@ -12,8 +9,10 @@
     "experimentalDecorators": true,
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["*"]
+    }
   },
-  "include": [
-    "**/*.ts",
-  ]
+  "include": ["**/*.ts"]
 }
