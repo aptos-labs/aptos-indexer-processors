@@ -50,20 +50,19 @@ def parse_marketplace_events(
 
         # Price parsing
         price = (
-            float(
-                data.get("price")
-                or data.get("coin_per_token")
-                or data.get("coin_amount")
-                or 0
-            )
-        ) / 10**8
+            data.get("price")
+            or data.get("coin_per_token")
+            or data.get("coin_amount")
+            or None
+        )
+        price = (float(price) / 10**8) if price != None else None
 
         # Token amount parsing
         token_amount = int(data.get("token_amount", 1))
 
         # Buyer and seller parsing
-        buyer = str(data.get("buyer", None))
-        seller = str(data.get("token_owner", None))
+        buyer = data.get("buyer", None)
+        seller = data.get("token_owner", None)
 
         activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
             transaction_version=event.transaction_version,
@@ -76,11 +75,11 @@ def parse_marketplace_events(
             collection=token_data_id_type.get_collection_trunc(),
             token_name=token_data_id_type.get_name_trunc(),
             token_data_id=token_data_id_type.to_hash(),
-            collection_id=None,
+            collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
             amount=token_amount,
-            buyer=standardize_address(buyer),
-            seller=standardize_address(seller),
+            buyer=standardize_address(buyer) if buyer else None,
+            seller=standardize_address(seller) if seller else None,
             json_data=event.json_data,
             marketplace=MarketplaceName.SOUFFLE.value,
             contract_address=event.contract_address,

@@ -25,3 +25,7 @@ def parse_pb_timestamp(timestamp: timestamp_pb2.Timestamp):
         timestamp.seconds + timestamp.nanos * 1e-9
     )
     return datetime_obj.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+def convert_timestamp_to_int64(timestamp: timestamp_pb2.Timestamp) -> int:
+    return timestamp.seconds * 1000000 + int(timestamp.nanos / 1000)

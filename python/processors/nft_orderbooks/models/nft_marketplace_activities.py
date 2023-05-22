@@ -13,7 +13,7 @@ schema = [
     SchemaField(name="token_name", field_type="STRING"),
     SchemaField(name="token_data_id", field_type="STRING"),
     SchemaField(name="collection_id", field_type="STRING"),
-    SchemaField(name="price", field_type="NUMERIC"),
+    SchemaField(name="price_octas", field_type="NUMERIC"),
     SchemaField(name="amount", field_type="NUMERIC"),
     SchemaField(name="buyer", field_type="STRING"),
     SchemaField(name="seller", field_type="STRING"),
@@ -34,10 +34,10 @@ schema = [
 ]
 
 
-def create_table(project_id: str, database: str, table_name: str):
+def create_table(table_path: str):
     client = Client()
     table = Table(
-        f"{project_id}.{database}.{table_name}",
+        table_path,
         schema=schema,
     )
     table.description = "Table of NFT marketplace events"
@@ -46,14 +46,14 @@ def create_table(project_id: str, database: str, table_name: str):
 
     table_update_query = f"""
         ALTER TABLE
-            `{project_id}.{database}.{table_name}`
+            `{table_path}`
         ADD PRIMARY KEY
             (transaction_version,
                 event_index) NOT ENFORCED
             ;
 
         ALTER TABLE
-            `{project_id}.{database}.{table_name}`
+            `{table_path}`
         SET
             OPTIONS( max_staleness = INTERVAL 10 MINUTE );
     """
@@ -66,9 +66,4 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config", help="Path to config file", required=True)
     args = parser.parse_args()
     config = Config.from_yaml_file(args.config)
-    processor_config = config.processors[nft_orderbooks_parser.INDEXER_NAME]
-    create_table(
-        project_id=processor_config.project_id,
-        database=processor_config.database,
-        table_name=processor_config.table_name,
-    )
+    create_table(table_path=config.db_connection_uri)

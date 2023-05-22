@@ -1,10 +1,10 @@
 import re
 
 from aptos.transaction.testing1.v1 import transaction_pb2
-from aptos.util.timestamp import timestamp_pb2
 from enum import Enum
 from dataclasses import dataclass
 from typing import List
+from utils import general_utils, transaction_utils
 
 
 class MarketplaceName(Enum):
@@ -58,12 +58,16 @@ def get_marketplace_events(
         return []
 
     transaction_version = transaction.version
-    transaction_timestamp = convert_timestamp_to_int64(transaction.timestamp)
+    transaction_timestamp = general_utils.convert_timestamp_to_int64(
+        transaction.timestamp
+    )
 
-    user_transaction = transaction.user
-    user_transaction_request = user_transaction.request
-    transaction_payload = user_transaction_request.payload
-    entry_function_payload = transaction_payload.entry_function_payload
+    user_transaction = transaction_utils.get_user_transaction(transaction)
+    assert user_transaction is not None
+
+    entry_function_payload = transaction_utils.get_entry_function_payload(
+        user_transaction
+    )
     entry_function = entry_function_payload.function
     module = entry_function.module
     contract_addr = module.address
@@ -91,7 +95,3 @@ def get_marketplace_events(
         raw_marketplace_events.append(raw_marketplace_event)
 
     return raw_marketplace_events
-
-
-def convert_timestamp_to_int64(timestamp: timestamp_pb2.Timestamp) -> int:
-    return timestamp.seconds * 1000000 + int(timestamp.nanos / 1000)
