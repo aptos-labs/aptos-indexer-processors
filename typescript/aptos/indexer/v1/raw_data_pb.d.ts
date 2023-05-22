@@ -5,19 +5,24 @@
 /* eslint-disable */
 
 import * as jspb from "google-protobuf";
-import * as aptos_transaction_testing1_v1_transaction_pb from "../../../aptos/transaction/testing1/v1/transaction_pb";
+import * as aptos_transaction_v1_transaction_pb from "../../../aptos/transaction/v1/transaction_pb";
 
 export class GetTransactionsRequest extends jspb.Message { 
 
     hasStartingVersion(): boolean;
     clearStartingVersion(): void;
-    getStartingVersion(): number | undefined;
-    setStartingVersion(value: number): GetTransactionsRequest;
+    getStartingVersion(): string | undefined;
+    setStartingVersion(value: string): GetTransactionsRequest;
 
     hasTransactionsCount(): boolean;
     clearTransactionsCount(): void;
-    getTransactionsCount(): number | undefined;
-    setTransactionsCount(value: number): GetTransactionsRequest;
+    getTransactionsCount(): string | undefined;
+    setTransactionsCount(value: string): GetTransactionsRequest;
+
+    hasBatchSize(): boolean;
+    clearBatchSize(): void;
+    getBatchSize(): number | undefined;
+    setBatchSize(value: number): GetTransactionsRequest;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): GetTransactionsRequest.AsObject;
@@ -31,21 +36,22 @@ export class GetTransactionsRequest extends jspb.Message {
 
 export namespace GetTransactionsRequest {
     export type AsObject = {
-        startingVersion?: number,
-        transactionsCount?: number,
+        startingVersion?: string,
+        transactionsCount?: string,
+        batchSize?: number,
     }
 }
 
 export class TransactionsResponse extends jspb.Message { 
     clearTransactionsList(): void;
-    getTransactionsList(): Array<aptos_transaction_testing1_v1_transaction_pb.Transaction>;
-    setTransactionsList(value: Array<aptos_transaction_testing1_v1_transaction_pb.Transaction>): TransactionsResponse;
-    addTransactions(value?: aptos_transaction_testing1_v1_transaction_pb.Transaction, index?: number): aptos_transaction_testing1_v1_transaction_pb.Transaction;
+    getTransactionsList(): Array<aptos_transaction_v1_transaction_pb.Transaction>;
+    setTransactionsList(value: Array<aptos_transaction_v1_transaction_pb.Transaction>): TransactionsResponse;
+    addTransactions(value?: aptos_transaction_v1_transaction_pb.Transaction, index?: number): aptos_transaction_v1_transaction_pb.Transaction;
 
     hasChainId(): boolean;
     clearChainId(): void;
-    getChainId(): number | undefined;
-    setChainId(value: number): TransactionsResponse;
+    getChainId(): string | undefined;
+    setChainId(value: string): TransactionsResponse;
 
     serializeBinary(): Uint8Array;
     toObject(includeInstance?: boolean): TransactionsResponse.AsObject;
@@ -59,7 +65,7 @@ export class TransactionsResponse extends jspb.Message {
 
 export namespace TransactionsResponse {
     export type AsObject = {
-        transactionsList: Array<aptos_transaction_testing1_v1_transaction_pb.Transaction.AsObject>,
-        chainId?: number,
+        transactionsList: Array<aptos_transaction_v1_transaction_pb.Transaction.AsObject>,
+        chainId?: string,
     }
 }

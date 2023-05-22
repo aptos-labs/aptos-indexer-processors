@@ -21,8 +21,8 @@ var global = (function() {
   return Function('return this')();
 }.call(null));
 
-var aptos_transaction_testing1_v1_transaction_pb = require('../../../aptos/transaction/testing1/v1/transaction_pb.js');
-goog.object.extend(proto, aptos_transaction_testing1_v1_transaction_pb);
+var aptos_transaction_v1_transaction_pb = require('../../../aptos/transaction/v1/transaction_pb.js');
+goog.object.extend(proto, aptos_transaction_v1_transaction_pb);
 goog.exportSymbol('proto.aptos.indexer.v1.GetTransactionsRequest', null, global);
 goog.exportSymbol('proto.aptos.indexer.v1.TransactionsResponse', null, global);
 /**
@@ -99,8 +99,9 @@ proto.aptos.indexer.v1.GetTransactionsRequest.prototype.toObject = function(opt_
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-    startingVersion: jspb.Message.getFieldWithDefault(msg, 1, 0),
-    transactionsCount: jspb.Message.getFieldWithDefault(msg, 2, 0)
+    startingVersion: jspb.Message.getFieldWithDefault(msg, 1, "0"),
+    transactionsCount: jspb.Message.getFieldWithDefault(msg, 2, "0"),
+    batchSize: jspb.Message.getFieldWithDefault(msg, 3, 0)
   };
 
   if (includeInstance) {
@@ -138,12 +139,16 @@ proto.aptos.indexer.v1.GetTransactionsRequest.deserializeBinaryFromReader = func
     var field = reader.getFieldNumber();
     switch (field) {
     case 1:
-      var value = /** @type {number} */ (reader.readUint64());
+      var value = /** @type {string} */ (reader.readUint64String());
       msg.setStartingVersion(value);
       break;
     case 2:
-      var value = /** @type {number} */ (reader.readUint64());
+      var value = /** @type {string} */ (reader.readUint64String());
       msg.setTransactionsCount(value);
+      break;
+    case 3:
+      var value = /** @type {number} */ (reader.readUint64());
+      msg.setBatchSize(value);
       break;
     default:
       reader.skipField();
@@ -174,17 +179,24 @@ proto.aptos.indexer.v1.GetTransactionsRequest.prototype.serializeBinary = functi
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.serializeBinaryToWriter = function(message, writer) {
   var f = undefined;
-  f = /** @type {number} */ (jspb.Message.getField(message, 1));
+  f = /** @type {string} */ (jspb.Message.getField(message, 1));
   if (f != null) {
-    writer.writeUint64(
+    writer.writeUint64String(
       1,
       f
     );
   }
-  f = /** @type {number} */ (jspb.Message.getField(message, 2));
+  f = /** @type {string} */ (jspb.Message.getField(message, 2));
+  if (f != null) {
+    writer.writeUint64String(
+      2,
+      f
+    );
+  }
+  f = /** @type {number} */ (jspb.Message.getField(message, 3));
   if (f != null) {
     writer.writeUint64(
-      2,
+      3,
       f
     );
   }
@@ -193,15 +205,15 @@ proto.aptos.indexer.v1.GetTransactionsRequest.serializeBinaryToWriter = function
 
 /**
  * optional uint64 starting_version = 1;
- * @return {number}
+ * @return {string}
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.prototype.getStartingVersion = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 1, "0"));
 };
 
 
 /**
- * @param {number} value
+ * @param {string} value
  * @return {!proto.aptos.indexer.v1.GetTransactionsRequest} returns this
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.prototype.setStartingVersion = function(value) {
@@ -229,15 +241,15 @@ proto.aptos.indexer.v1.GetTransactionsRequest.prototype.hasStartingVersion = fun
 
 /**
  * optional uint64 transactions_count = 2;
- * @return {number}
+ * @return {string}
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.prototype.getTransactionsCount = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 2, "0"));
 };
 
 
 /**
- * @param {number} value
+ * @param {string} value
  * @return {!proto.aptos.indexer.v1.GetTransactionsRequest} returns this
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.prototype.setTransactionsCount = function(value) {
@@ -260,6 +272,42 @@ proto.aptos.indexer.v1.GetTransactionsRequest.prototype.clearTransactionsCount =
  */
 proto.aptos.indexer.v1.GetTransactionsRequest.prototype.hasTransactionsCount = function() {
   return jspb.Message.getField(this, 2) != null;
+};
+
+
+/**
+ * optional uint64 batch_size = 3;
+ * @return {number}
+ */
+proto.aptos.indexer.v1.GetTransactionsRequest.prototype.getBatchSize = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.aptos.indexer.v1.GetTransactionsRequest} returns this
+ */
+proto.aptos.indexer.v1.GetTransactionsRequest.prototype.setBatchSize = function(value) {
+  return jspb.Message.setField(this, 3, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.aptos.indexer.v1.GetTransactionsRequest} returns this
+ */
+proto.aptos.indexer.v1.GetTransactionsRequest.prototype.clearBatchSize = function() {
+  return jspb.Message.setField(this, 3, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.aptos.indexer.v1.GetTransactionsRequest.prototype.hasBatchSize = function() {
+  return jspb.Message.getField(this, 3) != null;
 };
 
 
@@ -303,8 +351,8 @@ proto.aptos.indexer.v1.TransactionsResponse.prototype.toObject = function(opt_in
 proto.aptos.indexer.v1.TransactionsResponse.toObject = function(includeInstance, msg) {
   var f, obj = {
     transactionsList: jspb.Message.toObjectList(msg.getTransactionsList(),
-    aptos_transaction_testing1_v1_transaction_pb.Transaction.toObject, includeInstance),
-    chainId: jspb.Message.getFieldWithDefault(msg, 2, 0)
+    aptos_transaction_v1_transaction_pb.Transaction.toObject, includeInstance),
+    chainId: jspb.Message.getFieldWithDefault(msg, 2, "0")
   };
 
   if (includeInstance) {
@@ -342,12 +390,12 @@ proto.aptos.indexer.v1.TransactionsResponse.deserializeBinaryFromReader = functi
     var field = reader.getFieldNumber();
     switch (field) {
     case 1:
-      var value = new aptos_transaction_testing1_v1_transaction_pb.Transaction;
-      reader.readMessage(value,aptos_transaction_testing1_v1_transaction_pb.Transaction.deserializeBinaryFromReader);
+      var value = new aptos_transaction_v1_transaction_pb.Transaction;
+      reader.readMessage(value,aptos_transaction_v1_transaction_pb.Transaction.deserializeBinaryFromReader);
       msg.addTransactions(value);
       break;
     case 2:
-      var value = /** @type {number} */ (reader.readUint64());
+      var value = /** @type {string} */ (reader.readUint64String());
       msg.setChainId(value);
       break;
     default:
@@ -384,12 +432,12 @@ proto.aptos.indexer.v1.TransactionsResponse.serializeBinaryToWriter = function(m
     writer.writeRepeatedMessage(
       1,
       f,
-      aptos_transaction_testing1_v1_transaction_pb.Transaction.serializeBinaryToWriter
+      aptos_transaction_v1_transaction_pb.Transaction.serializeBinaryToWriter
     );
   }
-  f = /** @type {number} */ (jspb.Message.getField(message, 2));
+  f = /** @type {string} */ (jspb.Message.getField(message, 2));
   if (f != null) {
-    writer.writeUint64(
+    writer.writeUint64String(
       2,
       f
     );
@@ -398,17 +446,17 @@ proto.aptos.indexer.v1.TransactionsResponse.serializeBinaryToWriter = function(m
 
 
 /**
- * repeated aptos.transaction.testing1.v1.Transaction transactions = 1;
- * @return {!Array<!proto.aptos.transaction.testing1.v1.Transaction>}
+ * repeated aptos.transaction.v1.Transaction transactions = 1;
+ * @return {!Array<!proto.aptos.transaction.v1.Transaction>}
  */
 proto.aptos.indexer.v1.TransactionsResponse.prototype.getTransactionsList = function() {
-  return /** @type{!Array<!proto.aptos.transaction.testing1.v1.Transaction>} */ (
-    jspb.Message.getRepeatedWrapperField(this, aptos_transaction_testing1_v1_transaction_pb.Transaction, 1));
+  return /** @type{!Array<!proto.aptos.transaction.v1.Transaction>} */ (
+    jspb.Message.getRepeatedWrapperField(this, aptos_transaction_v1_transaction_pb.Transaction, 1));
 };
 
 
 /**
- * @param {!Array<!proto.aptos.transaction.testing1.v1.Transaction>} value
+ * @param {!Array<!proto.aptos.transaction.v1.Transaction>} value
  * @return {!proto.aptos.indexer.v1.TransactionsResponse} returns this
 */
 proto.aptos.indexer.v1.TransactionsResponse.prototype.setTransactionsList = function(value) {
@@ -417,12 +465,12 @@ proto.aptos.indexer.v1.TransactionsResponse.prototype.setTransactionsList = func
 
 
 /**
- * @param {!proto.aptos.transaction.testing1.v1.Transaction=} opt_value
+ * @param {!proto.aptos.transaction.v1.Transaction=} opt_value
  * @param {number=} opt_index
- * @return {!proto.aptos.transaction.testing1.v1.Transaction}
+ * @return {!proto.aptos.transaction.v1.Transaction}
  */
 proto.aptos.indexer.v1.TransactionsResponse.prototype.addTransactions = function(opt_value, opt_index) {
-  return jspb.Message.addToRepeatedWrapperField(this, 1, opt_value, proto.aptos.transaction.testing1.v1.Transaction, opt_index);
+  return jspb.Message.addToRepeatedWrapperField(this, 1, opt_value, proto.aptos.transaction.v1.Transaction, opt_index);
 };
 
 
@@ -437,15 +485,15 @@ proto.aptos.indexer.v1.TransactionsResponse.prototype.clearTransactionsList = fu
 
 /**
  * optional uint64 chain_id = 2;
- * @return {number}
+ * @return {string}
  */
 proto.aptos.indexer.v1.TransactionsResponse.prototype.getChainId = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 2, "0"));
 };
 
 
 /**
- * @param {number} value
+ * @param {string} value
  * @return {!proto.aptos.indexer.v1.TransactionsResponse} returns this
  */
 proto.aptos.indexer.v1.TransactionsResponse.prototype.setChainId = function(value) {
