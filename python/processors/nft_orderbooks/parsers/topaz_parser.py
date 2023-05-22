@@ -81,8 +81,8 @@ def parse_marketplace_events(
         amount = int(data.get("amount") or data.get("token_amount") or 0)
 
         # Buyer and seller parsing
-        buyer = str(data.get("buyer", None) or data.get("token_buyer", None))
-        seller = str(data.get("seller", None))
+        buyer = data.get("buyer", None) or data.get("token_buyer", None)
+        seller = data.get("seller", None)
 
         activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
             transaction_version=event.transaction_version,
@@ -98,8 +98,8 @@ def parse_marketplace_events(
             collection_id=collection_data_id_type.to_hash(),
             price=price,
             amount=amount,
-            buyer=standardize_address(buyer),
-            seller=standardize_address(seller),
+            buyer=standardize_address(buyer) if buyer != None else None,
+            seller=standardize_address(seller) if seller != None else None,
             json_data=event.json_data,
             marketplace=MarketplaceName.TOPAZ.value,
             contract_address=event.contract_address,

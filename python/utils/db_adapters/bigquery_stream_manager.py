@@ -23,14 +23,14 @@ class DefaultStreamManager:  # pragma: no cover
         bigquery_storage_write_client: bigquery_storage.BigQueryWriteClient,
     ):
         # Uncomment this to run in debug mode: --log=DEBUG
-        # logging.basicConfig(
-        #     level=logging.DEBUG,
-        #     format="%(asctime)s [%(levelname)s] %(message)s",
-        #     handlers=[
-        #         # logging.FileHandler("debug.log"),
-        #         logging.StreamHandler()
-        #     ],
-        # )
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            handlers=[
+                # logging.FileHandler("debug.log"),
+                logging.StreamHandler()
+            ],
+        )
         """Init."""
         self.stream_name = f"{table_path}/_default"
         self.message_protobuf_descriptor = message_protobuf_descriptor
@@ -94,17 +94,12 @@ class BigqueryWriteManager:
 
     def __init__(
         self,
-        project_id: str,
-        dataset_id: str,
-        table_id: str,
+        table_path: str,
         pb2_descriptor: Descriptor,
     ):  # pragma: no cover
         """Create a BigQueryManager."""
         self.bigquery_storage_write_client = BigQueryWriteClient()
-
-        self.table_path = self.bigquery_storage_write_client.table_path(
-            project_id, dataset_id, table_id
-        )
+        self.table_path = table_path
         self.pb2_descriptor = pb2_descriptor
         self.proto_rows = types.ProtoRows()
 

@@ -40,7 +40,7 @@ TOPAZ_MARKETPLACE_EVENT_TYPES = set(
 def parse_marketplace_events(
     transaction: transaction_pb2.Transaction,
 ) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
-    topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.TOPAZ)
+    topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.BLUEMOVE)
     nft_activities = []
 
     for event in topaz_raw_events:
@@ -144,8 +144,8 @@ def parse_marketplace_events(
             collection_id=collection_data_id_type.to_hash(),
             price=price,
             amount=amount,
-            buyer=standardize_address(buyer),
-            seller=standardize_address(seller),
+            buyer=standardize_address(buyer) if buyer else None,
+            seller=standardize_address(seller) if seller else None,
             json_data=event.json_data,
             marketplace=MarketplaceName.BLUEMOVE.value,
             contract_address=event.contract_address,

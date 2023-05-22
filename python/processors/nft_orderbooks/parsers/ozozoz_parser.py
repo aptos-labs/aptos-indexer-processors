@@ -12,6 +12,7 @@ from processors.nft_orderbooks.models.proto_autogen import (
     nft_marketplace_activities_pb2,
 )
 from utils.token_utils import CollectionDataIdType, TokenDataIdType, standardize_address
+from utils import transaction_utils
 
 OZOZOZ_MARKETPLACE_EVENT_TYPES = set(
     [
@@ -26,10 +27,10 @@ OZOZOZ_MARKETPLACE_EVENT_TYPES = set(
 def parse_marketplace_events(
     transaction: transaction_pb2.Transaction,
 ) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
-    topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.TOPAZ)
-    nft_activities = []
+    ozozoz_raw_events = get_marketplace_events(transaction, MarketplaceName.OZOZOZ)
+    nft_activities = []            
 
-    for event in topaz_raw_events:
+    for event in ozozoz_raw_events:
         # Readable transaction event type
         display_event_type = event.event_type.replace(
             "0xded0c1249b522cecb11276d2fad03e6635507438fef042abeea3097846090bcd::", ""
@@ -53,8 +54,8 @@ def parse_marketplace_events(
         amount = int(data.get("amount") or 0)
 
         # Buyer and seller parsing
-        user = str(data.get("user", None))
-        seller_address = str(data.get("sellerAddress", None))
+        user = data.get("user", None)
+        seller_address = data.get("sellerAddress", None)
 
         standard_event_type = standardize_marketplace_event_type(display_event_type)
         if standard_event_type == StandardMarketplaceEventType.LISTING_FILLED:
@@ -78,7 +79,7 @@ def parse_marketplace_events(
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
             amount=amount,
-            buyer=standardize_address(buyer),
+            buyer=standardize_address(buyer) if buyer else None,
             seller=standardize_address(seller),
             json_data=event.json_data,
             marketplace=MarketplaceName.OZOZOZ.value,

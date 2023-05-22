@@ -16,21 +16,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)
 args = parser.parse_args()
 config = Config.from_yaml_file(args.config)
-processor_config = config.processors[nft_orderbooks_parser.INDEXER_NAME]
 
 metadata = (("x-aptos-data-authorization", config.indexer_api_key),)
 options = [("grpc.max_receive_message_length", -1)]
 bq_write_manager = BigqueryWriteManager(
-    project_id=processor_config.project_id,
-    dataset_id=processor_config.database,
-    table_id=processor_config.table_name,
+    table_path=config.db_connection_uri,
     pb2_descriptor=nft_marketplace_activities_pb2.NFTMarketplaceActivityRow.DESCRIPTOR,
 )
 
-starting_version = 0
-if processor_config.starting_version != None:
-    # Start from config's starting version if set
-    starting_version = processor_config.starting_version
+starting_version = config.get_starting_version(nft_orderbooks_parser.INDEXER_NAME)
 
 print(
     json.dumps(
@@ -43,7 +37,7 @@ print(
 
 # Connect to grpc
 with grpc.insecure_channel(
-    processor_config.indexer_endpoint, options=options
+    config.indexer_endpoint, options=options
 ) as channel:
     stub = raw_data_pb2_grpc.RawDataStub(channel)
     current_transaction_version = starting_version
@@ -54,10 +48,10 @@ with grpc.insecure_channel(
     ):
         chain_id = response.chain_id
 
-        if chain_id != processor_config.chain_id:
+        if chain_id != config.chain_id:
             raise Exception(
                 "Chain ID mismatch. Expected chain ID is: "
-                + str(processor_config.chain_id)
+                + str(config.chain_id)
                 + ", but received chain ID is: "
                 + str(chain_id)
             )

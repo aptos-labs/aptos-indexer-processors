@@ -8,16 +8,6 @@ from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional
 
 
-class ProcessorConfig(BaseModel):
-    chain_id: int
-    indexer_endpoint: str
-    starting_version: int | None = None
-    db_connection_uri: str = ""
-    project_id: str = ""
-    database: str = ""
-    table_name: str = ""
-
-
 class Config(BaseSettings):
     chain_id: int
     indexer_endpoint: str
@@ -25,7 +15,6 @@ class Config(BaseSettings):
     db_connection_uri: str
     starting_version_default: Optional[int] = None
     starting_version_override: Optional[int] = None
-    processors: dict[str, ProcessorConfig]
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings
@@ -47,23 +36,29 @@ class Config(BaseSettings):
         return cls(**config)
 
     def get_starting_version(self, indexer_name: str) -> int:
-        engine = create_engine(self.db_connection_uri)
+        # Get next version to process from db
+        next_version = None
+        if self.db_connection_uri != None:
+            if self.db_connection_uri.startswith("postgresql://"):
+                engine = create_engine(self.db_connection_uri)
+
+                with Session(engine) as session, session.begin():
+                    next_version_to_process = session.get(
+                        NextVersionToProcess, indexer_name
+                    )
+                    if next_version_to_process != None:
+                        next_version = next_version_to_process.next_version
 
         # By default, if nothing is set, start from 0
         starting_version = 0
         if self.starting_version_override != None:
             # Start from config's starting_version_override if set
             starting_version = self.starting_version_override
-        else:
-            with Session(engine) as session, session.begin():
-                next_version_to_process_from_db = session.get(
-                    NextVersionToProcess, indexer_name
-                )
-                if next_version_to_process_from_db != None:
-                    # Start from next version to process in db
-                    starting_version = next_version_to_process_from_db.next_version
-                elif self.starting_version_default != None:
-                    # Start from config's starting_version_default if set
-                    starting_version = self.starting_version_default
+        elif next_version != None:
+            # Start from next version to process in db
+            starting_version = next_version
+        elif self.starting_version_default != None:
+            # Start from config's starting_version_default if set
+            starting_version = self.starting_version_default
 
         return starting_version

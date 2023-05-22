@@ -29,7 +29,7 @@ ITSRARE_MARKETPLACE_EVENT_TYPES = set(
 def parse_marketplace_events(
     transaction: transaction_pb2.Transaction,
 ) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
-    topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.TOPAZ)
+    topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.ITSRARE)
     nft_activities = []
 
     for event in topaz_raw_events:
@@ -67,9 +67,8 @@ def parse_marketplace_events(
         amount = int(data.get("amount", 1))
 
         # Buyer and seller parsing
-        buyer = str(data.get("buyer", None))
-        seller = str(data.get("seller", None))
-        lister = str(data.get("lister", None))
+        buyer = data.get("buyer", None)
+        seller = data.get("seller", None) or data.get("lister", None)
 
         activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
             transaction_version=event.transaction_version,
@@ -85,8 +84,8 @@ def parse_marketplace_events(
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
             amount=amount,
-            buyer=standardize_address(buyer),
-            seller=standardize_address(seller),
+            buyer=standardize_address(buyer) if buyer else None,
+            seller=standardize_address(seller) if seller else None,
             json_data=event.json_data,
             marketplace=MarketplaceName.ITSRARE.value,
             contract_address=event.contract_address,
