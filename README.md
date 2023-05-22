@@ -23,3 +23,5 @@ mainnet: 34.30.218.153:50051
 ## Response
 - The response is a stream of `RawDatastreamResponse` objects.
 - For each supported language, there is an `aptos` folder which contains the auto-generate protobuf files in that language. You can check out the files to see the stream response format and figure out how to parse the response. 
+
+## [Aptos Indexer GRPC Release Notes](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/indexer-grpc/release_notes.md)
