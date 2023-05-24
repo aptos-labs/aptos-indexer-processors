@@ -1,6 +1,7 @@
+import datetime
 import re
 
-from aptos.transaction.testing1.v1 import transaction_pb2
+from aptos.transaction.v1 import transaction_pb2
 from enum import Enum
 from dataclasses import dataclass
 from typing import List
@@ -47,7 +48,7 @@ class RawMarketplaceEvent:
     json_data: str
     contract_address: str
     entry_function_name: str
-    transaction_timestamp: int
+    transaction_timestamp: datetime.datetime
 
 
 def get_marketplace_events(
@@ -58,7 +59,7 @@ def get_marketplace_events(
         return []
 
     transaction_version = transaction.version
-    transaction_timestamp = general_utils.convert_timestamp_to_int64(
+    transaction_timestamp = general_utils.convert_pb_timestamp_to_datetime(
         transaction.timestamp
     )
 

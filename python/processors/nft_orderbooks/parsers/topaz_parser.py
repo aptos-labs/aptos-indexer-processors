@@ -1,4 +1,4 @@
-from aptos.transaction.testing1.v1 import transaction_pb2
+from aptos.transaction.v1 import transaction_pb2
 import json
 from typing import List
 from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
@@ -6,8 +6,8 @@ from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
     MarketplaceName,
     StandardMarketplaceEventType,
 )
-from processors.nft_orderbooks.models.proto_autogen import (
-    nft_marketplace_activities_pb2,
+from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
+    NFTMarketplaceEvent,
 )
 from utils.token_utils import CollectionDataIdType, TokenDataIdType, standardize_address
 
@@ -36,7 +36,7 @@ TOPAZ_MARKETPLACE_EVENT_TYPES = set(
 
 def parse_marketplace_events(
     transaction: transaction_pb2.Transaction,
-) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
+) -> List[NFTMarketplaceEvent]:
     topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.TOPAZ)
     nft_activities = []
 
@@ -84,7 +84,7 @@ def parse_marketplace_events(
         buyer = data.get("buyer", None) or data.get("token_buyer", None)
         seller = data.get("seller", None)
 
-        activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
+        activity = NFTMarketplaceEvent(
             transaction_version=event.transaction_version,
             event_index=event.event_index,
             event_type=display_event_type,

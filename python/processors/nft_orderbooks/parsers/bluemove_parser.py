@@ -1,4 +1,4 @@
-from aptos.transaction.testing1.v1 import transaction_pb2
+from aptos.transaction.v1 import transaction_pb2
 import json
 from typing import List
 from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
@@ -6,8 +6,8 @@ from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
     MarketplaceName,
     StandardMarketplaceEventType,
 )
-from processors.nft_orderbooks.models.proto_autogen import (
-    nft_marketplace_activities_pb2,
+from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
+    NFTMarketplaceEvent,
 )
 from utils.token_utils import CollectionDataIdType, TokenDataIdType, standardize_address
 
@@ -39,7 +39,7 @@ TOPAZ_MARKETPLACE_EVENT_TYPES = set(
 
 def parse_marketplace_events(
     transaction: transaction_pb2.Transaction,
-) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
+) -> List[NFTMarketplaceEvent]:
     topaz_raw_events = get_marketplace_events(transaction, MarketplaceName.BLUEMOVE)
     nft_activities = []
 
@@ -117,7 +117,7 @@ def parse_marketplace_events(
         buyer_address = str(data.get("buyer_address", None))
         offerer1 = str(offer_collection_item_struct.get("offerer", None))
         offerer2 = str(data.get("offerer", None))
-        buyer = buyer_bidder or offerer1 or offerer2 or buyer_address 
+        buyer = buyer_bidder or offerer1 or offerer2 or buyer_address
 
         owner_address = str(data.get("owner_address", None))
         seller_address = str(data.get("seller_address", None))
@@ -128,9 +128,14 @@ def parse_marketplace_events(
         seller_accepted_collection_bids = (
             can_claim_tokens_data[0] if len(can_claim_tokens_data) > 0 else {}
         ).get("value", None)
-        seller = seller_address or owner_address or seller_accepted_token_bids or seller_accepted_collection_bids
+        seller = (
+            seller_address
+            or owner_address
+            or seller_accepted_token_bids
+            or seller_accepted_collection_bids
+        )
 
-        activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
+        activity = NFTMarketplaceEvent(
             transaction_version=event.transaction_version,
             event_index=event.event_index,
             event_type=display_event_type,

@@ -27,15 +27,16 @@ class TransactionsProcessor:
 
     def init_db_tables(self) -> None:
         self.engine = create_engine(self.config.db_connection_uri)
+        Base.metadata.create_all(self.engine, checkfirst=True)
 
-        # Check if the tables are created.
-        inspector = inspect(self.engine)
-        table_name = NextVersionToProcess.__tablename__
-        if inspector.has_table(table_name):
-            print("Table {} exists.".format(table_name))
-        else:
-            print("Table {} does not exist. Creating it now.".format(table_name))
-            Base.metadata.create_all(self.engine)
+        # # Check if the tables are created.
+        # inspector = inspect(self.engine)
+        # table_name = NextVersionToProcess.__tablename__
+        # if inspector.has_table(table_name):
+        #     print("Table {} exists.".format(table_name))
+        # else:
+        #     print("Table {} does not exist. Creating it now.".format(table_name))
+        #     Base.metadata.create_all(self.engine)
 
     def process(self) -> None:
         # Setup the GetTransactionsRequest

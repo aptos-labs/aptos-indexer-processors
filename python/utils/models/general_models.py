@@ -16,6 +16,6 @@ class Base(DeclarativeBase):
 class NextVersionToProcess(Base):
     __tablename__ = "next_versions_to_process"
 
-    indexer_name: Mapped[StringPrimaryKeyType]
-    next_version: Mapped[BigIntegerType]
-    updated_at: Mapped[UpdatedAtType]
+    indexer_name: StringPrimaryKeyType
+    next_version: BigIntegerType
+    updated_at: UpdatedAtType

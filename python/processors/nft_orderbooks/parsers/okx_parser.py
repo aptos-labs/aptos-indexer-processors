@@ -1,4 +1,4 @@
-from aptos.transaction.testing1.v1 import transaction_pb2
+from aptos.transaction.v1 import transaction_pb2
 import json
 import re
 from typing import Dict, List, Optional, TypedDict
@@ -8,8 +8,8 @@ from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
     MARKETPLACE_ADDRESS_MATCH_REGEX_STRINGS,
     StandardMarketplaceEventType,
 )
-from processors.nft_orderbooks.models.proto_autogen import (
-    nft_marketplace_activities_pb2,
+from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
+    NFTMarketplaceEvent,
 )
 from utils.token_utils import CollectionDataIdType, TokenDataIdType, standardize_address
 from utils import event_utils, general_utils, transaction_utils
@@ -25,7 +25,7 @@ OKX_MARKETPLACE_EVENT_TYPES = set(
 
 def parse_marketplace_events(
     transaction: transaction_pb2.Transaction,
-) -> List[nft_marketplace_activities_pb2.NFTMarketplaceActivityRow]:
+) -> List[NFTMarketplaceEvent]:
     user_transaction = transaction_utils.get_user_transaction(transaction)
 
     if user_transaction is None:
@@ -110,7 +110,7 @@ def parse_marketplace_events(
         buyer = data.get("buyer", None)
         seller = data.get("id", {}).get("addr", None)
 
-        activity = nft_marketplace_activities_pb2.NFTMarketplaceActivityRow(
+        activity = NFTMarketplaceEvent(
             transaction_version=transaction.version,
             event_index=event_index,
             event_type=display_event_type,

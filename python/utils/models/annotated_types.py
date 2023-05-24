@@ -1,21 +1,38 @@
-from sqlalchemy import BigInteger, create_engine, DateTime, func, String
+from sqlalchemy import BigInteger, create_engine, DateTime, func, Numeric, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from datetime import datetime
 from typing_extensions import Annotated
 
-BigIntegerPrimaryKeyType = Annotated[int, mapped_column(BigInteger, primary_key=True)]
-StringPrimaryKeyType = Annotated[str, mapped_column(String, primary_key=True)]
-BigIntegerType = Annotated[int, mapped_column(BigInteger)]
+# To make pylint happy
 
-TimestampType = Annotated[datetime, mapped_column(DateTime(timezone=True))]
-InsertedAtType = Annotated[
-    datetime, mapped_column(DateTime(timezone=True), default=func.now())
+# Primary key types
+BigIntegerPrimaryKeyType = Mapped[
+    Annotated[int, mapped_column(BigInteger, primary_key=True)]
 ]
-UpdatedAtType = Annotated[
-    datetime,
-    mapped_column(
-        DateTime(timezone=True),
-        default=func.now(),
-        onupdate=func.now(),
-    ),
+StringPrimaryKeyType = Mapped[Annotated[str, mapped_column(String, primary_key=True)]]
+
+# Normal types
+BigIntegerType = Mapped[Annotated[int, mapped_column(BigInteger)]]
+JsonType = Mapped[Annotated[str, mapped_column(JSONB)]]
+StringType = Mapped[Annotated[str, mapped_column(String)]]
+
+# Nullable types
+NullableNumericType = Mapped[Annotated[float, mapped_column(Numeric, nullable=True)]]
+NullableStringType = Mapped[Annotated[str, mapped_column(String, nullable=True)]]
+
+# Timestamp types
+TimestampType = Mapped[Annotated[datetime, mapped_column(DateTime(timezone=True))]]
+InsertedAtType = Mapped[
+    Annotated[datetime, mapped_column(DateTime(timezone=True), default=func.now())]
+]
+UpdatedAtType = Mapped[
+    Annotated[
+        datetime,
+        mapped_column(
+            DateTime(timezone=True),
+            default=func.now(),
+            onupdate=func.now(),
+        ),
+    ]
 ]
