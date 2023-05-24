@@ -1,14 +1,13 @@
 # Aptos Indexer Client Guide
 This guide will get you started with creating an Aptos indexer with custom parsing. We have several endpoints that provided a streaming RPC of transaction data. 
 
-## Indexer Endpoints
-devent: 34.70.26.67:50051
+## Indexer Endpoints(all endpoints are in GCP us-central1 unless specified)
+* devent: 35.225.218.95:50051
 
-testnet: 35.223.137.149:50051
+* testnet: 35.223.137.149:50051
+  * Asia(GCP asia-northeast3): 34.64.252.224:50051
 
-previewnet: 104.154.118.201:50051
-
-mainnet: 34.30.218.153:50051
+* mainnet: 34.30.218.153:50051
 
 ## Request
  - `config.yaml`
