@@ -3,11 +3,11 @@ import grpc
 import json
 
 from processors.example_event_processor.event_parser import INDEXER_NAME, parse
-from processors.example_event_processor.models.models import NextVersionToProcess
+from processors.example_event_processor.models.models import NextVersionToProcess, Base
 from aptos.indexer.v1 import raw_data_pb2_grpc
 from aptos.indexer.v1 import raw_data_pb2
 from utils.config import Config
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session
 
 
@@ -15,6 +15,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="Path to config file", required=True)
 args = parser.parse_args()
 config = Config.from_yaml_file(args.config)
+
+engine = create_engine(config.db_connection_uri)
+
+# Check if the tables are created.
+inspector = inspect(engine)
+table_name = NextVersionToProcess.__tablename__
+if inspector.has_table(table_name):
+    print("Table {} exists.".format(table_name))
+else:
+    print("Table {} does not exist. Creating it now.".format(table_name))
+    Base.metadata.create_all(engine)
+
 starting_version = config.get_starting_version(INDEXER_NAME)
 
 metadata = (
@@ -22,7 +34,6 @@ metadata = (
     ("x-aptos-request-name", INDEXER_NAME),
 )
 options = [("grpc.max_receive_message_length", -1)]
-engine = create_engine(config.db_connection_uri)
 
 print(
     json.dumps(

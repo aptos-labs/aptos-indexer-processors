@@ -47,6 +47,7 @@ In this example, we have created an example event parser.
 7. Run `poetry run python -m processors.example_event_processor.processor -c config.yaml` to start indexing!
 8. (Optional) Run locally in Docker
    - The included `Dockerfile` is already set up for you to run the example event processor in Docker.
+   - Create `config.yaml` under current folder
    - Run `docker compose up --build --force-recreate`.
 
 ## Development
