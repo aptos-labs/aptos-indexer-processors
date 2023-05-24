@@ -5,7 +5,7 @@ import json
 
 from aptos.indexer.v1 import raw_data_pb2_grpc
 from aptos.indexer.v1 import raw_data_pb2
-from aptos.transaction.testing1.v1 import transaction_pb2
+from aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.general_utils import standardize_address
 

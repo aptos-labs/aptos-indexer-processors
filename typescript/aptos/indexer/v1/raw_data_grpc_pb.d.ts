@@ -6,7 +6,7 @@
 
 import * as grpc from "@grpc/grpc-js";
 import * as aptos_indexer_v1_raw_data_pb from "../../../aptos/indexer/v1/raw_data_pb";
-import * as aptos_transaction_testing1_v1_transaction_pb from "../../../aptos/transaction/testing1/v1/transaction_pb";
+import * as aptos_transaction_v1_transaction_pb from "../../../aptos/transaction/v1/transaction_pb";
 
 interface IRawDataService extends grpc.ServiceDefinition<grpc.UntypedServiceImplementation> {
     getTransactions: IRawDataService_IGetTransactions;

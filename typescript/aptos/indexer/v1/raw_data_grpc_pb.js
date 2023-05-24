@@ -7,7 +7,7 @@
 'use strict';
 var grpc = require('@grpc/grpc-js');
 var aptos_indexer_v1_raw_data_pb = require('../../../aptos/indexer/v1/raw_data_pb.js');
-var aptos_transaction_testing1_v1_transaction_pb = require('../../../aptos/transaction/testing1/v1/transaction_pb.js');
+var aptos_transaction_v1_transaction_pb = require('../../../aptos/transaction/v1/transaction_pb.js');
 
 function serialize_aptos_indexer_v1_GetTransactionsRequest(arg) {
   if (!(arg instanceof aptos_indexer_v1_raw_data_pb.GetTransactionsRequest)) {
