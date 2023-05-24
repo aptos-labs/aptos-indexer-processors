@@ -1,4 +1,4 @@
-from aptos.transaction.testing1.v1 import transaction_pb2 as _transaction_pb2
+from aptos.transaction.v1 import transaction_pb2 as _transaction_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -7,12 +7,14 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class GetTransactionsRequest(_message.Message):
-    __slots__ = ["starting_version", "transactions_count"]
+    __slots__ = ["batch_size", "starting_version", "transactions_count"]
+    BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     TRANSACTIONS_COUNT_FIELD_NUMBER: _ClassVar[int]
+    batch_size: int
     starting_version: int
     transactions_count: int
-    def __init__(self, starting_version: _Optional[int] = ..., transactions_count: _Optional[int] = ...) -> None: ...
+    def __init__(self, starting_version: _Optional[int] = ..., transactions_count: _Optional[int] = ..., batch_size: _Optional[int] = ...) -> None: ...
 
 class TransactionsResponse(_message.Message):
     __slots__ = ["chain_id", "transactions"]

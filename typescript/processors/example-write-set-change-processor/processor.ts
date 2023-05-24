@@ -105,7 +105,7 @@ program
     );
 
     const request = new GetTransactionsRequest();
-    request.setStartingVersion(config.starting_version);
+    request.setStartingVersion(config.starting_version.toString());
     const metadata = new Metadata();
     metadata.set("x-aptos-data-authorization", config.indexer_api_key);
 
@@ -130,7 +130,7 @@ program
       });
 
       // Validate response chain ID matches expected chain ID
-      if (response.getChainId() != config.chain_id) {
+      if (response.getChainId() != config.chain_id.toString()) {
         throw new Error(
           `Chain ID mismatch. Expected ${
             config.chain_id
@@ -144,7 +144,7 @@ program
 
       for (const transaction of transactionsList) {
         // Validate transaction version is correct
-        if (transaction.getVersion() != currentTxnVersion) {
+        if (transaction.getVersion() != currentTxnVersion.toString()) {
           throw new Error(
             `Transaction version mismatch. Expected ${currentTxnVersion} but got ${transaction.getVersion()}`
           );
