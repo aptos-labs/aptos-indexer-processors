@@ -1,117 +1,53 @@
-import argparse
-import grpc
-import json
+from aptos.transaction.v1 import transaction_pb2
+from processors.example_event_processor.models import Event
+from typing import List
 
-from processors.example_event_processor.event_parser import INDEXER_NAME, parse
-from processors.example_event_processor.models.models import NextVersionToProcess, Base
-from aptos.indexer.v1 import raw_data_pb2_grpc
-from aptos.indexer.v1 import raw_data_pb2
-from utils.config import Config
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import Session
+from utils import general_utils
+from utils.transactions_processor import TransactionsProcessor
+from utils.models.general_models import NextVersionToProcess, Base
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help="Path to config file", required=True)
-args = parser.parse_args()
-config = Config.from_yaml_file(args.config)
+# Define the parser function that will be used by the TransactionProcessor
+def parse(transaction: transaction_pb2.Transaction) -> List[Event]:
+    # Custom filtering
+    # Here we filter out all transactions that are not of type TRANSACTION_TYPE_USER
+    if transaction.type != transaction_pb2.Transaction.TRANSACTION_TYPE_USER:
+        return []
 
-engine = create_engine(config.db_connection_uri)
+    # Parse Transaction struct
+    transaction_version = transaction.version
+    transaction_block_height = transaction.block_height
+    transaction_timestamp = general_utils.parse_pb_timestamp(transaction.timestamp)
+    user_transaction = transaction.user
 
-# Check if the tables are created.
-inspector = inspect(engine)
-table_name = NextVersionToProcess.__tablename__
-if inspector.has_table(table_name):
-    print("Table {} exists.".format(table_name))
-else:
-    print("Table {} does not exist. Creating it now.".format(table_name))
-    Base.metadata.create_all(engine)
+    # Parse Event struct
+    event_db_objs: list[Event] = []
+    for event_index, event in enumerate(user_transaction.events):
+        creation_number = event.key.creation_number
+        sequence_number = event.sequence_number
+        account_address = general_utils.standardize_address(event.key.account_address)
+        type = event.type_str
+        data = event.data
 
-starting_version = config.get_starting_version(INDEXER_NAME)
-
-metadata = (
-    ("x-aptos-data-authorization", config.indexer_api_key),
-    ("x-aptos-request-name", INDEXER_NAME),
-)
-options = [("grpc.max_receive_message_length", -1)]
-
-print(
-    json.dumps(
-        {
-            "message": "Connected to the indexer grpc",
-            "starting_version": starting_version,
-        }
-    )
-)
-# Connect to grpc
-with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
-    stub = raw_data_pb2_grpc.RawDataStub(channel)
-    current_transaction_version = starting_version
-
-    for response in stub.GetTransactions(
-        raw_data_pb2.GetTransactionsRequest(starting_version=starting_version),
-        metadata=metadata,
-    ):
-        chain_id = response.chain_id
-
-        if chain_id != config.chain_id:
-            raise Exception(
-                "Chain ID mismatch. Expected chain ID is: "
-                + str(config.chain_id)
-                + ", but received chain ID is: "
-                + str(chain_id)
-            )
-        print(
-            json.dumps(
-                {
-                    "message": "Response received",
-                    "starting_version": response.transactions[0].version,
-                }
-            )
+        # Create an instance of Event
+        event_db_obj = Event(
+            creation_number=creation_number,
+            sequence_number=sequence_number,
+            account_address=account_address,
+            transaction_version=transaction_version,
+            transaction_block_height=transaction_block_height,
+            type=type,
+            data=data,
+            transaction_timestamp=transaction_timestamp,
+            event_index=event_index,
         )
-        transactions_output = response
-        for transaction in transactions_output.transactions:
-            transaction_version = transaction.version
-            if transaction_version != current_transaction_version:
-                raise Exception(
-                    "Transaction version mismatch. Expected transaction version is: "
-                    + str(current_transaction_version)
-                    + ", but received transaction version is: "
-                    + str(transaction_version)
-                )
+        event_db_objs.append(event_db_obj)
 
-            parsed_objs = parse(transaction)
+    return event_db_objs
 
-            # If we find relevant transactions add them and update latest processed version
-            if parsed_objs is not None:
-                with Session(engine) as session, session.begin():
-                    # Insert Events into database
-                    session.add_all(parsed_objs)
 
-                    # Update latest processed version
-                    session.merge(
-                        NextVersionToProcess(
-                            indexer_name=INDEXER_NAME,
-                            next_version=current_transaction_version + 1,
-                        )
-                    )
-            # If we don't find any relevant transactions, at least update latest processed version every 1000
-            elif (current_transaction_version % 1000) == 0:
-                with Session(engine) as session, session.begin():
-                    # Update latest processed version
-                    session.merge(
-                        NextVersionToProcess(
-                            indexer_name=INDEXER_NAME,
-                            next_version=current_transaction_version + 1,
-                        )
-                    )
-                print(
-                    json.dumps(
-                        {
-                            "message": "Successfully processed transaction",
-                            "last_success_transaction_version": current_transaction_version,
-                        }
-                    )
-                )
-
-            current_transaction_version += 1
+if __name__ == "__main__":
+    transactions_processor = TransactionsProcessor(
+        parse,
+    )
+    transactions_processor.process()

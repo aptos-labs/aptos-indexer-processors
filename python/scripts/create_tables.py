@@ -1,7 +1,8 @@
 import argparse
 
 from utils.config import Config
-from processors.example_event_processor.models.models import Base
+from utils.models.general_models import Base
+from processors.example_event_processor import models as example_models
 from sqlalchemy import create_engine
 
 if __name__ == "__main__":
@@ -13,3 +14,4 @@ if __name__ == "__main__":
 
     engine = create_engine(config.db_connection_uri)
     Base.metadata.create_all(engine)
+    example_models.Base.metadata.create_all(engine)
