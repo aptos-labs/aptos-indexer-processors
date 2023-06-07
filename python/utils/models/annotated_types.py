@@ -15,6 +15,7 @@ StringPrimaryKeyType = Mapped[Annotated[str, mapped_column(String, primary_key=T
 # Normal types
 BigIntegerType = Mapped[Annotated[int, mapped_column(BigInteger)]]
 JsonType = Mapped[Annotated[str, mapped_column(JSONB)]]
+NumericType = Mapped[Annotated[float, mapped_column(Numeric)]]
 StringType = Mapped[Annotated[str, mapped_column(String)]]
 
 # Nullable types
