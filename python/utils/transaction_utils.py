@@ -1,5 +1,5 @@
 from aptos.transaction.v1 import transaction_pb2
-from typing import Optional
+from typing import List, Optional
 
 # Utility functions for transaction_pb2
 
@@ -39,8 +39,32 @@ def get_entry_function_payload(
     return transaction_payload.entry_function_payload
 
 
+def get_entry_function_id_str_short(
+    user_transaction: transaction_pb2.UserTransaction,
+) -> str:
+    entry_function_payload = get_entry_function_payload(user_transaction)
+    entry_function = entry_function_payload.function
+    module = entry_function.module
+    entry_function_name = f"{module.name}::{entry_function.name}"
+    return entry_function_name
+
+
 def get_move_module(
     user_transaction: transaction_pb2.UserTransaction,
 ) -> transaction_pb2.MoveModuleId:
     entry_function_payload = get_entry_function_payload(user_transaction)
     return entry_function_payload.function.module
+
+
+def get_contract_address(
+    user_transaction: transaction_pb2.UserTransaction,
+) -> str:
+    move_module = get_move_module(user_transaction)
+    return move_module.address
+
+
+def get_write_set_changes(
+    transaction: transaction_pb2.Transaction,
+) -> List[transaction_pb2.WriteSetChange]:
+    transaction_info = transaction.info
+    return list(transaction_info.changes)

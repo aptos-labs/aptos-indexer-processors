@@ -3,10 +3,12 @@ import re
 from aptos.transaction.v1 import transaction_pb2
 import json
 from typing import List
-from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
-    get_marketplace_events,
+from processors.nft_orderbooks.nft_marketplace_enums import (
     MarketplaceName,
     StandardMarketplaceEventType,
+)
+from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
+    get_marketplace_events,
 )
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
     NFTMarketplaceEvent,

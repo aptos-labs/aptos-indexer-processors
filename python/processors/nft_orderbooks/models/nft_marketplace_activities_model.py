@@ -1,7 +1,5 @@
-from sqlalchemy.orm import Mapped
 from utils.models.annotated_types import (
     StringType,
-    BigIntegerType,
     BigIntegerPrimaryKeyType,
     InsertedAtType,
     JsonType,

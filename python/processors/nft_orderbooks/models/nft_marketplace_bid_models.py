@@ -1,28 +1,28 @@
 from utils.models.annotated_types import (
     StringType,
+    StringPrimaryKeyType,
     BigIntegerType,
     BigIntegerPrimaryKeyType,
-    BooleanType,
     InsertedAtType,
     NumericType,
-    StringPrimaryKeyType,
+    NumericPrimaryKeyType,
     TimestampType,
 )
 from utils.models.general_models import Base
 
 
-class CurrentNFTMarketplaceListing(Base):
-    __tablename__ = "current_nft_marketplace_listings"
+class CurrentNFTMarketplaceBid(Base):
+    __tablename__ = "current_nft_marketplace_bids"
 
     token_data_id: StringPrimaryKeyType
+    buyer: StringPrimaryKeyType
+    price: NumericPrimaryKeyType
+    num_bids: NumericType
     creator_address: StringType
+    amount: NumericType
     token_name: StringType
     collection: StringType
     collection_id: StringType
-    price: NumericType
-    amount: NumericType
-    seller: StringType
-    is_deleted: BooleanType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
@@ -31,8 +31,8 @@ class CurrentNFTMarketplaceListing(Base):
     inserted_at: InsertedAtType
 
 
-class NFTMarketplaceListing(Base):
-    __tablename__ = "nft_marketplace_listings"
+class NFTMarketplaceBid(Base):
+    __tablename__ = "nft_marketplace_bids"
 
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType
@@ -43,7 +43,7 @@ class NFTMarketplaceListing(Base):
     collection_id: StringType
     price: NumericType
     amount: NumericType
-    seller: StringType
+    buyer: StringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
