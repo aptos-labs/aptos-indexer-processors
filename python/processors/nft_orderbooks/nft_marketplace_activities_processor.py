@@ -19,6 +19,8 @@ from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
 from processors.nft_orderbooks.models.nft_marketplace_bid_models import (
     NFTMarketplaceBid,
     CurrentNFTMarketplaceBid,
+    NFTMarketplaceCollectionBid,
+    CurrentNFTMarketplaceCollectionBid,
 )
 from processors.nft_orderbooks.models.nft_marketplace_listings_models import (
     CurrentNFTMarketplaceListing,
@@ -40,12 +42,18 @@ def parse(
     | CurrentNFTMarketplaceListing
     | NFTMarketplaceBid
     | CurrentNFTMarketplaceBid
+    | NFTMarketplaceCollectionBid
+    | CurrentNFTMarketplaceCollectionBid
 ]:
     nft_activities: List[NFTMarketplaceEvent] = []
     nft_marketplace_listings: List[NFTMarketplaceListing] = []
     current_nft_marketplace_listings: List[CurrentNFTMarketplaceListing] = []
     nft_marketplace_bids: List[NFTMarketplaceBid] = []
     current_nft_marketplace_bids: List[CurrentNFTMarketplaceBid] = []
+    nft_marketplace_collection_bids: List[NFTMarketplaceCollectionBid] = []
+    current_nft_marketplace_collection_bids: List[
+        CurrentNFTMarketplaceCollectionBid
+    ] = []
 
     user_transaction = transaction_utils.get_user_transaction(transaction)
 
@@ -80,6 +88,8 @@ def parse(
                 current_nft_marketplace_listings,
                 nft_marketplace_bids,
                 current_nft_marketplace_bids,
+                nft_marketplace_collection_bids,
+                current_nft_marketplace_collection_bids,
             ) = topaz_parser.parse_transaction(transaction)
         case MarketplaceName.SOUFFLE:
             nft_activities.extend(souffle_parser.parse_marketplace_events(transaction))
@@ -98,62 +108,9 @@ def parse(
         + current_nft_marketplace_listings
         + nft_marketplace_bids
         + current_nft_marketplace_bids
+        + nft_marketplace_collection_bids
+        + current_nft_marketplace_collection_bids
     )
-
-
-# class NFTMarketplaceTransactionsProcessor(TransactionsProcessor):
-#     def insert_to_db(
-#         self,
-#         parsed_objs: Tuple[
-#             NFTMarketplaceEvent, NFTMarketplaceListing, CurrentNFTMarketplaceListing
-#         ],
-#         txn_version: int,
-#     ) -> None:
-#         indexer_name = self.config.indexer_name
-#         (
-#             nft_marketplace_activities,
-#             nft_marketplace_listings,
-#             current_nft_marketplace_listings,
-#         ) = parsed_objs
-
-#         # If we find relevant transactions add them and update latest processed version
-#         if parsed_objs is not None:
-#             with Session(self.engine) as session, session.begin():
-#                 # Simple merge
-#                 simple_merge_objs = (
-#                     nft_marketplace_activities + nft_marketplace_listings + current_nft_marketplace_listings
-#                 )
-#                 for obj in simple_merge_objs:
-#                     session.merge(obj)
-
-#                 # # Custom inserts
-#                 # self.insert_current_listings_to_db(
-#                 #     current_nft_marketplace_listings, session
-#                 # )
-
-#                 # Update latest processed version
-#                 session.merge(
-#                     NextVersionToProcess(
-#                         indexer_name=indexer_name,
-#                         next_version=txn_version + 1,
-#                     )
-#                 )
-#         # If we don't find any relevant transactions, at least update latest processed version every 1000
-#         elif (txn_version % 1000) == 0:
-#             with Session(self.engine) as session, session.begin():
-#                 # Update latest processed version
-#                 session.merge(
-#                     NextVersionToProcess(
-#                         indexer_name=indexer_name,
-#                         next_version=txn_version + 1,
-#                     )
-#                 )
-
-#     def insert_current_listings_to_db(
-#         self, current_listings: List[CurrentNFTMarketplaceListing], session: Session
-#     ) -> None:
-#         for current_listing in current_listings:
-#             session.merge(current_listing)
 
 
 if __name__ == "__main__":

@@ -59,3 +59,14 @@ class BidMetadata:
     price: Optional[int]
     amount: Optional[int]
     buyer: Optional[str]
+
+
+@dataclass
+class CollectionBidMetadata:
+    creator_address: Optional[str]
+    collection: Optional[str]
+    collection_id: Optional[str]
+    price: Optional[int]
+    amount: Optional[int]
+    buyer: Optional[str]
+    is_deleted: Optional[bool]

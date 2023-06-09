@@ -40,6 +40,7 @@ MARKETPLACE_ENTRY_FUNCTIONS = {
             "collection_marketplace::bid",
             "collection_marketplace::cancel",
             "collection_marketplace::fill",
+            "collection_marketplace::fill_many",
             "marketplace_v2::buy",
             "marketplace_v2::buy_many",
             "marketplace_v2::delist",
@@ -119,4 +120,7 @@ TOPAZ_BID_COIN_STORE_TABLE_HANDLE = (
 )
 TOPAZ_BIDS_TABLE_HANDLE = (
     "0x9e13f27559a044dcdcbc262e9c9f32a3e21d2bcb15ca1952d8f4d374e3210bdf"
+)
+TOPAZ_COLLECTION_BIDS_TABLE_HANDLE = (
+    "0x8f89a3d01d95119fbbb49e416a04394da369792b620536fcc9aa797589b18e5b"
 )

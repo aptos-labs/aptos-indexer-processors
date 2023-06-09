@@ -3,8 +3,8 @@ import json
 from aptos.transaction.v1 import transaction_pb2
 from typing import List, Optional, Tuple
 from processors.nft_orderbooks.nft_marketplace_constants import (
-    TOPAZ_BID_COIN_STORE_TABLE_HANDLE,
     TOPAZ_BIDS_TABLE_HANDLE,
+    TOPAZ_COLLECTION_BIDS_TABLE_HANDLE,
     TOPAZ_LISTINGS_TABLE_HANDLE,
 )
 from processors.nft_orderbooks.nft_marketplace_enums import (
@@ -13,6 +13,7 @@ from processors.nft_orderbooks.nft_marketplace_enums import (
     StandardMarketplaceEventType,
     ListingTableMetadata,
     MarketplaceEventMetadata,
+    CollectionBidMetadata,
 )
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
     NFTMarketplaceEvent,
@@ -20,6 +21,8 @@ from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
 from processors.nft_orderbooks.models.nft_marketplace_bid_models import (
     CurrentNFTMarketplaceBid,
     NFTMarketplaceBid,
+    CurrentNFTMarketplaceCollectionBid,
+    NFTMarketplaceCollectionBid,
 )
 from processors.nft_orderbooks.models.nft_marketplace_listings_models import (
     CurrentNFTMarketplaceListing,
@@ -79,12 +82,18 @@ def parse_transaction(
     List[CurrentNFTMarketplaceListing],
     List[NFTMarketplaceBid],
     List[CurrentNFTMarketplaceBid],
+    List[NFTMarketplaceCollectionBid],
+    List[CurrentNFTMarketplaceCollectionBid],
 ]:
     nft_marketplace_activities: List[NFTMarketplaceEvent] = []
     nft_marketplace_listings: List[NFTMarketplaceListing] = []
     current_nft_marketplace_listings: List[CurrentNFTMarketplaceListing] = []
     nft_marketplace_bids: List[NFTMarketplaceBid] = []
     current_nft_marketplace_bids: List[CurrentNFTMarketplaceBid] = []
+    nft_marketplace_collection_bids: List[NFTMarketplaceCollectionBid] = []
+    current_nft_marketplace_collection_bids: List[
+        CurrentNFTMarketplaceCollectionBid
+    ] = []
 
     user_transaction = transaction_utils.get_user_transaction(transaction)
     assert user_transaction
@@ -264,6 +273,14 @@ def parse_transaction(
                 elif table_handle == TOPAZ_BIDS_TABLE_HANDLE:
                     bid_data = parse_bid(write_table_item)
 
+                    bid_amount = 0
+                    is_deleted = False
+                    if bid_data.amount:
+                        if bid_data.amount > 0:
+                            bid_amount = bid_data.amount
+                        elif bid_data.amount == 0:
+                            bid_amount = -1  # Bid is deleted when filled
+
                     bid = NFTMarketplaceBid(
                         transaction_version=transaction_version,
                         index=wsc_index,
@@ -273,13 +290,7 @@ def parse_transaction(
                         collection=bid_data.collection,
                         collection_id=bid_data.collection_id,
                         price=bid_data.price,
-                        amount=(
-                            bid_data.amount
-                            if entry_function_id_str_short == "bid_any::bid"
-                            else bid_data.amount * -1,  # Bid is deleted when filled
-                        )
-                        if bid_data.amount
-                        else None,
+                        amount=bid_amount,
                         buyer=bid_data.buyer,
                         marketplace=MarketplaceName.TOPAZ.value,
                         contract_address=contract_address,
@@ -297,7 +308,7 @@ def parse_transaction(
                         buyer=bid_data.buyer,
                         is_deleted=False
                         if entry_function_id_str_short == "bid_any::bid"
-                        else True,  # Bid is deleted when filled
+                        else True,  # Bid is deleted when filled or cancelled
                         marketplace=MarketplaceName.TOPAZ.value,
                         contract_address=contract_address,
                         entry_function_id_str=entry_function_id_str_short,
@@ -306,6 +317,63 @@ def parse_transaction(
                     )
                     nft_marketplace_bids.append(bid)
                     current_nft_marketplace_bids.append(current_bid)
+                # Handle collection bid place and cancel and fill
+                elif table_handle == TOPAZ_COLLECTION_BIDS_TABLE_HANDLE:
+                    collection_bid_data = parse_collection_bid(write_table_item)
+
+                    # Count the number of tokens filled
+                    num_filled = 0
+                    for event in events:
+                        if "events::FillCollectionBidEvent" in event.type_str:
+                            event_metadata = parse_marketplace_event_metadata(event)
+                            num_filled += event_metadata.amount or 0
+
+                    is_deleted = (
+                        collection_bid_data.is_deleted
+                        or collection_bid_data.amount == 0
+                    )
+                    amount = collection_bid_data.amount
+                    if num_filled > 0:
+                        amount = -1 * num_filled
+                    elif amount != None and is_deleted:
+                        amount = -1 * amount
+
+                    current_amount = collection_bid_data.amount
+                    if is_deleted:
+                        current_amount = 0
+
+                    collection_bid = NFTMarketplaceCollectionBid(
+                        transaction_version=transaction_version,
+                        index=wsc_index,
+                        creator_address=collection_bid_data.creator_address,
+                        collection=collection_bid_data.collection,
+                        collection_id=collection_bid_data.collection_id,
+                        price=collection_bid_data.price,
+                        amount=amount,
+                        buyer=collection_bid_data.buyer,
+                        marketplace=MarketplaceName.TOPAZ.value,
+                        contract_address=contract_address,
+                        entry_function_id_str=entry_function_id_str_short,
+                        transaction_timestamp=transaction_timestamp,
+                    )
+                    current_collection_bid = CurrentNFTMarketplaceCollectionBid(
+                        creator_address=collection_bid_data.creator_address,
+                        collection=collection_bid_data.collection,
+                        collection_id=collection_bid_data.collection_id,
+                        price=collection_bid_data.price,
+                        amount=current_amount,
+                        buyer=collection_bid_data.buyer,
+                        is_deleted=is_deleted,
+                        marketplace=MarketplaceName.TOPAZ.value,
+                        contract_address=contract_address,
+                        entry_function_id_str=entry_function_id_str_short,
+                        last_transaction_version=transaction_version,
+                        last_transaction_timestamp=transaction_timestamp,
+                    )
+                    nft_marketplace_collection_bids.append(collection_bid)
+                    current_nft_marketplace_collection_bids.append(
+                        current_collection_bid
+                    )
 
     return (
         nft_marketplace_activities,
@@ -313,6 +381,8 @@ def parse_transaction(
         current_nft_marketplace_listings,
         nft_marketplace_bids,
         current_nft_marketplace_bids,
+        nft_marketplace_collection_bids,
+        current_nft_marketplace_collection_bids,
     )
 
 
@@ -393,6 +463,42 @@ def parse_bid(write_table_item: transaction_pb2.WriteTableItem) -> BidMetadata:
         price=price,
         amount=amount,
         buyer=standardize_address(buyer) if buyer != None else None,
+    )
+
+
+def parse_collection_bid(
+    write_table_item: transaction_pb2.WriteTableItem,
+) -> CollectionBidMetadata:
+    data = json.loads(write_table_item.data.value)
+
+    # Collection creator parsing
+    collection = data.get("collection_name", None)
+    creator = data.get("creator", None)
+
+    collection_data_id_type = CollectionDataIdType(creator, collection)
+
+    # Price parsing
+    price = data.get("price")
+    price = int(price) if price else None
+
+    # Amount parsing
+    amount = data.get("amount")
+    amount = int(amount) if amount else None
+
+    # Buyer parsing
+    buyer = data.get("buyer", None)
+
+    cancelled = data.get("cancelled", None)
+    cancelled = bool(cancelled) if cancelled != None else None
+
+    return CollectionBidMetadata(
+        creator_address=standardize_address(creator),
+        collection=collection_data_id_type.get_name_trunc(),
+        collection_id=collection_data_id_type.to_hash(),
+        price=price,
+        amount=amount,
+        buyer=standardize_address(buyer) if buyer != None else None,
+        is_deleted=cancelled,
     )
 
 
