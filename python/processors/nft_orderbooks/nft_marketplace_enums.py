@@ -47,3 +47,15 @@ class MarketplaceEventMetadata:
     amount: Optional[int]
     buyer: Optional[str]
     seller: Optional[str]
+
+
+@dataclass
+class BidMetadata:
+    creator_address: Optional[str]
+    token_data_id: Optional[str]
+    token_name: Optional[str]
+    collection: Optional[str]
+    collection_id: Optional[str]
+    price: Optional[int]
+    amount: Optional[int]
+    buyer: Optional[str]

@@ -16,6 +16,10 @@ from processors.nft_orderbooks.parsers import (
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
     NFTMarketplaceEvent,
 )
+from processors.nft_orderbooks.models.nft_marketplace_bid_models import (
+    NFTMarketplaceBid,
+    CurrentNFTMarketplaceBid,
+)
 from processors.nft_orderbooks.models.nft_marketplace_listings_models import (
     CurrentNFTMarketplaceListing,
     NFTMarketplaceListing,
@@ -30,10 +34,18 @@ from utils import transaction_utils
 
 def parse(
     transaction: transaction_pb2.Transaction,
-) -> List[NFTMarketplaceEvent | NFTMarketplaceListing | CurrentNFTMarketplaceListing]:
+) -> List[
+    NFTMarketplaceEvent
+    | NFTMarketplaceListing
+    | CurrentNFTMarketplaceListing
+    | NFTMarketplaceBid
+    | CurrentNFTMarketplaceBid
+]:
     nft_activities: List[NFTMarketplaceEvent] = []
     nft_marketplace_listings: List[NFTMarketplaceListing] = []
     current_nft_marketplace_listings: List[CurrentNFTMarketplaceListing] = []
+    nft_marketplace_bids: List[NFTMarketplaceBid] = []
+    current_nft_marketplace_bids: List[CurrentNFTMarketplaceBid] = []
 
     user_transaction = transaction_utils.get_user_transaction(transaction)
 
@@ -66,6 +78,8 @@ def parse(
                 nft_activities,
                 nft_marketplace_listings,
                 current_nft_marketplace_listings,
+                nft_marketplace_bids,
+                current_nft_marketplace_bids,
             ) = topaz_parser.parse_transaction(transaction)
         case MarketplaceName.SOUFFLE:
             nft_activities.extend(souffle_parser.parse_marketplace_events(transaction))
@@ -78,7 +92,13 @@ def parse(
         case MarketplaceName.ITSRARE:
             nft_activities.extend(itsrare_parser.parse_marketplace_events(transaction))
 
-    return nft_activities + nft_marketplace_listings + current_nft_marketplace_listings
+    return (
+        nft_activities
+        + nft_marketplace_listings
+        + current_nft_marketplace_listings
+        + nft_marketplace_bids
+        + current_nft_marketplace_bids
+    )
 
 
 # class NFTMarketplaceTransactionsProcessor(TransactionsProcessor):

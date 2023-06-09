@@ -3,6 +3,7 @@ from utils.models.annotated_types import (
     StringPrimaryKeyType,
     BigIntegerType,
     BigIntegerPrimaryKeyType,
+    BooleanType,
     InsertedAtType,
     NumericType,
     NumericPrimaryKeyType,
@@ -26,6 +27,7 @@ class CurrentNFTMarketplaceBid(Base):
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
+    is_deleted: BooleanType
     last_transaction_version: BigIntegerType
     last_transaction_timestamp: TimestampType
     inserted_at: InsertedAtType
