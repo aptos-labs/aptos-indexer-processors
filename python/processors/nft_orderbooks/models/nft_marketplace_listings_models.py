@@ -21,7 +21,7 @@ class CurrentNFTMarketplaceListing(Base):
     collection: StringType
     collection_id: StringType
     price: NumericType
-    amount: NumericType
+    token_amount: NumericType
     seller: StringType
     is_deleted: BooleanType
     marketplace: StringType
@@ -43,7 +43,7 @@ class NFTMarketplaceListing(Base):
     collection: StringType
     collection_id: StringType
     price: NumericType
-    amount: NumericType
+    token_amount: NumericType
     seller: StringType
     buyer: NullableStringType
     marketplace: StringType

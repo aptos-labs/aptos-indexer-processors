@@ -150,7 +150,7 @@ def parse_marketplace_events(
             token_data_id=token_data_id,
             collection_id=collection_data_id_type.to_hash(),
             price=price,
-            amount=amount,
+            token_amount=amount,
             buyer=standardize_address(buyer) if buyer else None,
             seller=standardize_address(seller) if seller else None,
             json_data=event.json_data,

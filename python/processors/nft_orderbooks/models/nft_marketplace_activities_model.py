@@ -23,7 +23,7 @@ class NFTMarketplaceEvent(Base):
     token_data_id: NullableStringType
     collection_id: NullableStringType
     price: NullableNumericType
-    amount: NullableNumericType
+    token_amount: NullableNumericType
     buyer: NullableStringType
     seller: NullableStringType
     json_data: JsonType

@@ -90,7 +90,7 @@ def parse_marketplace_events(
             token_data_id=token_data_id_type.to_hash(),
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
-            amount=token_amount,
+            token_amount=token_amount,
             buyer=standardize_address(buyer) if buyer else None,
             seller=standardize_address(seller) if seller else None,
             json_data=event.json_data,

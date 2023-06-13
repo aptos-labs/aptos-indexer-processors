@@ -20,7 +20,7 @@ class CurrentNFTMarketplaceBid(Base):
     buyer: StringPrimaryKeyType
     price: NumericPrimaryKeyType
     creator_address: StringType
-    amount: NumericType
+    token_amount: NumericType
     token_name: StringType
     collection: StringType
     collection_id: StringType
@@ -44,7 +44,7 @@ class NFTMarketplaceBid(Base):
     collection: StringType
     collection_id: StringType
     price: NumericType
-    amount: NumericType
+    token_amount: NumericType
     buyer: StringType
     seller: NullableStringType
     marketplace: StringType
@@ -62,7 +62,7 @@ class CurrentNFTMarketplaceCollectionBid(Base):
     buyer: StringPrimaryKeyType
     price: NumericPrimaryKeyType
     creator_address: StringType
-    amount: NumericType
+    token_amount: NumericType
     collection: StringType
     marketplace: StringType
     contract_address: StringType
@@ -82,7 +82,7 @@ class NFTMarketplaceCollectionBid(Base):
     collection: StringType
     collection_id: StringType
     price: NumericType
-    amount: NumericType
+    token_amount: NumericType
     buyer: StringType
     seller: NullableStringType
     marketplace: StringType
