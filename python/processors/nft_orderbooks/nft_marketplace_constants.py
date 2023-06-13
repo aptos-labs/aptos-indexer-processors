@@ -124,3 +124,19 @@ TOPAZ_BIDS_TABLE_HANDLE = (
 TOPAZ_COLLECTION_BIDS_TABLE_HANDLE = (
     "0x8f89a3d01d95119fbbb49e416a04394da369792b620536fcc9aa797589b18e5b"
 )
+
+# Marketplace table handles
+MARKETPLACE_TABLE_HANDLES = {
+    MarketplaceName.TOPAZ: set(
+        [
+            TOPAZ_LISTINGS_TABLE_HANDLE,
+            TOPAZ_BID_COIN_STORE_TABLE_HANDLE,
+            TOPAZ_BIDS_TABLE_HANDLE,
+            TOPAZ_COLLECTION_BIDS_TABLE_HANDLE,
+        ]
+    ),
+}
+
+MARKETPLACE_TABLE_HANDLES_INV = {
+    vv: k for k, v in MARKETPLACE_TABLE_HANDLES.items() for vv in v
+}

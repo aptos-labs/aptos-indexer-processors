@@ -69,4 +69,4 @@ class CollectionBidMetadata:
     price: Optional[int]
     amount: Optional[int]
     buyer: Optional[str]
-    is_deleted: Optional[bool]
+    is_cancelled: Optional[bool]

@@ -128,7 +128,7 @@ def parse_marketplace_events(
             marketplace=MarketplaceName.OKX.value,
             contract_address=contract_address,
             entry_function_id_str=entry_function_name,
-            transaction_timestamp=general_utils.convert_timestamp_to_int64(
+            transaction_timestamp=general_utils.convert_pb_timestamp_to_datetime(
                 transaction.timestamp
             ),
         )

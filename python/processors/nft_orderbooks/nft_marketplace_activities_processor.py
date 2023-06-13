@@ -4,6 +4,7 @@ from processors.nft_orderbooks.nft_marketplace_enums import MarketplaceName
 from processors.nft_orderbooks.nft_marketplace_constants import (
     MARKETPLACE_ENTRY_FUNCTIONS,
     MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV,
+    MARKETPLACE_TABLE_HANDLES_INV,
 )
 from processors.nft_orderbooks.parsers import (
     bluemove_parser,
@@ -31,7 +32,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from utils.models.general_models import NextVersionToProcess
 from utils.transactions_processor import TransactionsProcessor
-from utils import transaction_utils
+from utils import event_utils, general_utils, transaction_utils, write_set_change_utils
 
 
 def parse(
@@ -45,72 +46,61 @@ def parse(
     | NFTMarketplaceCollectionBid
     | CurrentNFTMarketplaceCollectionBid
 ]:
-    nft_activities: List[NFTMarketplaceEvent] = []
-    nft_marketplace_listings: List[NFTMarketplaceListing] = []
-    current_nft_marketplace_listings: List[CurrentNFTMarketplaceListing] = []
-    nft_marketplace_bids: List[NFTMarketplaceBid] = []
-    current_nft_marketplace_bids: List[CurrentNFTMarketplaceBid] = []
-    nft_marketplace_collection_bids: List[NFTMarketplaceCollectionBid] = []
-    current_nft_marketplace_collection_bids: List[
-        CurrentNFTMarketplaceCollectionBid
-    ] = []
-
+    parsed_objs = []
     user_transaction = transaction_utils.get_user_transaction(transaction)
 
     # Filter user transactions
     if not user_transaction:
         return []
 
-    contract_address = (
-        transaction_utils.get_contract_address(user_transaction)
-        if user_transaction
-        else None
-    )
+    events = user_transaction.events
+    for event_index, event in enumerate(events):
+        account_address = general_utils.standardize_address(
+            event_utils.get_account_address(event)
+        )
 
-    # Filter marketplace smart contracts
-    if contract_address not in MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV:
-        return []
+        if account_address not in MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV:
+            continue
 
-    marketplace_name = MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV[contract_address]
+        marketplace_name = MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV[account_address]
 
-    # Filter marketplace entry functions
-    entry_function_id_str_short = transaction_utils.get_entry_function_id_str_short(
-        user_transaction
-    )
-    if entry_function_id_str_short not in MARKETPLACE_ENTRY_FUNCTIONS[marketplace_name]:
-        return []
+        match (marketplace_name):
+            case MarketplaceName.TOPAZ:
+                parsed_objs.extend(
+                    topaz_parser.parse_event(transaction, event, event_index)
+                )
+            case MarketplaceName.SOUFFLE:
+                parsed_objs.extend(souffle_parser.parse_marketplace_events(transaction))
+            case MarketplaceName.BLUEMOVE:
+                parsed_objs.extend(
+                    bluemove_parser.parse_marketplace_events(transaction)
+                )
+            case MarketplaceName.OKX:
+                parsed_objs.extend(okx_parser.parse_marketplace_events(transaction))
+            case MarketplaceName.OZOZOZ:
+                parsed_objs.extend(ozozoz_parser.parse_marketplace_events(transaction))
+            case MarketplaceName.ITSRARE:
+                parsed_objs.extend(itsrare_parser.parse_marketplace_events(transaction))
 
-    match (marketplace_name):
-        case MarketplaceName.TOPAZ:
-            (
-                nft_activities,
-                nft_marketplace_listings,
-                current_nft_marketplace_listings,
-                nft_marketplace_bids,
-                current_nft_marketplace_bids,
-                nft_marketplace_collection_bids,
-                current_nft_marketplace_collection_bids,
-            ) = topaz_parser.parse_transaction(transaction)
-        case MarketplaceName.SOUFFLE:
-            nft_activities.extend(souffle_parser.parse_marketplace_events(transaction))
-        case MarketplaceName.BLUEMOVE:
-            nft_activities.extend(bluemove_parser.parse_marketplace_events(transaction))
-        case MarketplaceName.OKX:
-            nft_activities.extend(okx_parser.parse_marketplace_events(transaction))
-        case MarketplaceName.OZOZOZ:
-            nft_activities.extend(ozozoz_parser.parse_marketplace_events(transaction))
-        case MarketplaceName.ITSRARE:
-            nft_activities.extend(itsrare_parser.parse_marketplace_events(transaction))
+    write_set_changes = transaction_utils.get_write_set_changes(transaction)
+    for wsc_index, wsc in enumerate(write_set_changes):
+        write_table_item = write_set_change_utils.get_write_table_item(wsc)
 
-    return (
-        nft_activities
-        + nft_marketplace_listings
-        + current_nft_marketplace_listings
-        + nft_marketplace_bids
-        + current_nft_marketplace_bids
-        + nft_marketplace_collection_bids
-        + current_nft_marketplace_collection_bids
-    )
+        if write_table_item:
+            table_handle = write_table_item.handle
+            if table_handle not in MARKETPLACE_TABLE_HANDLES_INV:
+                continue
+            marketplace_name = MARKETPLACE_TABLE_HANDLES_INV[table_handle]
+
+            match (marketplace_name):
+                case MarketplaceName.TOPAZ:
+                    parsed_objs.extend(
+                        topaz_parser.parse_write_table_item(
+                            transaction, write_table_item, wsc_index
+                        )
+                    )
+
+    return parsed_objs
 
 
 if __name__ == "__main__":

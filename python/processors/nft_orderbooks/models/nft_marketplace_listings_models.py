@@ -1,4 +1,5 @@
 from utils.models.annotated_types import (
+    NullableStringType,
     StringType,
     BigIntegerType,
     BigIntegerPrimaryKeyType,
@@ -44,8 +45,10 @@ class NFTMarketplaceListing(Base):
     price: NumericType
     amount: NumericType
     seller: StringType
+    buyer: NullableStringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
+    event_type: StringType
     transaction_timestamp: TimestampType
     inserted_at: InsertedAtType

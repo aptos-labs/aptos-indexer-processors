@@ -8,11 +8,5 @@ db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"
 # Even if there is a version stored in the DB, start processor from starting_version_override
 # starting_version_override: 113880
 
-processors:
-  <indexer_name>:
-    chain_id: 1
-    indexer_endpoint: "34.30.218.153:50051"
-    project_id: <project_id>
-    database: <database_name>
-    table_name: <table_name>
-    starting_version: <starting_version>
+# Optionally stop processor after ending_version
+# ending_version: 114000
