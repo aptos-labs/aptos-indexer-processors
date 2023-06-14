@@ -112,6 +112,27 @@ MARKETPLACE_ADDRESS_MATCH_REGEX_STRINGS = {
 }
 
 # Topaz
+TOPAZ_MARKETPLACE_EVENT_TYPES = set(
+    [
+        # these are trade-related events
+        # trade-related events are by nature also orderbook-related events
+        "events::BuyEvent",
+        "events::SellEvent",
+        "events::FillCollectionBidEvent",
+        # these are orderbook-related events
+        "events::ListEvent",
+        "events::DelistEvent",
+        "events::BidEvent",
+        "events::CancelBidEvent",
+        "events::CollectionBidEvent",
+        "events::CancelCollectionBidEvent"
+        # unrelated to order book; these are filtered out (included here in comments for documentation)
+        # "token_coin_swap::TokenListingEvent" -- redundant with events::ListEvent
+        # "token_coin_swap::TokenSwapEvent"    -- redundant with events::BuyEvent
+        # "events::SendEvent" -- transfer events do not affect order book
+        # "events::ClaimEvent" -- transfer events do not affect order book
+    ]
+)
 TOPAZ_LISTINGS_TABLE_HANDLE = (
     "0xe32a79149395a3cb3611fd30f748be07c49adb10c36e4ff7cda52708e7ac025a"
 )
@@ -125,6 +146,59 @@ TOPAZ_COLLECTION_BIDS_TABLE_HANDLE = (
     "0x8f89a3d01d95119fbbb49e416a04394da369792b620536fcc9aa797589b18e5b"
 )
 
+# Souffle
+SOUFFLE_MARKETPLACE_EVENT_TYPES = set(
+    [
+        # these are trade-related events
+        # trade-related events are by nature also orderbook-related events
+        "FixedPriceMarket::BuyTokenEvent",
+        # these are orderbook-related events
+        "FixedPriceMarket::ListTokenEvent",
+        "FixedPriceMarket::CancelListTokenEvent",
+    ]
+)
+SOUFFLE_LISTINGS_TABLE_HANDLE = (
+    "0xa8426491baaed45f0d13bdf687e9f55959bdf297b685cbf61c6e968c81380d5f"
+)
+
+# Bluemove
+BLUEMOVE_MARKETPLACE_EVENT_TYPES = set(
+    [
+        # these are trade-related events
+        "marketplaceV2::BuyEvent",  # purchase
+        "offer_lib::AcceptOfferCollectionEvent",  # accept global bid
+        "offer_lib::AcceptOfferEvent",  # accept bid
+        # these are orderbook related events
+        "offer_lib::OfferCollectionEvent",  # global bid
+        "offer_lib::CancelOfferCollectionEvent",  # cancelled global bid
+        "offer_lib::OfferEvent",  # bid
+        "offer_lib::CancelOfferEvent",  # cancelled bid
+        "marketplaceV2::ListEvent",  # listing
+        "marketplaceV2::ChangePriceEvent",  # change price of listing
+        "marketplaceV2::DelistEvent"  # cancel listing
+        # # all auctions on bluemove look unsuccessful
+        # ,'marketplaceV2::AuctionEvent'
+        # ,'marketplaceV2::BidEvent' # bids on unsuccessful auctions
+        # # unrelated to order book; these are filtered out (included here in comments for documentation)
+        # ,'marketplaceV2::ClaimTokenEvent'
+        # ,'marketplaceV2::ClaimCoinsEvent'
+        # ,'offer_lib::ClaimTokenOffer'
+        # ,'offer_lib::ClaimTokenOfferCollectionEvent'
+    ]
+)
+
+BLUEMOVE_LISTINGS_TABLE_HANDLE = (
+    "0x7ccc0aa7c30736fbc1f4ba34f4e8fab4a5cad3d1bd520af716716087affb67f9"
+)
+
+BLUEMOVE_BIDS_TABLE_HANDLE = (
+    "0x6e5cefeb3c74d6fbfb559cda6b173024de2a8e3e0598e96c3e090e675a306fd6"
+)
+
+BLUEMOVE_COLLECTION_BIDS_TABLE_HANDLE = (
+    "0x892b432784f8147bfd1ed4cea039783d48a5a4d317ee14b334518ec6d899e3a5"
+)
+
 # Marketplace table handles
 MARKETPLACE_TABLE_HANDLES = {
     MarketplaceName.TOPAZ: set(
@@ -133,6 +207,14 @@ MARKETPLACE_TABLE_HANDLES = {
             TOPAZ_BID_COIN_STORE_TABLE_HANDLE,
             TOPAZ_BIDS_TABLE_HANDLE,
             TOPAZ_COLLECTION_BIDS_TABLE_HANDLE,
+        ]
+    ),
+    MarketplaceName.SOUFFLE: set([SOUFFLE_LISTINGS_TABLE_HANDLE]),
+    MarketplaceName.BLUEMOVE: set(
+        [
+            BLUEMOVE_LISTINGS_TABLE_HANDLE,
+            BLUEMOVE_BIDS_TABLE_HANDLE,
+            BLUEMOVE_COLLECTION_BIDS_TABLE_HANDLE,
         ]
     ),
 }

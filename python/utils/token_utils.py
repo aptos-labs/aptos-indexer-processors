@@ -22,6 +22,9 @@ class TokenDataIdType:
 
     def get_collection_data_id_hash(self):
         return CollectionDataIdType(self.creator, self.collection).to_hash()
+    
+    def get_creator(self):
+        return standardize_address(self.creator)
 
 
 class CollectionDataIdType:
@@ -36,3 +39,6 @@ class CollectionDataIdType:
 
     def get_name_trunc(self) -> str:
         return truncate_str(self.name, MAX_NAME_LENGTH)
+    
+    def get_creator(self):
+        return standardize_address(self.creator)

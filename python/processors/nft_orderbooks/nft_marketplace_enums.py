@@ -1,3 +1,5 @@
+import datetime
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -31,8 +33,8 @@ class ListingTableMetadata:
     token_name: Optional[str]
     collection: Optional[str]
     collection_id: Optional[str]
-    price: Optional[int]
-    amount: Optional[int]
+    price: Optional[float]
+    amount: Optional[float]
     seller: Optional[str]
 
 
@@ -43,8 +45,8 @@ class MarketplaceEventMetadata:
     token_name: Optional[str]
     collection: Optional[str]
     collection_id: Optional[str]
-    price: Optional[int]
-    amount: Optional[int]
+    price: Optional[float]
+    amount: Optional[float]
     buyer: Optional[str]
     seller: Optional[str]
 
@@ -56,9 +58,10 @@ class BidMetadata:
     token_name: Optional[str]
     collection: Optional[str]
     collection_id: Optional[str]
-    price: Optional[int]
-    amount: Optional[int]
+    price: Optional[float]
+    amount: Optional[float]
     buyer: Optional[str]
+    seller: Optional[str]
 
 
 @dataclass
@@ -66,7 +69,16 @@ class CollectionBidMetadata:
     creator_address: Optional[str]
     collection: Optional[str]
     collection_id: Optional[str]
-    price: Optional[int]
-    amount: Optional[int]
+    price: Optional[float]
+    amount: Optional[float] # Amount of tokens left in the collection bid
     buyer: Optional[str]
+    seller: Optional[str]
     is_cancelled: Optional[bool]
+
+
+@dataclass
+class TransactionMetadata:
+    transaction_version: int
+    transaction_timestamp: datetime.datetime
+    contract_address: str
+    entry_function_id_str_short: str

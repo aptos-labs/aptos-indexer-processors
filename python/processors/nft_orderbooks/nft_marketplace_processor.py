@@ -1,3 +1,5 @@
+import json
+
 from typing import List, Tuple
 from aptos.transaction.v1 import transaction_pb2
 from processors.nft_orderbooks.nft_marketplace_enums import MarketplaceName
@@ -13,6 +15,11 @@ from processors.nft_orderbooks.parsers import (
     ozozoz_parser,
     souffle_parser,
     topaz_parser,
+)
+from processors.nft_orderbooks.nft_marketplace_enums import (
+    ListingTableMetadata,
+    BidMetadata,
+    CollectionBidMetadata,
 )
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
     NFTMarketplaceEvent,
@@ -30,7 +37,6 @@ from processors.nft_orderbooks.models.nft_marketplace_listings_models import (
 from processors.nft_orderbooks.nft_orderbooks_parser_utils import MarketplaceName
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
-from utils.models.general_models import NextVersionToProcess
 from utils.transactions_processor import TransactionsProcessor
 from utils import event_utils, general_utils, transaction_utils, write_set_change_utils
 
@@ -55,14 +61,14 @@ def parse(
 
     events = user_transaction.events
     for event_index, event in enumerate(events):
-        account_address = general_utils.standardize_address(
-            event_utils.get_account_address(event)
+        contract_address = general_utils.standardize_address(
+            event_utils.get_event_type_address(event)
         )
 
-        if account_address not in MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV:
+        if contract_address not in MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV:
             continue
 
-        marketplace_name = MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV[account_address]
+        marketplace_name = MARKETPLACE_SMART_CONTRACT_ADDRESSES_INV[contract_address]
 
         match (marketplace_name):
             case MarketplaceName.TOPAZ:
@@ -70,10 +76,12 @@ def parse(
                     topaz_parser.parse_event(transaction, event, event_index)
                 )
             case MarketplaceName.SOUFFLE:
-                parsed_objs.extend(souffle_parser.parse_marketplace_events(transaction))
+                parsed_objs.extend(
+                    souffle_parser.parse_event(transaction, event, event_index)
+                )
             case MarketplaceName.BLUEMOVE:
                 parsed_objs.extend(
-                    bluemove_parser.parse_marketplace_events(transaction)
+                    bluemove_parser.parse_event(transaction, event, event_index)
                 )
             case MarketplaceName.OKX:
                 parsed_objs.extend(okx_parser.parse_marketplace_events(transaction))
@@ -87,15 +95,29 @@ def parse(
         write_table_item = write_set_change_utils.get_write_table_item(wsc)
 
         if write_table_item:
-            table_handle = write_table_item.handle
+            table_handle = str(write_table_item.handle)
+
             if table_handle not in MARKETPLACE_TABLE_HANDLES_INV:
                 continue
+
             marketplace_name = MARKETPLACE_TABLE_HANDLES_INV[table_handle]
 
             match (marketplace_name):
                 case MarketplaceName.TOPAZ:
                     parsed_objs.extend(
                         topaz_parser.parse_write_table_item(
+                            transaction, write_table_item, wsc_index
+                        )
+                    )
+                case MarketplaceName.SOUFFLE:
+                    parsed_objs.extend(
+                        souffle_parser.parse_write_table_item(
+                            transaction, write_table_item, wsc_index
+                        )
+                    )
+                case MarketplaceName.BLUEMOVE:
+                    parsed_objs.extend(
+                        bluemove_parser.parse_write_table_item(
                             transaction, write_table_item, wsc_index
                         )
                     )
