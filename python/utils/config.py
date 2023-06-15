@@ -1,11 +1,11 @@
 import yaml
 
 from utils.models.general_models import NextVersionToProcess
-from pydantic import BaseSettings
+from pydantic import BaseModel, BaseSettings
 from pydantic.env_settings import SettingsSourceCallable
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 
 class Config(BaseSettings):
@@ -16,6 +16,7 @@ class Config(BaseSettings):
     db_connection_uri: str
     starting_version_default: Optional[int] = None
     starting_version_override: Optional[int] = None
+    ending_version: Optional[int] = None
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings

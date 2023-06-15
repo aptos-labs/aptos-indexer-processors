@@ -1,0 +1,3 @@
+PATH_TO_YOUR_BIGQUERY_MODELS_FOLDER="$1"
+PROTO_FILE="$2"
+protoc --proto_path=${PATH_TO_YOUR_BIGQUERY_MODELS_FOLDER}"/protos" --python_out=${PATH_TO_YOUR_BIGQUERY_MODELS_FOLDER}"/proto_autogen" --pyi_out=${PATH_TO_YOUR_BIGQUERY_MODELS_FOLDER}"/proto_autogen" ${PROTO_FILE}
