@@ -1,10 +1,12 @@
 from aptos.transaction.v1 import transaction_pb2
 import json
 from typing import List
-from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
-    get_marketplace_events,
+from processors.nft_orderbooks.nft_marketplace_enums import (
     MarketplaceName,
     StandardMarketplaceEventType,
+)
+from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
+    get_marketplace_events,
 )
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
     NFTMarketplaceEvent,
@@ -83,7 +85,7 @@ def parse_marketplace_events(
             token_data_id=token_data_id,
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
-            amount=amount,
+            token_amount=amount,
             buyer=standardize_address(buyer) if buyer else None,
             seller=standardize_address(seller) if seller else None,
             json_data=event.json_data,

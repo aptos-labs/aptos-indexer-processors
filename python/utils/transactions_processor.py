@@ -99,6 +99,18 @@ class TransactionsProcessor:
                             + str(transaction_version)
                         )
 
+                    if self.config.ending_version != None:
+                        if transaction_version > self.config.ending_version:
+                            print(
+                                json.dumps(
+                                    {
+                                        "message": "Reached ending version",
+                                        "ending_version": self.config.ending_version,
+                                    }
+                                )
+                            )
+                            return
+
                     parsed_objs = self.parser_function(transaction)
                     self.insert_to_db(parsed_objs, current_transaction_version)
 

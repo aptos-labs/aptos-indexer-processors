@@ -2,10 +2,8 @@ from aptos.transaction.v1 import transaction_pb2
 import json
 import re
 from typing import Dict, List, Optional, TypedDict
-from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
-    get_marketplace_events,
+from processors.nft_orderbooks.nft_marketplace_enums import (
     MarketplaceName,
-    MARKETPLACE_ADDRESS_MATCH_REGEX_STRINGS,
     StandardMarketplaceEventType,
 )
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
@@ -123,14 +121,14 @@ def parse_marketplace_events(
             token_data_id=token_data_id,
             collection_id=collection_data_id,
             price=price,
-            amount=amount,
+            token_amount=amount,
             buyer=standardize_address(buyer) if buyer else None,
             seller=standardize_address(seller) if seller else None,
             json_data=event.data,
             marketplace=MarketplaceName.OKX.value,
             contract_address=contract_address,
             entry_function_id_str=entry_function_name,
-            transaction_timestamp=general_utils.convert_timestamp_to_int64(
+            transaction_timestamp=general_utils.convert_pb_timestamp_to_datetime(
                 transaction.timestamp
             ),
         )
