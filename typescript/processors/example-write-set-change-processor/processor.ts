@@ -83,7 +83,7 @@ program
 
     // Create the grpc client
     const client = new services.RawDataClient(
-      config.indexer_endpoint,
+      config.grpc_data_stream_endpoint,
       new CustomChannelCred(),
       {
         "grpc.keepalive_time_ms": 1000,
@@ -107,7 +107,7 @@ program
     const request = new GetTransactionsRequest();
     request.setStartingVersion(config.starting_version.toString());
     const metadata = new Metadata();
-    metadata.set("x-aptos-data-authorization", config.indexer_api_key);
+    metadata.set("x-aptos-data-authorization", config.grpc_data_stream_api_key);
 
     // Create and start the streaming RPC
     let currentTxnVersion = config.starting_version || 0;

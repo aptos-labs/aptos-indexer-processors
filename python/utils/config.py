@@ -10,9 +10,8 @@ from typing import Any, Dict, List, Optional
 
 class Config(BaseSettings):
     chain_id: int
-    indexer_endpoint: str
-    indexer_api_key: str
-    indexer_name: str
+    grpc_data_stream_endpoint: str
+    grpc_data_stream_api_key: str
     db_connection_uri: str
     starting_version_default: Optional[int] = None
     starting_version_override: Optional[int] = None
@@ -37,7 +36,7 @@ class Config(BaseSettings):
 
         return cls(**config)
 
-    def get_starting_version(self) -> int:
+    def get_starting_version(self, processor_name: str) -> int:
         next_version_to_process = None
 
         if self.db_connection_uri is not None:
@@ -46,7 +45,7 @@ class Config(BaseSettings):
 
                 with Session(engine) as session, session.begin():
                     next_version_to_process_from_db = session.get(
-                        NextVersionToProcess, self.indexer_name
+                        NextVersionToProcess, processor_name
                     )
                     if next_version_to_process_from_db != None:
                         next_version_to_process = (
