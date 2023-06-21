@@ -449,7 +449,7 @@ def parse_bid(write_table_item: transaction_pb2.WriteTableItem) -> BidMetadata:
         price=price,
         amount=amount,
         buyer=standardize_address(buyer) if buyer != None else None,
-        seller=None, # This is parsed from the transaction
+        seller=None,  # This is parsed from the transaction
     )
 
 
@@ -485,7 +485,7 @@ def parse_collection_bid(
         price=price,
         amount=amount,
         buyer=standardize_address(buyer) if buyer != None else None,
-        seller=None, # This is parsed from the transaction
+        seller=None,  # This is parsed from the transaction
         is_cancelled=cancelled,
     )
 

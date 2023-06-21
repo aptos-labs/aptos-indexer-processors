@@ -70,7 +70,7 @@ class CollectionBidMetadata:
     collection: Optional[str]
     collection_id: Optional[str]
     price: Optional[float]
-    amount: Optional[float] # Amount of tokens left in the collection bid
+    amount: Optional[float]  # Amount of tokens left in the collection bid
     buyer: Optional[str]
     seller: Optional[str]
     is_cancelled: Optional[bool]

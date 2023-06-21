@@ -111,7 +111,7 @@ def parse_event(
             collection=token_data_id_type.get_collection_trunc(),
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
-            token_amount=token_amount * -1, # Negative if listing is filled
+            token_amount=token_amount * -1,  # Negative if listing is filled
             seller=seller,
             buyer=buyer,
             event_type=standard_event_type.value,
@@ -127,7 +127,7 @@ def parse_event(
             collection=token_data_id_type.get_collection_trunc(),
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=price,
-            token_amount=0, # Zero if listing is filled
+            token_amount=0,  # Zero if listing is filled
             seller=seller,
             is_deleted=True,
             marketplace=MarketplaceName.SOUFFLE.value,
@@ -156,7 +156,7 @@ def parse_event(
             collection=token_data_id_type.get_collection_trunc(),
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=previous_price,
-            token_amount=token_amount * -1, # Negative if listing is canceled
+            token_amount=token_amount * -1,  # Negative if listing is canceled
             seller=seller,
             event_type=standard_event_type.value,
             marketplace=MarketplaceName.SOUFFLE.value,
@@ -171,7 +171,7 @@ def parse_event(
             collection=token_data_id_type.get_collection_trunc(),
             collection_id=token_data_id_type.get_collection_data_id_hash(),
             price=previous_price,
-            token_amount=0, # Zero if listing is canceled
+            token_amount=0,  # Zero if listing is canceled
             seller=seller,
             is_deleted=True,
             marketplace=MarketplaceName.SOUFFLE.value,
@@ -182,7 +182,6 @@ def parse_event(
         )
         parsed_objs.append(listing)
         parsed_objs.append(current_listing)
-
 
     parsed_objs.append(activity)
 
