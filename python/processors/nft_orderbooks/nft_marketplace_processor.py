@@ -1,6 +1,4 @@
-import json
-
-from typing import List, Tuple
+from typing import List
 from aptos.transaction.v1 import transaction_pb2
 from processors.nft_orderbooks.nft_marketplace_enums import MarketplaceName
 from processors.nft_orderbooks.nft_marketplace_constants import (
@@ -15,11 +13,6 @@ from processors.nft_orderbooks.parsers import (
     ozozoz_parser,
     souffle_parser,
     topaz_parser,
-)
-from processors.nft_orderbooks.nft_marketplace_enums import (
-    ListingTableMetadata,
-    BidMetadata,
-    CollectionBidMetadata,
 )
 from processors.nft_orderbooks.models.nft_marketplace_activities_model import (
     NFTMarketplaceEvent,
@@ -127,6 +120,7 @@ def parse(
 
 if __name__ == "__main__":
     transactions_processor = TransactionsProcessor(
-        parse,
+        parser_function=parse,
+        processor_name="nft-marketplace",
     )
     transactions_processor.process()

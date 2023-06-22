@@ -7,19 +7,28 @@ from aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
 from aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
-from sqlalchemy import create_engine, inspect, MetaData, Table
-from sqlalchemy.dialects import postgresql
 from utils.session import Session
+from sqlalchemy import Engine, create_engine
 from typing import Any, Callable
 
 
 class TransactionsProcessor:
-    def __init__(self, parser_function: Callable[[transaction_pb2.Transaction], Any]):
+    parser_function: Callable[[transaction_pb2.Transaction], list[Any]]
+    config: Config
+    processor_name: str
+    engine: Engine | None
+
+    def __init__(
+        self,
+        parser_function: Callable[[transaction_pb2.Transaction], list[Any]],
+        processor_name: str,
+    ):
         parser = argparse.ArgumentParser()
         parser.add_argument("-c", "--config", help="Path to config file", required=True)
         args = parser.parse_args()
         self.config = Config.from_yaml_file(args.config)
         self.parser_function = parser_function
+        self.processor_name = processor_name
 
         self.init_db_tables()
 
@@ -30,28 +39,31 @@ class TransactionsProcessor:
 
     def process(self) -> None:
         # Setup the GetTransactionsRequest
-        starting_version = self.config.get_starting_version()
+
+        starting_version = self.config.get_starting_version(self.processor_name)
+
         request = raw_data_pb2.GetTransactionsRequest(starting_version=starting_version)
 
         # Setup GRPC settings
         metadata = (
-            ("x-aptos-data-authorization", self.config.indexer_api_key),
-            ("x-aptos-request-name", self.config.indexer_name),
+            ("x-aptos-data-authorization", self.config.grpc_data_stream_api_key),
+            ("x-aptos-request-name", self.processor_name),
         )
         options = [("grpc.max_receive_message_length", -1)]
 
         print(
             json.dumps(
                 {
-                    "message": "Connected to the indexer grpc",
+                    "message": f"Connected to grpc data stream endpoint: {self.config.grpc_data_stream_endpoint}",
                     "starting_version": starting_version,
                 }
-            )
+            ),
+            flush=True,
         )
 
         # Connect to indexer grpc endpoint
         with grpc.insecure_channel(
-            self.config.indexer_endpoint, options=options
+            self.config.grpc_data_stream_endpoint, options=options
         ) as channel:
             stub = raw_data_pb2_grpc.RawDataStub(channel)
             current_transaction_version = starting_version
@@ -117,8 +129,6 @@ class TransactionsProcessor:
                     current_transaction_version += 1
 
     def insert_to_db(self, parsed_objs, txn_version) -> None:
-        indexer_name = self.config.indexer_name
-
         # If we find relevant transactions add them and update latest processed version
         if parsed_objs is not None:
             with Session() as session, session.begin():
@@ -128,7 +138,7 @@ class TransactionsProcessor:
                 # Update latest processed version
                 session.merge(
                     NextVersionToProcess(
-                        indexer_name=indexer_name,
+                        indexer_name=self.processor_name,
                         next_version=txn_version + 1,
                     )
                 )
@@ -138,7 +148,7 @@ class TransactionsProcessor:
                 # Update latest processed version
                 session.merge(
                     NextVersionToProcess(
-                        indexer_name=indexer_name,
+                        indexer_name=self.processor_name,
                         next_version=txn_version + 1,
                     )
                 )
