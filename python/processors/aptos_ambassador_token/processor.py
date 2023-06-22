@@ -20,7 +20,7 @@ if config.starting_version_default != None:
 if config.starting_version_override != None:
     starting_version = config.starting_version_override
 metadata = (
-    ("x-aptos-data-authorization", config.indexer_api_key),
+    ("x-aptos-data-authorization", config.grpc_data_stream_api_key),
     ("x-aptos-request-name", "ambassador token indexer"),
 )
 options = [("grpc.max_receive_message_length", -1)]
@@ -29,7 +29,7 @@ qualified_module_name = "0x9bfdd4efe15f4d8aa145bef5f64588c7c391bcddaf34f9e977f59
 qualified_event_name = qualified_module_name + "::LevelUpdateEvent"
 qualified_resource_name = qualified_module_name + "::AmbassadorLevel"
 
-with grpc.insecure_channel(config.indexer_endpoint, options=options) as channel:
+with grpc.insecure_channel(config.grpc_data_stream_endpoint, options=options) as channel:
     stub = raw_data_pb2_grpc.RawDataStub(channel)
     current_transaction_version = starting_version
 

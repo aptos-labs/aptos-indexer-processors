@@ -1,3 +1,4 @@
+from utils.models.annotated_types import StringType
 from utils.models.annotated_types import (
     StringPrimaryKeyType,
     BigIntegerType,
@@ -17,7 +18,7 @@ class Event(Base):
     transaction_version: BigIntegerType
     transaction_block_height: BigIntegerType
     transaction_timestamp: TimestampType
-    type: str
-    data: str
+    type: StringType
+    data: StringType
     inserted_at: InsertedAtType
     event_index: BigIntegerType

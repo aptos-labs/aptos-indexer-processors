@@ -105,6 +105,7 @@ def parse(
 
 if __name__ == "__main__":
     transactions_processor = TransactionsProcessor(
-        parse,
+        parser_function=parse,
+        processor_name="nft-marketplace-activities",
     )
     transactions_processor.process()

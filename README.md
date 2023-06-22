@@ -1,8 +1,8 @@
 # Aptos Indexer Client Guide
 This guide will get you started with creating an Aptos indexer with custom parsing. We have several endpoints that provided a streaming RPC of transaction data. 
 
-## Indexer Endpoints(all endpoints are in GCP us-central1 unless specified)
-* devent: 35.225.218.95:50051
+## GRPC Data Stream Endpoints(all endpoints are in GCP us-central1 unless specified)
+* devnet: 35.225.218.95:50051
 
 * testnet: 35.223.137.149:50051
   * Asia(GCP asia-northeast3): 34.64.252.224:50051
@@ -12,8 +12,8 @@ This guide will get you started with creating an Aptos indexer with custom parsi
 ## Request
  - `config.yaml`
    - `chain_id`: ID of the chain used for validation purposes. 
-   - `indexer_endpoint`: Replace with the indexer endpoints for mainnet, devnet, testnet, or previewnet. 
-   - `indexer_api_key`: Replace `YOUR_TOKEN` with your auth token.
+   - `grpc_data_stream_endpoint`: Replace with the grpc data stream endpoints for mainnet, devnet, testnet, or previewnet. 
+   - `grpc_data_stream_api_key`: Replace `YOUR_TOKEN` with your auth token.
    - `db_connection_uri`: The DB connection used to write the processed data 
    - (optional) `starting-version`
      - If `starting-version` is set, the processor will begin indexing from transaction version = `starting_version`.
