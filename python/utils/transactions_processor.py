@@ -7,8 +7,8 @@ from aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
 from aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
+from utils.session import Session
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import Session
 from typing import Any, Callable
 
 
@@ -29,22 +29,13 @@ class TransactionsProcessor:
         self.config = Config.from_yaml_file(args.config)
         self.parser_function = parser_function
         self.processor_name = processor_name
-        self.engine = None
 
         self.init_db_tables()
 
     def init_db_tables(self) -> None:
-        self.engine = create_engine(self.config.db_connection_uri)
-        Base.metadata.create_all(self.engine, checkfirst=True)
-
-        # # Check if the tables are created.
-        # inspector = inspect(self.engine)
-        # table_name = NextVersionToProcess.__tablename__
-        # if inspector.has_table(table_name):
-        #     print("Table {} exists.".format(table_name))
-        # else:
-        #     print("Table {} does not exist. Creating it now.".format(table_name))
-        #     Base.metadata.create_all(self.engine)
+        engine = create_engine(self.config.db_connection_uri)
+        Session.configure(bind=engine)
+        Base.metadata.create_all(engine, checkfirst=True)
 
     def process(self) -> None:
         # Setup the GetTransactionsRequest
@@ -140,7 +131,7 @@ class TransactionsProcessor:
     def insert_to_db(self, parsed_objs, txn_version) -> None:
         # If we find relevant transactions add them and update latest processed version
         if parsed_objs is not None:
-            with Session(self.engine) as session, session.begin():
+            with Session() as session, session.begin():
                 for obj in parsed_objs:
                     session.merge(obj)
 
@@ -153,7 +144,7 @@ class TransactionsProcessor:
                 )
         # If we don't find any relevant transactions, at least update latest processed version every 1000
         elif (txn_version % 1000) == 0:
-            with Session(self.engine) as session, session.begin():
+            with Session() as session, session.begin():
                 # Update latest processed version
                 session.merge(
                     NextVersionToProcess(
