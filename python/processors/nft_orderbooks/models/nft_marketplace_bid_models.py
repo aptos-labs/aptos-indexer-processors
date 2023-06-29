@@ -11,11 +11,12 @@ from utils.models.annotated_types import (
     TimestampType,
 )
 from utils.models.general_models import Base
+from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 
 
 class CurrentNFTMarketplaceBid(Base):
     __tablename__ = "current_nft_marketplace_bids"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     token_data_id: StringPrimaryKeyType
     buyer: StringPrimaryKeyType
@@ -36,7 +37,7 @@ class CurrentNFTMarketplaceBid(Base):
 
 class NFTMarketplaceBid(Base):
     __tablename__ = "nft_marketplace_bids"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType
@@ -59,7 +60,7 @@ class NFTMarketplaceBid(Base):
 
 class CurrentNFTMarketplaceCollectionBid(Base):
     __tablename__ = "current_nft_marketplace_collection_bids"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     collection_id: StringPrimaryKeyType
     buyer: StringPrimaryKeyType
@@ -78,7 +79,7 @@ class CurrentNFTMarketplaceCollectionBid(Base):
 
 class NFTMarketplaceCollectionBid(Base):
     __tablename__ = "nft_marketplace_collection_bids"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType
