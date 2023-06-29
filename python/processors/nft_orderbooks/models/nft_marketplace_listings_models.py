@@ -14,6 +14,7 @@ from utils.models.general_models import Base
 
 class CurrentNFTMarketplaceListing(Base):
     __tablename__ = "current_nft_marketplace_listings"
+    __table_args__ = {"schema": "nft_marketplace"}
 
     token_data_id: StringPrimaryKeyType
     creator_address: StringType
@@ -34,6 +35,7 @@ class CurrentNFTMarketplaceListing(Base):
 
 class NFTMarketplaceListing(Base):
     __tablename__ = "nft_marketplace_listings"
+    __table_args__ = {"schema": "nft_marketplace"}
 
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType
