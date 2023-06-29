@@ -10,11 +10,12 @@ from utils.models.annotated_types import (
     TimestampType,
 )
 from utils.models.general_models import Base
+from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 
 
 class CurrentNFTMarketplaceListing(Base):
     __tablename__ = "current_nft_marketplace_listings"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     token_data_id: StringPrimaryKeyType
     creator_address: StringType
@@ -35,7 +36,7 @@ class CurrentNFTMarketplaceListing(Base):
 
 class NFTMarketplaceListing(Base):
     __tablename__ = "nft_marketplace_listings"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType

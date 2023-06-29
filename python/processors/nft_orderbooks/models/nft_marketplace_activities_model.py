@@ -8,11 +8,12 @@ from utils.models.annotated_types import (
     TimestampType,
 )
 from utils.models.general_models import Base
+from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 
 
 class NFTMarketplaceEvent(Base):
     __tablename__ = "nft_marketplace_activities"
-    __table_args__ = {"schema": "nft_marketplace"}
+    __table_args__ = {"schema": NFT_MARKETPLACE_SCHEMA_NAME}
 
     transaction_version: BigIntegerPrimaryKeyType
     event_index: BigIntegerPrimaryKeyType
