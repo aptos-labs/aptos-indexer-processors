@@ -8,7 +8,8 @@ from aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import DDL, Engine, create_engine
+from sqlalchemy import event
 from typing import Any, Callable
 
 
@@ -152,3 +153,23 @@ class TransactionsProcessor:
                         next_version=txn_version + 1,
                     )
                 )
+
+
+@event.listens_for(Base.metadata, "before_create")
+def create_schemas(target, connection, **kw):
+    schemas = set()
+    for table in target.tables.values():
+        if table.schema is not None:
+            schemas.add(table.schema)
+    for schema in schemas:
+        connection.execute(DDL("CREATE SCHEMA IF NOT EXISTS %s" % schema))
+
+
+@event.listens_for(Base.metadata, "after_drop")
+def drop_schemas(target, connection, **kw):
+    schemas = set()
+    for table in target.tables.values():
+        if table.schema is not None:
+            schemas.add(table.schema)
+    for schema in schemas:
+        connection.execute(DDL("DROP SCHEMA IF EXISTS %s" % schema))

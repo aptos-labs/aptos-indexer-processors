@@ -12,6 +12,7 @@ from utils.models.general_models import Base
 
 class NFTMarketplaceEvent(Base):
     __tablename__ = "nft_marketplace_activities"
+    __table_args__ = {"schema": "nft_marketplace"}
 
     transaction_version: BigIntegerPrimaryKeyType
     event_index: BigIntegerPrimaryKeyType
