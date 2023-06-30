@@ -54,7 +54,7 @@ class CollectionDataIdType:
 @dataclass
 class TokenV2AggregatedData:
     creator_address: str
-    collection_address: str
+    collection_id: str
     collection_name: str
     token_name: str
     token_data_id_v1: str | None = None

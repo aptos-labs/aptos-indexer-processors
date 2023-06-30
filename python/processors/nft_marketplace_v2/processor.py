@@ -7,6 +7,7 @@ from processors.nft_orderbooks.nft_marketplace_constants import (
     MARKETPLACE_TABLE_HANDLES_INV,
 )
 from processors.nft_marketplace_v2 import marketplace_v2_parser
+from processors.nft_marketplace_v2.constants import MARKETPLACE_V2_ADDRESS
 from processors.nft_marketplace_v2.models.nft_marketplace_listings_models import (
     CurrentNFTMarketplaceListing,
     NFTMarketplaceListing,
@@ -14,11 +15,6 @@ from processors.nft_marketplace_v2.models.nft_marketplace_listings_models import
 from utils.transactions_processor import TransactionsProcessor
 from utils import event_utils, general_utils, transaction_utils, write_set_change_utils
 from utils.token_utils import TokenV2AggregatedDataMapping
-
-
-MARKETPLACE_V2_ADDRESS = (
-    "0xb11affd5c514bb969e988710ef57813d9556cc1e3fe6dc9aa6a82b56aee53d98"
-)
 
 
 def parse(
@@ -30,6 +26,7 @@ def parse(
     if not user_transaction:
         return parsed_objs
 
+    events = user_transaction.events
     write_set_changes = transaction_utils.get_write_set_changes(transaction)
 
     # Get token metadata
@@ -49,25 +46,8 @@ def parse(
             token_mapping[token_key] = token_metadata_v2
             print("found token v2", token_key)
 
-    # Parse write set changes for listings
-    for wsc_index, wsc in enumerate(write_set_changes):
-        write_resource = write_set_change_utils.get_write_resource(wsc)
-
-        if write_resource:
-            address = write_resource.type.address
-            if address != MARKETPLACE_V2_ADDRESS:
-                continue
-
-            resource_type_short = write_set_change_utils.get_move_type_short(
-                write_resource.type
-            )
-            match resource_type_short:
-                case "coin_listing::FixedPriceListing<0x1::aptos_coin::AptosCoin>":
-                    marketplace_v2_parser.parse_fixed_price_listing()
-                case "listing::TokenV1Container":
-                    marketplace_v2_parser.parse_listing_token_v1_container()
-                case "listing::Listing":
-                    marketplace_v2_parser.parse_listing()
+    # Parse listing
+    parsed_objs.extend(marketplace_v2_parser.parse_listing(transaction, token_mapping))
 
     # Parse write set changes for bids
 

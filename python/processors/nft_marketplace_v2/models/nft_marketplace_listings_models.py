@@ -18,6 +18,7 @@ class CurrentNFTMarketplaceListing(Base):
     __table_args__ = {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME}
 
     token_data_id: StringPrimaryKeyType
+    listing_address: NullableStringType
     creator_address: StringType
     token_name: StringType
     collection: StringType
@@ -41,6 +42,7 @@ class NFTMarketplaceListing(Base):
 
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType
+    listing_address: StringType
     creator_address: StringType
     token_name: StringType
     token_data_id: StringType
