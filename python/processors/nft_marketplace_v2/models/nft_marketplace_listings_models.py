@@ -19,9 +19,7 @@ class CurrentNFTMarketplaceListing(Base):
 
     token_data_id: StringPrimaryKeyType
     listing_address: NullableStringType
-    creator_address: StringType
     token_name: StringType
-    collection: StringType
     collection_id: StringType
     price: NumericType
     token_amount: NumericType
@@ -43,10 +41,8 @@ class NFTMarketplaceListing(Base):
     transaction_version: BigIntegerPrimaryKeyType
     index: BigIntegerPrimaryKeyType
     listing_address: StringType
-    creator_address: StringType
     token_name: StringType
     token_data_id: StringType
-    collection: StringType
     collection_id: StringType
     price: NumericType
     token_amount: NumericType

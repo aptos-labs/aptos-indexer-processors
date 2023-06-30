@@ -33,18 +33,11 @@ def parse(
     token_mapping: TokenV2AggregatedDataMapping = {}
     for _, wsc in enumerate(write_set_changes):
         token_metadata_v1 = marketplace_v2_parser.get_token_metadata_v1(wsc)
-        if token_metadata_v1:
-            token_key = token_metadata_v1.token_data_id_v1
-            assert token_key
-            token_mapping[token_key] = token_metadata_v1
-            print("found token v1", token_key)
-
         token_metadata_v2 = marketplace_v2_parser.get_token_metadata_v2(wsc)
-        if token_metadata_v2:
-            token_key = token_metadata_v2.token_address_v2
-            assert token_key
-            token_mapping[token_key] = token_metadata_v2
-            print("found token v2", token_key)
+
+        token_metadata = token_metadata_v1 or token_metadata_v2
+        if token_metadata:
+            token_mapping[token_metadata.token_data_id] = token_metadata
 
     # Parse listing
     parsed_objs.extend(marketplace_v2_parser.parse_listing(transaction, token_mapping))

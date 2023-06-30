@@ -53,12 +53,10 @@ class CollectionDataIdType:
 
 @dataclass
 class TokenV2AggregatedData:
-    creator_address: str
+    token_data_id: str
     collection_id: str
-    collection_name: str
     token_name: str
-    token_data_id_v1: str | None = None
-    token_address_v2: str | None = None
+    token_standard: TokenStandard
 
 
 TokenV2AggregatedDataMapping = dict[str, TokenV2AggregatedData]
