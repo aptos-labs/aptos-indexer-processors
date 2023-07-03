@@ -445,32 +445,32 @@ def get_token_metadata(data: dict) -> Optional[TokenMetadata]:
     if not token_metadata:
         return None
     token_v2 = token_metadata.get("token", {}).get("vec", [])
-    creator_address = standardize_address(token_metadata.get("creator_address"))
+    creator_address = standardize_address(token_metadata["creator_address"])
     maybe_property_version = token_metadata.get("property_version", {}).get("vec", [])
     property_version = maybe_property_version[0] if maybe_property_version else None
     if token_v2:
         return {
             "collection_id": standardize_address(
-                token_metadata.get("collection", {}).get("vec", [])[0].get("inner")
+                token_metadata.get("collection", {}).get("vec", [])[0]["inner"]
             ),
-            "token_data_id": standardize_address(token_v2[0].get("inner")),
+            "token_data_id": standardize_address(token_v2[0]["inner"]),
             "creator_address": creator_address,
-            "collection_name": token_metadata.get("collection_name"),
-            "token_name": token_metadata.get("token_name"),
+            "collection_name": token_metadata["collection_name"],
+            "token_name": token_metadata["token_name"],
             "property_version": property_version,
             "token_standard": TokenStandard.V2,
         }
     token_data_id_type = TokenDataIdType(
         creator_address,
-        token_metadata.get("collection_name"),
-        token_metadata.get("token_name"),
+        token_metadata["collection_name"],
+        token_metadata["token_name"],
     )
     return {
         "collection_id": token_data_id_type.get_collection_data_id_hash(),
         "token_data_id": token_data_id_type.to_hash(),
         "creator_address": creator_address,
-        "collection_name": token_metadata.get("collection_name"),
-        "token_name": token_metadata.get("token_name"),
+        "collection_name": token_metadata["collection_name"],
+        "token_name": token_metadata["token_name"],
         "property_version": property_version,
         "token_standard": TokenStandard.V1,
     }
@@ -480,22 +480,22 @@ def get_collection_metadata(data: dict) -> Optional[CollectionMetadata]:
     collection_metadata = data.get("collection_metadata", {})
     if not collection_metadata:
         return None
-    creator_address = standardize_address(collection_metadata.get("creator_address"))
+    creator_address = standardize_address(collection_metadata["creator_address"])
     collection_v2 = collection_metadata.get("collection", {}).get("vec", [])
     if collection_v2:
         return {
             "collection_id": standardize_address(collection_v2[0].get("inner")),
             "creator_address": creator_address,
-            "collection_name": collection_metadata.get("collection_name"),
+            "collection_name": collection_metadata["collection_name"],
             "token_standard": TokenStandard.V2,
         }
     collection = CollectionDataIdType(
         creator_address,
-        collection_metadata.get("collection_name"),
+        collection_metadata["collection_name"],
     )
     return {
         "collection_id": collection.to_hash(),
         "creator_address": creator_address,
-        "collection_name": collection_metadata.get("collection_name"),
+        "collection_name": collection_metadata["collection_name"],
         "token_standard": TokenStandard.V1,
     }

@@ -17,6 +17,7 @@ class MarketplaceName(Enum):
 
 
 class StandardMarketplaceEventType(Enum):
+    BID_CANCEL = "bid cancel"
     BID_CHANGE = "bid change"
     BID_FILLED = "bid filled"
     BID_PLACE = "bid place"

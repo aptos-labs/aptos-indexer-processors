@@ -42,8 +42,6 @@ def lookup_v2_current_listing_in_db(
             listing = CurrentNFTMarketplaceListing(
                 token_data_id=listing_from_db.token_data_id,
                 listing_address=listing_from_db.listing_address,
-                token_name=listing_from_db.token_name,
-                collection_id=listing_from_db.collection_id,
                 price=listing_from_db.price,
                 token_amount=listing_from_db.token_amount,
                 token_standard=listing_from_db.token_standard,
