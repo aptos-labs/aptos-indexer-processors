@@ -1,5 +1,5 @@
 from enum import Enum
 
 MARKETPLACE_V2_ADDRESS = (
-    "0xb11affd5c514bb969e988710ef57813d9556cc1e3fe6dc9aa6a82b56aee53d98"
+    "0x21dbfcef4bafda0a410050852d03e1924edb785e4ab98b19429ae1875e97a591"
 )

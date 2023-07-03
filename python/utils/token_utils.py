@@ -6,8 +6,8 @@ MAX_NAME_LENGTH = 128
 
 
 class TokenStandard(Enum):
-    TOKEN_V1 = "TOKEN_V1"
-    TOKEN_V2 = "TOKEN_V2"
+    V1 = "v1"
+    V2 = "v2"
 
 
 class TokenDataIdType:
