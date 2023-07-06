@@ -21,28 +21,20 @@ from utils import event_utils, transaction_utils, write_set_change_utils
 from utils.token_utils import TokenStandard, TokenDataIdType, CollectionDataIdType
 from utils.general_utils import standardize_address
 
-TokenMetadata = TypedDict(
-    "TokenMetadata",
-    {
-        "collection_id": str,
-        "token_data_id": str,
-        "creator_address": str,
-        "collection_name": str,
-        "token_name": str,
-        "property_version": Optional[int],
-        "token_standard": TokenStandard,
-    },
-)
+class TokenMetadata(TypedDict):
+    collection_id: str
+    token_data_id: str
+    creator_address: str
+    collection_name: str
+    token_name: str
+    property_version: Optional[int]
+    token_standard: TokenStandard
 
-CollectionMetadata = TypedDict(
-    "CollectionMetadata",
-    {
-        "collection_id": str,
-        "creator_address": str,
-        "collection_name": str,
-        "token_standard": TokenStandard,
-    },
-)
+class CollectionMetadata(TypedDict):
+    collection_id: str
+    creator_address: str
+    collection_name: str
+    token_standard: TokenStandard
 
 
 # Parse all activities related to token listings, token and collection offers
@@ -448,6 +440,8 @@ def get_token_metadata(data: dict) -> Optional[TokenMetadata]:
     creator_address = standardize_address(token_metadata["creator_address"])
     maybe_property_version = token_metadata.get("property_version", {}).get("vec", [])
     property_version = maybe_property_version[0] if maybe_property_version else None
+
+    # For token v2, token struct will contain token address
     if token_v2:
         return {
             "collection_id": standardize_address(
@@ -460,6 +454,8 @@ def get_token_metadata(data: dict) -> Optional[TokenMetadata]:
             "property_version": property_version,
             "token_standard": TokenStandard.V2,
         }
+    
+    # Token v1 parsing
     token_data_id_type = TokenDataIdType(
         creator_address,
         token_metadata["collection_name"],
@@ -482,6 +478,8 @@ def get_collection_metadata(data: dict) -> Optional[CollectionMetadata]:
         return None
     creator_address = standardize_address(collection_metadata["creator_address"])
     collection_v2 = collection_metadata.get("collection", {}).get("vec", [])
+
+    # For token v2, collection struct will contain collection address
     if collection_v2:
         return {
             "collection_id": standardize_address(collection_v2[0].get("inner")),
@@ -489,6 +487,8 @@ def get_collection_metadata(data: dict) -> Optional[CollectionMetadata]:
             "collection_name": collection_metadata["collection_name"],
             "token_standard": TokenStandard.V2,
         }
+    
+    # Token v1 parsing
     collection = CollectionDataIdType(
         creator_address,
         collection_metadata["collection_name"],

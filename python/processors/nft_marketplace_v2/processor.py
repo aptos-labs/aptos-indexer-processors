@@ -26,6 +26,8 @@ def parse(
     if not user_transaction:
         return []
 
+    # First pass to get token and collection metadata
+    
     # Parse activities
     parsed_objs.extend(marketplace_v2_parser.parse_activities(transaction))
     # Parse listing
