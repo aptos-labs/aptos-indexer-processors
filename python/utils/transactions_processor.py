@@ -21,27 +21,24 @@ import socketserver
 import threading
 import sys
 import traceback
+from abc import ABC, abstractmethod
 
 
-class TransactionsProcessor:
+class TransactionsProcessor(ABC):
     parser_function: Callable[[transaction_pb2.Transaction], list[Any]]
     config: Config
-    processor_name: str
     engine: Engine | None
 
     def __init__(
         self,
-        parser_function: Callable[[transaction_pb2.Transaction], list[Any]],
-        processor_name: str,
-        schema_name: str,
     ):
         parser = argparse.ArgumentParser()
         parser.add_argument("-c", "--config", help="Path to config file", required=True)
         args = parser.parse_args()
         self.config = Config.from_yaml_file(args.config)
-        self.parser_function = parser_function
-        self.processor_name = processor_name
-        self.schema_name = schema_name
+        # self.parser_function = parser_function
+        # self.processor_name = processor_name
+        # self.schema_name = schema_name
 
         self.init_db_tables()
 
@@ -68,25 +65,55 @@ class TransactionsProcessor:
         # TODO: Handles the exit signal and gracefully shutdown the server.
         t.start()
 
+        self.init_db_tables()
+
+    # Name of the processor for status logging
+    # This will get stored in the database for each (`TransactionProcessor`, transaction_version) pair
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+    # Name of the DB schema this processor writes to
+    @abstractmethod
+    def schema(self) -> str:
+        pass
+
+    # Process all transactions within a block and processes it.
+    # This method will be called from `process_transaction_with_status`
+    # In case a transaction cannot be processed, we will fail the entire block.
+    @abstractmethod
+    def process_transactions(
+        self,
+        transactions: list[transaction_pb2.Transaction],
+        start_version: int,
+        end_version: int,
+    ) -> None:
+        # TODO: Make this return processing result
+        pass
+
+    # TODO: Move this to indexer worker
     def init_db_tables(self) -> None:
         engine = create_engine(self.config.db_connection_uri)
         engine = engine.execution_options(
-            schema_translate_map={"per_schema": self.schema_name}
+            schema_translate_map={"per_schema": self.schema()}
         )
         Session.configure(bind=engine)
         Base.metadata.create_all(engine, checkfirst=True)
 
-    def process(self) -> None:
+    # TODO: Move this to indexer worker
+    def run(self) -> None:
         # Setup the GetTransactionsRequest
 
-        starting_version = self.config.get_starting_version(self.processor_name)
+        processor_name = self.name()
+        starting_version = self.config.get_starting_version(processor_name)
+        ending_version = self.config.ending_version
 
         request = raw_data_pb2.GetTransactionsRequest(starting_version=starting_version)
 
         # Setup GRPC settings
         metadata = (
             ("x-aptos-data-authorization", self.config.grpc_data_stream_api_key),
-            ("x-aptos-request-name", self.processor_name),
+            ("x-aptos-request-name", processor_name),
         )
         options = [
             ("grpc.max_receive_message_length", -1),
@@ -111,25 +138,24 @@ class TransactionsProcessor:
         )
 
         # Connect to indexer grpc endpoint
+        # TODO: Move this to indexer worker
         with grpc.insecure_channel(
             self.config.grpc_data_stream_endpoint, options=options
         ) as channel:
             stub = raw_data_pb2_grpc.RawDataStub(channel)
-            current_transaction_version = starting_version
+
+            last_processed_version = None
+
             try:
                 for response in stub.GetTransactions(
                     request,
                     metadata=metadata,
                 ):
-                    chain_id = response.chain_id
+                    self.validate_grpc_chain_id(response)
 
-                    if chain_id != self.config.chain_id:
-                        raise Exception(
-                            "Chain ID mismatch. Expected chain ID is: "
-                            + str(self.config.chain_id)
-                            + ", but received chain ID is: "
-                            + str(chain_id)
-                        )
+                    batch_start_version = response.transactions[0].version
+                    batch_end_version = response.transactions[-1].version
+
                     print(
                         json.dumps(
                             {
@@ -139,63 +165,51 @@ class TransactionsProcessor:
                         )
                     )
 
-                    transactions_output = response
-                    for transaction in transactions_output.transactions:
-                        transaction_version = transaction.version
-                        if transaction_version != current_transaction_version:
-                            raise Exception(
-                                "Transaction version mismatch. Expected transaction version is: "
-                                + str(current_transaction_version)
-                                + ", but received transaction version is: "
-                                + str(transaction_version)
-                            )
+                    # TODO: Transaction version validation
 
-                        if self.config.ending_version != None:
-                            if transaction_version > self.config.ending_version:
-                                print(
-                                    json.dumps(
-                                        {
-                                            "message": "[Parser] Reached ending version",
-                                            "ending_version": self.config.ending_version,
-                                        }
-                                    )
-                                )
-                                return
+                    # If ending version is in the current batch, truncate the transactions in this batcch
+                    if ending_version != None and batch_end_version >= ending_version:
+                        batch_end_version = ending_version
 
-                        try:
-                            parsed_objs = self.parser_function(transaction)
-                            self.insert_to_db(parsed_objs, current_transaction_version)
-                        except Exception as e:
-                            print(
-                                json.dumps(
-                                    {
-                                        "message": f"[Parser] Error processing transaction {transaction_version}",
-                                        "error": str(e),
-                                        "error_stacktrace": traceback.format_exception(
-                                            e
-                                        ),
-                                    }
-                                )
-                            )
-                            sys.exit(1)
-                        PROCESSED_TRANSACTIONS_COUNTER.inc()
-                        if current_transaction_version % 1000 == 0:
-                            print(
-                                json.dumps(
-                                    {
-                                        "message": "[Parser] Successfully processed transaction",
-                                        "last_success_transaction_version": current_transaction_version,
-                                    }
-                                )
-                            )
+                    self.process_transactions(
+                        response.transactions[
+                            : batch_end_version - batch_start_version + 1
+                        ],
+                        batch_start_version,
+                        batch_end_version,
+                    )
 
-                        current_transaction_version += 1
+                    # Stop processing if reached ending version
+                    # TODO: Maybe move this to indexer worker
+                    if ending_version == batch_end_version:
+                        print(
+                            json.dumps(
+                                {
+                                    "message": "Reached ending version",
+                                    "ending_version": ending_version,
+                                }
+                            )
+                        )
+                        return
+
+                    if batch_end_version % 1000 == 0:
+                        print(
+                            json.dumps(
+                                {
+                                    "message": "Successfully processed transaction",
+                                    "last_processed_version": batch_end_version,
+                                }
+                            )
+                        )
+
+                    # Update last_processed_version for error logging
+                    last_processed_version = batch_end_version
             except grpc.RpcError as e:
                 print(
                     json.dumps(
                         {
                             "message": "[Parser] Error processing transaction",
-                            "last_success_transaction_version": current_transaction_version,
+                            "last_success_transaction_version": last_processed_version,
                             "error": str(e),
                         }
                     )
@@ -203,32 +217,29 @@ class TransactionsProcessor:
                 # TODO: Add retry logic.
                 sys.exit(1)
 
-    def insert_to_db(self, parsed_objs, txn_version) -> None:
-        # If we find relevant transactions add them and update latest processed version
-        if parsed_objs is not None:
-            with Session() as session, session.begin():
-                for obj in parsed_objs:
-                    session.merge(obj)
-
-                # Update latest processed version
-                session.merge(
-                    NextVersionToProcess(
-                        indexer_name=self.processor_name,
-                        next_version=txn_version + 1,
-                    )
+    def update_last_processed_version(self, last_processed_version) -> None:
+        with Session() as session, session.begin():
+            session.merge(
+                NextVersionToProcess(
+                    indexer_name=self.name(),
+                    next_version=last_processed_version + 1,
                 )
-        # If we don't find any relevant transactions, at least update latest processed version every 1000
-        elif (txn_version % 1000) == 0:
-            with Session() as session, session.begin():
-                # Update latest processed version
-                session.merge(
-                    NextVersionToProcess(
-                        indexer_name=self.processor_name,
-                        next_version=txn_version + 1,
-                    )
-                )
+            )
+
+    # TODO: Move this to worker and validate chain id same way as Rust
+    def validate_grpc_chain_id(self, response: raw_data_pb2.TransactionsResponse):
+        chain_id = response.chain_id
+
+        if chain_id != self.config.chain_id:
+            raise Exception(
+                "Chain ID mismatch. Expected chain ID is: "
+                + str(self.config.chain_id)
+                + ", but received chain ID is: "
+                + str(chain_id)
+            )
 
 
+# TODO: Move DB schema initialization to the worker
 @event.listens_for(Base.metadata, "before_create")
 def create_schemas(target, connection, **kw):
     schemas = set()
