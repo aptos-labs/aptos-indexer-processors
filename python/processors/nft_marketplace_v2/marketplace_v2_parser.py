@@ -109,15 +109,6 @@ def get_collection_metadata_from_event(data: dict) -> Optional[CollectionMetadat
     }
 
 
-def get_token_metadata_from_wsc(
-    move_resource_type: str, data: dict
-) -> Optional[TokenMetadata]:
-    if move_resource_type != "0x4::token::Token":
-        return None
-
-    collection = data.get("collection", {}).get("inner")
-
-
 # Listing models
 class FixedPriceListing(TypedDict):
     price: int
@@ -185,4 +176,69 @@ def get_listing_token_v1_container(
             "token_standard": TokenStandard.V1,
         },
         "amount": amount,
+    }
+
+
+# Token offer models and helpers
+class TokenOfferMetadata(TypedDict):
+    expiration_time: int
+    price: int
+
+
+class TokenOfferV2(TypedDict):
+    token_address: str
+
+
+class TokenOfferV1(TypedDict):
+    token_metadata: TokenMetadata
+
+
+def get_token_offer_metadata(
+    move_resource_type: str, data: dict
+) -> Optional[TokenOfferMetadata]:
+    if move_resource_type != f"{MARKETPLACE_V2_ADDRESS}::token_offer::TokenOffer":
+        return None
+
+    return {
+        "expiration_time": data["expiration_time"],
+        "price": data["item_price"],
+    }
+
+
+def get_token_offer_v2(move_resource_type: str, data: dict) -> Optional[TokenOfferV2]:
+    if (
+        move_resource_type
+        != f"{MARKETPLACE_V2_ADDRESS}::token_offer::TokenOfferTokenV2"
+    ):
+        return None
+
+    return {
+        "token_address": standardize_address(data["token"]["inner"]),
+    }
+
+
+def get_token_offer_v1(move_resource_type: str, data: dict) -> Optional[TokenOfferV1]:
+    if (
+        move_resource_type
+        != f"{MARKETPLACE_V2_ADDRESS}::token_offer::TokenOfferTokenV1"
+    ):
+        return None
+
+    property_version = data.get("property_version")
+    token_data_id_type = TokenDataIdType(
+        data["creator_address"],
+        data["collection_name"],
+        data["token_name"],
+    )
+
+    return {
+        "token_metadata": {
+            "collection_id": token_data_id_type.get_collection_data_id_hash(),
+            "token_data_id": token_data_id_type.to_hash(),
+            "creator_address": token_data_id_type.get_creator(),
+            "collection_name": token_data_id_type.get_collection_trunc(),
+            "token_name": token_data_id_type.get_name_trunc(),
+            "property_version": property_version,
+            "token_standard": TokenStandard.V1,
+        },
     }
