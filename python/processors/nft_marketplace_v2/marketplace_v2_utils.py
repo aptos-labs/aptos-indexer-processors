@@ -15,7 +15,7 @@ from processors.nft_orderbooks.nft_marketplace_enums import (
     ListingTableMetadata,
     BidMetadata,
 )
-from processors.nft_marketplace_v2.models.nft_marketplace_listings_models import (
+from processors.nft_marketplace_v2.nft_marketplace_models import (
     CurrentNFTMarketplaceListing,
 )
 from processors.nft_orderbooks.models.nft_marketplace_bid_models import (
