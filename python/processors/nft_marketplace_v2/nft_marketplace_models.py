@@ -126,16 +126,17 @@ class CurrentNFTMarketplaceCollectionOffer(Base):
     __tablename__ = "current_nft_marketplace_collection_offers"
     __table_args__ = {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME}
 
-    collection_id: StringPrimaryKeyType
-    buyer: StringPrimaryKeyType
-    price: NumericType
-    creator_address: StringType
-    token_amount: NumericType
-    collection: StringType
+    collection_offer_id: StringPrimaryKeyType
+    collection_id: StringType
+    buyer: StringType
+    item_price: NumericType
+    remaining_token_amount: NumericType
+    expiration_time: NumericType
+    is_deleted: BooleanType
+    token_standard: StringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
-    is_deleted: BooleanType
     last_transaction_version: BigIntegerType
     last_transaction_timestamp: TimestampType
     inserted_at: InsertedAtType

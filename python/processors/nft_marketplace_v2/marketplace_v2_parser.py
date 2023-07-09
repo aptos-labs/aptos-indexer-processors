@@ -242,3 +242,81 @@ def get_token_offer_v1(move_resource_type: str, data: dict) -> Optional[TokenOff
             "token_standard": TokenStandard.V1,
         },
     }
+
+
+# Collection offer models and helpers
+
+
+class CollectionOfferMetadata(TypedDict):
+    expiration_time: int
+    item_price: int
+    remaining_token_amount: int
+
+
+class CollectionOfferV1(TypedDict):
+    collection_metadata: CollectionMetadata
+
+
+class CollectionOfferV2(TypedDict):
+    collection_address: str
+
+
+class CollectionOfferEventMetadata(TypedDict):
+    collection_offer_id: str
+    collection_metadata: CollectionMetadata
+    item_price: int
+    buyer: str
+
+
+def get_collection_offer_metadata(
+    move_resource_type: str, data: dict
+) -> Optional[CollectionOfferMetadata]:
+    if (
+        move_resource_type
+        != f"{MARKETPLACE_V2_ADDRESS}::collection_offer::CollectionOffer"
+    ):
+        return None
+
+    return {
+        "expiration_time": data["expiration_time"],
+        "item_price": data["item_price"],
+        "remaining_token_amount": data["remaining"],
+    }
+
+
+def get_collection_offer_v1(
+    move_resource_type: str, data: dict
+) -> Optional[CollectionOfferV1]:
+    if (
+        move_resource_type
+        != f"{MARKETPLACE_V2_ADDRESS}::collection_offer::CollectionOfferTokenV1"
+    ):
+        return None
+
+    collection_data_id_type = CollectionDataIdType(
+        data["creator_address"],
+        data["collection_name"],
+    )
+
+    return {
+        "collection_metadata": {
+            "collection_id": collection_data_id_type.to_hash(),
+            "creator_address": collection_data_id_type.get_creator(),
+            "collection_name": collection_data_id_type.get_name_trunc(),
+            "token_standard": TokenStandard.V1,
+        },
+    }
+
+
+def get_collection_offer_v2(
+    move_resource_type: str, data: dict
+) -> Optional[CollectionOfferV2]:
+    if (
+        move_resource_type
+        != f"{MARKETPLACE_V2_ADDRESS}::collection_offer::CollectionOfferTokenV2"
+    ):
+        return None
+
+    return {
+        "collection_address": standardize_address(data["collection"]["inner"]),
+    }

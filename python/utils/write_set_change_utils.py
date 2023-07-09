@@ -17,6 +17,14 @@ def get_write_resource(
     return write_set_change.write_resource
 
 
+def get_delete_resource(
+    write_set_change: transaction_pb2.WriteSetChange,
+) -> transaction_pb2.DeleteResource | None:
+    if write_set_change.type != transaction_pb2.WriteSetChange.TYPE_DELETE_RESOURCE:
+        return None
+    return write_set_change.delete_resource
+
+
 def get_move_type_short(
     move_struct: transaction_pb2.MoveStructTag,
 ) -> str:
