@@ -14,6 +14,7 @@ from processors.nft_marketplace_v2.nft_marketplace_models import (
     CurrentNFTMarketplaceListing,
     CurrentNFTMarketplaceTokenOffer,
     CurrentNFTMarketplaceCollectionOffer,
+    CurrentNFTMarketplaceAuction,
     NFTMarketplaceActivities,
 )
 from utils.object_utils import get_object_core, ObjectCore
@@ -36,6 +37,7 @@ from processors.nft_marketplace_v2.marketplace_v2_parser import (
     get_collection_offer_metadata,
     get_collection_offer_v1,
     get_collection_offer_v2,
+    get_auction_listing,
     ListingMetadata,
     FixedPriceListing,
     ListingTokenV1Container,
@@ -48,6 +50,7 @@ from processors.nft_marketplace_v2.marketplace_v2_parser import (
     CollectionOfferV1,
     CollectionOfferV2,
     CollectionOfferEventMetadata,
+    AuctionListing,
 )
 from processors.nft_orderbooks.nft_marketplace_enums import (
     StandardMarketplaceEventType,
@@ -63,6 +66,7 @@ def parse(
     | CurrentNFTMarketplaceListing
     | CurrentNFTMarketplaceTokenOffer
     | CurrentNFTMarketplaceCollectionOffer
+    | CurrentNFTMarketplaceAuction
 ]:
     user_transaction = transaction_utils.get_user_transaction(transaction)
 
@@ -80,6 +84,7 @@ def parse(
     current_nft_marketplace_listings: List[CurrentNFTMarketplaceListing] = []
     current_token_offers: List[CurrentNFTMarketplaceTokenOffer] = []
     current_collection_offers: List[CurrentNFTMarketplaceCollectionOffer] = []
+    current_auctions: List[CurrentNFTMarketplaceAuction] = []
 
     collection_offer_filled_metadatas: Dict[str, CollectionOfferEventMetadata] = {}
 
@@ -108,6 +113,7 @@ def parse(
             "events::TokenOfferPlacedEvent",
             "events::TokenOfferCanceledEvent",
             "events::TokenOfferFilledEvent",
+            "events::AuctionBidEvent",
         ]:
             continue
 
@@ -162,7 +168,7 @@ def parse(
 
                 current_listing = CurrentNFTMarketplaceListing(
                     token_data_id=token_metadata["token_data_id"],
-                    listing_address=offer_or_listing_id,
+                    listing_id=offer_or_listing_id,
                     price=price,
                     token_amount=0,
                     token_standard=token_metadata["token_standard"].value,
@@ -199,7 +205,7 @@ def parse(
                 )
                 current_listing = CurrentNFTMarketplaceListing(
                     token_data_id=token_metadata["token_data_id"],
-                    listing_address=offer_or_listing_id,
+                    listing_id=offer_or_listing_id,
                     price=price,
                     token_amount=0,
                     token_standard=token_metadata["token_standard"].value,
@@ -435,6 +441,29 @@ def parse(
                     last_transaction_version=transaction.version,
                     last_transaction_timestamp=transaction_metadata.transaction_timestamp,
                 )
+            case "events::AuctionBidEvent":
+                assert token_metadata
+                activity = NFTMarketplaceActivities(
+                    transaction_version=transaction.version,
+                    event_index=event_index,
+                    offer_or_listing_id=offer_or_listing_id,
+                    collection_id=token_metadata["collection_id"],
+                    token_data_id=token_metadata["token_data_id"],
+                    creator_address=token_metadata["creator_address"],
+                    collection_name=token_metadata["collection_name"],
+                    token_name=token_metadata["token_name"],
+                    property_version=token_metadata["property_version"],
+                    price=data.get("new_bid"),
+                    token_amount=1,
+                    token_standard=token_metadata["token_standard"].value,
+                    seller=None,
+                    buyer=standardize_address(data.get("new_bidder")),
+                    marketplace=MarketplaceName.EXAMPLE_V2_MARKETPLACE.value,
+                    contract_address=transaction_metadata.contract_address,
+                    entry_function_id_str=transaction_metadata.entry_function_id_str_short,
+                    event_type=StandardMarketplaceEventType.BID_PLACE.value,
+                    transaction_timestamp=transaction_metadata.transaction_timestamp,
+                )
             case _:
                 continue
 
@@ -455,6 +484,7 @@ def parse(
     collection_offer_metadatas: Dict[str, CollectionOfferMetadata] = {}
     collection_offer_v1s: Dict[str, CollectionOfferV1] = {}
     collection_offer_v2s: Dict[str, CollectionOfferV2] = {}
+    auction_listings: Dict[str, AuctionListing] = {}
 
     # Loop 2
     # Parse out all the listing, auction, bid, and offer data from write set changes.
@@ -521,6 +551,12 @@ def parse(
             if collection_offer_v2:
                 collection_offer_v2s[move_resource_address] = collection_offer_v2
 
+            # Parse auction metadata
+            auction_listing = get_auction_listing(move_resource_type, data)
+
+            if auction_listing:
+                auction_listings[move_resource_address] = auction_listing
+
     # Loop 3
     # Reconstruct the full listing and offer models and create DB objects
     for _, wsc in enumerate(write_set_changes):
@@ -537,58 +573,84 @@ def parse(
                 # Get the data related to this listing that was parsed from loop 2
                 listing_metadata = listing_metadatas.get(move_resource_address)
                 fixed_price_listing = fixed_price_listings.get(move_resource_address)
+                auction_listing = auction_listings.get(move_resource_address)
 
                 assert (
                     listing_metadata
                 ), f"Listing metadata not found for txn {transaction.version}"
-                assert (
-                    fixed_price_listing
-                ), f"Fixed price listing not found for txn {transaction.version}"
 
-                token_address = listing_metadata["token_address"]
-                token_v1_container = listing_token_v1_containers.get(token_address)
-
-                current_listing = None
-
-                if token_v1_container:
-                    token_v1_metadata = token_v1_container["token_metadata"]
-                    current_listing = CurrentNFTMarketplaceListing(
-                        token_data_id=token_v1_metadata["token_data_id"],
-                        listing_address=move_resource_address,
-                        price=fixed_price_listing["price"],
-                        token_amount=token_v1_container["amount"],
-                        token_standard=TokenStandard.V1.value,
+                # If the listing is an auction, it will have an coin_listing::AuctionListing resource, otherwise
+                # it's a fixed price listing.
+                if auction_listing:
+                    # Parses when auction is placed and when a bid is placed on an auction
+                    current_auction = CurrentNFTMarketplaceAuction(
+                        listing_id=move_resource_address,
+                        token_data_id=listing_metadata["token_address"],
                         seller=listing_metadata["seller"],
-                        is_deleted=False,
-                        marketplace=MarketplaceName.EXAMPLE_V2_MARKETPLACE.value,
-                        contract_address=transaction_metadata.contract_address,
-                        entry_function_id_str=transaction_metadata.entry_function_id_str_short,
-                        last_transaction_version=transaction.version,
-                        last_transaction_timestamp=transaction_metadata.transaction_timestamp,
-                    )
-                else:
-                    token_v2_metadata = token_metadatas.get(token_address)
-
-                    assert (
-                        token_v2_metadata
-                    ), f"Token v2 metadata not found for txn {transaction.version}"
-
-                    current_listing = CurrentNFTMarketplaceListing(
-                        token_data_id=token_v2_metadata["token_data_id"],
-                        listing_address=move_resource_address,
-                        price=fixed_price_listing["price"],
+                        current_bid_price=auction_listing["current_bid_price"],
+                        current_bidder=auction_listing["current_bidder"],
+                        starting_bid_price=auction_listing["starting_bid_price"],
+                        buy_it_now_price=auction_listing["buy_it_now_price"],
                         token_amount=1,
-                        token_standard=TokenStandard.V2.value,
-                        seller=listing_metadata["seller"],
+                        expiration_time=auction_listing["auction_end_time"],
                         is_deleted=False,
+                        token_standard=TokenStandard.V2.value,
                         marketplace=MarketplaceName.EXAMPLE_V2_MARKETPLACE.value,
                         contract_address=transaction_metadata.contract_address,
                         entry_function_id_str=transaction_metadata.entry_function_id_str_short,
                         last_transaction_version=transaction.version,
                         last_transaction_timestamp=transaction_metadata.transaction_timestamp,
                     )
+                    current_auctions.append(current_auction)
+                else:
+                    assert (
+                        fixed_price_listing
+                    ), f"Fixed price listing not found for txn {transaction.version}"
 
-                current_nft_marketplace_listings.append(current_listing)
+                    token_address = listing_metadata["token_address"]
+                    token_v1_container = listing_token_v1_containers.get(token_address)
+
+                    current_listing = None
+
+                    if token_v1_container:
+                        token_v1_metadata = token_v1_container["token_metadata"]
+                        current_listing = CurrentNFTMarketplaceListing(
+                            token_data_id=token_v1_metadata["token_data_id"],
+                            listing_id=move_resource_address,
+                            price=fixed_price_listing["price"],
+                            token_amount=token_v1_container["amount"],
+                            token_standard=TokenStandard.V1.value,
+                            seller=listing_metadata["seller"],
+                            is_deleted=False,
+                            marketplace=MarketplaceName.EXAMPLE_V2_MARKETPLACE.value,
+                            contract_address=transaction_metadata.contract_address,
+                            entry_function_id_str=transaction_metadata.entry_function_id_str_short,
+                            last_transaction_version=transaction.version,
+                            last_transaction_timestamp=transaction_metadata.transaction_timestamp,
+                        )
+                    else:
+                        token_v2_metadata = token_metadatas.get(token_address)
+
+                        assert (
+                            token_v2_metadata
+                        ), f"Token v2 metadata not found for txn {transaction.version}"
+
+                        current_listing = CurrentNFTMarketplaceListing(
+                            token_data_id=token_v2_metadata["token_data_id"],
+                            listing_id=move_resource_address,
+                            price=fixed_price_listing["price"],
+                            token_amount=1,
+                            token_standard=TokenStandard.V2.value,
+                            seller=listing_metadata["seller"],
+                            is_deleted=False,
+                            marketplace=MarketplaceName.EXAMPLE_V2_MARKETPLACE.value,
+                            contract_address=transaction_metadata.contract_address,
+                            entry_function_id_str=transaction_metadata.entry_function_id_str_short,
+                            last_transaction_version=transaction.version,
+                            last_transaction_timestamp=transaction_metadata.transaction_timestamp,
+                        )
+
+                    current_nft_marketplace_listings.append(current_listing)
 
             elif (
                 move_resource_type
@@ -750,6 +812,7 @@ def parse(
         + current_nft_marketplace_listings
         + current_token_offers
         + current_collection_offers
+        + current_auctions
     )
 
 

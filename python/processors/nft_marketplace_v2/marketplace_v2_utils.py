@@ -27,21 +27,21 @@ from utils.session import Session
 
 
 def lookup_v2_current_listing_in_db(
-    listing_address: str,
+    listing_id: str,
 ) -> CurrentNFTMarketplaceListing | None:
     listing = None
 
     with Session() as session, session.begin():
         listing_from_db = (
             session.query(CurrentNFTMarketplaceListing)
-            .filter(CurrentNFTMarketplaceListing.listing_address == listing_address)
+            .filter(CurrentNFTMarketplaceListing.listing_id == listing_id)
             .one_or_none()
         )
 
         if listing_from_db:
             listing = CurrentNFTMarketplaceListing(
                 token_data_id=listing_from_db.token_data_id,
-                listing_address=listing_from_db.listing_address,
+                listing_id=listing_from_db.listing_id,
                 price=listing_from_db.price,
                 token_amount=listing_from_db.token_amount,
                 token_standard=listing_from_db.token_standard,

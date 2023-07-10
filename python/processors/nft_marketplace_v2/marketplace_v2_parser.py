@@ -320,3 +320,41 @@ def get_collection_offer_v2(
     return {
         "collection_address": standardize_address(data["collection"]["inner"]),
     }
+
+
+# Auction models and helpers
+class AuctionListing(TypedDict):
+    auction_end_time: int
+    starting_bid_price: int
+    current_bid_price: Optional[int]
+    current_bidder: Optional[str]
+    buy_it_now_price: Optional[int]
+
+
+def get_auction_listing(
+    move_resource_type: str, data: dict
+) -> Optional[AuctionListing]:
+    if (
+        f"{MARKETPLACE_V2_ADDRESS}::coin_listing::AuctionListing"
+        not in move_resource_type
+    ):
+        return None
+
+    maybe_buy_it_now_price = data.get("buy_it_now_price", {}).get("vec", [])
+    buy_it_now_price = maybe_buy_it_now_price[0] if maybe_buy_it_now_price else None
+
+    current_bid_price = None
+    current_bidder = None
+    maybe_current_bid = data.get("current_bid", {}).get("vec", [])
+    if maybe_current_bid:
+        current_bid = maybe_current_bid[0]
+        current_bid_price = current_bid["coins"]["value"]
+        current_bidder = standardize_address(current_bid["bidder"])
+
+    return {
+        "auction_end_time": data["auction_end_time"],
+        "starting_bid_price": data["starting_bid"],
+        "current_bid_price": current_bid_price,
+        "current_bidder": current_bidder,
+        "buy_it_now_price": buy_it_now_price,
+    }

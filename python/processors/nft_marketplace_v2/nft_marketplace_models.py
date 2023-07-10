@@ -8,6 +8,7 @@ from utils.models.annotated_types import (
     NumericType,
     StringPrimaryKeyType,
     TimestampType,
+    NullableNumericType,
 )
 from utils.models.general_models import Base
 from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
@@ -43,8 +44,8 @@ class CurrentNFTMarketplaceListing(Base):
     __tablename__ = "current_nft_marketplace_listings"
     __table_args__ = {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME}
 
+    listing_id: StringPrimaryKeyType
     token_data_id: StringPrimaryKeyType
-    listing_address: NullableStringType
     price: NumericType
     token_amount: NumericType
     token_standard: StringType
@@ -161,3 +162,26 @@ class CurrentNFTMarketplaceCollectionOffer(Base):
 #     event_type: StringType
 #     transaction_timestamp: TimestampType
 #     inserted_at: InsertedAtType
+
+
+class CurrentNFTMarketplaceAuction(Base):
+    __tablename__ = "current_nft_marketplace_auctions"
+    __table_args__ = {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME}
+
+    listing_id: StringPrimaryKeyType
+    token_data_id: StringType
+    seller: StringType
+    current_bid_price: NullableNumericType
+    current_bidder: NullableStringType
+    starting_bid_price: NumericType
+    buy_it_now_price: NullableNumericType
+    token_amount: NumericType
+    expiration_time: NumericType
+    is_deleted: BooleanType
+    token_standard: StringType
+    marketplace: StringType
+    contract_address: StringType
+    entry_function_id_str: StringType
+    last_transaction_version: BigIntegerType
+    last_transaction_timestamp: TimestampType
+    inserted_at: InsertedAtType
