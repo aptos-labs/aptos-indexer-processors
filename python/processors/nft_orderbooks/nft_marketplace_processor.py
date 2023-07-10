@@ -32,6 +32,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from utils.transactions_processor import TransactionsProcessor
 from utils import event_utils, general_utils, transaction_utils, write_set_change_utils
+from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 
 
 def parse(
@@ -122,5 +123,6 @@ if __name__ == "__main__":
     transactions_processor = TransactionsProcessor(
         parser_function=parse,
         processor_name="nft-marketplace",
+        schema_name=NFT_MARKETPLACE_SCHEMA_NAME,
     )
     transactions_processor.process()

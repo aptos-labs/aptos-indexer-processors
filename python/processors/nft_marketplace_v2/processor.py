@@ -57,6 +57,7 @@ from processors.nft_orderbooks.nft_marketplace_enums import (
     MarketplaceName,
 )
 from utils.token_utils import TokenStandard, TokenDataIdType, CollectionDataIdType
+from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
 
 
 def parse(
@@ -824,5 +825,6 @@ if __name__ == "__main__":
     transactions_processor = TransactionsProcessor(
         parser_function=parse,
         processor_name="nft-marketplace-v2",
+        schema_name=NFT_MARKETPLACE_V2_SCHEMA_NAME,
     )
     transactions_processor.process()

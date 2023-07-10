@@ -29,6 +29,7 @@ class TransactionsProcessor:
         self,
         parser_function: Callable[[transaction_pb2.Transaction], list[Any]],
         processor_name: str,
+        schema_name: str,
     ):
         parser = argparse.ArgumentParser()
         parser.add_argument("-c", "--config", help="Path to config file", required=True)
@@ -36,6 +37,7 @@ class TransactionsProcessor:
         self.config = Config.from_yaml_file(args.config)
         self.parser_function = parser_function
         self.processor_name = processor_name
+        self.schema_name = schema_name
 
         self.init_db_tables()
 
@@ -63,6 +65,9 @@ class TransactionsProcessor:
 
     def init_db_tables(self) -> None:
         engine = create_engine(self.config.db_connection_uri)
+        engine = engine.execution_options(
+            schema_translate_map={"per_schema": self.schema_name}
+        )
         Session.configure(bind=engine)
         Base.metadata.create_all(engine, checkfirst=True)
 

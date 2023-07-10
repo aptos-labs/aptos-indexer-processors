@@ -9,6 +9,7 @@ from utils.models.annotated_types import (
     StringPrimaryKeyType,
     TimestampType,
     NullableNumericType,
+    UpdatedAtType,
 )
 from utils.models.general_models import Base
 from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
