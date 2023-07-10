@@ -2,6 +2,11 @@ chain_id: 1
 grpc_data_stream_endpoint: "34.30.218.153:50051"
 grpc_data_stream_api_key: "<grpc_data_stream_api_key>"
 db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"
+health_port: 8080
+monitoring_port: 8081
+indexer_grpc_http2_ping_interval_in_secs: 30
+indexer_grpc_http2_ping_timeout_in_secs: 5
+
 # If there is no version in the DB, start processor from starting_version_default
 # starting_version_default: <starting_version_default>
 # Even if there is a version stored in the DB, start processor from starting_version_override
