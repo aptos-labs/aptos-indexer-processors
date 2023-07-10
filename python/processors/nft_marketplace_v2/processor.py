@@ -169,6 +169,7 @@ def parse(
                 current_listing = CurrentNFTMarketplaceListing(
                     token_data_id=token_metadata["token_data_id"],
                     listing_id=offer_or_listing_id,
+                    collection_id=token_metadata["collection_id"],
                     price=price,
                     token_amount=0,
                     token_standard=token_metadata["token_standard"].value,
@@ -206,6 +207,7 @@ def parse(
                 current_listing = CurrentNFTMarketplaceListing(
                     token_data_id=token_metadata["token_data_id"],
                     listing_id=offer_or_listing_id,
+                    collection_id=token_metadata["collection_id"],
                     price=price,
                     token_amount=0,
                     token_standard=token_metadata["token_standard"].value,
@@ -617,6 +619,7 @@ def parse(
                         current_listing = CurrentNFTMarketplaceListing(
                             token_data_id=token_v1_metadata["token_data_id"],
                             listing_id=move_resource_address,
+                            collection_id=token_v1_metadata["collection_id"],
                             price=fixed_price_listing["price"],
                             token_amount=token_v1_container["amount"],
                             token_standard=TokenStandard.V1.value,
@@ -638,6 +641,7 @@ def parse(
                         current_listing = CurrentNFTMarketplaceListing(
                             token_data_id=token_v2_metadata["token_data_id"],
                             listing_id=move_resource_address,
+                            collection_id=token_v2_metadata["collection_id"],
                             price=fixed_price_listing["price"],
                             token_amount=1,
                             token_standard=TokenStandard.V2.value,
