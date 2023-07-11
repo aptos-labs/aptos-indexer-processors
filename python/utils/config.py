@@ -15,8 +15,6 @@ class Config(BaseSettings):
     db_connection_uri: str
     # Used for k8s liveness and readiness probes
     health_port: int
-    # Used for Prometheus metrics collection at /metrics
-    monitoring_port: int
     # HTTP2 ping interval in seconds to detect if the connection is still alive
     indexer_grpc_http2_ping_interval_in_secs: int
     # HTTP2 ping timeout in seconds to detect if the connection is still alive
