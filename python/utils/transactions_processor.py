@@ -41,22 +41,26 @@ class TransactionsProcessor:
         self.processor_name = processor_name
 
         self.init_db_tables()
+
         # Start the health + metrics server.
         def start_health_server() -> None:
             # The kubelet uses liveness probes to know when to restart a container. In cases where the
             # container is crashing or unresponsive, the kubelet receives timeout or error responses, and then
             # restarts the container. It polls every 10 seconds by default.
             root = Resource()
-            root.putChild(b'metrics', MetricsResource())
+            root.putChild(b"metrics", MetricsResource())
+
             class ServerOk(Resource):
                 isLeaf = True
+
                 def render_GET(self, request):
-                    return b'ok'
-            root.putChild(b'', ServerOk())    
+                    return b"ok"
+
+            root.putChild(b"", ServerOk())
             factory = Site(root)
             reactor.listenTCP(self.config.health_port, factory)
             reactor.run(installSignalHandlers=False)
-            
+
         t = threading.Thread(target=start_health_server, daemon=True)
         # TODO: Handles the exit signal and gracefully shutdown the server.
         t.start()
