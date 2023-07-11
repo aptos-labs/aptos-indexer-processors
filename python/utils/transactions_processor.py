@@ -48,7 +48,7 @@ class TransactionsProcessor:
             # container is crashing or unresponsive, the kubelet receives timeout or error responses, and then
             # restarts the container. It polls every 10 seconds by default.
             root = Resource()
-            root.putChild(b"metrics", MetricsResource())
+            root.putChild(b"metrics", MetricsResource())  # type: ignore
 
             class ServerOk(Resource):
                 isLeaf = True
@@ -56,10 +56,10 @@ class TransactionsProcessor:
                 def render_GET(self, request):
                     return b"ok"
 
-            root.putChild(b"", ServerOk())
+            root.putChild(b"", ServerOk())  # type: ignore
             factory = Site(root)
-            reactor.listenTCP(self.config.health_port, factory)
-            reactor.run(installSignalHandlers=False)
+            reactor.listenTCP(self.config.health_port, factory)  # type: ignore
+            reactor.run(installSignalHandlers=False)  # type: ignore
 
         t = threading.Thread(target=start_health_server, daemon=True)
         # TODO: Handles the exit signal and gracefully shutdown the server.
