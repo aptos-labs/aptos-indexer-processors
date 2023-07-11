@@ -12,7 +12,10 @@ from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
 from sqlalchemy import DDL, Engine, create_engine
 from sqlalchemy import event
 from typing import Any, Callable
-from prometheus_client import start_http_server
+from prometheus_client.twisted import MetricsResource
+from twisted.web.server import Site
+from twisted.web.resource import Resource
+from twisted.internet import reactor
 import http.server
 import socketserver
 import threading
@@ -38,25 +41,22 @@ class TransactionsProcessor:
         self.processor_name = processor_name
 
         self.init_db_tables()
-
-        # Start the Prometheus client; this is a non-blocking call.
-        start_http_server(self.config.monitoring_port)
-
-        # Start the health server.
+        # Start the health + metrics server.
         def start_health_server() -> None:
             # The kubelet uses liveness probes to know when to restart a container. In cases where the
             # container is crashing or unresponsive, the kubelet receives timeout or error responses, and then
             # restarts the container. It polls every 10 seconds by default.
-            class Handler(http.server.SimpleHTTPRequestHandler):
-                def do_GET(self):
-                    self.send_response(http.HTTPStatus.OK)
-                    self.end_headers()
-                    self.wfile.write(b"OK")
-
-            server_address = ("", self.config.health_port)
-            httpd = socketserver.TCPServer(server_address, Handler)
-            httpd.serve_forever()
-
+            root = Resource()
+            root.putChild(b'metrics', MetricsResource())
+            class ServerOk(Resource):
+                isLeaf = True
+                def render_GET(self, request):
+                    return b'ok'
+            root.putChild(b'', ServerOk())    
+            factory = Site(root)
+            reactor.listenTCP(self.config.health_port, factory)
+            reactor.run(installSignalHandlers=False)
+            
         t = threading.Thread(target=start_health_server, daemon=True)
         # TODO: Handles the exit signal and gracefully shutdown the server.
         t.start()
