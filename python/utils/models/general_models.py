@@ -15,6 +15,7 @@ class Base(DeclarativeBase):
 
 class NextVersionToProcess(Base):
     __tablename__ = "next_versions_to_process"
+    __table_args__ = {"schema": "per_schema"}
 
     indexer_name: StringPrimaryKeyType
     next_version: BigIntegerType

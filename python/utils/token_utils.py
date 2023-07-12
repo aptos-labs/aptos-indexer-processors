@@ -1,6 +1,13 @@
+from dataclasses import dataclass
+from enum import Enum
 from utils.general_utils import hash, standardize_address, truncate_str
 
 MAX_NAME_LENGTH = 128
+
+
+class TokenStandard(Enum):
+    V1 = "v1"
+    V2 = "v2"
 
 
 class TokenDataIdType:
@@ -42,3 +49,14 @@ class CollectionDataIdType:
 
     def get_creator(self):
         return standardize_address(self.creator)
+
+
+@dataclass
+class TokenV2AggregatedData:
+    token_data_id: str
+    collection_id: str
+    token_name: str
+    token_standard: TokenStandard
+
+
+TokenV2AggregatedDataMapping = dict[str, TokenV2AggregatedData]

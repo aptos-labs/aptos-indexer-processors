@@ -5,6 +5,7 @@ from typing import List
 from utils import general_utils
 from utils.transactions_processor import TransactionsProcessor
 from utils.models.general_models import NextVersionToProcess, Base
+from utils.models.schema_names import EXAMPLE
 
 
 # Define the parser function that will be used by the TransactionProcessor
@@ -50,5 +51,6 @@ if __name__ == "__main__":
     transactions_processor = TransactionsProcessor(
         parser_function=parse,
         processor_name="python-example-event-processor",
+        schema_name=EXAMPLE,
     )
     transactions_processor.process()

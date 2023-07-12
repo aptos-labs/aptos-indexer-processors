@@ -13,10 +13,12 @@ class MarketplaceName(Enum):
     OZOZOZ = "ozozoz"
     ITSRARE = "itsrare"
     APTOMINGOS_AUCTION = "aptomingos_auction"
+    EXAMPLE_V2_MARKETPLACE = "example_v2_marketplace"
 
 
 class StandardMarketplaceEventType(Enum):
     BID_CANCEL = "bid cancel"
+    BID_CHANGE = "bid change"
     BID_FILLED = "bid filled"
     BID_PLACE = "bid place"
     LISTING_CANCEL = "listing cancel"

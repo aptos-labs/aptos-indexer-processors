@@ -3,8 +3,7 @@ import yaml
 from utils.models.general_models import NextVersionToProcess
 from pydantic import BaseModel, BaseSettings
 from pydantic.env_settings import SettingsSourceCallable
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from utils.session import Session
 from typing import Any, Dict, List, Optional
 
 
@@ -47,9 +46,7 @@ class Config(BaseSettings):
 
         if self.db_connection_uri is not None:
             try:
-                engine = create_engine(self.db_connection_uri)
-
-                with Session(engine) as session, session.begin():
+                with Session() as session, session.begin():
                     next_version_to_process_from_db = session.get(
                         NextVersionToProcess, processor_name
                     )
