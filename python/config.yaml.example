@@ -1,4 +1,3 @@
-chain_id: 1
 grpc_data_stream_endpoint: "34.30.218.153:50051"
 grpc_data_stream_api_key: "<grpc_data_stream_api_key>"
 db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"

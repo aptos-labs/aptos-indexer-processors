@@ -55,18 +55,23 @@ class Config(BaseSettings):
                             next_version_to_process_from_db.next_version
                         )
             except:
-                print("Error getting NextVersionToProcess from db. Skipping...")
+                print("Database error when getting NextVersionToProcess. Skipping...")
 
         # By default, if nothing is set, start from 0
         starting_version = 0
         if self.starting_version_override != None:
             # Start from config's starting_version_override if set
+            print("[Config] Starting from starting_version_override")
             starting_version = self.starting_version_override
         elif next_version_to_process != None:
             # Start from next version to process in db
+            print("[Config] Starting from version from db")
             starting_version = next_version_to_process
         elif self.starting_version_default != None:
             # Start from config's starting_version_default if set
+            print("[Config] Starting from starting_version_default")
             starting_version = self.starting_version_default
+        else:
+            print("Starting from version 0")
 
         return starting_version
