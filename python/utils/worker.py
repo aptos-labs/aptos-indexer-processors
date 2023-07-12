@@ -9,18 +9,15 @@ from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
 from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
-from sqlalchemy import DDL, Engine, create_engine
+from sqlalchemy import DDL, create_engine
 from sqlalchemy import event
 from typing import List
 from prometheus_client.twisted import MetricsResource
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import reactor
-import http.server
-import socketserver
 import threading
 import sys
-from abc import ABC, abstractmethod
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from time import perf_counter
 
