@@ -1,6 +1,7 @@
 from aptos.transaction.v1 import transaction_pb2
 from processors.example_event_processor.models import Event
 from typing import List
+from utils.worker import IndexerProcessorServer
 
 from utils import general_utils
 from utils.transactions_processor import TransactionsProcessor
@@ -72,4 +73,7 @@ class ExampleEventProcessor(TransactionsProcessor):
 
 if __name__ == "__main__":
     example_event_processor = ExampleEventProcessor()
-    example_event_processor.run()
+    indexer_server = IndexerProcessorServer(
+        processor=example_event_processor,
+    )
+    indexer_server.run()
