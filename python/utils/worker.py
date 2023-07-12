@@ -9,15 +9,15 @@ from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
 from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
-from sqlalchemy import DDL, Engine, create_engine
+from sqlalchemy import DDL, create_engine
 from sqlalchemy import event
 from typing import List
-from prometheus_client import start_http_server
-import http.server
-import socketserver
+from prometheus_client.twisted import MetricsResource
+from twisted.web.server import Site
+from twisted.web.resource import Resource
+from twisted.internet import reactor
 import threading
 import sys
-from abc import ABC, abstractmethod
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from time import perf_counter
 
@@ -279,23 +279,24 @@ class IndexerProcessorServer:
         Base.metadata.create_all(engine, checkfirst=True)
 
     def start_health_and_monitoring_ports(self) -> None:
-        # Start the Prometheus client; this is a non-blocking call.
-        start_http_server(self.config.health_port)
-
-        # Start the health server.
+        # Start the health + metrics server.
         def start_health_server() -> None:
             # The kubelet uses liveness probes to know when to restart a container. In cases where the
             # container is crashing or unresponsive, the kubelet receives timeout or error responses, and then
             # restarts the container. It polls every 10 seconds by default.
-            class Handler(http.server.SimpleHTTPRequestHandler):
-                def do_GET(self):
-                    self.send_response(http.HTTPStatus.OK)
-                    self.end_headers()
-                    self.wfile.write(b"OK")
+            root = Resource()
+            root.putChild(b"metrics", MetricsResource())  # type: ignore
 
-            server_address = ("", self.config.health_port)
-            httpd = socketserver.TCPServer(server_address, Handler)
-            httpd.serve_forever()
+            class ServerOk(Resource):
+                isLeaf = True
+
+                def render_GET(self, request):
+                    return b"ok"
+
+            root.putChild(b"", ServerOk())  # type: ignore
+            factory = Site(root)
+            reactor.listenTCP(self.config.health_port, factory)  # type: ignore
+            reactor.run(installSignalHandlers=False)  # type: ignore
 
         t = threading.Thread(target=start_health_server, daemon=True)
         # TODO: Handles the exit signal and gracefully shutdown the server.
