@@ -10,14 +10,7 @@ from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
 from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
-from sqlalchemy import DDL, Engine, create_engine
-from sqlalchemy import event
-from typing import Any, Callable, TypedDict
 from prometheus_client import start_http_server
-import http.server
-import socketserver
-import threading
-import sys
 from abc import ABC, abstractmethod
 
 
