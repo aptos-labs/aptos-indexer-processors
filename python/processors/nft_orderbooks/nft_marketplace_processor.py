@@ -30,7 +30,8 @@ from processors.nft_orderbooks.models.nft_marketplace_listings_models import (
 from processors.nft_orderbooks.nft_orderbooks_parser_utils import MarketplaceName
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
-from utils.transactions_processor import TransactionsProcessor
+from utils.worker import IndexerProcessorServer
+from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from utils import event_utils, general_utils, transaction_utils, write_set_change_utils
 from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 from utils.session import Session
@@ -48,7 +49,7 @@ class NFTMarketplaceProcesser(TransactionsProcessor):
         transactions: list[transaction_pb2.Transaction],
         start_version: int,
         end_version: int,
-    ) -> None:
+    ) -> ProcessingResult:
         parsed_objs = []
 
         for transaction in transactions:
@@ -136,6 +137,11 @@ class NFTMarketplaceProcesser(TransactionsProcessor):
             parsed_objs,
         )
 
+        return ProcessingResult(
+            start_version=start_version,
+            end_version=end_version,
+        )
+
     def insert_to_db(
         self,
         parsed_objs: List[
@@ -156,4 +162,7 @@ class NFTMarketplaceProcesser(TransactionsProcessor):
 
 if __name__ == "__main__":
     transactions_processor = NFTMarketplaceProcesser()
-    transactions_processor.run()
+    indexer_server = IndexerProcessorServer(
+        processor=transactions_processor,
+    )
+    indexer_server.run()

@@ -12,7 +12,7 @@ from processors.nft_marketplace_v2.nft_marketplace_models import (
 )
 from utils.object_utils import get_object_core, ObjectCore
 from utils.token_utils import TokenStandard
-from utils.transactions_processor import TransactionsProcessor
+from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from utils import event_utils, transaction_utils, write_set_change_utils
 from utils.general_utils import standardize_address
 from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
@@ -53,6 +53,7 @@ from utils.token_utils import TokenStandard
 from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
 from processors.nft_marketplace_v2.constants import MARKETPLCE_SMART_CONTRACT_ADDRESS
 from utils.session import Session
+from utils.worker import IndexerProcessorServer
 
 
 class NFTMarketplaceV2Processor(TransactionsProcessor):
@@ -67,7 +68,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         transactions: list[transaction_pb2.Transaction],
         start_version: int,
         end_version: int,
-    ) -> None:
+    ) -> ProcessingResult:
         parsed_objs = []
 
         for transaction in transactions:
@@ -935,6 +936,13 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                 + current_auctions
             )
 
+            self.insert_to_db(parsed_objs)
+
+        return ProcessingResult(
+            start_version=start_version,
+            end_version=end_version,
+        )
+
     def insert_to_db(
         self,
         parsed_objs: List[
@@ -945,7 +953,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
             | CurrentNFTMarketplaceAuction
         ],
     ) -> None:
-        # TODO: Turn this into on conflict, update, to support backfilling
+        # TODO: Turn this into on conflict, update, to support backfilling and multithreading
         with Session() as session, session.begin():
             for obj in parsed_objs:
                 session.merge(obj)
@@ -953,4 +961,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
 
 if __name__ == "__main__":
     processor = NFTMarketplaceV2Processor()
-    processor.run()
+    indexer_server = IndexerProcessorServer(
+        processor=processor,
+    )
+    indexer_server.run()
