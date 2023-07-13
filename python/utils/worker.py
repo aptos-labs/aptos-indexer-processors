@@ -20,6 +20,7 @@ import threading
 import sys
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from time import perf_counter
+import traceback
 
 
 INDEXER_GRPC_BLOB_STORAGE_SIZE = 1000
@@ -51,7 +52,7 @@ class IndexerProcessorServer:
     class WorkerThread(
         threading.Thread,
     ):
-        processing_result: ProcessingResult | None
+        processing_result: ProcessingResult
         exception: Exception | None
 
         def __init__(
@@ -62,7 +63,9 @@ class IndexerProcessorServer:
             threading.Thread.__init__(self)
             self.processor = processor
             self.transactions = transactions
-            self.processing_result = None
+            self.processing_result = ProcessingResult(
+                transactions[0].version, transactions[-1].version
+            )
             self.exception = None
 
         def run(self):
@@ -75,9 +78,6 @@ class IndexerProcessorServer:
                 )
 
             except Exception as e:
-                print(
-                    f"[Processor worker] Error processing transactions from {start_version} to {end_version}: {e}"
-                )
                 self.exception = e
 
     def run(self):
@@ -187,6 +187,7 @@ class IndexerProcessorServer:
                 # Update state depending on the results of the batch processing
                 processed_versions: List[ProcessingResult] = []
                 for thread in threads:
+                    processing_result = thread.processing_result
                     exception = thread.exception
 
                     # TODO: Log errors metric
@@ -194,15 +195,15 @@ class IndexerProcessorServer:
                         print(
                             json.dumps(
                                 {
-                                    "message": "[Parser] Error processing transaction batch",
+                                    "message": f"[Parser] Error processing transactions {processing_result.start_version} to {processing_result.end_version}",
                                     "error": str(exception),
+                                    "error_stacktrace": traceback.format_exc(),
                                 }
                             )
                         )
                         sys.exit(1)
-
-                    if thread.processing_result:
-                        processed_versions.append(thread.processing_result)
+                    elif processing_result:
+                        processed_versions.append(processing_result)
 
                 # Make sure there are no gaps and advance states
                 processed_versions.sort(key=lambda x: x.start_version)
@@ -243,6 +244,7 @@ class IndexerProcessorServer:
 
                 # TODO: Update latest processed version metric
                 self.processor.update_last_processed_version(batch_end)
+                PROCESSED_TRANSACTIONS_COUNTER.inc(len(processed_versions))
 
                 print(
                     json.dumps(

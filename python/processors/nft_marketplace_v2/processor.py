@@ -54,6 +54,7 @@ from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
 from processors.nft_marketplace_v2.constants import MARKETPLCE_SMART_CONTRACT_ADDRESS
 from utils.session import Session
 from utils.worker import IndexerProcessorServer
+from sqlalchemy.dialects.postgresql import insert
 
 
 class NFTMarketplaceV2Processor(TransactionsProcessor):
@@ -792,7 +793,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                             assert (
                                 token_offer_v2
                             ), f"Token offer v2 metadata not found for txn {transaction.version}"
-                            
+
                             token_v2_metadata = token_metadatas.get(
                                 token_offer_v2["token_address"]
                             )
@@ -847,7 +848,9 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                                 collection_id=collection_offer_v1[
                                     "collection_metadata"
                                 ]["collection_id"],
-                                fee_schedule_id=collection_offer_metadata["fee_schedule_id"],
+                                fee_schedule_id=collection_offer_metadata[
+                                    "fee_schedule_id"
+                                ],
                                 buyer=collection_object["owner"],
                                 item_price=collection_offer_metadata["item_price"],
                                 remaining_token_amount=collection_offer_metadata[
@@ -875,7 +878,9 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                             current_collection_offer = CurrentNFTMarketplaceCollectionOffer(
                                 collection_offer_id=move_resource_address,
                                 collection_id=collection_offer_v2["collection_address"],
-                                fee_schedule_id=collection_offer_metadata["fee_schedule_id"],
+                                fee_schedule_id=collection_offer_metadata[
+                                    "fee_schedule_id"
+                                ],
                                 buyer=collection_object["owner"],
                                 item_price=collection_offer_metadata["item_price"],
                                 remaining_token_amount=collection_offer_metadata[
@@ -910,7 +915,9 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                         current_collection_offer = CurrentNFTMarketplaceCollectionOffer(
                             collection_offer_id=move_resource_address,
                             collection_id=collection_metadata["collection_id"],
-                            fee_schedule_id=maybe_collection_offer_filled_metadata["fee_schedule_id"],
+                            fee_schedule_id=maybe_collection_offer_filled_metadata[
+                                "fee_schedule_id"
+                            ],
                             buyer=maybe_collection_offer_filled_metadata["buyer"],
                             item_price=maybe_collection_offer_filled_metadata[
                                 "item_price"
@@ -957,6 +964,36 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         with Session() as session, session.begin():
             for obj in parsed_objs:
                 session.merge(obj)
+
+    def insert_nft_activities(
+        self,
+        activities: List[NFTMarketplaceActivities],
+    ) -> None:
+        pass
+
+    def insert_nft_listings(
+        self,
+        listings: List[CurrentNFTMarketplaceListing],
+    ) -> None:
+        pass
+
+    def insert_nft_token_offers(
+        self,
+        offers: List[CurrentNFTMarketplaceTokenOffer],
+    ) -> None:
+        pass
+
+    def insert_nft_collection_offers(
+        self,
+        offers: List[CurrentNFTMarketplaceCollectionOffer],
+    ) -> None:
+        pass
+
+    def insert_nft_auctions(
+        self,
+        auctions: List[CurrentNFTMarketplaceAuction],
+    ) -> None:
+        pass
 
 
 if __name__ == "__main__":
