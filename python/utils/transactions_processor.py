@@ -20,6 +20,7 @@ import http.server
 import socketserver
 import threading
 import sys
+import traceback
 
 
 class TransactionsProcessor:
@@ -161,8 +162,20 @@ class TransactionsProcessor:
                                 )
                                 return
 
-                        parsed_objs = self.parser_function(transaction)
-                        self.insert_to_db(parsed_objs, current_transaction_version)
+                        try:
+                            parsed_objs = self.parser_function(transaction)
+                            self.insert_to_db(parsed_objs, current_transaction_version)
+                        except Exception as e:
+                            print(
+                                json.dumps(
+                                    {
+                                        "message": f"Error processing transaction {transaction_version}",
+                                        "error": str(e),
+                                        "error_stacktrace": traceback.format_exception(e),
+                                    }
+                                )
+                            )
+                            sys.exit(1)
                         PROCESSED_TRANSACTIONS_COUNTER.inc()
                         if current_transaction_version % 1000 == 0:
                             print(
