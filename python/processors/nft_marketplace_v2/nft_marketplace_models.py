@@ -22,12 +22,14 @@ class NFTMarketplaceActivities(Base):
         (Index("ev_offer_or_listing_index", "offer_or_listing_id")),
         (Index("ev_token_data_id_index", "token_data_id")),
         (Index("ev_collection_id_index", "collection_id")),
+        (Index("ev_fee_schedule_index", "fee_schedule_id")),
         {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME},
     )
 
     transaction_version: BigIntegerPrimaryKeyType
     event_index: BigIntegerPrimaryKeyType
     offer_or_listing_id: StringType
+    fee_schedule_id: StringType
     collection_id: StringType
     token_data_id: NullableStringType
     creator_address: StringType
@@ -50,6 +52,8 @@ class NFTMarketplaceActivities(Base):
 class CurrentNFTMarketplaceListing(Base):
     __tablename__ = "current_nft_marketplace_listings"
     __table_args__ = (
+        (Index("curr_list_collection_index", "collection_id")),
+        (Index("curr_list_fee_schedule_index", "fee_schedule_id")),
         (Index("curr_list_collection_price_index", "collection_id", "price")),
         (Index("curr_list_seller_index", "seller")),
         {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME},
@@ -58,6 +62,7 @@ class CurrentNFTMarketplaceListing(Base):
     listing_id: StringPrimaryKeyType
     token_data_id: StringPrimaryKeyType
     collection_id: StringType
+    fee_schedule_id: StringType
     price: NumericType
     token_amount: NumericType
     token_standard: StringType
@@ -94,12 +99,16 @@ class CurrentNFTMarketplaceListing(Base):
 class CurrentNFTMarketplaceTokenOffer(Base):
     __tablename__ = "current_nft_marketplace_token_offers"
     __table_args__ = (
+        (Index("curr_tok_offer_collection_index", "collection_id")),
+        (Index("curr_tok_offer_fee_schedule_index", "fee_schedule_id")),
         (Index("curr_tok_offer_buyer_index", "buyer")),
         {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME},
     )
 
     offer_id: StringPrimaryKeyType
     token_data_id: StringPrimaryKeyType
+    collection_id: StringType
+    fee_schedule_id: StringType
     buyer: StringType
     price: NumericType
     token_amount: NumericType
@@ -141,6 +150,7 @@ class CurrentNFTMarketplaceTokenOffer(Base):
 class CurrentNFTMarketplaceCollectionOffer(Base):
     __tablename__ = "current_nft_marketplace_collection_offers"
     __table_args__ = (
+        (Index("curr_coll_off_fee_schedule_index", "fee_schedule_id")),
         (Index("curr_coll_off_buyer_index", "buyer")),
         (Index("curr_coll_off_price_index", "item_price")),
         {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME},
@@ -148,6 +158,7 @@ class CurrentNFTMarketplaceCollectionOffer(Base):
 
     collection_offer_id: StringPrimaryKeyType
     collection_id: StringPrimaryKeyType
+    fee_schedule_id: StringType
     buyer: StringType
     item_price: NumericType
     remaining_token_amount: NumericType
@@ -186,6 +197,8 @@ class CurrentNFTMarketplaceCollectionOffer(Base):
 class CurrentNFTMarketplaceAuction(Base):
     __tablename__ = "current_nft_marketplace_auctions"
     __table_args__ = (
+        (Index("curr_auc_collection_index", "collection_id")),
+        (Index("curr_auc_fee_schedule_index", "fee_schedule_id")),
         (Index("curr_auc_seller_index", "seller")),
         (Index("curr_auc_bidder_index", "current_bidder")),
         {"schema": NFT_MARKETPLACE_V2_SCHEMA_NAME},
@@ -193,6 +206,8 @@ class CurrentNFTMarketplaceAuction(Base):
 
     listing_id: StringPrimaryKeyType
     token_data_id: StringPrimaryKeyType
+    collection_id: StringType
+    fee_schedule_id: StringType
     seller: StringType
     current_bid_price: NullableNumericType
     current_bidder: NullableStringType

@@ -1,24 +1,6 @@
-import json
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Optional
 from typing_extensions import TypedDict
-from aptos.transaction.v1 import transaction_pb2
-from processors.nft_marketplace_v2.marketplace_v2_utils import (
-    lookup_v2_current_listing_in_db,
-)
-from processors.nft_marketplace_v2.constants import MARKETPLACE_V2_ADDRESS
-from processors.nft_marketplace_v2.nft_marketplace_models import (
-    CurrentNFTMarketplaceListing,
-    NFTMarketplaceActivities,
-)
-from processors.nft_orderbooks.nft_orderbooks_parser_utils import (
-    parse_transaction_metadata,
-)
-from processors.nft_orderbooks.nft_marketplace_enums import (
-    StandardMarketplaceEventType,
-    MarketplaceName,
-)
-from utils import event_utils, transaction_utils, write_set_change_utils
+from processors.nft_marketplace_v2.constants import MARKETPLCE_SMART_CONTRACT_ADDRESS
 from utils.token_utils import TokenStandard, TokenDataIdType, CollectionDataIdType
 from utils.general_utils import standardize_address
 
@@ -116,6 +98,7 @@ class FixedPriceListing(TypedDict):
 
 class ListingMetadata(TypedDict):
     seller: str
+    fee_schedule_id: str
     # Either the token v2 address or the token v1 container address
     token_address: str
 
@@ -128,11 +111,12 @@ class ListingTokenV1Container(TypedDict):
 def get_listing_metadata(
     move_resource_type: str, data: dict
 ) -> Optional[ListingMetadata]:
-    if move_resource_type != f"{MARKETPLACE_V2_ADDRESS}::listing::Listing":
+    if move_resource_type != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::listing::Listing":
         return None
 
     return {
         "seller": standardize_address(data["seller"]),
+        "fee_schedule_id": standardize_address(data["fee_schedule"]["inner"]),
         "token_address": standardize_address(data["object"]["inner"]),
     }
 
@@ -141,7 +125,7 @@ def get_fixed_priced_listing(
     move_resource_type: str, data: dict
 ) -> Optional[FixedPriceListing]:
     if (
-        f"{MARKETPLACE_V2_ADDRESS}::coin_listing::FixedPriceListing"
+        f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::coin_listing::FixedPriceListing"
         not in move_resource_type
     ):
         return None
@@ -152,7 +136,10 @@ def get_fixed_priced_listing(
 def get_listing_token_v1_container(
     move_resource_type: str, data: dict
 ) -> Optional[ListingTokenV1Container]:
-    if move_resource_type != f"{MARKETPLACE_V2_ADDRESS}::listing::TokenV1Container":
+    if (
+        move_resource_type
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::listing::TokenV1Container"
+    ):
         return None
 
     token = data.get("token", {})
@@ -183,6 +170,7 @@ def get_listing_token_v1_container(
 class TokenOfferMetadata(TypedDict):
     expiration_time: int
     price: int
+    fee_schedule_id: str
 
 
 class TokenOfferV2(TypedDict):
@@ -196,19 +184,23 @@ class TokenOfferV1(TypedDict):
 def get_token_offer_metadata(
     move_resource_type: str, data: dict
 ) -> Optional[TokenOfferMetadata]:
-    if move_resource_type != f"{MARKETPLACE_V2_ADDRESS}::token_offer::TokenOffer":
+    if (
+        move_resource_type
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOffer"
+    ):
         return None
 
     return {
         "expiration_time": data["expiration_time"],
         "price": data["item_price"],
+        "fee_schedule_id": standardize_address(data["fee_schedule"]["inner"]),
     }
 
 
 def get_token_offer_v2(move_resource_type: str, data: dict) -> Optional[TokenOfferV2]:
     if (
         move_resource_type
-        != f"{MARKETPLACE_V2_ADDRESS}::token_offer::TokenOfferTokenV2"
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOfferTokenV2"
     ):
         return None
 
@@ -220,7 +212,7 @@ def get_token_offer_v2(move_resource_type: str, data: dict) -> Optional[TokenOff
 def get_token_offer_v1(move_resource_type: str, data: dict) -> Optional[TokenOfferV1]:
     if (
         move_resource_type
-        != f"{MARKETPLACE_V2_ADDRESS}::token_offer::TokenOfferTokenV1"
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOfferTokenV1"
     ):
         return None
 
@@ -251,6 +243,7 @@ class CollectionOfferMetadata(TypedDict):
     expiration_time: int
     item_price: int
     remaining_token_amount: int
+    fee_schedule_id: str
 
 
 class CollectionOfferV1(TypedDict):
@@ -266,6 +259,7 @@ class CollectionOfferEventMetadata(TypedDict):
     collection_metadata: CollectionMetadata
     item_price: int
     buyer: str
+    fee_schedule_id: str
 
 
 def get_collection_offer_metadata(
@@ -273,7 +267,7 @@ def get_collection_offer_metadata(
 ) -> Optional[CollectionOfferMetadata]:
     if (
         move_resource_type
-        != f"{MARKETPLACE_V2_ADDRESS}::collection_offer::CollectionOffer"
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOffer"
     ):
         return None
 
@@ -281,6 +275,7 @@ def get_collection_offer_metadata(
         "expiration_time": data["expiration_time"],
         "item_price": data["item_price"],
         "remaining_token_amount": data["remaining"],
+        "fee_schedule_id": standardize_address(data["fee_schedule"]["inner"]),
     }
 
 
@@ -289,7 +284,7 @@ def get_collection_offer_v1(
 ) -> Optional[CollectionOfferV1]:
     if (
         move_resource_type
-        != f"{MARKETPLACE_V2_ADDRESS}::collection_offer::CollectionOfferTokenV1"
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOfferTokenV1"
     ):
         return None
 
@@ -313,7 +308,7 @@ def get_collection_offer_v2(
 ) -> Optional[CollectionOfferV2]:
     if (
         move_resource_type
-        != f"{MARKETPLACE_V2_ADDRESS}::collection_offer::CollectionOfferTokenV2"
+        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOfferTokenV2"
     ):
         return None
 
@@ -335,7 +330,7 @@ def get_auction_listing(
     move_resource_type: str, data: dict
 ) -> Optional[AuctionListing]:
     if (
-        f"{MARKETPLACE_V2_ADDRESS}::coin_listing::AuctionListing"
+        f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::coin_listing::AuctionListing"
         not in move_resource_type
     ):
         return None
