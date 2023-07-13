@@ -20,6 +20,7 @@ import http.server
 import socketserver
 import threading
 import sys
+import traceback
 
 
 class TransactionsProcessor:
@@ -132,7 +133,7 @@ class TransactionsProcessor:
                     print(
                         json.dumps(
                             {
-                                "message": "Response received",
+                                "message": "[Parser] Response received",
                                 "starting_version": response.transactions[0].version,
                             }
                         )
@@ -154,21 +155,35 @@ class TransactionsProcessor:
                                 print(
                                     json.dumps(
                                         {
-                                            "message": "Reached ending version",
+                                            "message": "[Parser] Reached ending version",
                                             "ending_version": self.config.ending_version,
                                         }
                                     )
                                 )
                                 return
 
-                        parsed_objs = self.parser_function(transaction)
-                        self.insert_to_db(parsed_objs, current_transaction_version)
+                        try:
+                            parsed_objs = self.parser_function(transaction)
+                            self.insert_to_db(parsed_objs, current_transaction_version)
+                        except Exception as e:
+                            print(
+                                json.dumps(
+                                    {
+                                        "message": f"[Parser] Error processing transaction {transaction_version}",
+                                        "error": str(e),
+                                        "error_stacktrace": traceback.format_exception(
+                                            e
+                                        ),
+                                    }
+                                )
+                            )
+                            sys.exit(1)
                         PROCESSED_TRANSACTIONS_COUNTER.inc()
                         if current_transaction_version % 1000 == 0:
                             print(
                                 json.dumps(
                                     {
-                                        "message": "Successfully processed transaction",
+                                        "message": "[Parser] Successfully processed transaction",
                                         "last_success_transaction_version": current_transaction_version,
                                     }
                                 )
@@ -179,7 +194,7 @@ class TransactionsProcessor:
                 print(
                     json.dumps(
                         {
-                            "message": "Error processing transaction",
+                            "message": "[Parser] Error processing transaction",
                             "last_success_transaction_version": current_transaction_version,
                             "error": str(e),
                         }
