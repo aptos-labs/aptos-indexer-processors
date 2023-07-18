@@ -15,7 +15,7 @@ set -ex
 TARGET_REGISTRY="us-docker.pkg.dev/aptos-registry/docker/indexer-client-examples"
 # take GIT_SHA from environment variable if set, otherwise use git rev-parse HEAD
 GIT_SHA="${GIT_SHA:-$(git rev-parse HEAD)}"
-ALL_EXAMPLES="python"
+ALL_EXAMPLES=("python" "rust")
 EXAMPLE_TO_BUILD_ARG="${1:-all}"
 
 if [ "$EXAMPLE_TO_BUILD_ARG" == "all" ]; then

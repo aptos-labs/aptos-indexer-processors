@@ -1,0 +1,42 @@
+[package]
+name = "processor"
+description = "Indexer GRPC processor in Rust."
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+edition = "2021"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/aptos-labs/aptos-core"
+rust-version = "1.70"
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+bigdecimal = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+diesel =  { workspace = true }
+diesel_migrations = { workspace = true }
+field_count = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+gcloud-sdk = { workspace = true }
+hex = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+server-framework = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }

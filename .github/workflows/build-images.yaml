@@ -2,7 +2,6 @@ name: "Build Docker Images"
 on:
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request:
   push:
     branches:
       - main
@@ -25,10 +24,34 @@ jobs:
   Build:
     strategy:
       matrix:
-        example: [python]
+        example: [python, rust]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install pnpm & protoc-gen-ts
+        uses: pnpm/action-setup@v2
+        with:
+          version: 7.12.2
+      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+      - name: install rust prost plugin
+        run: |
+          cargo install protoc-gen-prost
+          cargo install protoc-gen-prost-serde
+          cargo install protoc-gen-prost-crate
+          cargo install protoc-gen-tonic
+      - name: Generate the protos
+        uses: bufbuild/buf-setup-action@v1.24.0
+      - run: buf generate
+      - run: > 
+          pip install grpcio-tools &&
+          python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python  
+          proto/aptos/bigquery_schema/v1/transaction.proto 
+          proto/aptos/indexer/v1/raw_data.proto 
+          proto/aptos/internal/fullnode/v1/fullnode_data.proto 
+          proto/aptos/transaction/v1/transaction.proto 
+          proto/aptos/util/timestamp/timestamp.proto
       - uses: ./.github/actions/docker-setup
         with:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}

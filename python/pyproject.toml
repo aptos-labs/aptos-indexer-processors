@@ -25,6 +25,7 @@ google-cloud-bigquery-storage = "^2.19.1"
 google-cloud-bigquery = "^3.10.0"
 prometheus-client = "^0.17.1"
 twisted = "^22.10.0"
+grpclib = "^0.4.5"
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.53.0"
