@@ -1,0 +1,20 @@
+{
+  "name": "aptos-indexer-processors",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "google-protobuf": "^3.21.2",
+    "protoc-gen-ts": "^0.8.6",
+    "typescript": "4.x.x"
+  },
+  "peerDependencies": {
+    "protoc-gen-ts": "^0.8.6"
+  }
+}

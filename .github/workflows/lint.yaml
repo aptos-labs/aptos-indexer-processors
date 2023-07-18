@@ -17,14 +17,49 @@ concurrency:
 jobs:
   Python:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: python
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4 
       - uses: snok/install-poetry@v1
         with:
           version: 1.4.2
+      - run: >
+          pip install grpcio-tools &&  
+          python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python
+          proto/aptos/bigquery_schema/v1/transaction.proto 
+          proto/aptos/indexer/v1/raw_data.proto 
+          proto/aptos/internal/fullnode/v1/fullnode_data.proto 
+          proto/aptos/transaction/v1/transaction.proto 
+          proto/aptos/util/timestamp/timestamp.proto
       - run: poetry install
+        working-directory: python
       - run: poetry run poe lint
+        working-directory: python
+
+  Rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install pnpm & protoc-gen-ts
+        uses: pnpm/action-setup@v2
+        with:
+          version: 7.12.2
+      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+      - name: install rust prost plugin
+        run: |
+          cargo install protoc-gen-prost
+          cargo install protoc-gen-prost-serde
+          cargo install protoc-gen-prost-crate
+          cargo install protoc-gen-tonic
+      - name: Generate the protos
+        uses: bufbuild/buf-setup-action@v1.24.0
+      - run: buf generate
+      - run: |
+          cargo install cargo-sort 
+          rustup update
+          rustup toolchain install nightly
+          rustup component add rustfmt --toolchain nightly
+          scripts/rust_lint.sh --check
+        working-directory: rust

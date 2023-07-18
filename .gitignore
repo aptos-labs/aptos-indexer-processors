@@ -1,14 +1,44 @@
-.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__.DS_Store
-__pycache__
 config.yaml
 cursor.txt
 build
 node_modules/
+
+# Rust specific ignores
+# Please follow https://help.github.com/en/articles/ignoring-files to create a global
+# .gitignore file locally for IDE/Emacs/Vim generated files.
+**/target
+**/*.rs.bk
+.idea/
+
+# macOS Specific ignores
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Vim swap files
+*.swp
+*.swo
+
+# Emacs backup files
+*~
+.\#*
+.*\#
+\#*\#
+
+# VSCode settings
+.vscode/
+
+# Cached python files
+__pycache__
+
+# Protocol buffer generated files
+# Rust generated files
+rust/aptos-protos/src/pb
+# Python generated files
+python/aptos/
+# TypeScript generated files
+typescript/aptos
