@@ -13,7 +13,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub processor_name: String,
     pub postgres_connection_string: String,
     // TODO: add tls support.
-    pub indexer_grpc_data_service_addresss: String,
+    pub indexer_grpc_data_service_address: String,
     // Indexer GRPC http2 ping interval in seconds; default to 30.
     // tonic ref: https://docs.rs/tonic/latest/tonic/transport/channel/struct.Endpoint.html#method.http2_keep_alive_interval
     pub indexer_grpc_http2_ping_interval_in_secs: Option<u64>,
@@ -21,8 +21,10 @@ pub struct IndexerGrpcProcessorConfig {
     pub indexer_grpc_http2_ping_timeout_in_secs: Option<u64>,
     pub auth_token: String,
     pub starting_version: Option<u64>,
+    pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
     pub ans_address: Option<String>,
+    pub nft_points_contract: Option<String>,
     // TODO: split this out into an adapter model
     pub bigquery_project_id: Option<String>,
     pub bigquery_dataset_name: Option<String>,
@@ -31,10 +33,10 @@ pub struct IndexerGrpcProcessorConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
     async fn run(&self) -> Result<()> {
-        let worker = Worker::new(
+        let mut worker = Worker::new(
             self.processor_name.clone(),
             self.postgres_connection_string.clone(),
-            self.indexer_grpc_data_service_addresss.clone(),
+            self.indexer_grpc_data_service_address.clone(),
             std::time::Duration::from_secs(
                 self.indexer_grpc_http2_ping_interval_in_secs.unwrap_or(30),
             ),
@@ -43,8 +45,10 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             ),
             self.auth_token.clone(),
             self.starting_version,
+            self.ending_version,
             self.number_concurrent_processing_tasks,
             self.ans_address.clone(),
+            self.nft_points_contract.clone(),
             self.bigquery_project_id.clone(),
             self.bigquery_dataset_name.clone(),
         )
