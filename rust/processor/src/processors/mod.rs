@@ -3,21 +3,18 @@
 
 pub mod coin_processor;
 pub mod default_processor;
-pub mod default_processor_bq;
 pub mod processor_trait;
 pub mod stake_processor;
 pub mod token_processor;
 
 use self::{
     coin_processor::NAME as COIN_PROCESSOR_NAME, default_processor::NAME as DEFAULT_PROCESSOR_NAME,
-    default_processor_bq::NAME as DEFAULT_PROCESSOR_BQ_NAME,
     stake_processor::NAME as STAKE_PROCESSOR_NAME, token_processor::NAME as TOKEN_PROCESSOR_NAME,
 };
 
 pub enum Processor {
     CoinProcessor,
     DefaultProcessor,
-    DefaultProcessorBQ,
     StakeProcessor,
     TokenProcessor,
 }
@@ -29,7 +26,6 @@ impl Processor {
             COIN_PROCESSOR_NAME => Self::CoinProcessor,
             STAKE_PROCESSOR_NAME => Self::StakeProcessor,
             TOKEN_PROCESSOR_NAME => Self::TokenProcessor,
-            DEFAULT_PROCESSOR_BQ_NAME => Self::DefaultProcessorBQ,
             _ => panic!("Processor unsupported {}", input_str),
         }
     }
