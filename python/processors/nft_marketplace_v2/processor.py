@@ -51,7 +51,6 @@ from processors.nft_orderbooks.nft_marketplace_enums import (
 )
 from utils.token_utils import TokenStandard
 from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
-from processors.nft_marketplace_v2.constants import MARKETPLCE_SMART_CONTRACT_ADDRESS
 from utils.session import Session
 from utils.worker import IndexerProcessorServer
 from sqlalchemy.dialects.postgresql import insert
@@ -71,6 +70,11 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         end_version: int,
     ) -> ProcessingResult:
         parsed_objs = []
+
+        assert self.config.custom_config, "Custom config must be set for this processor"
+        marketplace_contract_address = self.config.custom_config[
+            "marketplace_contract_address"
+        ]
 
         for transaction in transactions:
             user_transaction = transaction_utils.get_user_transaction(transaction)
@@ -106,7 +110,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
             for event_index, event in enumerate(events):
                 qualified_event_type = event.type_str
 
-                if MARKETPLCE_SMART_CONTRACT_ADDRESS not in qualified_event_type:
+                if marketplace_contract_address not in qualified_event_type:
                     continue
 
                 event_type_short = event_utils.get_event_type_short(event)
@@ -562,16 +566,18 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                     if object_core:
                         object_metadatas[move_resource_address] = object_core
 
-                    if move_resource_type_address != MARKETPLCE_SMART_CONTRACT_ADDRESS:
+                    if move_resource_type_address != marketplace_contract_address:
                         continue
 
                     # Parse listing metadata
-                    listing_metadata = get_listing_metadata(move_resource_type, data)
+                    listing_metadata = get_listing_metadata(
+                        move_resource_type, data, marketplace_contract_address
+                    )
                     fixed_price_listing = get_fixed_priced_listing(
-                        move_resource_type, data
+                        move_resource_type, data, marketplace_contract_address
                     )
                     listing_token_v1_container = get_listing_token_v1_container(
-                        move_resource_type, data
+                        move_resource_type, data, marketplace_contract_address
                     )
 
                     if listing_metadata:
@@ -587,10 +593,14 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
 
                     # Parse token offer metadata
                     token_offer_metadata = get_token_offer_metadata(
-                        move_resource_type, data
+                        move_resource_type, data, marketplace_contract_address
                     )
-                    token_offer_v1 = get_token_offer_v1(move_resource_type, data)
-                    token_offer_v2 = get_token_offer_v2(move_resource_type, data)
+                    token_offer_v1 = get_token_offer_v1(
+                        move_resource_type, data, marketplace_contract_address
+                    )
+                    token_offer_v2 = get_token_offer_v2(
+                        move_resource_type, data, marketplace_contract_address
+                    )
 
                     if token_offer_metadata:
                         token_offer_metadatas[
@@ -603,13 +613,13 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
 
                     # Parse collection offer metadata
                     collection_offer_metadata = get_collection_offer_metadata(
-                        move_resource_type, data
+                        move_resource_type, data, marketplace_contract_address
                     )
                     collection_offer_v1 = get_collection_offer_v1(
-                        move_resource_type, data
+                        move_resource_type, data, marketplace_contract_address
                     )
                     collection_offer_v2 = get_collection_offer_v2(
-                        move_resource_type, data
+                        move_resource_type, data, marketplace_contract_address
                     )
 
                     if collection_offer_metadata:
@@ -626,7 +636,9 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                         ] = collection_offer_v2
 
                     # Parse auction metadata
-                    auction_listing = get_auction_listing(move_resource_type, data)
+                    auction_listing = get_auction_listing(
+                        move_resource_type, data, marketplace_contract_address
+                    )
 
                     if auction_listing:
                         auction_listings[move_resource_address] = auction_listing
@@ -637,7 +649,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                 write_resource = write_set_change_utils.get_write_resource(wsc)
                 if write_resource:
                     move_type_address = write_resource.type.address
-                    if move_type_address != MARKETPLCE_SMART_CONTRACT_ADDRESS:
+                    if move_type_address != marketplace_contract_address:
                         continue
 
                     move_resource_address = standardize_address(write_resource.address)
@@ -645,7 +657,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
 
                     if (
                         move_resource_type
-                        == f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::listing::Listing"
+                        == f"{marketplace_contract_address}::listing::Listing"
                     ):
                         # Get the data related to this listing that was parsed from loop 2
                         listing_metadata = listing_metadatas.get(move_resource_address)
@@ -750,7 +762,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
 
                     elif (
                         move_resource_type
-                        == f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOffer"
+                        == f"{marketplace_contract_address}::token_offer::TokenOffer"
                     ):
                         # Get the data related to this token offer that was parsed from loop 2
                         token_offer_object = object_metadatas.get(move_resource_address)
@@ -822,7 +834,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                         current_token_offers.append(current_token_offer)
                     elif (
                         move_resource_type
-                        == f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOffer"
+                        == f"{marketplace_contract_address}::collection_offer::CollectionOffer"
                     ):
                         # Get the data related to this collection offer that was parsed from loop 2
                         collection_offer_metadata = collection_offer_metadatas.get(

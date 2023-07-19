@@ -1,6 +1,5 @@
 from typing import Optional
 from typing_extensions import TypedDict
-from processors.nft_marketplace_v2.constants import MARKETPLCE_SMART_CONTRACT_ADDRESS
 from utils.token_utils import TokenStandard, TokenDataIdType, CollectionDataIdType
 from utils.general_utils import standardize_address
 
@@ -109,9 +108,9 @@ class ListingTokenV1Container(TypedDict):
 
 
 def get_listing_metadata(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[ListingMetadata]:
-    if move_resource_type != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::listing::Listing":
+    if move_resource_type != f"{marketplace_contract_address}::listing::Listing":
         return None
 
     return {
@@ -122,10 +121,10 @@ def get_listing_metadata(
 
 
 def get_fixed_priced_listing(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[FixedPriceListing]:
     if (
-        f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::coin_listing::FixedPriceListing"
+        f"{marketplace_contract_address}::coin_listing::FixedPriceListing"
         not in move_resource_type
     ):
         return None
@@ -134,11 +133,11 @@ def get_fixed_priced_listing(
 
 
 def get_listing_token_v1_container(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[ListingTokenV1Container]:
     if (
         move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::listing::TokenV1Container"
+        != f"{marketplace_contract_address}::listing::TokenV1Container"
     ):
         return None
 
@@ -182,12 +181,9 @@ class TokenOfferV1(TypedDict):
 
 
 def get_token_offer_metadata(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[TokenOfferMetadata]:
-    if (
-        move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOffer"
-    ):
+    if move_resource_type != f"{marketplace_contract_address}::token_offer::TokenOffer":
         return None
 
     return {
@@ -197,10 +193,12 @@ def get_token_offer_metadata(
     }
 
 
-def get_token_offer_v2(move_resource_type: str, data: dict) -> Optional[TokenOfferV2]:
+def get_token_offer_v2(
+    move_resource_type: str, data: dict, marketplace_contract_address: str
+) -> Optional[TokenOfferV2]:
     if (
         move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOfferTokenV2"
+        != f"{marketplace_contract_address}::token_offer::TokenOfferTokenV2"
     ):
         return None
 
@@ -209,10 +207,12 @@ def get_token_offer_v2(move_resource_type: str, data: dict) -> Optional[TokenOff
     }
 
 
-def get_token_offer_v1(move_resource_type: str, data: dict) -> Optional[TokenOfferV1]:
+def get_token_offer_v1(
+    move_resource_type: str, data: dict, marketplace_contract_address: str
+) -> Optional[TokenOfferV1]:
     if (
         move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::token_offer::TokenOfferTokenV1"
+        != f"{marketplace_contract_address}::token_offer::TokenOfferTokenV1"
     ):
         return None
 
@@ -263,11 +263,11 @@ class CollectionOfferEventMetadata(TypedDict):
 
 
 def get_collection_offer_metadata(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[CollectionOfferMetadata]:
     if (
         move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOffer"
+        != f"{marketplace_contract_address}::collection_offer::CollectionOffer"
     ):
         return None
 
@@ -280,11 +280,11 @@ def get_collection_offer_metadata(
 
 
 def get_collection_offer_v1(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[CollectionOfferV1]:
     if (
         move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOfferTokenV1"
+        != f"{marketplace_contract_address}::collection_offer::CollectionOfferTokenV1"
     ):
         return None
 
@@ -304,11 +304,11 @@ def get_collection_offer_v1(
 
 
 def get_collection_offer_v2(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[CollectionOfferV2]:
     if (
         move_resource_type
-        != f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::collection_offer::CollectionOfferTokenV2"
+        != f"{marketplace_contract_address}::collection_offer::CollectionOfferTokenV2"
     ):
         return None
 
@@ -327,10 +327,10 @@ class AuctionListing(TypedDict):
 
 
 def get_auction_listing(
-    move_resource_type: str, data: dict
+    move_resource_type: str, data: dict, marketplace_contract_address: str
 ) -> Optional[AuctionListing]:
     if (
-        f"{MARKETPLCE_SMART_CONTRACT_ADDRESS}::coin_listing::AuctionListing"
+        f"{marketplace_contract_address}::coin_listing::AuctionListing"
         not in move_resource_type
     ):
         return None

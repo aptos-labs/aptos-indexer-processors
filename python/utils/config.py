@@ -20,6 +20,8 @@ class Config(BaseSettings):
     starting_version_default: Optional[int] = None
     starting_version_override: Optional[int] = None
     ending_version: Optional[int] = None
+    # Custom config variables for each processor
+    custom_config: Optional[Dict[str, Any]] = None
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings
