@@ -46,6 +46,8 @@ const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
 /// data destination.
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 
+const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20; // 20MB
+
 pub struct Worker {
     pub db_pool: PgDbPool,
     pub processor_name: String,
@@ -122,7 +124,11 @@ impl Worker {
         .keep_alive_timeout(self.indexer_grpc_http2_ping_timeout);
 
         let mut rpc_client = match RawDataClient::connect(channel).await {
-            Ok(client) => client,
+            Ok(client) => client
+                .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+                .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+                .max_decoding_message_size(MAX_RESPONSE_SIZE)
+                .max_encoding_message_size(MAX_RESPONSE_SIZE),
             Err(e) => {
                 error!(
                     processor_name = processor_name,
@@ -263,7 +269,13 @@ impl Worker {
                         // If we get a None, then the stream has ended, i.e., this is a finite stream.
                         break;
                     },
-                    _ => {
+                    Some(Err(e)) => {
+                        error!(
+                            processor_name = processor_name,
+                            stream_address = self.indexer_grpc_data_service_address.clone(),
+                            error = ?e,
+                            "[Parser] Error receiving datastream response."
+                        );
                         panic!("[Parser] Error receiving datastream response.");
                     },
                 };
