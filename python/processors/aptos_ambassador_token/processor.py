@@ -37,7 +37,6 @@ with grpc.insecure_channel(config.grpc_data_stream_endpoint, options=options) as
         raw_data_pb2.GetTransactionsRequest(starting_version=starting_version),
         metadata=metadata,
     ):
-        assert response.chain_id == config.chain_id
         for transaction in response.transactions:
             assert transaction.version == current_transaction_version
 
