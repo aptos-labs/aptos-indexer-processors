@@ -63,15 +63,3 @@ class TransactionsProcessor(ABC):
                     next_version=last_processed_version + 1,
                 )
             )
-
-    # TODO: Move this to worker and validate chain id same way as Rust
-    def validate_grpc_chain_id(self, response: raw_data_pb2.TransactionsResponse):
-        chain_id = response.chain_id
-
-        if chain_id != self.config.chain_id:
-            raise Exception(
-                "Chain ID mismatch. Expected chain ID is: "
-                + str(self.config.chain_id)
-                + ", but received chain ID is: "
-                + str(chain_id)
-            )

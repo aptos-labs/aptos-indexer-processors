@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 
 
 class Config(BaseSettings):
-    chain_id: int
     grpc_data_stream_endpoint: str
     grpc_data_stream_api_key: str
     db_connection_uri: str
