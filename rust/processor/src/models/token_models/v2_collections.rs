@@ -206,7 +206,7 @@ impl CollectionV2 {
                         "Failed to get collection creator for table handle {}, txn version {}",
                         table_handle, txn_version
                     ))?
-                }
+                },
             };
             creator_address = standardize_address(&creator_address);
             let collection_id_struct =
@@ -269,7 +269,7 @@ impl CollectionV2 {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-                }
+                },
             }
         }
         Err(anyhow::anyhow!("Failed to get collection creator"))

@@ -314,7 +314,7 @@ impl ProcessorTrait for CoinTransactionProcessor {
                     err
                 );
                 bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
-            }
+            },
         }
     }
 

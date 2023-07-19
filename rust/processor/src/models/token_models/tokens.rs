@@ -163,7 +163,7 @@ impl Token {
                             table_handle_to_owner,
                         )
                         .unwrap()
-                    }
+                    },
                     WriteSetChangeEnum::DeleteTableItem(delete_table_item) => {
                         CurrentTokenPendingClaim::from_delete_table_item(
                             delete_table_item,
@@ -172,7 +172,7 @@ impl Token {
                             table_handle_to_owner,
                         )
                         .unwrap()
-                    }
+                    },
                     _ => None,
                 };
 
@@ -417,7 +417,7 @@ impl TableMetadataForToken {
         )? {
             TokenResource::CollectionResource(collection_resource) => {
                 collection_resource.collection_data.get_handle()
-            }
+            },
             TokenResource::TokenStoreResource(inner) => inner.tokens.get_handle(),
             TokenResource::PendingClaimsResource(inner) => inner.pending_claims.get_handle(),
         };

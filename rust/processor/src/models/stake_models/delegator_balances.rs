@@ -292,7 +292,7 @@ impl CurrentDelegatorBalance {
                 Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-                }
+                },
             }
         }
         Err(anyhow::anyhow!(
@@ -357,7 +357,7 @@ impl CurrentDelegatorBalance {
                         )
                         .unwrap()
                     }
-                }
+                },
                 Change::WriteTableItem(table_item) => {
                     if let Some(balance) = Self::get_active_share_from_write_table_item(
                         table_item,
@@ -377,7 +377,7 @@ impl CurrentDelegatorBalance {
                         )
                         .unwrap()
                     }
-                }
+                },
                 _ => None,
             };
             if let Some(delegator_balance) = maybe_delegator_balance {

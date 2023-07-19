@@ -115,7 +115,7 @@ impl StakeTableItem {
         match data_type {
             "0x1::pool_u64_unbound::Pool" => {
                 serde_json::from_str(data).map(|inner| Some(StakeTableItem::Pool(inner)))
-            }
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -145,11 +145,11 @@ impl StakeResource {
             x if x == format!("{}::stake::StakePool", STAKE_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(StakeResource::StakePool(inner)))
-            }
+            },
             x if x == format!("{}::delegation_pool::DelegationPool", STAKE_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(StakeResource::DelegationPool(inner)))
-            }
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -199,18 +199,18 @@ impl StakeEvent {
         match data_type {
             "0x1::aptos_governance::VoteEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner)))
-            }
+            },
             "0x1::stake::DistributeRewardsEvent" => serde_json::from_str(data)
                 .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),
             "0x1::delegation_pool::AddStakeEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::AddStakeEvent(inner)))
-            }
+            },
             "0x1::delegation_pool::UnlockStakeEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::UnlockStakeEvent(inner)))
-            }
+            },
             "0x1::delegation_pool::WithdrawStakeEvent" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::WithdrawStakeEvent(inner)))
-            }
+            },
             "0x1::delegation_pool::ReactivateStakeEvent" => serde_json::from_str(data)
                 .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner))),
             _ => Ok(None),

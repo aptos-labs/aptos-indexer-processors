@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::util::time_diff_since_pb_timestamp_in_secs;
 use crate::{
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
@@ -20,6 +19,7 @@ use crate::{
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
         },
         database::{execute_with_better_error, new_db_pool, PgDbPool},
+        util::time_diff_since_pb_timestamp_in_secs,
     },
 };
 use anyhow::Context;
@@ -131,7 +131,7 @@ impl Worker {
                     "[Parser] Error connecting to grpc_stream"
                 );
                 panic!();
-            }
+            },
         };
         info!(
             processor_name = processor_name,
@@ -202,10 +202,10 @@ impl Worker {
         let processor: Arc<dyn ProcessorTrait> = match processor_enum {
             Processor::CoinProcessor => {
                 Arc::new(CoinTransactionProcessor::new(self.db_pool.clone()))
-            }
+            },
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
-            }
+            },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
                 self.ans_address.clone(),
@@ -213,7 +213,7 @@ impl Worker {
             )),
             Processor::StakeProcessor => {
                 Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
-            }
+            },
         };
         let processor_name = processor.name();
 
@@ -258,14 +258,14 @@ impl Worker {
                             "[Parser] Received chunk of transactions."
                         );
                         r
-                    }
+                    },
                     None => {
                         // If we get a None, then the stream has ended, i.e., this is a finite stream.
                         break;
-                    }
+                    },
                     _ => {
                         panic!("[Parser] Error receiving datastream response.");
-                    }
+                    },
                 };
                 let transactions = next_stream.transactions;
 
@@ -330,7 +330,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         versions
-                    }
+                    },
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -342,7 +342,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         panic!();
-                    }
+                    },
                 };
                 processed_versions.push(processed);
             }
@@ -436,7 +436,7 @@ impl Worker {
                     "[Parser] Chain id matches! Continue to index...",
                 );
                 Ok(chain_id as u64)
-            }
+            },
             None => {
                 info!(
                     processor_name = self.processor_name.as_str(),
@@ -452,7 +452,7 @@ impl Worker {
                 )
                 .context(r#"[Parser] Error updating chain_id!"#)
                 .map(|_| grpc_chain_id as u64)
-            }
+            },
         }
     }
 
