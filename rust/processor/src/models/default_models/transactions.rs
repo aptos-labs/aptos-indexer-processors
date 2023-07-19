@@ -179,7 +179,7 @@ impl Transaction {
                     wsc,
                     wsc_detail,
                 )
-            },
+            }
             TxnData::Genesis(genesis_txn) => {
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &transaction_info.changes,
@@ -203,7 +203,7 @@ impl Transaction {
                     wsc,
                     wsc_detail,
                 )
-            },
+            }
             TxnData::BlockMetadata(block_metadata_txn) => {
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &transaction_info.changes,
@@ -233,7 +233,7 @@ impl Transaction {
                     wsc,
                     wsc_detail,
                 )
-            },
+            }
             TxnData::StateCheckpoint(_state_checkpoint_txn) => (
                 Self::from_transaction_info(
                     transaction_info,
@@ -414,15 +414,15 @@ impl TransactionQuery {
                     .filter(user_transactions::version.eq(&self.version))
                     .first::<UserTransactionQuery>(conn)
                     .optional()?;
-            },
+            }
             "block_metadata_transaction" => {
                 block_metadata_transaction = block_metadata_transactions::table
                     .filter(block_metadata_transactions::version.eq(&self.version))
                     .first::<BlockMetadataTransactionQuery>(conn)
                     .optional()?;
-            },
-            "genesis_transaction" => {},
-            "state_checkpoint_transaction" => {},
+            }
+            "genesis_transaction" => {}
+            "state_checkpoint_transaction" => {}
             _ => unreachable!("Unknown transaction type: {}", &self.type_),
         };
         Ok((

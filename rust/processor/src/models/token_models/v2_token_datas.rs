@@ -243,7 +243,7 @@ impl TokenDataV2 {
                 Ok(_) => return Ok(true),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-                },
+                }
             }
         }
         Ok(false)

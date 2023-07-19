@@ -176,7 +176,7 @@ fn insert_to_db(
                         (&objects, &current_objects),
                     )
                 })
-        },
+        }
     }
 }
 
@@ -483,10 +483,10 @@ impl ProcessorTrait for DefaultTransactionProcessor {
                 TransactionDetail::User(user_txn, sigs) => {
                     signatures.append(&mut sigs.clone());
                     user_transactions.push(user_txn.clone());
-                },
+                }
                 TransactionDetail::BlockMetadata(bmt) => {
                     block_metadata_transactions.push(bmt.clone())
-                },
+                }
             }
         }
         let mut move_modules = vec![];
@@ -510,7 +510,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
                     if let Some(meta) = metadata {
                         table_metadata.insert(meta.handle.clone(), meta.clone());
                     }
-                },
+                }
             }
         }
 
@@ -566,7 +566,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 

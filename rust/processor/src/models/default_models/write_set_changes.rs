@@ -153,7 +153,7 @@ impl WriteSetChange {
                         Some(TableMetadata::from_write_table_item(inner)),
                     ),
                 )
-            },
+            }
             WriteSetChangeEnum::DeleteTableItem(inner) => {
                 let (ti, cti) = TableItem::from_delete_table_item(
                     inner,
@@ -174,7 +174,7 @@ impl WriteSetChange {
                     },
                     WriteSetChangeDetail::Table(ti, cti, None),
                 )
-            },
+            }
         }
     }
 
@@ -211,7 +211,7 @@ impl WriteSetChange {
             WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
             WriteSetChangeTypeEnum::Unspecified => {
                 panic!("WriteSetChange type must be specified.")
-            },
+            }
         }
     }
 }

@@ -361,22 +361,22 @@ impl TokenWriteSet {
         match data_type {
             "0x3::token::TokenDataId" => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenDataId(inner)))
-            },
+            }
             "0x3::token::TokenId" => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenId(inner)))
-            },
+            }
             "0x3::token::TokenData" => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenData(inner)))
-            },
+            }
             "0x3::token::Token" => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::Token(inner)))
-            },
+            }
             "0x3::token::CollectionData" => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::CollectionData(inner)))
-            },
+            }
             "0x3::token_transfers::TokenOfferId" => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenOfferId(inner)))
-            },
+            }
             _ => Ok(None),
         }
         .context(format!(
@@ -403,26 +403,26 @@ impl TokenEvent {
         match data_type {
             "0x3::token::MintTokenEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::MintTokenEvent(inner)))
-            },
+            }
             "0x3::token::BurnTokenEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::BurnTokenEvent(inner)))
-            },
+            }
             "0x3::token::MutateTokenPropertyMapEvent" => serde_json::from_str(data)
                 .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner))),
             "0x3::token::WithdrawEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::WithdrawTokenEvent(inner)))
-            },
+            }
             "0x3::token::DepositEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::DepositTokenEvent(inner)))
-            },
+            }
             "0x3::token_transfers::TokenOfferEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::OfferTokenEvent(inner)))
-            },
+            }
             "0x3::token_transfers::TokenCancelOfferEvent" => serde_json::from_str(data)
                 .map(|inner| Some(TokenEvent::CancelTokenOfferEvent(inner))),
             "0x3::token_transfers::TokenClaimEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::ClaimTokenEvent(inner)))
-            },
+            }
             _ => Ok(None),
         }
         .context(format!(
@@ -458,15 +458,15 @@ impl TokenResource {
             x if x == format!("{}::token::Collections", TOKEN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(TokenResource::CollectionResource(inner)))
-            },
+            }
             x if x == format!("{}::token::TokenStore", TOKEN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(TokenResource::TokenStoreResource(inner)))
-            },
+            }
             x if x == format!("{}::token_transfers::PendingClaims", TOKEN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(TokenResource::PendingClaimsResource(inner)))
-            },
+            }
             _ => Ok(None),
         }
         .context(format!(

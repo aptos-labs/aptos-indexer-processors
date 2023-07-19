@@ -70,10 +70,10 @@ impl Object {
                 let maybe_object_combo = match wsc.change.as_ref().unwrap() {
                     Change::DeleteResource(inner) => {
                         Self::from_delete_resource(inner, txn_version, index).unwrap()
-                    },
+                    }
                     Change::WriteResource(inner) => {
                         Self::from_write_resource(inner, txn_version, index).unwrap()
-                    },
+                    }
                     _ => None,
                 };
                 if let Some((object, current_object)) = maybe_object_combo {

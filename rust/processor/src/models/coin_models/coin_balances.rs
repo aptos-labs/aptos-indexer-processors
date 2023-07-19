@@ -90,7 +90,7 @@ impl CoinBalance {
                     current_coin_balance,
                     event_to_coin_mapping,
                 )))
-            },
+            }
             _ => Ok(None),
         }
     }

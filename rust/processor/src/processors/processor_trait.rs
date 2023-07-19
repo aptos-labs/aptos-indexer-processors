@@ -46,7 +46,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                 Ok(conn) => {
                     GOT_CONNECTION_COUNT.inc();
                     return conn;
-                },
+                }
                 Err(err) => {
                     UNABLE_TO_GET_CONNECTION_COUNT.inc();
                     tracing::error!(
@@ -54,7 +54,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                         pool.connection_timeout(),
                         err
                     );
-                },
+                }
             };
         }
     }

@@ -7,7 +7,6 @@ use crate::{
     processors::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
-        default_processor_bq::DefaultTransactionProcessorBq,
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
@@ -24,9 +23,6 @@ use crate::{
     },
 };
 use anyhow::Context;
-use aptos_indexer_grpc_utils::{
-    constants::BLOB_STORAGE_SIZE, time_diff_since_pb_timestamp_in_secs,
-};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::indexer::v1::{
     raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
@@ -41,7 +37,6 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
-pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 const BLOB_STORAGE_SIZE: usize = 1000;
@@ -64,8 +59,6 @@ pub struct Worker {
     pub number_concurrent_processing_tasks: usize,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
-    pub bigquery_project_id: Option<String>,
-    pub bigquery_dataset_name: Option<String>,
 }
 
 impl Worker {
@@ -81,8 +74,6 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         ans_address: Option<String>,
         nft_points_contract: Option<String>,
-        bigquery_project_id: Option<String>,
-        bigquery_dataset_name: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -110,8 +101,6 @@ impl Worker {
             number_concurrent_processing_tasks,
             ans_address,
             nft_points_contract,
-            bigquery_project_id,
-            bigquery_dataset_name,
         }
     }
 
@@ -142,7 +131,7 @@ impl Worker {
                     "[Parser] Error connecting to grpc_stream"
                 );
                 panic!();
-            },
+            }
         };
         info!(
             processor_name = processor_name,
@@ -213,10 +202,10 @@ impl Worker {
         let processor: Arc<dyn ProcessorTrait> = match processor_enum {
             Processor::CoinProcessor => {
                 Arc::new(CoinTransactionProcessor::new(self.db_pool.clone()))
-            },
+            }
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
-            },
+            }
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
                 self.ans_address.clone(),
@@ -224,15 +213,7 @@ impl Worker {
             )),
             Processor::StakeProcessor => {
                 Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
-            },
-            Processor::DefaultProcessorBQ => Arc::new(
-                DefaultTransactionProcessorBq::new(
-                    self.db_pool.clone(),
-                    self.bigquery_project_id.as_ref().unwrap().clone(),
-                    self.bigquery_dataset_name.as_ref().unwrap().clone(),
-                )
-                .await,
-            ),
+            }
         };
         let processor_name = processor.name();
 
@@ -277,14 +258,14 @@ impl Worker {
                             "[Parser] Received chunk of transactions."
                         );
                         r
-                    },
+                    }
                     None => {
                         // If we get a None, then the stream has ended, i.e., this is a finite stream.
                         break;
-                    },
+                    }
                     _ => {
                         panic!("[Parser] Error receiving datastream response.");
-                    },
+                    }
                 };
                 let transactions = next_stream.transactions;
 
@@ -349,7 +330,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         versions
-                    },
+                    }
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -361,7 +342,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         panic!();
-                    },
+                    }
                 };
                 processed_versions.push(processed);
             }
@@ -455,7 +436,7 @@ impl Worker {
                     "[Parser] Chain id matches! Continue to index...",
                 );
                 Ok(chain_id as u64)
-            },
+            }
             None => {
                 info!(
                     processor_name = self.processor_name.as_str(),
@@ -471,7 +452,7 @@ impl Worker {
                 )
                 .context(r#"[Parser] Error updating chain_id!"#)
                 .map(|_| grpc_chain_id as u64)
-            },
+            }
         }
     }
 

@@ -25,9 +25,6 @@ pub struct IndexerGrpcProcessorConfig {
     pub number_concurrent_processing_tasks: Option<usize>,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
-    // TODO: split this out into an adapter model
-    pub bigquery_project_id: Option<String>,
-    pub bigquery_dataset_name: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -49,8 +46,6 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.number_concurrent_processing_tasks,
             self.ans_address.clone(),
             self.nft_points_contract.clone(),
-            self.bigquery_project_id.clone(),
-            self.bigquery_dataset_name.clone(),
         )
         .await;
         worker.run().await;

@@ -447,26 +447,26 @@ impl V2TokenResource {
         match data_type {
             x if x == format!("{}::object::ObjectCore", COIN_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::ObjectCore(inner)))
-            },
+            }
             x if x == format!("{}::collection::Collection", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::Collection(inner)))
-            },
+            }
             x if x == format!("{}::collection::FixedSupply", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::FixedSupply(inner)))
-            },
+            }
             x if x == format!("{}::collection::UnlimitedSupply", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::UnlimitedSupply(inner)))
-            },
+            }
             x if x == format!("{}::aptos_token::AptosCollection", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::AptosCollection(inner)))
-            },
+            }
             x if x == format!("{}::token::Token", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::TokenV2(inner)))
-            },
+            }
             x if x == format!("{}::property_map::PropertyMap", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::PropertyMapModel(inner)))
-            },
+            }
             _ => Ok(None),
         }
         .context(format!(
@@ -493,16 +493,16 @@ impl V2TokenEvent {
         match data_type {
             "0x4::collection::MintEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::MintEvent(inner)))
-            },
+            }
             "0x4::token::MutationEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
-            },
+            }
             "0x4::collection::BurnEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
-            },
+            }
             "0x1::object::TransferEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TransferEvent(inner)))
-            },
+            }
             _ => Ok(None),
         }
         .context(format!(
