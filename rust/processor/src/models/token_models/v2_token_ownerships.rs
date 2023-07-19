@@ -286,8 +286,21 @@ impl TokenOwnershipV2 {
             {
                 Some(inner) => inner.clone(),
                 None => {
-                    CurrentTokenOwnershipV2Query::get_nft_by_token_data_id(conn, token_address)?
-                }
+                    match CurrentTokenOwnershipV2Query::get_nft_by_token_data_id(
+                        conn,
+                        token_address,
+                    ) {
+                        Ok(nft) => nft,
+                        Err(_) => {
+                            tracing::error!(
+                                transaction_version = txn_version,
+                                lookup_key = &token_address,
+                                "Failed to find NFT for burned token. You probably should backfill db."
+                            );
+                            return Ok(None);
+                        },
+                    }
+                },
             };
 
             let token_data_id = token_address.clone();
@@ -456,7 +469,7 @@ impl TokenOwnershipV2 {
                         Some(owner_address),
                         Some(tm.table_type.clone()),
                     )
-                }
+                },
                 None => {
                     tracing::warn!(
                         transaction_version = txn_version,
@@ -465,7 +478,7 @@ impl TokenOwnershipV2 {
                         table_handle_to_owner
                     );
                     (None, None, None)
-                }
+                },
             };
 
             Ok(Some((
@@ -542,7 +555,7 @@ impl TokenOwnershipV2 {
                         Some(owner_address),
                         Some(tm.table_type.clone()),
                     )
-                }
+                },
                 None => {
                     tracing::warn!(
                         transaction_version = txn_version,
@@ -551,7 +564,7 @@ impl TokenOwnershipV2 {
                         table_handle_to_owner
                     );
                     (None, None, None)
-                }
+                },
             };
 
             Ok(Some((
@@ -594,10 +607,10 @@ impl CurrentTokenOwnershipV2Query {
                         owner_address: inner.owner_address.clone(),
                         is_soulbound: inner.is_soulbound_v2,
                     })
-                }
+                },
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-                }
+                },
             }
         }
         Err(anyhow::anyhow!(

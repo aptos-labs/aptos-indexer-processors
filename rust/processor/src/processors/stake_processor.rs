@@ -408,7 +408,7 @@ impl ProcessorTrait for StakeTransactionProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 

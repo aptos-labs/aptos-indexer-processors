@@ -201,15 +201,15 @@ impl V2FungibleAssetResource {
             x if x == format!("{}::fungible_asset::Supply", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::FungibleAssetSupply(inner)))
-            }
+            },
             x if x == format!("{}::fungible_asset::Metadata", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::FungibleAssetMetadata(inner)))
-            }
+            },
             x if x == format!("{}::fungible_asset::FungibleStore", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::FungibleAssetStore(inner)))
-            }
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -233,10 +233,10 @@ impl FungibleAssetEvent {
         match data_type {
             "0x1::fungible_asset::DepositEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::DepositEvent(inner)))
-            }
+            },
             "0x1::fungible_asset::WithdrawEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::WithdrawEvent(inner)))
-            }
+            },
             _ => Ok(None),
         }
         .context(format!(

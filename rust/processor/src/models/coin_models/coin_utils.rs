@@ -223,11 +223,11 @@ impl CoinResource {
             x if x == format!("{}::coin::CoinInfo", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(CoinResource::CoinInfoResource(inner)))
-            }
+            },
             x if x == format!("{}::coin::CoinStore", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(CoinResource::CoinStoreResource(inner)))
-            }
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -273,10 +273,10 @@ impl CoinEvent {
         match data_type {
             "0x1::coin::WithdrawEvent" => {
                 serde_json::from_str(data).map(|inner| Some(CoinEvent::WithdrawCoinEvent(inner)))
-            }
+            },
             "0x1::coin::DepositEvent" => {
                 serde_json::from_str(data).map(|inner| Some(CoinEvent::DepositCoinEvent(inner)))
-            }
+            },
             _ => Ok(None),
         }
         .context(format!(

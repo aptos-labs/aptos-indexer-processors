@@ -106,7 +106,7 @@ impl CurrentAnsLookup {
                         "domains::SetNameAddressEventV1" => {
                             serde_json::from_str(event.data.as_str())
                                 .map(|inner| Some(ANSEvent::SetNameAddressEventV1(inner)))
-                        }
+                        },
                         "domains::RegisterNameEventV1" => serde_json::from_str(event.data.as_str())
                             .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner))),
                         _ => Ok(None),
@@ -141,7 +141,7 @@ impl CurrentAnsLookup {
                                     expiration_timestamp,
                                     token_name,
                                 }
-                            }
+                            },
                             ANSEvent::RegisterNameEventV1(inner) => {
                                 let expiration_timestamp = parse_timestamp_secs(
                                     bigdecimal_to_u64(&inner.expiration_time_secs),
@@ -161,7 +161,7 @@ impl CurrentAnsLookup {
                                     expiration_timestamp,
                                     token_name,
                                 }
-                            }
+                            },
                         };
 
                         current_ans_lookups.insert(

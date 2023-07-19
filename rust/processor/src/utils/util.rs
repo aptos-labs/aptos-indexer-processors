@@ -93,11 +93,11 @@ pub fn get_entry_function_from_user_request(
                 match payload.payload.as_ref().unwrap() {
                     MultisigPayloadType::EntryFunctionPayload(payload) => {
                         Some(payload.entry_function_id_str.clone())
-                    }
+                    },
                 };
             }
             return None;
-        }
+        },
         _ => return None,
     };
     Some(truncate_str(
@@ -115,27 +115,27 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
                 tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
-        }
+        },
         PayloadType::ScriptPayload(inner) => {
             let clean = get_clean_script_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
                 tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
-        }
+        },
         PayloadType::ModuleBundlePayload(inner) => {
             Some(serde_json::to_value(inner).unwrap_or_else(|_| {
                 tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
-        }
+        },
         PayloadType::WriteSetPayload(inner) => {
             if let Some(writeset) = inner.write_set.as_ref() {
                 get_clean_writeset(writeset, version)
             } else {
                 None
             }
-        }
+        },
         PayloadType::MultisigPayload(inner) => {
             let clean = if let Some(payload) = inner.transaction_payload.as_ref() {
                 let payload_clean = match payload.payload.as_ref().unwrap() {
@@ -148,7 +148,7 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
                             );
                             panic!()
                         }))
-                    }
+                    },
                 };
                 MultisigPayloadClean {
                     multisig_address: inner.multisig_address.clone(),
@@ -164,7 +164,7 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
                 tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
-        }
+        },
     }
 }
 
@@ -185,7 +185,7 @@ pub fn get_clean_writeset(writeset: &WriteSet, version: i64) -> Option<Value> {
                     },
                 ),
             )
-        }
+        },
         WriteSetType::DirectWriteSet(_) => None,
     }
 }
@@ -254,19 +254,19 @@ fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
             for item in array {
                 recurse_remove_null_bytes_from_json(item);
             }
-        }
+        },
         Value::Object(object) => {
             for (_key, value) in object {
                 recurse_remove_null_bytes_from_json(value);
             }
-        }
+        },
         Value::String(str) => {
             if !str.is_empty() {
                 let replacement = string_null_byte_replacement(str);
                 *str = replacement;
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
 }
 

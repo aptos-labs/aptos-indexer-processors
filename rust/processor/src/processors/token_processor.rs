@@ -1025,7 +1025,7 @@ impl ProcessorTrait for TokenTransactionProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 
@@ -1290,7 +1290,7 @@ fn parse_v2_token(
                                 );
                             }
                         }
-                    }
+                    },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
                             TokenOwnershipV2::get_v1_from_delete_table_item(
@@ -1323,7 +1323,7 @@ fn parse_v2_token(
                                 );
                             }
                         }
-                    }
+                    },
                     Change::WriteResource(resource) => {
                         if let Some((collection, current_collection)) =
                             CollectionV2::get_v2_from_write_resource(
@@ -1476,7 +1476,7 @@ fn parse_v2_token(
                                 token_metadata,
                             );
                         }
-                    }
+                    },
                     Change::DeleteResource(resource) => {
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
@@ -1510,8 +1510,8 @@ fn parse_v2_token(
                                 current_nft_ownership,
                             );
                         }
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
             }
         }

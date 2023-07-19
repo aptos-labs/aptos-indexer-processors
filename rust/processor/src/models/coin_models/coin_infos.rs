@@ -76,7 +76,7 @@ impl CoinInfo {
                     supply_aggregator_table_handle,
                     supply_aggregator_table_key,
                 }))
-            }
+            },
             _ => Ok(None),
         }
     }
