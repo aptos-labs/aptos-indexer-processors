@@ -10,6 +10,13 @@ diesel::table! {
 }
 
 diesel::table! {
+    alembic_version (version_num) {
+        #[max_length = 32]
+        version_num -> Varchar,
+    }
+}
+
+diesel::table! {
     block_metadata_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -168,6 +175,8 @@ diesel::table! {
         inserted_at -> Timestamp,
         #[max_length = 140]
         token_name -> Varchar,
+        is_primary -> Bool,
+        is_deleted -> Bool,
     }
 }
 
@@ -1020,6 +1029,7 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
+    alembic_version,
     block_metadata_transactions,
     coin_activities,
     coin_balances,

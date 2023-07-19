@@ -12,7 +12,8 @@ use crate::{
     },
 };
 use aptos_indexer_protos::transaction::v1::{
-    move_type::Content, transaction::TxnData, Transaction as TransactionPB,
+    transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, DeleteTableItem,
+    Transaction as TransactionPB, WriteTableItem,
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -35,6 +36,8 @@ pub struct CurrentAnsLookup {
     pub last_transaction_version: i64,
     pub expiration_timestamp: chrono::NaiveDateTime,
     pub token_name: String,
+    pub is_primary: bool,
+    pub is_deleted: bool,
 }
 
 pub enum ANSEvent {
@@ -74,107 +77,225 @@ impl OptionalString {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NameRecordKeyV1 {
+    domain_name: String,
+    subdomain_name: OptionalString,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NameRecordV1 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    expiration_time_sec: BigDecimal,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    property_version: BigDecimal,
+    target_address: OptionalString,
+}
+
 impl CurrentAnsLookup {
     pub fn from_transaction(
         transaction: &TransactionPB,
-        ans_contract_address: Option<String>,
+        maybe_ans_primary_names_table_handle: Option<String>,
+        maybe_ans_name_records_table_handle: Option<String>,
     ) -> HashMap<CurrentAnsLookupPK, Self> {
         let mut current_ans_lookups: HashMap<CurrentAnsLookupPK, Self> = HashMap::new();
-        if let Some(addr) = ans_contract_address {
-            // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
-            let txn_data = transaction
-                .txn_data
-                .as_ref()
-                .expect("Txn Data doesn't exit!");
-            if let TxnData::User(user_txn) = txn_data {
-                for event in &user_txn.events {
-                    let (event_addr, event_type) = if let Some(Some(Content::Struct(inner))) =
-                        event.r#type.as_ref().map(|s| s.content.as_ref())
-                    {
-                        (
-                            inner.address.to_string(),
-                            format!("{}::{}", inner.module, inner.name),
-                        )
-                    } else {
-                        continue;
-                    };
-                    if event_addr != addr {
-                        continue;
-                    }
-                    let txn_version = transaction.version as i64;
-                    let maybe_ans_event = match event_type.as_str() {
-                        "domains::SetNameAddressEventV1" => {
-                            serde_json::from_str(event.data.as_str())
-                                .map(|inner| Some(ANSEvent::SetNameAddressEventV1(inner)))
-                        },
-                        "domains::RegisterNameEventV1" => serde_json::from_str(event.data.as_str())
-                            .map(|inner| Some(ANSEvent::RegisterNameEventV1(inner))),
-                        _ => Ok(None),
-                    }
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "version {} failed! failed to parse type {}, data {:?}. Error: {:?}",
-                            txn_version, event_type, event.data, e
-                        )
-                    });
-                    if let Some(ans_event) = maybe_ans_event {
-                        let current_ans_lookup = match ans_event {
-                            ANSEvent::SetNameAddressEventV1(inner) => {
-                                let expiration_timestamp = parse_timestamp_secs(
-                                    bigdecimal_to_u64(&inner.expiration_time_secs),
-                                    txn_version,
-                                );
-                                let subdomain =
-                                    inner.subdomain_name.get_string().unwrap_or_default();
-                                let mut token_name = format!("{}.apt", &inner.domain_name);
-                                if !subdomain.is_empty() {
-                                    token_name = format!("{}.{}", &subdomain, token_name);
-                                }
-                                Self {
-                                    domain: inner.domain_name,
-                                    subdomain,
-                                    registered_address: inner
-                                        .new_address
-                                        .get_string()
-                                        .map(|s| standardize_address(&s)),
-                                    last_transaction_version: txn_version,
-                                    expiration_timestamp,
-                                    token_name,
-                                }
-                            },
-                            ANSEvent::RegisterNameEventV1(inner) => {
-                                let expiration_timestamp = parse_timestamp_secs(
-                                    bigdecimal_to_u64(&inner.expiration_time_secs),
-                                    txn_version,
-                                );
-                                let subdomain =
-                                    inner.subdomain_name.get_string().unwrap_or_default();
-                                let mut token_name = format!("{}.apt", &inner.domain_name);
-                                if !subdomain.is_empty() {
-                                    token_name = format!("{}.{}", &subdomain, token_name);
-                                }
-                                Self {
-                                    domain: inner.domain_name,
-                                    subdomain,
-                                    registered_address: None,
-                                    last_transaction_version: txn_version,
-                                    expiration_timestamp,
-                                    token_name,
-                                }
-                            },
-                        };
+        let txn_version = transaction.version as i64;
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
 
-                        current_ans_lookups.insert(
-                            (
-                                current_ans_lookup.domain.clone(),
-                                current_ans_lookup.subdomain.clone(),
-                            ),
-                            current_ans_lookup,
-                        );
+        // Extracts from user transactions. Other transactions won't have any ANS changes
+        if let (
+            TxnData::User(_),
+            Some(ans_primary_names_table_handle),
+            Some(ans_name_records_table_handle),
+        ) = (
+            txn_data,
+            maybe_ans_primary_names_table_handle,
+            maybe_ans_name_records_table_handle,
+        ) {
+            let transaction_info = transaction
+                .info
+                .as_ref()
+                .expect("Transaction info doesn't exist!");
+
+            // Extract primary names and name records
+            for wsc in &transaction_info.changes {
+                if let Ok(maybe_name_record) = match wsc.change.as_ref().unwrap() {
+                    WriteSetChangeEnum::WriteTableItem(write_table_item) => {
+                        Self::from_write_table_item(
+                            write_table_item,
+                            txn_version,
+                            ans_primary_names_table_handle.as_str(),
+                            ans_name_records_table_handle.as_str(),
+                        )
+                    },
+                    WriteSetChangeEnum::DeleteTableItem(delete_table_item) => {
+                        Self::from_delete_table_item(
+                            delete_table_item,
+                            txn_version,
+                            ans_name_records_table_handle.as_str(),
+                        )
+                    },
+                    _ => Ok(None),
+                } {
+                    if let Some(name_record) = maybe_name_record {
+                        current_ans_lookups
+                            .entry((name_record.domain.clone(), name_record.subdomain.clone()))
+                            .and_modify(|e| {
+                                e.registered_address = name_record.registered_address.clone();
+                                e.expiration_timestamp = name_record.expiration_timestamp;
+                                e.is_primary = name_record.is_primary || e.is_primary;
+                                e.is_deleted = name_record.is_deleted;
+                            })
+                            .or_insert(name_record);
                     }
+                } else {
+                    continue;
                 }
             }
         }
+
         current_ans_lookups
+    }
+
+    pub fn from_write_table_item(
+        table_item: &WriteTableItem,
+        txn_version: i64,
+        ans_primary_names_table_handle: &str,
+        ans_name_records_table_handle: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        let table_handle = table_item.handle.as_str();
+        let mut maybe_name_record = None;
+
+        // Create primary name reverse lookup
+        if table_handle == ans_primary_names_table_handle {
+            let table_item_data = table_item.data.as_ref().unwrap();
+            let key_type = table_item_data.key_type.as_str();
+            let key = serde_json::from_str(&table_item_data.key).unwrap_or_else(|e| {
+                panic!(
+                    "version {} failed! failed to parse type {}, data {:?}. Error: {:?}",
+                    txn_version, key_type, table_item_data.key, e
+                )
+            });
+            let target_address = standardize_address(key);
+            let value_type = table_item_data.value_type.as_str();
+            let value = &table_item_data.value;
+            let primary_name_record: NameRecordKeyV1 =
+                serde_json::from_str(value).unwrap_or_else(|e| {
+                    panic!(
+                        "version {} failed! failed to parse type {}, data {:?}. Error: {:?}",
+                        txn_version, value_type, value, e
+                    )
+                });
+            let subdomain = primary_name_record
+                .subdomain_name
+                .get_string()
+                .unwrap_or_default();
+            let mut token_name = format!("{}.apt", &primary_name_record.domain_name);
+            if !subdomain.is_empty() {
+                token_name = format!("{}.{}", &subdomain, token_name);
+            }
+            maybe_name_record = Some(Self {
+                domain: primary_name_record.domain_name,
+                subdomain,
+                registered_address: Some(target_address),
+                last_transaction_version: txn_version,
+                expiration_timestamp: chrono::NaiveDateTime::from_timestamp_opt(0, 0)
+                    .unwrap_or_default(),
+                token_name,
+                is_primary: true,
+                is_deleted: false,
+            })
+        } else if table_handle == ans_name_records_table_handle {
+            // Create name record (primary + non-primary)
+            let table_item_data = table_item.data.as_ref().unwrap();
+            let key_type = table_item_data.key_type.as_str();
+            let name_record_key: NameRecordKeyV1 = serde_json::from_str(&table_item_data.key)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "version {} failed! failed to parse type {}, data {:?}. Error: {:?}",
+                        txn_version, key_type, table_item_data.key, e
+                    )
+                });
+            let value_type = table_item_data.value_type.as_str();
+            let name_record: NameRecordV1 = serde_json::from_str(&table_item_data.value)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "version {} failed! failed to parse type {}, data {:?}. Error: {:?}",
+                        txn_version, value_type, table_item_data.value, e
+                    )
+                });
+            let subdomain = name_record_key
+                .subdomain_name
+                .get_string()
+                .unwrap_or_default();
+            let mut token_name = format!("{}.apt", &name_record_key.domain_name);
+            if !subdomain.is_empty() {
+                token_name = format!("{}.{}", &subdomain, token_name);
+            }
+            let expiration_timestamp = parse_timestamp_secs(
+                bigdecimal_to_u64(&name_record.expiration_time_sec),
+                txn_version,
+            );
+            let mut target_address = name_record.target_address.get_string().unwrap_or_default();
+            if !target_address.is_empty() {
+                target_address = standardize_address(&target_address);
+            }
+            maybe_name_record = Some(Self {
+                domain: name_record_key.domain_name,
+                subdomain,
+                registered_address: Some(target_address),
+                last_transaction_version: txn_version,
+                expiration_timestamp,
+                token_name,
+                is_primary: false,
+                is_deleted: false,
+            })
+        }
+        Ok(maybe_name_record)
+    }
+
+    pub fn from_delete_table_item(
+        table_item: &DeleteTableItem,
+        txn_version: i64,
+        ans_name_records_table_handle: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        let table_handle = table_item.handle.as_str();
+        let mut maybe_name_record = None;
+
+        // Delete name record
+        if table_handle == ans_name_records_table_handle {
+            let table_item_data = table_item.data.as_ref().unwrap();
+            let key_type = table_item_data.key_type.as_str();
+            let name_record_key: NameRecordKeyV1 = serde_json::from_str(&table_item_data.key)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "version {} failed! failed to parse type {}, data {:?}. Error: {:?}",
+                        txn_version, key_type, table_item_data.key, e
+                    )
+                });
+            let subdomain = name_record_key
+                .subdomain_name
+                .get_string()
+                .unwrap_or_default();
+            let mut token_name = format!("{}.apt", &name_record_key.domain_name);
+            if !subdomain.is_empty() {
+                token_name = format!("{}.{}", &subdomain, token_name);
+            }
+            maybe_name_record = Some(Self {
+                domain: name_record_key.domain_name,
+                subdomain,
+                registered_address: None,
+                last_transaction_version: txn_version,
+                expiration_timestamp: chrono::NaiveDateTime::from_timestamp_opt(0, 0)
+                    .unwrap_or_default(),
+                token_name,
+                is_primary: false,
+                is_deleted: true,
+            })
+        }
+        Ok(maybe_name_record)
     }
 }
