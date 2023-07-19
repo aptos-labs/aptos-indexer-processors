@@ -45,6 +45,7 @@ class IndexerProcessorServer:
         self.config = Config.from_yaml_file(args.config)
         self.perf_transactions = args.perf
         self.processor = processor
+        processor.config = self.config
 
         # TODO: Move this to a config
         self.num_concurrent_processing_tasks = 10
