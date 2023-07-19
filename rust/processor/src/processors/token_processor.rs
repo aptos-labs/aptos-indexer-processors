@@ -32,7 +32,8 @@ use tracing::error;
 pub const NAME: &str = "token_processor";
 pub struct TokenTransactionProcessor {
     connection_pool: PgDbPool,
-    ans_contract_address: Option<String>,
+    ans_primary_names_table_handle: Option<String>,
+    ans_name_records_table_handle: Option<String>,
     nft_points_contract: Option<String>,
 }
 
@@ -40,15 +41,20 @@ impl TokenTransactionProcessor {
     pub fn new(
         connection_pool: PgDbPool,
         ans_contract_address: Option<String>,
+        ans_primary_names_table_handle: Option<String>,
+        ans_name_records_table_handle: Option<String>,
         nft_points_contract: Option<String>,
     ) -> Self {
         tracing::info!(
             ans_contract_address = ans_contract_address,
+            ans_primary_names_table_handle = ans_primary_names_table_handle,
+            ans_name_records_table_handle = ans_name_records_table_handle,
             "init TokenTransactionProcessor"
         );
         Self {
             connection_pool,
-            ans_contract_address,
+            ans_primary_names_table_handle,
+            ans_name_records_table_handle,
             nft_points_contract,
         }
     }
@@ -462,6 +468,8 @@ fn insert_current_ans_lookups(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
                     token_name.eq(excluded(token_name)),
+                    is_primary.eq(excluded(is_primary)),
+                    is_deleted.eq(excluded(is_deleted)),
                 )),
                 Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
             )?;
@@ -564,8 +572,11 @@ impl ProcessorTrait for TokenTransactionProcessor {
             all_current_token_claims.extend(current_token_claims);
 
             // ANS lookups
-            let current_ans_lookups =
-                CurrentAnsLookup::from_transaction(txn, self.ans_contract_address.clone());
+            let current_ans_lookups = CurrentAnsLookup::from_transaction(
+                txn,
+                self.ans_primary_names_table_handle.clone(),
+                self.ans_name_records_table_handle.clone(),
+            );
             all_current_ans_lookups.extend(current_ans_lookups);
 
             // NFT points
