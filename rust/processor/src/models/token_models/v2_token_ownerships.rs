@@ -170,7 +170,7 @@ impl TokenOwnershipV2 {
             if transfer_event.get_to_address() == transfer_event.get_from_address() {
                 return Ok(Some((ownership, current_ownership, None, None)));
             }
-            
+
             Ok(Some((
                 ownership,
                 current_ownership,
