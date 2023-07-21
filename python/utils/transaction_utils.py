@@ -68,3 +68,10 @@ def get_write_set_changes(
 ) -> List[transaction_pb2.WriteSetChange]:
     transaction_info = transaction.info
     return list(transaction_info.changes)
+
+
+def get_move_type_str(
+    move_type: transaction_pb2.MoveType,
+) -> str:
+    struct = move_type.struct
+    return f"{struct.address}::{struct.module}::{struct.name}"
