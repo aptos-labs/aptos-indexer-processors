@@ -39,7 +39,8 @@ use tracing::{error, info};
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
-const BLOB_STORAGE_SIZE: usize = 1000;
+// const BLOB_STORAGE_SIZE: usize = 1000;
+const MIN_BLOB_SIZE: usize = 10;
 /// GRPC request metadata key for the token ID.
 const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
@@ -290,8 +291,8 @@ impl Worker {
                     panic!();
                 }
                 transactions_batches.push(transactions);
-                // If it is a partial batch, then skip polling and head to process it first.
-                if current_batch_size < BLOB_STORAGE_SIZE {
+                // If it is a small batch, we assume we're at the head and break out of the loop.
+                if current_batch_size < MIN_BLOB_SIZE {
                     break;
                 }
             }
