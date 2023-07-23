@@ -269,9 +269,10 @@ class IndexerProcessorServer:
                     break
 
         perf_stop_time = perf_counter()
-        print(
-            f"Elapsed TPS: {int(self.perf_transactions) / (perf_stop_time - perf_start_time)}"
-        )
+        if self.perf_transactions:
+            print(
+                f"Elapsed TPS: {int(self.perf_transactions) / (perf_stop_time - perf_start_time)}"
+            )
 
     def init_db_tables(self, schema_name: str) -> None:
         engine = create_engine(self.config.db_connection_uri)

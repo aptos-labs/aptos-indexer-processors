@@ -41,6 +41,7 @@ class NFTMarketplaceActivities(Base):
     token_standard: StringType
     seller: NullableStringType
     buyer: NullableStringType
+    coin_type: NullableStringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
@@ -68,6 +69,7 @@ class CurrentNFTMarketplaceListing(Base):
     token_standard: StringType
     seller: StringType
     is_deleted: BooleanType
+    coin_type: NullableStringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
@@ -115,6 +117,7 @@ class CurrentNFTMarketplaceTokenOffer(Base):
     expiration_time: NumericType
     is_deleted: BooleanType
     token_standard: StringType
+    coin_type: NullableStringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
@@ -165,6 +168,7 @@ class CurrentNFTMarketplaceCollectionOffer(Base):
     expiration_time: NumericType
     is_deleted: BooleanType
     token_standard: StringType
+    coin_type: NullableStringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
@@ -217,6 +221,7 @@ class CurrentNFTMarketplaceAuction(Base):
     expiration_time: NumericType
     is_deleted: BooleanType
     token_standard: StringType
+    coin_type: NullableStringType
     marketplace: StringType
     contract_address: StringType
     entry_function_id_str: StringType
