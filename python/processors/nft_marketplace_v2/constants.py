@@ -1,1 +1,0 @@
-MARKETPLCE_SMART_CONTRACT_ADDRESS = "0xeb36546237930294a8a9fec1e5d42d9633e9e9355eec3fa80f2610a29d95e152"  # TODO: Replace this with the actual address
