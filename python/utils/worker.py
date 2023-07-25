@@ -198,7 +198,7 @@ class IndexerProcessorServer:
                                 {
                                     "message": f"[Parser] Error processing transactions {processing_result.start_version} to {processing_result.end_version}",
                                     "error": str(exception),
-                                    "error_stacktrace": traceback.format_exc(),
+                                    "error_stacktrace": traceback.format_exception(exception),
                                 }
                             )
                         )
