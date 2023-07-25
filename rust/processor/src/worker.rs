@@ -263,6 +263,7 @@ impl Worker {
             // 1. If we lose the connection, we will stop fetching and let the consumer panic.
             // 2. If we specified an end version and we hit that, we will stop fetching.
             while let Some(current_item) = resp_stream.next().await {
+                let current_instant = std::time::Instant::now();
                 match current_item {
                     Ok(r) => {
                         let start_version = r.transactions.as_slice().first().unwrap().version;
@@ -271,6 +272,7 @@ impl Worker {
                             processor_name = processor_name,
                             start_version = start_version,
                             end_version = end_version,
+                            time_elapsed_ms = current_instant.elapsed().as_millis(),
                             "[Parser] Received chunk of transactions."
                         );
                         let chain_id = r
