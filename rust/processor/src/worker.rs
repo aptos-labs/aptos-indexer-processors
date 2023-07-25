@@ -16,7 +16,7 @@ use crate::{
         counters::{
             LATEST_PROCESSED_VERSION, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
-            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT, TRANSMITTED_BYTES_COUNT,
         },
         database::{execute_with_better_error, new_db_pool, PgDbPool},
         util::time_diff_since_pb_timestamp_in_secs,
@@ -35,6 +35,7 @@ use diesel::{
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::{StreamExt};
 use futures_util::SinkExt;
+use prost::Message;
 use tokio::sync::mpsc::error::TryRecvError;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -263,7 +264,6 @@ impl Worker {
             // 1. If we lose the connection, we will stop fetching and let the consumer panic.
             // 2. If we specified an end version and we hit that, we will stop fetching.
             while let Some(current_item) = resp_stream.next().await {
-                let current_instant = std::time::Instant::now();
                 match current_item {
                     Ok(r) => {
                         let start_version = r.transactions.as_slice().first().unwrap().version;
@@ -272,9 +272,11 @@ impl Worker {
                             processor_name = processor_name,
                             start_version = start_version,
                             end_version = end_version,
-                            time_elapsed_ms = current_instant.elapsed().as_millis(),
                             "[Parser] Received chunk of transactions."
                         );
+                        TRANSMITTED_BYTES_COUNT
+                            .with_label_values(&[processor_name])
+                            .inc_by(r.encoded_len() as u64);
                         let chain_id = r
                             .chain_id
                             .expect("[Parser] Chain Id doesn't exist.")
