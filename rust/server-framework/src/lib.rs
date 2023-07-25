@@ -37,6 +37,7 @@ where
 {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name(config.get_server_name())
+
         .enable_all()
         .build()?;
 
