@@ -52,10 +52,6 @@ const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
 const BUFFER_SIZE: usize = 50;
-// If we don't receive any data in X seconds, we should panic.
-const NO_DATA_TIMEOUT_SECS: i64 = 5;
-// How long to sleep when we get no data b/c we're at the head
-const SLEEP_MS: u64 = 50;
 
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20; // 20MB
 
@@ -325,8 +321,18 @@ impl Worker {
         loop {
             let mut transactions_batches = vec![];
             let mut last_fetched_version = batch_start_version - 1;
-            for _ in 0..concurrent_tasks {
-                match receiver.try_recv() {
+            for task_index in 0..concurrent_tasks {
+                let receive_status = match task_index {
+                    0 => {
+                        // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
+                        receiver.recv().await.ok_or(TryRecvError::Disconnected)
+                    },
+                    _ => {
+                        // If we're not the first task, we should poll to see if we get any data.
+                        receiver.try_recv()
+                    },
+                };
+                match receive_status {
                     Ok((chain_id, transactions)) => {
                         if let Some(existing_id) = db_chain_id {
                             if chain_id != existing_id {
@@ -378,17 +384,6 @@ impl Worker {
 
             // Process the transactions in parallel
             let mut tasks = vec![];
-            if transactions_batches.is_empty() {
-                // If we get an empty batch, we want to skip and continue polling.
-                info!(
-                    batch_start_version = batch_start_version,
-                    last_fetched_version = last_fetched_version,
-                    sleep_ms = SLEEP_MS,
-                    "[Parser] No more data in channel"
-                );
-                tokio::time::sleep(std::time::Duration::from_millis(SLEEP_MS)).await;
-                continue;
-            }
             for transactions in transactions_batches {
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
