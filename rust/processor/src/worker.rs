@@ -382,7 +382,6 @@ impl Worker {
                     sleep_ms = SLEEP_MS,
                     "[Parser] No more data in channel"
                 );
-                // tokio::time::(std::time::Duration::from_millis(SLEEP_MS));
                 tokio::time::sleep(std::time::Duration::from_millis(SLEEP_MS)).await;
                 continue;
             }
