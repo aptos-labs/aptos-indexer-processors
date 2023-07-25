@@ -261,13 +261,13 @@ impl Worker {
             // There could be several special scenarios:
             // 1. If we lose the connection, we will stop fetching and let the consumer panic.
             // 2. If we specified an end version and we hit that, we will stop fetching.
-            // let last_insertion_time = std::time::Instant::now();
+            let mut last_insertion_time = std::time::Instant::now();
             while let Some(current_item) = resp_stream.next().await {
                 match current_item {
                     Ok(r) => {
                         let start_version = r.transactions.as_slice().first().unwrap().version;
                         let end_version = r.transactions.as_slice().last().unwrap().version;
-                        
+
                         TRANSMITTED_BYTES_COUNT
                             .with_label_values(&[processor_name])
                             .inc_by(r.encoded_len() as u64);
@@ -295,8 +295,10 @@ impl Worker {
                             start_version = start_version,
                             end_version = end_version,
                             channel_size = *size,
+                            channel_recv_latency_in_secs = last_insertion_time.elapsed().as_secs(),
                             "[Parser] Received chunk of transactions."
                         );
+                        last_insertion_time = std::time::Instant::now();
                     },
                     Err(rpc_error) => {
                         error!(
@@ -417,11 +419,18 @@ impl Worker {
                 });
                 tasks.push(task);
             }
-
+            let processing_time = std::time::Instant::now();
+            let task_count = tasks.len();
             let batches = match futures::future::try_join_all(tasks).await {
                 Ok(res) => res,
                 Err(err) => panic!("[Parser] Error processing transaction batches: {:?}", err),
             };
+            info!(
+                processing_duration = processing_time.elapsed().as_secs_f64(),
+                task_count = task_count,
+                processor_name = processor_name,
+                "[Parser] Finished processing transaction batches"
+            );
             // Update states depending on results of the batch processing
             let mut processed_versions = vec![];
             for res in batches {
