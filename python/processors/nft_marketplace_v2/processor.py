@@ -72,9 +72,9 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         parsed_objs = []
 
         assert self.config.custom_config, "Custom config must be set for this processor"
-        marketplace_contract_address = self.config.custom_config[
+        marketplace_contract_address = str(self.config.custom_config[
             "marketplace_contract_address"
-        ]
+        ])
 
         for transaction in transactions:
             user_transaction = transaction_utils.get_user_transaction(transaction)
@@ -116,7 +116,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
             # The contract actually gives token/collection related metadata so we don't have to
             # look up anything
             for event_index, event in enumerate(events):
-                qualified_event_type = event.type_str
+                qualified_event_type = str(event.type_str)
 
                 if marketplace_contract_address not in qualified_event_type:
                     continue
