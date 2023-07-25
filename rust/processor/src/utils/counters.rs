@@ -104,3 +104,13 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Count of bytes processed.
+pub static TRANSMITTED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_processed_bytes_count",
+        "Count of bytes processed",
+        &["processor_name"]
+    )
+    .unwrap()
+});

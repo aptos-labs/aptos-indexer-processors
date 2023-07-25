@@ -15,9 +15,12 @@ pub struct MovingAverage {
 
 impl MovingAverage {
     pub fn new(window_millis: u64) -> Self {
+        let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+        let mut queue = VecDeque::new();
+        queue.push_back((now, 0));
         Self {
             window_millis,
-            values: VecDeque::new(),
+            values: queue,
             sum: 0,
         }
     }
@@ -30,7 +33,7 @@ impl MovingAverage {
     pub fn tick(&mut self, timestamp_millis: u64, value: u64) -> f64 {
         self.values.push_back((timestamp_millis, value));
         self.sum += value;
-        loop {
+        while self.values.len() > 2 {
             match self.values.front() {
                 None => break,
                 Some((ts, val)) => {

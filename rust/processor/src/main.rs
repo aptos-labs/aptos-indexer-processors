@@ -57,7 +57,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     let args = ServerArgs::parse();
     args.run::<IndexerGrpcProcessorConfig>().await

@@ -16,7 +16,7 @@ use crate::{
         counters::{
             LATEST_PROCESSED_VERSION, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
-            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT, TRANSMITTED_BYTES_COUNT,
         },
         database::{execute_with_better_error, new_db_pool, PgDbPool},
         util::time_diff_since_pb_timestamp_in_secs,
@@ -24,8 +24,9 @@ use crate::{
 };
 use anyhow::Context;
 use aptos_moving_average::MovingAverage;
-use aptos_protos::indexer::v1::{
-    raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
+use aptos_protos::{
+    indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
+    transaction::v1::Transaction,
 };
 use diesel::{
     pg::PgConnection,
@@ -33,19 +34,23 @@ use diesel::{
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
+use prost::Message;
 use std::sync::Arc;
+use tokio::sync::mpsc::error::TryRecvError;
 use tracing::{error, info};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
-// const BLOB_STORAGE_SIZE: usize = 1000;
-const MIN_BLOB_SIZE: usize = 10;
 /// GRPC request metadata key for the token ID.
 const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
+// this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
+// of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
+// machines accordingly.
+const BUFFER_SIZE: usize = 50;
 
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20; // 20MB
 
@@ -107,6 +112,12 @@ impl Worker {
         }
     }
 
+    /// This is the main logic of the processor. We will do a few large parts:
+    /// 1. Connect to GRPC and handling all the stuff before starting the stream such as diesel migration
+    /// 2. Start a thread specifically to fetch data from GRPC. We will keep a buffer of X batches of transactions
+    /// 3. Start a loop to consume from the buffer. We will have Y threads to process the transactions in parallel. (Y should be less than X for obvious reasons)
+    ///   * Note that the batches will be sequential so we won't have problems with gaps
+    /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
         let processor_name = self.processor_name.clone();
 
@@ -224,85 +235,150 @@ impl Worker {
         };
         let processor_name = processor.name();
 
-        let mut ma = MovingAverage::new(10_000);
+        // This is the moving average that we use to calculate TPS
+        let mut ma = MovingAverage::new(10);
         info!(processor_name = processor_name, "[Parser] Starting stream");
         let mut batch_start_version = starting_version;
-        let mut chain_matched = false;
 
-        loop {
-            let mut transactions_batches = vec![];
-            if let Some(ending_version) = self.ending_version {
-                if ending_version < batch_start_version {
-                    info!(
-                        processor_name = processor_name,
-                        ending_version = self.ending_version,
-                        batch_start_version = batch_start_version,
-                        "[Parser] We reached the end version."
-                    );
-                    break;
-                }
-            }
+        let ending_version = self.ending_version;
+        let indexer_grpc_data_service_address = self.indexer_grpc_data_service_address.clone();
+        // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
+        // and write into a channel
+        // The each item will be (chain_id, batch of transactions)
+        let (tx, mut receiver) = tokio::sync::mpsc::channel::<(u64, Vec<Transaction>)>(BUFFER_SIZE);
+        tokio::spawn(async move {
+            info!(
+                processor_name = processor_name,
+                ending_version = ending_version,
+                batch_start_version = batch_start_version,
+                "[Parser] Starting fetcher thread"
+            );
             // Gets a batch of transactions from the stream. Batch size is set in the grpc server.
             // The number of batches depends on our config
             // There could be several special scenarios:
-            // 1. If we're at the head, we will break out of the loop as soon as we get a partial (transaction counts < 1000) batch.
-            // 2. If we lose the connection, we will panic.
-            // 3. If we specified an end version and we hit that, we will break out of the loop as soon as we get an empty batch.
-            for _ in 0..concurrent_tasks {
-                let next_stream = match resp_stream.next().await {
-                    Some(Ok(r)) => {
-                        if !chain_matched {
-                            self.validate_grpc_chain_id(r.clone())
-                                .await
-                                .expect("[Parser] Invalid grpc response with INIT frame.");
-                            chain_matched = true;
-                        }
+            // 1. If we lose the connection, we will stop fetching and let the consumer panic.
+            // 2. If we specified an end version and we hit that, we will stop fetching.
+            while let Some(current_item) = resp_stream.next().await {
+                match current_item {
+                    Ok(r) => {
                         let start_version = r.transactions.as_slice().first().unwrap().version;
                         let end_version = r.transactions.as_slice().last().unwrap().version;
                         info!(
+                            processor_name = processor_name,
                             start_version = start_version,
                             end_version = end_version,
                             "[Parser] Received chunk of transactions."
                         );
-                        r
+                        TRANSMITTED_BYTES_COUNT
+                            .with_label_values(&[processor_name])
+                            .inc_by(r.encoded_len() as u64);
+                        let chain_id = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
+                        match tx.send((chain_id, r.transactions)).await {
+                            Ok(()) => {},
+                            Err(e) => {
+                                error!(
+                                    processor_name = processor_name,
+                                    stream_address = indexer_grpc_data_service_address,
+                                    error = ?e,
+                                    "[Parser] Error sending datastream response to channel."
+                                );
+                                // Note, we don't necessarily want to panic right away because there might be still things in the
+                                // channel that we want to process. Let's panic in the consumer side instead, say if there has not
+                                // been any data in the channel for a while.
+                                break;
+                            },
+                        }
                     },
-                    None => {
-                        // If we get a None, then the stream has ended, i.e., this is a finite stream.
+                    Err(rpc_error) => {
+                        error!(
+                            processor_name = processor_name,
+                            stream_address = indexer_grpc_data_service_address,
+                            error = ?rpc_error,
+                            "[Parser] Error receiving datastream response."
+                        );
+                        // Note, we don't necessarily want to panic right away because there might be still things in the
+                        // channel that we want to process. Let's panic in the consumer side instead, say if there has not
+                        // been any data in the channel for a while.
                         break;
                     },
-                    Some(Err(e)) => {
+                }
+            }
+            // All senders are dropped here; channel is closed.
+            info!("[Parser] The stream is ended.")
+        });
+        // This is the consumer side of the channel. These are the major states:
+        // 1. We're backfilling so we should expect many concurrent threads to process transactions
+        // 2. We're caught up so we should expect a single thread to process transactions
+        // 3. We have received either an empty batch or a batch with a gap. We should panic.
+        // 4. We have not received anything in X seconds, we should panic.
+        // 5. If it's the wrong chain, panic.
+        let mut db_chain_id = None;
+        loop {
+            let mut transactions_batches = vec![];
+            let mut last_fetched_version = batch_start_version - 1;
+            for task_index in 0..concurrent_tasks {
+                let receive_status = match task_index {
+                    0 => {
+                        // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
+                        receiver.recv().await.ok_or(TryRecvError::Disconnected)
+                    },
+                    _ => {
+                        // If we're not the first task, we should poll to see if we get any data.
+                        receiver.try_recv()
+                    },
+                };
+                match receive_status {
+                    Ok((chain_id, transactions)) => {
+                        if let Some(existing_id) = db_chain_id {
+                            if chain_id != existing_id {
+                                error!(
+                                    processor_name = processor_name,
+                                    stream_address = self.indexer_grpc_data_service_address.clone(),
+                                    chain_id = chain_id,
+                                    existing_id = existing_id,
+                                    "[Parser] Stream somehow changed chain id!",
+                                );
+                                panic!("[Parser] Stream somehow changed chain id!");
+                            }
+                        } else {
+                            db_chain_id = Some(
+                                self.check_or_update_chain_id(chain_id as i64)
+                                    .await
+                                    .unwrap(),
+                            );
+                        }
+                        let current_fetched_version =
+                            transactions.as_slice().first().unwrap().version;
+                        if last_fetched_version + 1 != current_fetched_version {
+                            error!(
+                                batch_start_version = batch_start_version,
+                                last_fetched_version = last_fetched_version,
+                                current_fetched_version = current_fetched_version,
+                                "[Parser] Received batch with gap from GRPC stream"
+                            );
+                            panic!("[Parser] Received batch with gap from GRPC stream");
+                        }
+                        last_fetched_version = transactions.as_slice().last().unwrap().version;
+                        transactions_batches.push(transactions);
+                    },
+                    // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
+                    Err(TryRecvError::Empty) => {
+                        break;
+                    },
+                    // This happens when the channel is closed. We should panic.
+                    Err(TryRecvError::Disconnected) => {
                         error!(
                             processor_name = processor_name,
                             stream_address = self.indexer_grpc_data_service_address.clone(),
-                            error = ?e,
-                            "[Parser] Error receiving datastream response."
+                            "[Parser] Channel closed; stream ended."
                         );
-                        panic!("[Parser] Error receiving datastream response.");
+                        panic!("[Parser] Channel closed");
                     },
-                };
-                let transactions = next_stream.transactions;
-
-                let current_batch_size = transactions.len();
-                if current_batch_size == 0 {
-                    error!(
-                        batch_start_version = batch_start_version,
-                        "[Parser] Received empty batch from GRPC stream"
-                    );
-                    panic!();
-                }
-                transactions_batches.push(transactions);
-                // If it is a small batch, we assume we're at the head and break out of the loop.
-                if current_batch_size < MIN_BLOB_SIZE {
-                    break;
                 }
             }
 
             // Process the transactions in parallel
             let mut tasks = vec![];
-            if transactions_batches.is_empty() {
-                // If we get an empty batch, we want to skip and continue polling.
-                continue;
-            }
             for transactions in transactions_batches {
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
@@ -330,6 +406,7 @@ impl Worker {
                 });
                 tasks.push(task);
             }
+
             let batches = match futures::future::try_join_all(tasks).await {
                 Ok(res) => res,
                 Err(err) => panic!("[Parser] Error processing transaction batches: {:?}", err),
@@ -467,18 +544,6 @@ impl Worker {
                 .map(|_| grpc_chain_id as u64)
             },
         }
-    }
-
-    /// GRPC validation
-    pub async fn validate_grpc_chain_id(
-        &self,
-        response: TransactionsResponse,
-    ) -> anyhow::Result<()> {
-        let grpc_chain_id = response
-            .chain_id
-            .ok_or_else(|| anyhow::Error::msg("Chain Id doesn't exist."))?;
-        let _chain_id = self.check_or_update_chain_id(grpc_chain_id as i64).await?;
-        Ok(())
     }
 }
 
