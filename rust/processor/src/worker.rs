@@ -246,6 +246,9 @@ impl Worker {
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
         let (tx, mut receiver) = tokio::sync::mpsc::channel::<(u64, Vec<Transaction>)>(BUFFER_SIZE);
+        // An Arc of mutex protected counter.
+        let channel_size = Arc::new(std::sync::Mutex::new(0));
+        let channel_size_clone = channel_size.clone();
         tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
@@ -258,17 +261,13 @@ impl Worker {
             // There could be several special scenarios:
             // 1. If we lose the connection, we will stop fetching and let the consumer panic.
             // 2. If we specified an end version and we hit that, we will stop fetching.
+            // let last_insertion_time = std::time::Instant::now();
             while let Some(current_item) = resp_stream.next().await {
                 match current_item {
                     Ok(r) => {
                         let start_version = r.transactions.as_slice().first().unwrap().version;
                         let end_version = r.transactions.as_slice().last().unwrap().version;
-                        info!(
-                            processor_name = processor_name,
-                            start_version = start_version,
-                            end_version = end_version,
-                            "[Parser] Received chunk of transactions."
-                        );
+                        
                         TRANSMITTED_BYTES_COUNT
                             .with_label_values(&[processor_name])
                             .inc_by(r.encoded_len() as u64);
@@ -288,6 +287,16 @@ impl Worker {
                                 break;
                             },
                         }
+                        // increase the counter.
+                        let mut size = channel_size_clone.lock().unwrap();
+                        *size += 1;
+                        info!(
+                            processor_name = processor_name,
+                            start_version = start_version,
+                            end_version = end_version,
+                            channel_size = *size,
+                            "[Parser] Received chunk of transactions."
+                        );
                     },
                     Err(rpc_error) => {
                         error!(
@@ -360,6 +369,8 @@ impl Worker {
                         }
                         last_fetched_version = transactions.as_slice().last().unwrap().version;
                         transactions_batches.push(transactions);
+                        let mut size = channel_size.lock().unwrap();
+                        *size -= 1;
                     },
                     // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
                     Err(TryRecvError::Empty) => {
@@ -477,11 +488,13 @@ impl Worker {
                 .unwrap();
 
             ma.tick_now(batch_end - batch_start + 1);
+            let channel_size = *channel_size.lock().unwrap();
             info!(
                 processor_name = processor_name,
                 start_version = batch_start,
                 end_version = batch_end,
                 batch_size = batch_end - batch_start + 1,
+                channel_size = channel_size,
                 tps = (ma.avg() * 1000.0) as u64,
                 "[Parser] Processed transactions.",
             );
