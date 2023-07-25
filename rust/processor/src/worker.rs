@@ -236,7 +236,7 @@ impl Worker {
         let processor_name = processor.name();
 
         // This is the moving average that we use to calculate TPS
-        let mut ma = MovingAverage::new(100_000);
+        let mut ma = MovingAverage::new(10);
         info!(processor_name = processor_name, "[Parser] Starting stream");
         let mut batch_start_version = starting_version;
 
