@@ -295,7 +295,8 @@ impl Worker {
                             start_version = start_version,
                             end_version = end_version,
                             channel_size = *size,
-                            channel_recv_latency_in_secs = last_insertion_time.elapsed().as_secs_f64(),
+                            channel_recv_latency_in_secs =
+                                last_insertion_time.elapsed().as_secs_f64(),
                             "[Parser] Received chunk of transactions."
                         );
                         last_insertion_time = std::time::Instant::now();
