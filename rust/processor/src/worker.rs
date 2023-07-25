@@ -33,11 +33,10 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use futures::{StreamExt};
-use futures_util::SinkExt;
+use futures::StreamExt;
 use prost::Message;
-use tokio::sync::mpsc::error::TryRecvError;
 use std::sync::Arc;
+use tokio::sync::mpsc::error::TryRecvError;
 use tracing::{error, info};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
@@ -273,12 +272,8 @@ impl Worker {
                         TRANSMITTED_BYTES_COUNT
                             .with_label_values(&[processor_name])
                             .inc_by(r.encoded_len() as u64);
-                        let chain_id = r
-                            .chain_id
-                            .expect("[Parser] Chain Id doesn't exist.")
-                            as u64;
-                        match tx.send((chain_id, r.transactions))
-                            .await {
+                        let chain_id = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
+                        match tx.send((chain_id, r.transactions)).await {
                             Ok(()) => {},
                             Err(e) => {
                                 error!(
@@ -307,9 +302,9 @@ impl Worker {
                         break;
                     },
                 }
-            };
+            }
             // All senders are dropped here; channel is closed.
-            info!("[Parser] The stream is ended; it's a finite stream.")
+            info!("[Parser] The stream is ended.")
         });
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
