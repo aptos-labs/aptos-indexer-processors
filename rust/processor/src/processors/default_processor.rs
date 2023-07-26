@@ -280,7 +280,8 @@ fn insert_events(
             diesel::insert_into(schema::events::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((account_address, creation_number, sequence_number))
-                .do_nothing(),
+                .do_update()
+                .set(inserted_at.eq(excluded(inserted_at))),
             None,
         )?;
     }
