@@ -1,0 +1,13 @@
+version: v1
+managed:
+  enabled: true
+plugins:
+  # TODO: use the asyncio version of the generated code.
+  # - name: python
+  #   out: python/
+  #   opt:
+  #     - pyi_out=python
+  # - name: grpc_python
+  #   out: python/
+  #   opt:
+  #     - grpc_out=python

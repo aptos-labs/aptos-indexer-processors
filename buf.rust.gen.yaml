@@ -2,7 +2,6 @@ version: v1
 managed:
   enabled: true
 plugins:
-  # Rust-related plugins
   - name: prost
     out: rust/aptos-indexer-protos/src/pb/
     opt:
@@ -20,18 +19,3 @@ plugins:
 
   - name: tonic
     out: rust/aptos-indexer-protos/src/pb/
-
-  # TODO: use the asyncio version of the generated code.
-  # # Python-related plugins
-  # - name: python
-  #   out: python/
-  #   opt:
-  #     - pyi_out=python
-  # - name: grpc_python
-  #   out: python/
-  #   opt:
-  #     - grpc_out=python
-
-  # TypeScript-related plugins
-  - name: ts
-    out: typescript/

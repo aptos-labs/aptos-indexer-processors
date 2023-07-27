@@ -48,8 +48,7 @@ pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
 ### Development
 
 ```
-
-buf generate
+./build_protos.sh
 python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python \
 proto/aptos/bigquery_schema/v1/transaction.proto \
 proto/aptos/indexer/v1/raw_data.proto \

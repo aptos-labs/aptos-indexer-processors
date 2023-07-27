@@ -2,11 +2,11 @@
 name = "aptos-indexer-protos"
 version = "1.0.9"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Aptos Protobuf Definitions"
-repository = "https://github.com/aptos-labs/aptos-core"
+description = "Aptos indexer stack protobuf definitions"
+repository = "https://github.com/aptos-labs/aptos-indexer-processors"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
-publish = false
+publish = true
 edition = "2021"
 
 [dependencies]
