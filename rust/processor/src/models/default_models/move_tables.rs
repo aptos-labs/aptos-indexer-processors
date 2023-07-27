@@ -7,7 +7,7 @@ use crate::{
     schema::{current_table_items, table_items, table_metadatas},
     utils::util::{hash_str, standardize_address},
 };
-use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
+use aptos_indexer_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

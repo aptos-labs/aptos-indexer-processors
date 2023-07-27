@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::Transaction;
 use crate::{schema::move_modules, utils::util::standardize_address};
-use aptos_protos::transaction::v1::{
+use aptos_indexer_protos::transaction::v1::{
     DeleteModule, MoveModule as MoveModulePB, MoveModuleBytecode, WriteModule,
 };
 use field_count::FieldCount;

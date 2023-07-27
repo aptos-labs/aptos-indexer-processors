@@ -15,7 +15,7 @@ use crate::{
     schema::token_activities_v2,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use aptos_protos::transaction::v1::Event;
+use aptos_indexer_protos::transaction::v1::Event;
 use bigdecimal::{BigDecimal, One, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

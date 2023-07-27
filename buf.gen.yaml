@@ -4,22 +4,22 @@ managed:
 plugins:
   # Rust-related plugins
   - name: prost
-    out: rust/aptos-protos/src/pb/
+    out: rust/aptos-indexer-protos/src/pb/
     opt:
       #- bytes=.
       - file_descriptor_set
 
   - name: prost-serde
-    out: rust/aptos-protos/src/pb/
+    out: rust/aptos-indexer-protos/src/pb/
 
   - name: prost-crate
-    out: rust/aptos-protos/src/pb/
+    out: rust/aptos-indexer-protos/src/pb/
     strategy: all
     opt:
       - no_features
 
   - name: tonic
-    out: rust/aptos-protos/src/pb/
+    out: rust/aptos-indexer-protos/src/pb/
 
   # TODO: use the asyncio version of the generated code.
   # # Python-related plugins
@@ -31,7 +31,7 @@ plugins:
   #   out: python/
   #   opt:
   #     - grpc_out=python
-  
+
   # TypeScript-related plugins
   - name: ts
     out: typescript/

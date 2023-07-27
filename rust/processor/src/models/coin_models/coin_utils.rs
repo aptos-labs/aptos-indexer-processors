@@ -9,7 +9,7 @@ use crate::{
     utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
 };
 use anyhow::{Context, Result};
-use aptos_protos::transaction::v1::{move_type::Content, MoveType, WriteResource};
+use aptos_indexer_protos::transaction::v1::{move_type::Content, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use regex::Regex;
 use serde::{Deserialize, Serialize};

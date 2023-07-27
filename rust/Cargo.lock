@@ -97,21 +97,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
-name = "aptos-moving-average"
-version = "0.1.0"
-dependencies = [
- "chrono",
-]
-
-[[package]]
-name = "aptos-protos"
-version = "1.0.8"
+name = "aptos-indexer-protos"
+version = "1.0.9"
 dependencies = [
  "pbjson",
  "prost",
  "prost-types",
  "serde",
  "tonic",
+]
+
+[[package]]
+name = "aptos-moving-average"
+version = "0.1.0"
+dependencies = [
+ "chrono",
 ]
 
 [[package]]
@@ -1391,8 +1391,8 @@ name = "processor"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-indexer-protos",
  "aptos-moving-average",
- "aptos-protos",
  "async-trait",
  "base64 0.13.1",
  "bcs",

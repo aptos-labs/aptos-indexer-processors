@@ -7,7 +7,7 @@
 
 use super::coin_utils::{CoinInfoType, CoinResource};
 use crate::{schema::coin_infos, utils::database::PgPoolConnection};
-use aptos_protos::transaction::v1::WriteResource;
+use aptos_indexer_protos::transaction::v1::WriteResource;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

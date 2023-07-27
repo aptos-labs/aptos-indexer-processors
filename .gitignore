@@ -37,7 +37,7 @@ __pycache__
 
 # Protocol buffer generated files
 # Rust generated files
-rust/aptos-protos/src/pb
+rust/aptos-indexer-protos/src/pb
 # Python generated files
 python/aptos/
 # TypeScript generated files
