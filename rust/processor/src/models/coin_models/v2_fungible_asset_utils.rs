@@ -13,7 +13,7 @@ use crate::{
     utils::util::{deserialize_from_string, truncate_str},
 };
 use anyhow::{Context, Result};
-use aptos_protos::transaction::v1::WriteResource;
+use aptos_indexer_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 

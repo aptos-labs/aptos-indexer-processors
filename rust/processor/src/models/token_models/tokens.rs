@@ -20,7 +20,7 @@ use crate::{
         util::{ensure_not_negative, parse_timestamp, standardize_address},
     },
 };
-use aptos_protos::transaction::v1::{
+use aptos_indexer_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, DeleteTableItem,
     Transaction, WriteResource, WriteTableItem,
 };

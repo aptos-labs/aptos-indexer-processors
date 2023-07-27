@@ -13,7 +13,7 @@ use crate::{
     schema::{collection_datas, current_collection_datas},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use aptos_protos::transaction::v1::WriteTableItem;
+use aptos_indexer_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};
 use field_count::FieldCount;

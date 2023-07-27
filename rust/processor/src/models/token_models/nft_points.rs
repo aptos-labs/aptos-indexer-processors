@@ -9,7 +9,7 @@ use crate::{
     schema::nft_points,
     utils::util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
 };
-use aptos_protos::transaction::v1::{
+use aptos_indexer_protos::transaction::v1::{
     transaction::TxnData, transaction_payload::Payload, Transaction,
 };
 use bigdecimal::BigDecimal;

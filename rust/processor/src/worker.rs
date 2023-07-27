@@ -23,11 +23,11 @@ use crate::{
     },
 };
 use anyhow::Context;
-use aptos_moving_average::MovingAverage;
-use aptos_protos::{
+use aptos_indexer_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
     transaction::v1::Transaction,
 };
+use aptos_moving_average::MovingAverage;
 use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, PooledConnection},
@@ -318,6 +318,7 @@ impl Worker {
             // All senders are dropped here; channel is closed.
             info!("[Parser] The stream is ended.")
         });
+
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
         // 2. We're caught up so we should expect a single thread to process transactions

@@ -13,7 +13,7 @@ use crate::{
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;
-use aptos_protos::transaction::v1::{
+use aptos_indexer_protos::transaction::v1::{
     write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, Zero};

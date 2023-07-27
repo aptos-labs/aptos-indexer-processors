@@ -13,7 +13,7 @@ use crate::{
     schema::account_transactions,
     utils::util::standardize_address,
 };
-use aptos_protos::transaction::v1::{
+use aptos_indexer_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, DeleteResource, Event, Transaction,
     WriteResource,
 };

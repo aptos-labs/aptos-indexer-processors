@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-    "aptos-protos",
+    "aptos-indexer-protos",
     "moving-average",
     "processor",
     "server-framework",
@@ -18,7 +18,7 @@ repository = "https://github.com/aptos-labs/aptos-indexer-processors"
 rust-version = "1.70"
 
 [workspace.dependencies]
-aptos-protos = { path = "aptos-protos" }
+aptos-indexer-protos = { path = "aptos-indexer-protos" }
 processor = { path = "processor" }
 server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }

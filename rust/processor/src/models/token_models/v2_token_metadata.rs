@@ -15,7 +15,7 @@ use crate::{
     utils::util::{standardize_address, truncate_str},
 };
 use anyhow::Context;
-use aptos_protos::transaction::v1::WriteResource;
+use aptos_indexer_protos::transaction::v1::WriteResource;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
