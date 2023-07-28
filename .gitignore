@@ -36,9 +36,11 @@ node_modules/
 __pycache__
 
 # Protocol buffer generated files
-# Rust generated files
-rust/aptos-indexer-protos/src/pb
+
 # Python generated files
 python/aptos/
 # TypeScript generated files
 typescript/aptos
+
+# As you can see, we choose to check in the Rust generated code. We will likely do the
+# same for the other generated code later.
