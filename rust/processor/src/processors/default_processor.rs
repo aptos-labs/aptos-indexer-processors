@@ -192,11 +192,7 @@ fn insert_transactions(
             diesel::insert_into(schema::transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_update()
-                .set((
-                    num_events.eq(excluded(num_events)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -215,7 +211,11 @@ fn insert_user_transactions(
             diesel::insert_into(schema::user_transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
+                .do_update()
+                .set((
+                    entry_function_id_str.eq(excluded(entry_function_id_str)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -337,11 +337,7 @@ fn insert_move_resources(
             diesel::insert_into(schema::move_resources::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    state_key_hash.eq(excluded(state_key_hash)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }

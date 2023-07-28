@@ -139,7 +139,11 @@ fn insert_coin_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    entry_function_id_str.eq(excluded(entry_function_id_str)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }

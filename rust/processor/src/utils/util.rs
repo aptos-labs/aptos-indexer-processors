@@ -20,7 +20,7 @@ use std::str::FromStr;
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 // Max length of entry function id string to ensure that db doesn't explode
-pub const MAX_ENTRY_FUNCTION_LENGTH: usize = 100;
+pub const MAX_ENTRY_FUNCTION_LENGTH: usize = 1000;
 
 // Supporting structs to get clean payload without escaped strings
 #[derive(Debug, Deserialize, Serialize)]
