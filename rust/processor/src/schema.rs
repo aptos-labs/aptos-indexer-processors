@@ -42,7 +42,7 @@ diesel::table! {
         activity_type -> Varchar,
         is_gas_fee -> Bool,
         is_transaction_success -> Bool,
-        #[max_length = 100]
+        #[max_length = 1000]
         entry_function_id_str -> Nullable<Varchar>,
         block_height -> Int8,
         transaction_timestamp -> Timestamp,
@@ -721,7 +721,7 @@ diesel::table! {
         token_amount -> Numeric,
         before_value -> Nullable<Text>,
         after_value -> Nullable<Text>,
-        #[max_length = 100]
+        #[max_length = 1000]
         entry_function_id_str -> Nullable<Varchar>,
         #[max_length = 10]
         token_standard -> Varchar,
@@ -901,7 +901,8 @@ diesel::table! {
         expiration_timestamp_secs -> Timestamp,
         gas_unit_price -> Numeric,
         timestamp -> Timestamp,
-        entry_function_id_str -> Text,
+        #[max_length = 1000]
+        entry_function_id_str -> Varchar,
         inserted_at -> Timestamp,
         epoch -> Int8,
     }
