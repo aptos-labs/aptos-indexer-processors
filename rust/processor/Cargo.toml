@@ -28,6 +28,8 @@ field_count = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 gcloud-sdk = { workspace = true }
+google-cloud-googleapis = { workspace = true }
+google-cloud-pubsub = { workspace = true }
 hex = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
