@@ -19,17 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4 
+      - uses: actions/setup-python@v4
       - uses: snok/install-poetry@v1
         with:
           version: 1.4.2
       - run: >
-          pip install grpcio-tools &&  
+          pip install grpcio-tools &&
           python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python
-          proto/aptos/bigquery_schema/v1/transaction.proto 
-          proto/aptos/indexer/v1/raw_data.proto 
-          proto/aptos/internal/fullnode/v1/fullnode_data.proto 
-          proto/aptos/transaction/v1/transaction.proto 
+          proto/aptos/bigquery_schema/v1/transaction.proto
+          proto/aptos/indexer/v1/raw_data.proto
+          proto/aptos/internal/fullnode/v1/fullnode_data.proto
+          proto/aptos/transaction/v1/transaction.proto
           proto/aptos/util/timestamp/timestamp.proto
       - run: poetry install
         working-directory: python
@@ -44,7 +44,7 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: 7.12.2
-      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x 
+      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
       - name: install rust prost plugin
@@ -55,9 +55,9 @@ jobs:
           cargo install protoc-gen-tonic
       - name: Generate the protos
         uses: bufbuild/buf-setup-action@v1.24.0
-      - run: buf generate
+      - run: buf generate --template buf.rust.gen.yaml
       - run: |
-          cargo install cargo-sort 
+          cargo install cargo-sort
           rustup update
           rustup toolchain install nightly
           rustup component add rustfmt --toolchain nightly
