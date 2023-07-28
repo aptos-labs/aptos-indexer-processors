@@ -215,7 +215,11 @@ fn insert_user_transactions(
             diesel::insert_into(schema::user_transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
+                .do_update()
+                .set((
+                    entry_function_id_str.eq(excluded(entry_function_id_str)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
