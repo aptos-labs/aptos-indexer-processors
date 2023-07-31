@@ -328,7 +328,7 @@ impl Worker {
         let mut db_chain_id = None;
         loop {
             let mut transactions_batches = vec![];
-            let mut last_fetched_version = batch_start_version - 1;
+            let mut last_fetched_version = batch_start_version as i64 - 1;
             for task_index in 0..concurrent_tasks {
                 let receive_status = match task_index {
                     0 => {
@@ -362,7 +362,7 @@ impl Worker {
                         }
                         let current_fetched_version =
                             transactions.as_slice().first().unwrap().version;
-                        if last_fetched_version + 1 != current_fetched_version {
+                        if last_fetched_version + 1 != current_fetched_version as i64 {
                             error!(
                                 batch_start_version = batch_start_version,
                                 last_fetched_version = last_fetched_version,
@@ -371,7 +371,7 @@ impl Worker {
                             );
                             panic!("[Parser] Received batch with gap from GRPC stream");
                         }
-                        last_fetched_version = transactions.as_slice().last().unwrap().version;
+                        last_fetched_version = transactions.as_slice().last().unwrap().version as i64;
                         transactions_batches.push(transactions);
                         let mut size = channel_size.lock().unwrap();
                         *size -= 1;
