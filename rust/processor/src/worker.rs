@@ -371,7 +371,8 @@ impl Worker {
                             );
                             panic!("[Parser] Received batch with gap from GRPC stream");
                         }
-                        last_fetched_version = transactions.as_slice().last().unwrap().version as i64;
+                        last_fetched_version =
+                            transactions.as_slice().last().unwrap().version as i64;
                         transactions_batches.push(transactions);
                         let mut size = channel_size.lock().unwrap();
                         *size -= 1;
