@@ -7,11 +7,12 @@
 
 use crate::{
     schema::nft_points,
-    utils::util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
+    utils::util::{
+        get_clean_payload, get_entry_function_from_user_request, parse_timestamp,
+        standardize_address,
+    },
 };
-use aptos_indexer_protos::transaction::v1::{
-    transaction::TxnData, transaction_payload::Payload, Transaction,
-};
+use aptos_indexer_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;
@@ -68,20 +69,55 @@ impl NftPoints {
                     return None;
                 }
                 if entry_function_id_str == contract {
-                    if let Payload::EntryFunctionPayload(inner) = payload.payload.as_ref().unwrap()
-                    {
-                        let owner_address = standardize_address(&inner.arguments[0]);
-                        let amount = inner.arguments[2].parse().unwrap();
-                        let transaction_timestamp = parse_timestamp(timestamp, version);
-                        return Some(Self {
-                            transaction_version: version,
-                            owner_address,
-                            token_name: inner.arguments[1].clone(),
-                            point_type: inner.arguments[3].clone(),
-                            amount,
-                            transaction_timestamp,
-                        });
-                    }
+                    let payload_cleaned = get_clean_payload(payload, version).unwrap();
+                    let args = payload_cleaned["arguments"]
+                        .as_array()
+                        .unwrap_or_else(|| {
+                            tracing::error!(
+                                transaction_version = version,
+                                payload = ?payload_cleaned,
+                                "Failed to get arguments from nft_points transaction"
+                            );
+                            panic!()
+                        })
+                        .iter()
+                        .map(|x| {
+                            unescape::unescape(x.as_str().unwrap_or_else(|| {
+                                tracing::error!(
+                                    transaction_version = version,
+                                    payload = ?payload_cleaned,
+                                    "Failed to parse arguments from nft_points transaction"
+                                );
+                                panic!()
+                            }))
+                            .unwrap_or_else(|| {
+                                tracing::error!(
+                                    transaction_version = version,
+                                    payload = ?payload_cleaned,
+                                    "Failed to escape arguments from nft_points transaction"
+                                );
+                                panic!()
+                            })
+                        })
+                        .collect::<Vec<String>>();
+                    let owner_address = standardize_address(&args[0]);
+                    let amount = args[2].parse().unwrap_or_else(|_| {
+                        tracing::error!(
+                            transaction_version = version,
+                            argument = &args[2],
+                            "Failed to parse amount from nft_points transaction"
+                        );
+                        panic!()
+                    });
+                    let transaction_timestamp = parse_timestamp(timestamp, version);
+                    return Some(Self {
+                        transaction_version: version,
+                        owner_address,
+                        token_name: args[1].clone(),
+                        point_type: args[3].clone(),
+                        amount,
+                        transaction_timestamp,
+                    });
                 }
             }
         }

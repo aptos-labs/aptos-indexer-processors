@@ -107,6 +107,8 @@ pub fn get_entry_function_from_user_request(
 }
 
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
+/// This function converts the string into json recursively and lets the diesel ORM handles
+/// the escaping.
 pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<Value> {
     match payload.payload.as_ref().unwrap() {
         PayloadType::EntryFunctionPayload(inner) => {
