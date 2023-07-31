@@ -7,7 +7,7 @@ use crate::{
         account_transactions::AccountTransaction,
         coin_activities::{CoinActivity, CurrentCoinBalancePK},
         coin_balances::{CoinBalance, CurrentCoinBalance},
-        coin_infos::{CoinInfo, CoinInfoQuery},
+        coin_infos::CoinInfo,
         coin_supply::CoinSupply,
     },
     schema,
@@ -24,7 +24,7 @@ use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
 pub const NAME: &str = "coin_processor";
-const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 pub struct CoinTransactionProcessor {
     connection_pool: PgDbPool,
 }
@@ -280,10 +280,6 @@ impl ProcessorTrait for CoinTransactionProcessor {
         end_version: u64,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        // get aptos_coin info for supply tracking
-        // TODO: This only needs to be fetched once. Need to persist somehow
-        let maybe_aptos_coin_info =
-            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE_STR.to_string(), &mut conn).unwrap();
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
@@ -301,7 +297,7 @@ impl ProcessorTrait for CoinTransactionProcessor {
                 coin_infos,
                 current_coin_balances,
                 mut coin_supply,
-            ) = CoinActivity::from_transaction(txn, maybe_aptos_coin_info);
+            ) = CoinActivity::from_transaction(txn);
             all_coin_activities.append(&mut coin_activities);
             all_coin_balances.append(&mut coin_balances);
             all_coin_supply.append(&mut coin_supply);
