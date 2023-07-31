@@ -71,8 +71,6 @@ impl CoinActivity {
     /// Note, we're not currently tracking supply
     pub fn from_transaction(
         transaction: &TransactionPB,
-        apt_supply_table_handle: Option<String>,
-        apt_supply_table_key: Option<String>,
     ) -> (
         Vec<Self>,
         Vec<CoinBalance>,
@@ -154,15 +152,8 @@ impl CoinActivity {
             let maybe_coin_supply = if let WriteSetChangeEnum::WriteTableItem(table_item) =
                 wsc.change.as_ref().unwrap()
             {
-                CoinSupply::from_write_table_item(
-                    table_item,
-                    apt_supply_table_handle.clone(),
-                    apt_supply_table_key.clone(),
-                    txn_version,
-                    txn_timestamp,
-                    txn_epoch,
-                )
-                .unwrap()
+                CoinSupply::from_write_table_item(table_item, txn_version, txn_timestamp, txn_epoch)
+                    .unwrap()
             } else {
                 None
             };

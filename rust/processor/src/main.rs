@@ -25,8 +25,6 @@ pub struct IndexerGrpcProcessorConfig {
     pub number_concurrent_processing_tasks: Option<usize>,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
-    pub apt_supply_table_handle: Option<String>,
-    pub apt_supply_table_key: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -48,8 +46,6 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.number_concurrent_processing_tasks,
             self.ans_address.clone(),
             self.nft_points_contract.clone(),
-            self.apt_supply_table_handle.clone(),
-            self.apt_supply_table_key.clone(),
         )
         .await;
         worker.run().await;

@@ -27,21 +27,11 @@ pub const NAME: &str = "coin_processor";
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 pub struct CoinTransactionProcessor {
     connection_pool: PgDbPool,
-    apt_supply_table_handle: Option<String>,
-    apt_supply_table_key: Option<String>,
 }
 
 impl CoinTransactionProcessor {
-    pub fn new(
-        connection_pool: PgDbPool,
-        apt_supply_table_handle: Option<String>,
-        apt_supply_table_key: Option<String>,
-    ) -> Self {
-        Self {
-            connection_pool,
-            apt_supply_table_handle,
-            apt_supply_table_key,
-        }
+    pub fn new(connection_pool: PgDbPool) -> Self {
+        Self { connection_pool }
     }
 }
 
@@ -307,11 +297,7 @@ impl ProcessorTrait for CoinTransactionProcessor {
                 coin_infos,
                 current_coin_balances,
                 mut coin_supply,
-            ) = CoinActivity::from_transaction(
-                txn,
-                self.apt_supply_table_handle.clone(),
-                self.apt_supply_table_key.clone(),
-            );
+            ) = CoinActivity::from_transaction(txn);
             all_coin_activities.append(&mut coin_activities);
             all_coin_balances.append(&mut coin_balances);
             all_coin_supply.append(&mut coin_supply);
