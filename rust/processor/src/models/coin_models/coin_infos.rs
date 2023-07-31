@@ -6,9 +6,8 @@
 #![allow(clippy::unused_unit)]
 
 use super::coin_utils::{CoinInfoType, CoinResource};
-use crate::{schema::coin_infos, utils::database::PgPoolConnection};
+use crate::schema::coin_infos;
 use aptos_indexer_protos::transaction::v1::WriteResource;
-use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -24,23 +23,6 @@ pub struct CoinInfo {
     pub symbol: String,
     pub decimals: i32,
     pub transaction_created_timestamp: chrono::NaiveDateTime,
-    pub supply_aggregator_table_handle: Option<String>,
-    pub supply_aggregator_table_key: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(primary_key(coin_type_hash))]
-#[diesel(table_name = coin_infos)]
-pub struct CoinInfoQuery {
-    pub coin_type_hash: String,
-    pub coin_type: String,
-    pub transaction_version_created: i64,
-    pub creator_address: String,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: i32,
-    pub transaction_created_timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
     pub supply_aggregator_table_handle: Option<String>,
     pub supply_aggregator_table_key: Option<String>,
 }
@@ -79,17 +61,5 @@ impl CoinInfo {
             },
             _ => Ok(None),
         }
-    }
-}
-
-impl CoinInfoQuery {
-    pub fn get_by_coin_type(
-        coin_type: String,
-        conn: &mut PgPoolConnection,
-    ) -> diesel::QueryResult<Option<Self>> {
-        coin_infos::table
-            .filter(coin_infos::coin_type.eq(coin_type))
-            .first::<Self>(conn)
-            .optional()
     }
 }

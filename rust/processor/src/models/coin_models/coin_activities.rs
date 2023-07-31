@@ -7,11 +7,12 @@
 
 use super::{
     coin_balances::{CoinBalance, CurrentCoinBalance},
-    coin_infos::{CoinInfo, CoinInfoQuery},
+    coin_infos::CoinInfo,
     coin_supply::CoinSupply,
     coin_utils::{CoinEvent, EventGuidResource},
 };
 use crate::{
+    processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
     utils::util::{get_entry_function_from_user_request, standardize_address},
 };
@@ -26,7 +27,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
-const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 // We will never have a negative number on chain so this will avoid collision in postgres
 const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
 const BURN_GAS_EVENT_INDEX: i64 = -1;
@@ -71,7 +71,8 @@ impl CoinActivity {
     /// Note, we're not currently tracking supply
     pub fn from_transaction(
         transaction: &TransactionPB,
-        maybe_aptos_coin_info: &Option<CoinInfoQuery>,
+        apt_supply_table_handle: Option<String>,
+        apt_supply_table_key: Option<String>,
     ) -> (
         Vec<Self>,
         Vec<CoinBalance>,
@@ -155,7 +156,8 @@ impl CoinActivity {
             {
                 CoinSupply::from_write_table_item(
                     table_item,
-                    maybe_aptos_coin_info,
+                    apt_supply_table_handle.clone(),
+                    apt_supply_table_key.clone(),
                     txn_version,
                     txn_timestamp,
                     txn_epoch,

@@ -67,6 +67,8 @@ pub struct Worker {
     pub number_concurrent_processing_tasks: usize,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
+    pub apt_supply_table_handle: Option<String>,
+    pub apt_supply_table_key: Option<String>,
 }
 
 impl Worker {
@@ -82,6 +84,8 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         ans_address: Option<String>,
         nft_points_contract: Option<String>,
+        apt_supply_table_handle: Option<String>,
+        apt_supply_table_key: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -109,6 +113,8 @@ impl Worker {
             number_concurrent_processing_tasks,
             ans_address,
             nft_points_contract,
+            apt_supply_table_handle,
+            apt_supply_table_key,
         }
     }
 
@@ -218,9 +224,11 @@ impl Worker {
         // Instantiates correct processor based on config
         let processor_enum = Processor::from_string(&processor_name);
         let processor: Arc<dyn ProcessorTrait> = match processor_enum {
-            Processor::CoinProcessor => {
-                Arc::new(CoinTransactionProcessor::new(self.db_pool.clone()))
-            },
+            Processor::CoinProcessor => Arc::new(CoinTransactionProcessor::new(
+                self.db_pool.clone(),
+                self.apt_supply_table_handle.clone(),
+                self.apt_supply_table_key.clone(),
+            )),
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
