@@ -20,7 +20,6 @@ pub struct Event {
     pub transaction_block_height: i64,
     pub type_: String,
     pub data: serde_json::Value,
-    pub event_index: Option<i64>,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -37,7 +36,6 @@ pub struct EventQuery {
     pub type_: String,
     pub data: serde_json::Value,
     pub inserted_at: chrono::NaiveDateTime,
-    pub event_index: Option<i64>,
 }
 
 impl Event {
@@ -57,7 +55,6 @@ impl Event {
             transaction_block_height,
             type_: event.type_str.clone(),
             data: serde_json::from_str(event.data.as_str()).unwrap(),
-            event_index: Some(event_index),
         }
     }
 

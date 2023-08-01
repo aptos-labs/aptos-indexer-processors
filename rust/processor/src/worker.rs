@@ -4,11 +4,8 @@
 use crate::{
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
-        coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
-        stake_processor::StakeTransactionProcessor,
-        token_processor::TokenTransactionProcessor,
         Processor,
     },
     schema::ledger_infos,
@@ -218,20 +215,10 @@ impl Worker {
         // Instantiates correct processor based on config
         let processor_enum = Processor::from_string(&processor_name);
         let processor: Arc<dyn ProcessorTrait> = match processor_enum {
-            Processor::CoinProcessor => {
-                Arc::new(CoinTransactionProcessor::new(self.db_pool.clone()))
-            },
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
-            Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
-                self.db_pool.clone(),
-                self.ans_address.clone(),
-                self.nft_points_contract.clone(),
-            )),
-            Processor::StakeProcessor => {
-                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
-            },
+            
         };
         let processor_name = processor.name();
 

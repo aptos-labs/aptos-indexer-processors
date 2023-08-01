@@ -45,7 +45,7 @@ CREATE TABLE transactions (
   num_events BIGINT NOT NULL,
   num_write_set_changes BIGINT NOT NULL,
   -- Default time columns
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX txn_insat_index ON transactions (inserted_at);
 /* Ex:
@@ -91,9 +91,9 @@ CREATE TABLE block_metadata_transactions (
   previous_block_votes_bitvec jsonb NOT NULL,
   proposer VARCHAR(66) NOT NULL,
   failed_proposer_indices jsonb NOT NULL,
-  "timestamp" TIMESTAMP NOT NULL,
+  "timestamp" TIMESTAMPTZ NOT NULL,
   -- Default time columns
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   CONSTRAINT fk_versions FOREIGN KEY (version) REFERENCES transactions (version)
 );
@@ -158,13 +158,13 @@ CREATE TABLE user_transactions (
   sender VARCHAR(66) NOT NULL,
   sequence_number BIGINT NOT NULL,
   max_gas_amount NUMERIC NOT NULL,
-  expiration_timestamp_secs TIMESTAMP NOT NULL,
+  expiration_timestamp_secs TIMESTAMPTZ NOT NULL,
   gas_unit_price NUMERIC NOT NULL,
   -- from UserTransaction
-  "timestamp" TIMESTAMP NOT NULL,
+  "timestamp" TIMESTAMPTZ NOT NULL,
   entry_function_id_str text NOT NULL,
   -- Default time columns
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   CONSTRAINT fk_versions FOREIGN KEY (version) REFERENCES transactions (version),
   UNIQUE (sender, sequence_number)
@@ -184,7 +184,7 @@ CREATE TABLE signatures (
   signature VARCHAR(200) NOT NULL,
   threshold BIGINT NOT NULL,
   public_key_indices jsonb NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (
     transaction_version,
@@ -213,7 +213,7 @@ CREATE TABLE events (
   transaction_block_height BIGINT NOT NULL,
   type TEXT NOT NULL,
   data jsonb NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (
     account_address,
@@ -232,7 +232,7 @@ CREATE TABLE write_set_changes (
   transaction_block_height BIGINT NOT NULL,
   type TEXT NOT NULL,
   address VARCHAR(66) NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (transaction_version, index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
@@ -251,7 +251,7 @@ CREATE TABLE move_modules (
   exposed_functions jsonb,
   structs jsonb,
   is_deleted BOOLEAN NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (transaction_version, write_set_change_index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
@@ -270,7 +270,7 @@ CREATE TABLE move_resources (
   generic_type_params jsonb,
   data jsonb,
   is_deleted BOOLEAN NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (transaction_version, write_set_change_index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
@@ -287,7 +287,7 @@ CREATE TABLE table_items (
   decoded_key jsonb NOT NULL,
   decoded_value jsonb,
   is_deleted BOOLEAN NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (transaction_version, write_set_change_index),
   CONSTRAINT fk_transaction_versions FOREIGN KEY (transaction_version) REFERENCES transactions (version)
@@ -299,7 +299,15 @@ CREATE TABLE table_metadatas (
   handle VARCHAR(66) UNIQUE PRIMARY KEY NOT NULL,
   key_type text NOT NULL,
   value_type text NOT NULL,
-  inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX tm_insat_index ON table_metadatas (inserted_at);
 CREATE TABLE ledger_infos (chain_id BIGINT UNIQUE PRIMARY KEY NOT NULL);
+
+-- Your SQL goes here
+-- Tracks latest processed version per processor
+CREATE TABLE processor_status (
+  processor VARCHAR(50) UNIQUE PRIMARY KEY NOT NULL,
+  last_success_version BIGINT NOT NULL,
+  last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

@@ -5,7 +5,7 @@
 use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
-    move_tables::{CurrentTableItem, TableItem, TableMetadata},
+    move_tables::{TableItem, TableMetadata},
     transactions::{Transaction, TransactionQuery},
 };
 use crate::{schema::write_set_changes, utils::util::standardize_address};
@@ -130,7 +130,7 @@ impl WriteSetChange {
                 )),
             ),
             WriteSetChangeEnum::WriteTableItem(inner) => {
-                let (ti, cti) = TableItem::from_write_table_item(
+                let (ti,) = TableItem::from_write_table_item(
                     inner,
                     index,
                     transaction_version,
@@ -149,13 +149,12 @@ impl WriteSetChange {
                     },
                     WriteSetChangeDetail::Table(
                         ti,
-                        cti,
                         Some(TableMetadata::from_write_table_item(inner)),
                     ),
                 )
             },
             WriteSetChangeEnum::DeleteTableItem(inner) => {
-                let (ti, cti) = TableItem::from_delete_table_item(
+                let (ti, ) = TableItem::from_delete_table_item(
                     inner,
                     index,
                     transaction_version,
@@ -172,7 +171,7 @@ impl WriteSetChange {
                         address: String::default(),
                         index,
                     },
-                    WriteSetChangeDetail::Table(ti, cti, None),
+                    WriteSetChangeDetail::Table(ti, None),
                 )
             },
         }
@@ -220,7 +219,7 @@ impl WriteSetChange {
 pub enum WriteSetChangeDetail {
     Module(MoveModule),
     Resource(MoveResource),
-    Table(TableItem, CurrentTableItem, Option<TableMetadata>),
+    Table(TableItem, Option<TableMetadata>),
 }
 
 // Prevent conflicts with other things named `WriteSetChange`

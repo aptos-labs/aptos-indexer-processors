@@ -48,7 +48,6 @@ pub struct Transaction {
     pub accumulator_root_hash: String,
     pub num_events: i64,
     pub num_write_set_changes: i64,
-    pub epoch: i64,
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
@@ -71,7 +70,6 @@ pub struct TransactionQuery {
     pub num_events: i64,
     pub num_write_set_changes: i64,
     pub inserted_at: chrono::NaiveDateTime,
-    pub epoch: i64,
 }
 
 impl Transaction {
@@ -108,7 +106,6 @@ impl Transaction {
             ),
             num_events,
             num_write_set_changes: info.changes.len() as i64,
-            epoch,
         }
     }
 

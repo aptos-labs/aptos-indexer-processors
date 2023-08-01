@@ -4,25 +4,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::Transaction;
 use crate::{
-    schema::{current_table_items, table_items, table_metadatas},
+    schema::{table_items, table_metadatas},
     utils::util::{hash_str, standardize_address},
 };
 use aptos_indexer_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(table_handle, key_hash))]
-#[diesel(table_name = current_table_items)]
-pub struct CurrentTableItem {
-    pub table_handle: String,
-    pub key_hash: String,
-    pub key: String,
-    pub decoded_key: serde_json::Value,
-    pub decoded_value: Option<serde_json::Value>,
-    pub last_transaction_version: i64,
-    pub is_deleted: bool,
-}
 
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
@@ -56,7 +43,7 @@ impl TableItem {
         write_set_change_index: i64,
         transaction_version: i64,
         transaction_block_height: i64,
-    ) -> (Self, CurrentTableItem) {
+    ) -> (Self, ) {
         (
             Self {
                 transaction_version,
@@ -72,21 +59,6 @@ impl TableItem {
                     write_table_item.data.as_ref().unwrap().value.as_str(),
                 )
                 .unwrap(),
-                is_deleted: false,
-            },
-            CurrentTableItem {
-                table_handle: standardize_address(&write_table_item.handle.to_string()),
-                key_hash: hash_str(&write_table_item.key.to_string()),
-                key: write_table_item.key.to_string(),
-                decoded_key: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
-                decoded_value: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().value.as_str(),
-                )
-                .unwrap(),
-                last_transaction_version: transaction_version,
                 is_deleted: false,
             },
         )
@@ -97,7 +69,7 @@ impl TableItem {
         write_set_change_index: i64,
         transaction_version: i64,
         transaction_block_height: i64,
-    ) -> (Self, CurrentTableItem) {
+    ) -> (Self, ) {
         (
             Self {
                 transaction_version,
@@ -113,18 +85,7 @@ impl TableItem {
                 decoded_value: None,
                 is_deleted: true,
             },
-            CurrentTableItem {
-                table_handle: standardize_address(&delete_table_item.handle.to_string()),
-                key_hash: hash_str(&delete_table_item.key.to_string()),
-                key: delete_table_item.key.to_string(),
-                decoded_key: serde_json::from_str(
-                    delete_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
-                decoded_value: None,
-                last_transaction_version: transaction_version,
-                is_deleted: true,
-            },
+            
         )
     }
 }

@@ -9,5 +9,4 @@ pub mod move_tables;
 pub mod signatures;
 pub mod transactions;
 pub mod user_transactions;
-pub mod v2_objects;
 pub mod write_set_changes;
