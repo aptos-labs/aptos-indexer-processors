@@ -385,6 +385,7 @@ impl Worker {
             // chunk the transactions
             let transactions_batches_new = transactions_batches.chunks(transactions_batches.len() / 100 + 1);
             for transactions in transactions_batches_new {
+                let transactions = transactions.to_vec();
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
