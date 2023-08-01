@@ -67,14 +67,6 @@ fn insert_to_db_impl(
     ),
 ) -> Result<(), diesel::result::Error> {
     insert_transactions(conn, txns)?;
-    insert_user_transactions(conn, user_transactions)?;
-    insert_signatures(conn, signatures)?;
-    insert_block_metadata_transactions(conn, block_metadata_transactions)?;
-    insert_events(conn, events)?;
-    insert_write_set_changes(conn, wscs)?;
-    insert_move_modules(conn, move_modules)?;
-    insert_move_resources(conn, move_resources)?;
-    insert_table_items(conn, table_items)?;
     Ok(())
 }
 
