@@ -429,7 +429,7 @@ dependencies = [
 [[package]]
 name = "diesel"
 version = "2.1.0"
-source = "git+https://github.com/larry-aptos/diesel.git?rev=a61e57b617431321d60a471e8c3956056fae331b#a61e57b617431321d60a471e8c3956056fae331b"
+source = "git+https://github.com/larry-aptos/diesel.git?rev=3596edc7311667d59c99e587b9521dda519ada19#3596edc7311667d59c99e587b9521dda519ada19"
 dependencies = [
  "bigdecimal",
  "bitflags 2.3.3",
@@ -448,7 +448,7 @@ dependencies = [
 [[package]]
 name = "diesel_derives"
 version = "2.1.0"
-source = "git+https://github.com/larry-aptos/diesel.git?rev=a61e57b617431321d60a471e8c3956056fae331b#a61e57b617431321d60a471e8c3956056fae331b"
+source = "git+https://github.com/larry-aptos/diesel.git?rev=3596edc7311667d59c99e587b9521dda519ada19#3596edc7311667d59c99e587b9521dda519ada19"
 dependencies = [
  "diesel_table_macro_syntax",
  "proc-macro2",
@@ -459,7 +459,7 @@ dependencies = [
 [[package]]
 name = "diesel_migrations"
 version = "2.1.0"
-source = "git+https://github.com/larry-aptos/diesel.git?rev=a61e57b617431321d60a471e8c3956056fae331b#a61e57b617431321d60a471e8c3956056fae331b"
+source = "git+https://github.com/larry-aptos/diesel.git?rev=3596edc7311667d59c99e587b9521dda519ada19#3596edc7311667d59c99e587b9521dda519ada19"
 dependencies = [
  "diesel",
  "migrations_internals",
@@ -469,7 +469,7 @@ dependencies = [
 [[package]]
 name = "diesel_table_macro_syntax"
 version = "0.1.0"
-source = "git+https://github.com/larry-aptos/diesel.git?rev=a61e57b617431321d60a471e8c3956056fae331b#a61e57b617431321d60a471e8c3956056fae331b"
+source = "git+https://github.com/larry-aptos/diesel.git?rev=3596edc7311667d59c99e587b9521dda519ada19#3596edc7311667d59c99e587b9521dda519ada19"
 dependencies = [
  "syn 2.0.25",
 ]
@@ -1103,7 +1103,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 [[package]]
 name = "migrations_internals"
 version = "2.1.0"
-source = "git+https://github.com/larry-aptos/diesel.git?rev=a61e57b617431321d60a471e8c3956056fae331b#a61e57b617431321d60a471e8c3956056fae331b"
+source = "git+https://github.com/larry-aptos/diesel.git?rev=3596edc7311667d59c99e587b9521dda519ada19#3596edc7311667d59c99e587b9521dda519ada19"
 dependencies = [
  "serde",
  "toml",
@@ -1112,7 +1112,7 @@ dependencies = [
 [[package]]
 name = "migrations_macros"
 version = "2.1.0"
-source = "git+https://github.com/larry-aptos/diesel.git?rev=a61e57b617431321d60a471e8c3956056fae331b#a61e57b617431321d60a471e8c3956056fae331b"
+source = "git+https://github.com/larry-aptos/diesel.git?rev=3596edc7311667d59c99e587b9521dda519ada19#3596edc7311667d59c99e587b9521dda519ada19"
 dependencies = [
  "migrations_internals",
  "proc-macro2",
