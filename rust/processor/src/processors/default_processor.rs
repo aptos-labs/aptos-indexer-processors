@@ -166,9 +166,7 @@ fn insert_transactions(
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::transactions::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(version)
-                .do_nothing(),
+                .values(&items_to_insert[start_ind..end_ind]),
             None,
         )?;
     }
