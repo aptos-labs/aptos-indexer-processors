@@ -383,7 +383,7 @@ impl Worker {
             // flattern the transactions
             let transactions_batches = transactions_batches.into_iter().flatten().collect::<Vec<Transaction>>();
             // chunk the transactions
-            let transactions_batches_new = transactions_batches.chunks(transactions_batches.len() / 150 + 1);
+            let transactions_batches_new = transactions_batches.chunks(transactions_batches.len() / 300 + 1);
             for transactions in transactions_batches_new {
                 let transactions = transactions.to_vec();
                 let processor_clone = processor.clone();
