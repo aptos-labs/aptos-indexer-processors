@@ -67,19 +67,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
             processor: self.name().to_string(),
             last_success_version: version as i64,
         };
-        execute_with_better_error(
-            &mut conn,
-            diesel::insert_into(processor_status::table)
-                .values(&status)
-                .on_conflict(processor_status::processor)
-                .do_update()
-                .set((
-                    processor_status::last_success_version
-                        .eq(excluded(processor_status::last_success_version)),
-                    processor_status::last_updated.eq(excluded(processor_status::last_updated)),
-                )),
-            Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
-        )?;
+        
         Ok(())
     }
 }
