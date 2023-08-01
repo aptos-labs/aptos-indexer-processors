@@ -29,7 +29,6 @@ use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, PooledConnection},
 };
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
 use prost::Message;
 use std::sync::Arc;
@@ -38,7 +37,7 @@ use tracing::{error, info};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
 /// GRPC request metadata key for the token ID.
 const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
@@ -158,7 +157,6 @@ impl Worker {
             processor_name = processor_name,
             "[Parser] Running migrations"
         );
-        self.run_migrations();
         info!(
             processor_name = processor_name,
             "[Parser] Finished migrations"
@@ -500,14 +498,6 @@ impl Worker {
         }
     }
 
-    fn run_migrations(&self) {
-        let _ = &self
-            .db_pool
-            .get()
-            .expect("[Parser] Could not get connection for migrations")
-            .run_pending_migrations(MIGRATIONS)
-            .expect("[Parser] migrations failed!");
-    }
 
     /// Gets the start version for the processor. If not found, start from 0.
     pub fn get_start_version(&self) -> anyhow::Result<Option<u64>> {
