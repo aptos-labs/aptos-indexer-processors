@@ -978,66 +978,204 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                         )
                         current_collection_offers.append(current_collection_offer)
 
-            # TODO: Sort values by PK to avoid postgres deadlock
-            parsed_objs.extend(
-                nft_marketplace_activities
-                + current_nft_marketplace_listings
-                + current_token_offers
-                + current_collection_offers
-                + current_auctions
-            )
-
-            self.insert_to_db(parsed_objs)
+            self.insert_nft_activities(nft_marketplace_activities)
+            self.insert_nft_listings(current_nft_marketplace_listings)
+            self.insert_nft_token_offers(current_token_offers)
+            self.insert_nft_collection_offers(current_collection_offers)
+            self.insert_nft_auctions(current_auctions)
 
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,
         )
 
-    def insert_to_db(
-        self,
-        parsed_objs: List[
-            NFTMarketplaceActivities
-            | CurrentNFTMarketplaceListing
-            | CurrentNFTMarketplaceTokenOffer
-            | CurrentNFTMarketplaceCollectionOffer
-            | CurrentNFTMarketplaceAuction
-        ],
-    ) -> None:
-        # TODO: Turn this into on conflict, update, to support backfilling and multithreading
-        with Session() as session, session.begin():
-            for obj in parsed_objs:
-                session.merge(obj)
-
     def insert_nft_activities(
         self,
         activities: List[NFTMarketplaceActivities],
     ) -> None:
-        pass
+        # Sort by pk to avoid postgres deadlock since we're doing multi threaded db writes
+        activities = sorted(
+            activities, key=lambda x: (x.transaction_version, x.event_index)
+        )
+        with Session() as session, session.begin():
+            for activity in activities:
+                insert_stmt = insert(NFTMarketplaceActivities).values(
+                    transaction_version=activity.transaction_version,
+                    event_index=activity.event_index,
+                    offer_or_listing_id=activity.offer_or_listing_id,
+                    fee_schedule_id=activity.fee_schedule_id,
+                    collection_id=activity.collection_id,
+                    token_data_id=activity.token_data_id,
+                    creator_address=activity.creator_address,
+                    collection_name=activity.collection_name,
+                    token_name=activity.token_name,
+                    property_version=activity.property_version,
+                    price=activity.price,
+                    token_amount=activity.token_amount,
+                    token_standard=activity.token_standard,
+                    seller=activity.seller,
+                    buyer=activity.buyer,
+                    coin_type=activity.coin_type,
+                    marketplace=activity.marketplace,
+                    contract_address=activity.contract_address,
+                    entry_function_id_str=activity.entry_function_id_str,
+                    event_type=activity.event_type,
+                    transaction_timestamp=activity.transaction_timestamp,
+                )
+                do_update_stmt = insert_stmt.on_conflict_do_update(
+                    constraint="nft_marketplace_activities_pkey",
+                    set_=dict(insert_stmt.excluded.items()),
+                )
+                session.execute(do_update_stmt)
 
     def insert_nft_listings(
         self,
         listings: List[CurrentNFTMarketplaceListing],
     ) -> None:
-        pass
+        # Sort by pk to avoid postgres deadlock since we're doing multi threaded db writes
+        listings = sorted(listings, key=lambda x: (x.listing_id, x.token_data_id))
+        with Session() as session, session.begin():
+            for listing in listings:
+                insert_stmt = insert(CurrentNFTMarketplaceListing).values(
+                    token_data_id=listing.token_data_id,
+                    listing_id=listing.listing_id,
+                    fee_schedule_id=listing.fee_schedule_id,
+                    collection_id=listing.collection_id,
+                    price=listing.price,
+                    token_amount=listing.token_amount,
+                    token_standard=listing.token_standard,
+                    seller=listing.seller,
+                    is_deleted=listing.is_deleted,
+                    coin_type=listing.coin_type,
+                    marketplace=listing.marketplace,
+                    contract_address=listing.contract_address,
+                    entry_function_id_str=listing.entry_function_id_str,
+                    last_transaction_version=listing.last_transaction_version,
+                    last_transaction_timestamp=listing.last_transaction_timestamp,
+                )
+                # Only update if the new transaction version is greater than the current one
+                do_update_stmt = insert_stmt.on_conflict_do_update(
+                    constraint="current_nft_marketplace_listings_pkey",
+                    set_=dict(insert_stmt.excluded.items()),
+                    where=(
+                        insert_stmt.excluded["last_transaction_version"]
+                        > CurrentNFTMarketplaceListing.last_transaction_version
+                    ),
+                )
+                session.execute(do_update_stmt)
 
     def insert_nft_token_offers(
         self,
         offers: List[CurrentNFTMarketplaceTokenOffer],
     ) -> None:
-        pass
+        # Sort by pk to avoid postgres deadlock since we're doing multi threaded db writes
+        offers = sorted(offers, key=lambda x: (x.offer_id, x.token_data_id))
+        with Session() as session, session.begin():
+            for offer in offers:
+                insert_stmt = insert(CurrentNFTMarketplaceTokenOffer).values(
+                    offer_id=offer.offer_id,
+                    token_data_id=offer.token_data_id,
+                    collection_id=offer.collection_id,
+                    fee_schedule_id=offer.fee_schedule_id,
+                    buyer=offer.buyer,
+                    price=offer.price,
+                    token_amount=offer.token_amount,
+                    expiration_time=offer.expiration_time,
+                    is_deleted=offer.is_deleted,
+                    token_standard=offer.token_standard,
+                    coin_type=offer.coin_type,
+                    marketplace=offer.marketplace,
+                    contract_address=offer.contract_address,
+                    entry_function_id_str=offer.entry_function_id_str,
+                    last_transaction_version=offer.last_transaction_version,
+                    last_transaction_timestamp=offer.last_transaction_timestamp,
+                )
+                # Only update if the new transaction version is greater than the current one
+                do_update_stmt = insert_stmt.on_conflict_do_update(
+                    constraint="current_nft_marketplace_token_offers_pkey",
+                    set_=dict(insert_stmt.excluded.items()),
+                    where=(
+                        insert_stmt.excluded["last_transaction_version"]
+                        > CurrentNFTMarketplaceTokenOffer.last_transaction_version
+                    ),
+                )
+                session.execute(do_update_stmt)
 
     def insert_nft_collection_offers(
         self,
         offers: List[CurrentNFTMarketplaceCollectionOffer],
     ) -> None:
-        pass
+        # Sort by pk to avoid postgres deadlock since we're doing multi threaded db writes
+        offers = sorted(offers, key=lambda x: (x.collection_offer_id, x.collection_id))
+        with Session() as session, session.begin():
+            for offer in offers:
+                insert_stmt = insert(CurrentNFTMarketplaceCollectionOffer).values(
+                    collection_offer_id=offer.collection_offer_id,
+                    collection_id=offer.collection_id,
+                    fee_schedule_id=offer.fee_schedule_id,
+                    buyer=offer.buyer,
+                    item_price=offer.item_price,
+                    remaining_token_amount=offer.remaining_token_amount,
+                    expiration_time=offer.expiration_time,
+                    is_deleted=offer.is_deleted,
+                    token_standard=offer.token_standard,
+                    coin_type=offer.coin_type,
+                    marketplace=offer.marketplace,
+                    contract_address=offer.contract_address,
+                    entry_function_id_str=offer.entry_function_id_str,
+                    last_transaction_version=offer.last_transaction_version,
+                    last_transaction_timestamp=offer.last_transaction_timestamp,
+                )
+                # Only update if the new transaction version is greater than the current one
+                do_update_stmt = insert_stmt.on_conflict_do_update(
+                    constraint="current_nft_marketplace_collection_offers_pkey",
+                    set_=dict(insert_stmt.excluded.items()),
+                    where=(
+                        insert_stmt.excluded["last_transaction_version"]
+                        > CurrentNFTMarketplaceCollectionOffer.last_transaction_version
+                    ),
+                )
+                session.execute(do_update_stmt)
 
     def insert_nft_auctions(
         self,
         auctions: List[CurrentNFTMarketplaceAuction],
     ) -> None:
-        pass
+        # Sort by pk to avoid postgres deadlock since we're doing multi threaded db writes
+        auctions = sorted(auctions, key=lambda x: (x.listing_id, x.token_data_id))
+        with Session() as session, session.begin():
+            for auction in auctions:
+                insert_stmt = insert(CurrentNFTMarketplaceAuction).values(
+                    listing_id=auction.listing_id,
+                    token_data_id=auction.token_data_id,
+                    collection_id=auction.collection_id,
+                    fee_schedule_id=auction.fee_schedule_id,
+                    seller=auction.seller,
+                    current_bid_price=auction.current_bid_price,
+                    current_bidder=auction.current_bidder,
+                    starting_bid_price=auction.starting_bid_price,
+                    buy_it_now_price=auction.buy_it_now_price,
+                    token_amount=auction.token_amount,
+                    expiration_time=auction.expiration_time,
+                    is_deleted=auction.is_deleted,
+                    token_standard=auction.token_standard,
+                    coin_type=auction.coin_type,
+                    marketplace=auction.marketplace,
+                    contract_address=auction.contract_address,
+                    entry_function_id_str=auction.entry_function_id_str,
+                    last_transaction_version=auction.last_transaction_version,
+                    last_transaction_timestamp=auction.last_transaction_timestamp,
+                )
+                # Only update if the new transaction version is greater than the current one
+                do_update_stmt = insert_stmt.on_conflict_do_update(
+                    constraint="current_nft_marketplace_auctions_pkey",
+                    set_=dict(insert_stmt.excluded.items()),
+                    where=(
+                        insert_stmt.excluded["last_transaction_version"]
+                        > CurrentNFTMarketplaceAuction.last_transaction_version
+                    ),
+                )
+                session.execute(do_update_stmt)
 
 
 if __name__ == "__main__":
