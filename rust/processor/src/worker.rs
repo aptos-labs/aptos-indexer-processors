@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery, default_models::transactions},
     processors::{
         default_processor::DefaultTransactionProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
@@ -380,7 +380,11 @@ impl Worker {
 
             // Process the transactions in parallel
             let mut tasks = vec![];
-            for transactions in transactions_batches {
+            // flattern the transactions
+            let transactions_batches = transactions_batches.into_iter().flatten().collect::<Vec<Transaction>>();
+            // chunk the transactions
+            let transactions_batches_new = transactions_batches.chunks(transactions_batches.len() / 100 + 1);
+            for transactions in transactions_batches_new {
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
