@@ -88,9 +88,19 @@ impl CurrentAnsLookup {
                 .expect("Txn Data doesn't exit!");
             if let TxnData::User(user_txn) = txn_data {
                 for event in &user_txn.events {
-                    let (event_addr, event_type) = if let Content::Struct(inner) =
-                        event.r#type.as_ref().unwrap().content.as_ref().unwrap()
-                    {
+                    let (event_addr, event_type) = if let Content::Struct(inner) = event
+                        .r#type
+                        .as_ref()
+                        .unwrap_or_else(|| {
+                            tracing::error!(version = transaction.version);
+                            panic!("Event type is None!")
+                        })
+                        .content
+                        .as_ref()
+                        .unwrap_or_else(|| {
+                            tracing::error!(version = transaction.version);
+                            panic!("Content is None!")
+                        }) {
                         (
                             inner.address.to_string(),
                             format!("{}::{}", inner.module, inner.name),
