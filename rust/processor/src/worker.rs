@@ -159,15 +159,15 @@ impl Worker {
         );
 
         let indexer_grpc_data_service_address = self.indexer_grpc_data_service_address.clone();
-        let indexer_grpc_http2_ping_interval = self.indexer_grpc_http2_ping_interval.clone();
-        let indexer_grpc_http2_ping_timeout = self.indexer_grpc_http2_ping_timeout.clone();
+        let indexer_grpc_http2_ping_interval = self.indexer_grpc_http2_ping_interval;
+        let indexer_grpc_http2_ping_timeout = self.indexer_grpc_http2_ping_timeout;
         let count = self
             .ending_version
             .map(|v| (v as i64 - starting_version as i64 + 1) as u64);
         let mut resp_stream = get_stream(
-            indexer_grpc_data_service_address.clone(),
-            indexer_grpc_http2_ping_interval.clone(),
-            indexer_grpc_http2_ping_timeout.clone(),
+            indexer_grpc_data_service_address,
+            indexer_grpc_http2_ping_interval,
+            indexer_grpc_http2_ping_timeout,
             starting_version,
             count,
             self.auth_token.clone(),
@@ -252,7 +252,7 @@ impl Worker {
                             Err(e) => {
                                 error!(
                                     processor_name = processor_name,
-                                    stream_address = indexer_grpc_data_service_address,
+                                    stream_address = indexer_grpc_data_service_address.clone(),
                                     error = ?e,
                                     "[Parser] Error sending datastream response to channel."
                                 );
@@ -276,7 +276,7 @@ impl Worker {
                     Err(rpc_error) => {
                         tracing::warn!(
                             processor_name = processor_name,
-                            stream_address = indexer_grpc_data_service_address,
+                            stream_address = indexer_grpc_data_service_address.clone(),
                             error = ?rpc_error,
                             "[Parser] Error receiving datastream response."
                         );
@@ -285,7 +285,7 @@ impl Worker {
                             if elapsed < MIN_SEC_BETWEEN_GRPC_RECONNECTS {
                                 error!(
                                     processor_name = processor_name,
-                                    stream_address = indexer_grpc_data_service_address,
+                                    stream_address = indexer_grpc_data_service_address.clone(),
                                     seconds_since_last_retry = elapsed,
                                     "[Parser] Recently reconnected. Will not retry.",
                                 );
@@ -299,7 +299,7 @@ impl Worker {
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         tracing::warn!(
                             processor_name = processor_name,
-                            stream_address = indexer_grpc_data_service_address,
+                            stream_address = indexer_grpc_data_service_address.clone(),
                             starting_version = next_version_to_fetch,
                             ending_version = ending_version,
                             count = num_versions,
@@ -307,8 +307,8 @@ impl Worker {
                         );
                         resp_stream = get_stream(
                             indexer_grpc_data_service_address.clone(),
-                            indexer_grpc_http2_ping_interval.clone(),
-                            indexer_grpc_http2_ping_timeout.clone(),
+                            indexer_grpc_http2_ping_interval,
+                            indexer_grpc_http2_ping_timeout,
                             next_version_to_fetch,
                             num_versions,
                             auth_token.clone(),
@@ -350,7 +350,8 @@ impl Worker {
                             if chain_id != existing_id {
                                 error!(
                                     processor_name = processor_name,
-                                    stream_address = self.indexer_grpc_data_service_address.clone(),
+                                    stream_address =
+                                        self.indexer_grpc_data_service_address.as_str(),
                                     chain_id = chain_id,
                                     existing_id = existing_id,
                                     "[Parser] Stream somehow changed chain id!",
@@ -389,7 +390,7 @@ impl Worker {
                     Err(TryRecvError::Disconnected) => {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.clone(),
+                            stream_address = self.indexer_grpc_data_service_address.as_str(),
                             "[Parser] Channel closed; stream ended."
                         );
                         panic!("[Parser] Channel closed");
