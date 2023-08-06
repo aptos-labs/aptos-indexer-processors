@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 
 class Config(BaseSettings):
+    processor_name: str
     grpc_data_stream_endpoint: str
     grpc_data_stream_api_key: str
     db_connection_uri: str
@@ -18,7 +19,7 @@ class Config(BaseSettings):
     # HTTP2 ping timeout in seconds to detect if the connection is still alive
     indexer_grpc_http2_ping_timeout_in_secs: int
     starting_version_default: Optional[int] = None
-    starting_version_override: Optional[int] = None
+    starting_version_backfill: Optional[int] = None
     ending_version: Optional[int] = None
     # Custom config variables for each processor
     custom_config: Optional[Dict[str, Any]] = None
@@ -60,10 +61,10 @@ class Config(BaseSettings):
 
         # By default, if nothing is set, start from 0
         starting_version = 0
-        if self.starting_version_override != None:
-            # Start from config's starting_version_override if set
-            print("[Config] Starting from starting_version_override")
-            starting_version = self.starting_version_override
+        if self.starting_version_backfill != None:
+            # Start from config's starting_version_backfill if set
+            print("[Config] Starting from starting_version_backfill")
+            starting_version = self.starting_version_backfill
         elif next_version_to_process != None:
             # Start from next version to process in db
             print("[Config] Starting from version from db")

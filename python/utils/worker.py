@@ -21,7 +21,10 @@ import sys
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from time import perf_counter
 import traceback
-
+from utils.processor_name import ProcessorName
+from processors.example_event_processor.processor import ExampleEventProcessor
+from processors.nft_orderbooks.nft_marketplace_processor import NFTMarketplaceProcesser
+from processors.nft_marketplace_v2.processor import NFTMarketplaceV2Processor
 
 INDEXER_GRPC_BLOB_STORAGE_SIZE = 1000
 
@@ -30,22 +33,24 @@ class IndexerProcessorServer:
     config: Config
     num_concurrent_processing_tasks: int
 
-    def __init__(self, processor: TransactionsProcessor):
+    def __init__(self, config: Config, perf_transactions: str | None = None):
         print("[Parser] Kicking off")
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument("-c", "--config", help="Path to config file", required=True)
-        parser.add_argument(
-            "-p",
-            "--perf",
-            help="Show perf metrics for processing X transactions",
-            required=False,
-        )
-        args = parser.parse_args()
-        self.config = Config.from_yaml_file(args.config)
-        self.perf_transactions = args.perf
-        self.processor = processor
-        processor.config = self.config
+        self.config = config
+        self.perf_transactions = perf_transactions
+
+        # Instantiate the correct processor based on config
+        match self.config.processor_name:
+            case ProcessorName.EXAMPLE_EVENT_PROCESSOR.value:
+                self.processor = ExampleEventProcessor()
+            case ProcessorName.NFT_MARKETPLACE_V1_PROCESSOR.value:
+                self.processor = NFTMarketplaceProcesser()
+            case ProcessorName.NFT_MARKETPLACE_V2_PROCESSOR.value:
+                self.processor = NFTMarketplaceV2Processor()
+            case _:
+                raise Exception("Invalid processor name")
+
+        self.processor.config = self.config
 
         # TODO: Move this to a config
         self.num_concurrent_processing_tasks = 10

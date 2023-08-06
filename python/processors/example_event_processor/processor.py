@@ -1,18 +1,17 @@
 from aptos.transaction.v1 import transaction_pb2
 from processors.example_event_processor.models import Event
 from typing import List
-from utils.worker import IndexerProcessorServer
 
 from utils import general_utils
 from utils.transactions_processor import TransactionsProcessor
-from utils.models.general_models import NextVersionToProcess, Base
 from utils.models.schema_names import EXAMPLE
 from utils.session import Session
+from utils.processor_name import ProcessorName
 
 
 class ExampleEventProcessor(TransactionsProcessor):
     def name(self) -> str:
-        return "python-example-event-processor"
+        return ProcessorName.EXAMPLE_EVENT_PROCESSOR.value
 
     def schema(self) -> str:
         return EXAMPLE
@@ -69,11 +68,3 @@ class ExampleEventProcessor(TransactionsProcessor):
         with Session() as session, session.begin():
             for obj in parsed_objs:
                 session.merge(obj)
-
-
-if __name__ == "__main__":
-    example_event_processor = ExampleEventProcessor()
-    indexer_server = IndexerProcessorServer(
-        processor=example_event_processor,
-    )
-    indexer_server.run()

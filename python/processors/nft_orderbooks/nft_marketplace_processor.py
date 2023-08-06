@@ -30,16 +30,16 @@ from processors.nft_orderbooks.models.nft_marketplace_listings_models import (
 from processors.nft_orderbooks.nft_orderbooks_parser_utils import MarketplaceName
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
-from utils.worker import IndexerProcessorServer
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from utils import event_utils, general_utils, transaction_utils, write_set_change_utils
 from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 from utils.session import Session
+from utils.processor_name import ProcessorName
 
 
 class NFTMarketplaceProcesser(TransactionsProcessor):
     def name(self) -> str:
-        return "nft-marketplace-processor"
+        return ProcessorName.NFT_MARKETPLACE_V1_PROCESSOR.value
 
     def schema(self) -> str:
         return NFT_MARKETPLACE_SCHEMA_NAME
@@ -158,11 +158,3 @@ class NFTMarketplaceProcesser(TransactionsProcessor):
             # TODO: Turn this into on conflict, update, to support backfilling
             for obj in parsed_objs:
                 session.merge(obj)
-
-
-if __name__ == "__main__":
-    transactions_processor = NFTMarketplaceProcesser()
-    indexer_server = IndexerProcessorServer(
-        processor=transactions_processor,
-    )
-    indexer_server.run()

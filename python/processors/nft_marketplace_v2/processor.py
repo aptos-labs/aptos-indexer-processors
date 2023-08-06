@@ -49,16 +49,17 @@ from processors.nft_orderbooks.nft_marketplace_enums import (
     StandardMarketplaceEventType,
     MarketplaceName,
 )
+from utils.processor_name import ProcessorName
 from utils.token_utils import TokenStandard
 from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
 from utils.session import Session
-from utils.worker import IndexerProcessorServer
 from sqlalchemy.dialects.postgresql import insert
+from utils.config import Config
 
 
 class NFTMarketplaceV2Processor(TransactionsProcessor):
     def name(self) -> str:
-        return "nft-marketplace-v2"
+        return ProcessorName.NFT_MARKETPLACE_V2_PROCESSOR.value
 
     def schema(self) -> str:
         return NFT_MARKETPLACE_V2_SCHEMA_NAME
@@ -1208,11 +1209,3 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                 ),
             )
             session.execute(do_update_stmt)
-
-
-if __name__ == "__main__":
-    processor = NFTMarketplaceV2Processor()
-    indexer_server = IndexerProcessorServer(
-        processor=processor,
-    )
-    indexer_server.run()
