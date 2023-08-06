@@ -161,15 +161,12 @@ impl Worker {
         let indexer_grpc_data_service_address = self.indexer_grpc_data_service_address.clone();
         let indexer_grpc_http2_ping_interval = self.indexer_grpc_http2_ping_interval;
         let indexer_grpc_http2_ping_timeout = self.indexer_grpc_http2_ping_timeout;
-        let count = self
-            .ending_version
-            .map(|v| (v as i64 - starting_version as i64 + 1) as u64);
         let mut resp_stream = get_stream(
             indexer_grpc_data_service_address,
             indexer_grpc_http2_ping_interval,
             indexer_grpc_http2_ping_timeout,
             starting_version,
-            count,
+            self.ending_version,
             self.auth_token.clone(),
             self.processor_name.clone(),
         )
@@ -181,7 +178,6 @@ impl Worker {
             stream_address = self.indexer_grpc_data_service_address.clone(),
             starting_version = starting_version,
             ending_version = self.ending_version,
-            count = count,
             concurrent_tasks = concurrent_tasks,
             "[Parser] Successfully connected to GRPC endpoint. Now instantiating processor",
         );
@@ -293,16 +289,12 @@ impl Worker {
                             }
                         }
                         last_reconnection_time = Some(std::time::Instant::now());
-                        let num_versions = ending_version
-                            .map(|v| (v as i64 - next_version_to_fetch as i64 + 1) as u64);
-                        // Reconnecting after sleeping for a bit
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        // Reconnecting
                         tracing::warn!(
                             processor_name = processor_name,
                             stream_address = indexer_grpc_data_service_address.clone(),
                             starting_version = next_version_to_fetch,
                             ending_version = ending_version,
-                            count = num_versions,
                             "[Parser] Reconnecting to GRPC."
                         );
                         resp_stream = get_stream(
@@ -310,7 +302,7 @@ impl Worker {
                             indexer_grpc_http2_ping_interval,
                             indexer_grpc_http2_ping_timeout,
                             next_version_to_fetch,
-                            num_versions,
+                            ending_version,
                             auth_token.clone(),
                             processor_name.to_string(),
                         )
@@ -602,7 +594,7 @@ pub async fn get_stream(
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
     starting_version: u64,
-    count: Option<u64>,
+    ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
 ) -> Streaming<TransactionsResponse> {
@@ -613,7 +605,11 @@ pub async fn get_stream(
     .expect("[Parser] Endpoint is not a valid URI")
     .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
     .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
-
+    info!(
+        processor_name = processor_name,
+        stream_address = indexer_grpc_data_service_address,
+        "[Parser] Setting up rpc client"
+    );
     let mut rpc_client = match RawDataClient::connect(channel).await {
         Ok(client) => client
             .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
@@ -630,9 +626,15 @@ pub async fn get_stream(
             panic!();
         },
     };
-
+    let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
+    info!(
+        processor_name = processor_name,
+        stream_address = indexer_grpc_data_service_address,
+        starting_version = starting_version,
+        ending_version = ending_version,
+        count = ?count,
+        "[Parser] Setting up stream");
     let request = grpc_request_builder(starting_version, count, auth_token, processor_name);
-
     rpc_client
         .get_transactions(request)
         .await
