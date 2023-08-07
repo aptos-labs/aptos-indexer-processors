@@ -402,7 +402,11 @@ fn insert_fungible_asset_balances(
             diesel::insert_into(schema::fungible_asset_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    is_frozen.eq(excluded(is_frozen)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }

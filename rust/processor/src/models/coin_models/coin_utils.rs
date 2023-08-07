@@ -100,6 +100,7 @@ pub struct CoinStoreResource {
     pub coin: Coin,
     pub deposit_events: DepositEventResource,
     pub withdraw_events: WithdrawEventResource,
+    pub frozen: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
