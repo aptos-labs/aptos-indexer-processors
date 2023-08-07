@@ -36,7 +36,6 @@ pub struct TokenTransactionProcessor {
 
 impl TokenTransactionProcessor {
     pub fn new(connection_pool: PgDbPool, nft_points_contract: Option<String>) -> Self {
-        tracing::info!("init TokenTransactionProcessor");
         Self {
             connection_pool,
             nft_points_contract,
