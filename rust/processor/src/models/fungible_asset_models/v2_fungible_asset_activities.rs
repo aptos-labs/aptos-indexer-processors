@@ -10,7 +10,13 @@ use super::{
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
-    models::{token_models::v2_token_utils::TokenStandard, coin_models::{coin_utils::{CoinEvent, EventGuidResource, CoinInfoType}, coin_activities::CoinActivity}},
+    models::{
+        coin_models::{
+            coin_activities::CoinActivity,
+            coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
+        },
+        token_models::v2_token_utils::TokenStandard,
+    },
     schema::fungible_asset_activities,
     utils::{database::PgPoolConnection, util::standardize_address},
 };

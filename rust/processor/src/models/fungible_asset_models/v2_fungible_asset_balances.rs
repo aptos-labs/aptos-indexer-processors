@@ -11,7 +11,10 @@ use super::{
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
-    models::{token_models::v2_token_utils::TokenStandard, coin_models::coin_utils::{CoinResource, CoinInfoType}},
+    models::{
+        coin_models::coin_utils::{CoinInfoType, CoinResource},
+        token_models::v2_token_utils::TokenStandard,
+    },
     schema::{current_fungible_asset_balances, fungible_asset_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
