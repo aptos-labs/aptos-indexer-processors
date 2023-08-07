@@ -5,11 +5,9 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{
-    coin_utils::{CoinInfoType, CoinResource},
-    v2_fungible_asset_activities::EventToCoinType,
-};
+use super::coin_utils::{CoinInfoType, CoinResource};
 use crate::{
+    models::fungible_asset_models::v2_fungible_asset_activities::EventToCoinType,
     schema::{coin_balances, current_coin_balances},
     utils::util::standardize_address,
 };

@@ -3,13 +3,15 @@
 
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
-    models::coin_models::{
-        account_transactions::AccountTransaction,
-        coin_activities::CoinActivity,
-        coin_balances::{CoinBalance, CurrentCoinBalance},
-        coin_infos::CoinInfo,
-        coin_supply::CoinSupply,
-        v2_fungible_asset_activities::CurrentCoinBalancePK,
+    models::{
+        coin_models::{
+            account_transactions::AccountTransaction,
+            coin_activities::CoinActivity,
+            coin_balances::{CoinBalance, CurrentCoinBalance},
+            coin_infos::CoinInfo,
+            coin_supply::CoinSupply,
+        },
+        fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
     schema,
     utils::database::{

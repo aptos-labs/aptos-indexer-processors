@@ -10,13 +10,15 @@ use super::{
     coin_infos::CoinInfo,
     coin_supply::CoinSupply,
     coin_utils::{CoinEvent, EventGuidResource},
-    v2_fungible_asset_activities::{
-        CoinType, CurrentCoinBalancePK, EventToCoinType, BURN_GAS_EVENT_CREATION_NUM,
-        BURN_GAS_EVENT_INDEX, GAS_FEE_EVENT,
-    },
 };
 use crate::{
-    models::default_models::signatures::Signature,
+    models::{
+        default_models::signatures::Signature,
+        fungible_asset_models::v2_fungible_asset_activities::{
+            CoinType, CurrentCoinBalancePK, EventToCoinType, BURN_GAS_EVENT_CREATION_NUM,
+            BURN_GAS_EVENT_INDEX, GAS_FEE_EVENT,
+        },
+    },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
     utils::util::{get_entry_function_from_user_request, standardize_address},
