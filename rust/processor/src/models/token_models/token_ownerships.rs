@@ -110,9 +110,7 @@ impl TokenOwnership {
                 Some(tm.get_owner_address()),
                 Some(tm.table_type.clone()),
             ),
-            None => {
-                (None, None, None)
-            },
+            None => (None, None, None),
         };
 
         Ok(Some((
