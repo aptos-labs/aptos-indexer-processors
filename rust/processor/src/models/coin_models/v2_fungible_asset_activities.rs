@@ -84,7 +84,6 @@ impl FungibleAssetActivity {
                     &asset_type,
                     fungible_asset_metadata,
                 ) {
-                    tracing::info!(event_type = event_type, "blablalbla");
                     return Ok(None);
                 }
 
