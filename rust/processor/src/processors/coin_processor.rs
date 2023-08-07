@@ -281,6 +281,7 @@ impl ProcessorTrait for CoinTransactionProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
+        _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
 

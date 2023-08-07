@@ -18,6 +18,7 @@ pub const NAME: &str = "nft_metadata_processor";
 pub struct NFTMetadataProcessor {
     connection_pool: PgDbPool,
     pubsub_topic_name: String,
+    chain_id: u8,
 }
 
 impl NFTMetadataProcessor {
@@ -26,7 +27,12 @@ impl NFTMetadataProcessor {
         Self {
             connection_pool,
             pubsub_topic_name,
+            chain_id: 0,
         }
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: u8) {
+        self.chain_id = chain_id;
     }
 }
 
@@ -52,6 +58,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
+        db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         // Initialize pubsub client
         let config = ClientConfig::default().with_auth().await?;
@@ -64,11 +71,12 @@ impl ProcessorTrait for NFTMetadataProcessor {
             publisher
                 .publish(PubsubMessage {
                     data: format!(
-                        "{},{},{},{},false",
+                        "{},{},{},{},{},false",
                         token_data.token_data_id,
                         token_data.token_uri,
                         token_data.last_transaction_version,
-                        token_data.last_transaction_timestamp
+                        token_data.last_transaction_timestamp,
+                        db_chain_id.expect("db_chain_id must not be null"),
                     )
                     .into(),
                     ..Default::default()

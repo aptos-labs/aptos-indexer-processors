@@ -435,8 +435,9 @@ impl Worker {
                     PROCESSOR_INVOCATIONS_COUNT
                         .with_label_values(&[processor_name])
                         .inc();
+
                     let processed_result = processor_clone
-                        .process_transactions(transactions, start_version, end_version)
+                        .process_transactions(transactions, start_version, end_version, db_chain_id) // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
