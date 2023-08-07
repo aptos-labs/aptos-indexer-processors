@@ -1420,6 +1420,7 @@ fn parse_v2_token(
                                 wsc_index,
                                 txn_timestamp,
                                 &token_v2_metadata_helper,
+                                conn,
                             )
                             .unwrap()
                         {
