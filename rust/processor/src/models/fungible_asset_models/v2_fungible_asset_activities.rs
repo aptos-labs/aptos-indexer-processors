@@ -6,13 +6,11 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    coin_activities::CoinActivity,
-    coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
     v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, FungibleAssetEvent},
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
-    models::token_models::v2_token_utils::TokenStandard,
+    models::{token_models::v2_token_utils::TokenStandard, coin_models::{coin_utils::{CoinEvent, EventGuidResource, CoinInfoType}, coin_activities::CoinActivity}},
     schema::fungible_asset_activities,
     utils::{database::PgPoolConnection, util::standardize_address},
 };

@@ -4,7 +4,7 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::{
-        coin_models::{
+        fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             v2_fungible_asset_balances::{
                 CurrentFungibleAssetBalance, CurrentFungibleAssetMapping, FungibleAssetBalance,

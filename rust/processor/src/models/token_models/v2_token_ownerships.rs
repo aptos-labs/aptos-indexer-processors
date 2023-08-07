@@ -16,8 +16,8 @@ use super::{
 };
 use crate::{
     models::{
-        coin_models::v2_fungible_asset_utils::V2FungibleAssetResource,
         default_models::move_resources::MoveResource,
+        fungible_asset_models::v2_fungible_asset_utils::V2FungibleAssetResource,
     },
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     utils::{

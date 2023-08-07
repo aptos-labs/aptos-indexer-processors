@@ -11,7 +11,7 @@ use super::{
     v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
 };
 use crate::{
-    models::coin_models::v2_fungible_asset_utils::FungibleAssetEvent,
+    models::fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
     schema::token_activities_v2,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
