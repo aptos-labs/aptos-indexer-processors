@@ -574,19 +574,3 @@ mod tests {
         assert_eq!(d.default_properties, Value::Object(serde_json::Map::new()));
     }
 }
-
-// #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Clone, Copy)]
-// pub struct AccountAddress([u8; 32]);
-
-// impl FromStr for AccountAddress {
-//     type Err = AccountAddressParseError;
-
-//     fn from_str(s: &str) -> Result<Self, AccountAddressParseError> {
-//         // Accept 0xADDRESS or ADDRESS
-//         if let Ok(address) = AccountAddress::from_hex_literal(s) {
-//             Ok(address)
-//         } else {
-//             Self::from_hex(s)
-//         }
-//     }
-// }

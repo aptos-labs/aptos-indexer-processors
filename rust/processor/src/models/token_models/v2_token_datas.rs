@@ -234,7 +234,8 @@ impl TokenDataV2 {
 
     /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
     /// and if we can't find after 3 times, we'll assume that it's not a token.
-    /// TODO: An improvement is that we'll make another query to see if address is a coin.
+    /// TODO: An improvement is to combine this with is_address_coin. To do this well we need
+    /// a k-v store
     pub fn is_address_token(conn: &mut PgPoolConnection, address: &str) -> bool {
         let mut retried = 0;
         while retried < QUERY_RETRIES {

@@ -6,8 +6,8 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    coin_activities::EventToCoinType,
     coin_utils::{CoinInfoType, CoinResource},
+    v2_fungible_asset_activities::EventToCoinType,
 };
 use crate::{
     schema::{coin_balances, current_coin_balances},
