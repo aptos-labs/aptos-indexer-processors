@@ -758,6 +758,7 @@ fn parse_v2_coin(
                         txn_version,
                         txn_timestamp,
                         &fungible_asset_object_helper,
+                        conn,
                     )
                     .unwrap_or_else(|e| {
                         tracing::error!(

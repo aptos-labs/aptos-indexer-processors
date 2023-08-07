@@ -9,11 +9,12 @@ use super::{
     coin_utils::{CoinInfoType, CoinResource},
     v2_fungible_asset_activities::EventToCoinType,
     v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, FungibleAssetStore},
+    v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
     models::token_models::v2_token_utils::TokenStandard,
     schema::{current_fungible_asset_balances, fungible_asset_balances},
-    utils::util::standardize_address,
+    utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_indexer_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
@@ -68,6 +69,7 @@ impl FungibleAssetBalance {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        conn: &mut PgPoolConnection,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
         {
@@ -77,6 +79,14 @@ impl FungibleAssetBalance {
                 let object = &store_metadata.object.object_core;
                 let owner_address = object.get_owner_address();
                 let asset_type = inner.metadata.get_reference_address();
+                // If it's a fungible token, return early
+                if !FungibleAssetMetadataModel::is_address_fungible_asset(
+                    conn,
+                    &asset_type,
+                    fungible_asset_metadata,
+                ) {
+                    return Ok(None);
+                }
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);
 
                 let coin_balance = Self {
