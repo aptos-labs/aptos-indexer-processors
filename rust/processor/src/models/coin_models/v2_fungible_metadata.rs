@@ -133,11 +133,27 @@ impl FungibleAssetMetadataModel {
         }
     }
 
+    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
+    /// 1. If metadata is present without token object, then it's not a token
+    /// 2. If metadata is not present, we will do a lookup in the db. If it's not there, it's a token
+    pub fn is_address_fungible_asset(
+        conn: &mut PgPoolConnection,
+        address: &str,
+        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+    ) -> bool {
+        if let Some(metadata) = fungible_asset_metadata.get(address) {
+            metadata.token.is_none()
+        } else {
+            // Look up in the db
+            Self::query_is_address_fungible_asset(conn, address)
+        }
+    }
+
     /// Try to see if an address is a fungible asset (not a token). We'll try a few times in case there is a race condition,
     /// and if we can't find after 3 times, we'll assume that it's not a fungible asset.
     /// TODO: An improvement is to combine this with is_address_token. To do this well we need
     /// a k-v store
-    pub fn is_address_fungible_asset(conn: &mut PgPoolConnection, address: &str) -> bool {
+    fn query_is_address_fungible_asset(conn: &mut PgPoolConnection, address: &str) -> bool {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
@@ -154,7 +170,7 @@ impl FungibleAssetMetadataModel {
     /// TODO: Change this to a KV store
     fn get_by_asset_type(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<String> {
         let mut res: Vec<Option<AssetTypeFromTable>> =
-            sql_query("SELECT asset_type FROM v2_fungible_metadata WHERE asset_type = $1")
+            sql_query("SELECT asset_type FROM fungible_asset_metadata WHERE asset_type = $1")
                 .bind::<Text, _>(address)
                 .get_results(conn)?;
         Ok(res

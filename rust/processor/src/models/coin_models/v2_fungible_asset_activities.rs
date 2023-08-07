@@ -77,22 +77,14 @@ impl FungibleAssetActivity {
             if let Some(metadata) = fungible_asset_metadata.get(&storage_id) {
                 let object_core = &metadata.object.object_core;
                 let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
-                let maybe_fungible_asset_type = fungible_asset.metadata.get_reference_address();
-                // A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
-                // 1. If metadata is present without token object, then it's not a token
-                // 2. If metadata is not present, we will do a lookup in the db. If it's not there, it's a token
-                let is_fa = if let Some(metadata) =
-                    fungible_asset_metadata.get(&maybe_fungible_asset_type)
-                {
-                    metadata.token.is_none()
-                } else {
-                    // Look up in the db
-                    FungibleAssetMetadataModel::is_address_fungible_asset(
-                        conn,
-                        &maybe_fungible_asset_type,
-                    )
-                };
-                if !is_fa {
+                let asset_type = fungible_asset.metadata.get_reference_address();
+                // If it's a fungible token, return early
+                if !FungibleAssetMetadataModel::is_address_fungible_asset(
+                    conn,
+                    &asset_type,
+                    fungible_asset_metadata,
+                ) {
+                    tracing::info!(event_type = event_type, "blablalbla");
                     return Ok(None);
                 }
 
@@ -107,7 +99,7 @@ impl FungibleAssetActivity {
                     event_index,
                     owner_address: object_core.get_owner_address(),
                     storage_id: storage_id.clone(),
-                    asset_type: maybe_fungible_asset_type.clone(),
+                    asset_type: asset_type.clone(),
                     is_frozen,
                     amount,
                     type_: event_type.clone(),
