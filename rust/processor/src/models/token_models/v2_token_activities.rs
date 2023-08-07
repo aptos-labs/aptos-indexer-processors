@@ -87,15 +87,10 @@ impl TokenActivityV2 {
             if let Some(metadata) = token_v2_metadata.get(&event_account_address) {
                 let object_core = &metadata.object.object_core;
                 let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
-                let maybe_token_data_id = fungible_asset.metadata.get_reference_address();
-                // Now we try to see if the fungible asset is actually a token. If it's not token, return early
-                let is_token = if let Some(metadata) = token_v2_metadata.get(&maybe_token_data_id) {
-                    metadata.token.is_some()
-                } else {
-                    // Look up in the db
-                    TokenDataV2::is_address_token(conn, &maybe_token_data_id)
-                };
-                if !is_token {
+                let token_data_id = fungible_asset.metadata.get_reference_address();
+                // Exit early if it's not a token
+                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
+                {
                     return Ok(None);
                 }
 
@@ -121,7 +116,7 @@ impl TokenActivityV2 {
                     transaction_version: txn_version,
                     event_index,
                     event_account_address,
-                    token_data_id: maybe_token_data_id.clone(),
+                    token_data_id: token_data_id.clone(),
                     property_version_v1: BigDecimal::zero(),
                     type_: event_type.to_string(),
                     from_address: token_activity_helper.from_address,
