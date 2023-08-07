@@ -4,6 +4,7 @@
 use crate::{
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
+        ans_processor::AnsTransactionProcessor,
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
@@ -208,9 +209,6 @@ impl Worker {
             },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
-                self.ans_address.clone(),
-                self.ans_primary_names_table_handle.clone(),
-                self.ans_name_records_table_handle.clone(),
                 self.nft_points_contract.clone(),
             )),
             Processor::TokenV2Processor => {
@@ -232,6 +230,11 @@ impl Worker {
                     pubsub_topic_name,
                 ))
             },
+            Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
+                self.db_pool.clone(),
+                self.ans_primary_names_table_handle.clone(),
+                self.ans_name_records_table_handle.clone(),
+            )),
         };
         let processor_name = processor.name();
 
