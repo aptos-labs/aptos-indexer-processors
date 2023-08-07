@@ -379,7 +379,7 @@ impl TokenOwnershipV2 {
             if let Some(metadata) = token_v2_metadata.get(&resource.address) {
                 let object_core = &metadata.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
-                let storage_id = token_data_id.clone();
+                let storage_id = resource.address.clone();
                 let is_soulbound = inner.frozen;
                 let amount = inner.balance;
                 let owner_address = object_core.get_owner_address();
@@ -476,12 +476,6 @@ impl TokenOwnershipV2 {
                     )
                 },
                 None => {
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        table_handle = table_handle,
-                        "Missing table handle metadata for TokenStore. {:?}",
-                        table_handle_to_owner
-                    );
                     (None, None, None)
                 },
             };
@@ -562,12 +556,6 @@ impl TokenOwnershipV2 {
                     )
                 },
                 None => {
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        table_handle = table_handle,
-                        "Missing table handle metadata for TokenStore. {:?}",
-                        table_handle_to_owner
-                    );
                     (None, None, None)
                 },
             };

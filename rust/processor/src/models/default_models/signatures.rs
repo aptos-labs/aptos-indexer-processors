@@ -91,6 +91,22 @@ impl Signature {
         }
     }
 
+    pub fn get_fee_payer_address(
+        t: &TransactionSignaturePB,
+        transaction_version: i64,
+    ) -> Option<String> {
+        match t.signature.as_ref().unwrap_or_else(|| {
+            tracing::error!(
+                transaction_version = transaction_version,
+                "Transaction signature is missing"
+            );
+            panic!("Transaction signature is missing");
+        }) {
+            SignatureEnum::FeePayer(sig) => Some(standardize_address(&sig.fee_payer_address)),
+            _ => None,
+        }
+    }
+
     fn parse_single_signature(
         s: &Ed25519SignaturePB,
         sender: &String,
@@ -230,15 +246,6 @@ impl Signature {
                 Some(&address.to_string()),
             ));
         }
-        signatures.append(&mut Self::parse_multi_agent_signature_helper(
-            s.fee_payer_signer.as_ref().unwrap(),
-            sender,
-            transaction_version,
-            transaction_block_height,
-            true,
-            (s.secondary_signer_addresses.len() + 1) as i64,
-            Some(&s.fee_payer_address.to_string()),
-        ));
         Ok(signatures)
     }
 

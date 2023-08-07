@@ -89,8 +89,8 @@ impl TokenActivityV2 {
                 let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
                 let maybe_token_data_id = fungible_asset.metadata.get_reference_address();
                 // Now we try to see if the fungible asset is actually a token. If it's not token, return early
-                let is_token = if token_v2_metadata.get(&maybe_token_data_id).is_some() {
-                    true
+                let is_token = if let Some(metadata) = token_v2_metadata.get(&maybe_token_data_id) {
+                    metadata.token.is_some()
                 } else {
                     // Look up in the db
                     TokenDataV2::is_address_token(conn, &maybe_token_data_id)
@@ -114,6 +114,7 @@ impl TokenActivityV2 {
                         before_value: None,
                         after_value: None,
                     },
+                    _ => return Ok(None),
                 };
 
                 return Ok(Some(Self {
