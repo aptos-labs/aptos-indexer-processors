@@ -6,6 +6,7 @@ use crate::{
     processors::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
+        fungible_asset_processor::FungibleAssetTransactionProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
@@ -184,6 +185,9 @@ impl Worker {
             },
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
+            },
+            Processor::FungibleAssetProcessor => {
+                Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
             },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
