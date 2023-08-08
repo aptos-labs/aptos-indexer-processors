@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Ok, Result};
+use aptos_processor_service::worker::Worker;
 use clap::Parser;
-use processor::worker::Worker;
 use serde::{Deserialize, Serialize};
 use server_framework::{RunnableConfig, ServerArgs};
 
