@@ -172,6 +172,17 @@ dependencies = [
 [[package]]
 name = "aptos-txn-parsers"
 version = "0.1.0"
+dependencies = [
+ "aptos-indexer-protos",
+ "bcs",
+ "bigdecimal",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tracing",
+]
 
 [[package]]
 name = "arrayvec"
