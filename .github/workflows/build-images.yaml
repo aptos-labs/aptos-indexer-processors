@@ -16,6 +16,7 @@ concurrency:
 
 env:
   GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  RUSTUP_TOOLCHAIN: 1.66.1
 
 permissions:
   contents: read
@@ -26,9 +27,13 @@ jobs:
     strategy:
       matrix:
         example: [python, rust]
-    runs-on: ubuntu-latest
+    runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
       - name: Install pnpm & protoc-gen-ts
         uses: pnpm/action-setup@v2
         with:
@@ -36,6 +41,7 @@ jobs:
       - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: install rust prost plugin
         run: |
           cargo install protoc-gen-prost
@@ -51,3 +57,4 @@ jobs:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       - run: ./scripts/build-and-push-images.sh ${{ matrix.example }}
+
