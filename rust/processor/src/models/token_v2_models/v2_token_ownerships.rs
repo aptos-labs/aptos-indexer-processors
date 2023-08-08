@@ -6,9 +6,6 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    token_utils::TokenWriteSet,
-    tokens::TableHandleToOwner,
     v2_token_datas::TokenDataV2,
     v2_token_utils::{
         ObjectWithMetadata, TokenStandard, TokenV2AggregatedDataMapping, TokenV2Burned,
@@ -18,6 +15,11 @@ use crate::{
     models::{
         default_models::move_resources::MoveResource,
         fungible_asset_models::v2_fungible_asset_utils::V2FungibleAssetResource,
+        token_models::{
+            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            token_utils::TokenWriteSet,
+            tokens::TableHandleToOwner,
+        },
     },
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     utils::{

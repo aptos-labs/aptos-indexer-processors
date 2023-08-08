@@ -9,10 +9,8 @@ use super::v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, Fungibl
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
-        token_models::{
-            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-            v2_token_utils::TokenStandard,
-        },
+        token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+        token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,
     utils::{database::PgPoolConnection, util::standardize_address},

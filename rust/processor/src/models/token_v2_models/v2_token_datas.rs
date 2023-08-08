@@ -5,12 +5,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{
-    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    token_utils::TokenWriteSet,
-    v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping},
-};
+use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping};
 use crate::{
+    models::token_models::{
+        collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+        token_utils::TokenWriteSet,
+    },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };

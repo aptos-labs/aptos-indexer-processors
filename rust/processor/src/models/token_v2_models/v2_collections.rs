@@ -5,14 +5,16 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{
-    collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    token_utils::{CollectionDataIdType, TokenWriteSet},
-    tokens::TableHandleToOwner,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource},
-};
+use super::v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource};
 use crate::{
-    models::default_models::move_resources::MoveResource,
+    models::{
+        default_models::move_resources::MoveResource,
+        token_models::{
+            collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            token_utils::{CollectionDataIdType, TokenWriteSet},
+            tokens::TableHandleToOwner,
+        },
+    },
     schema::{collections_v2, current_collections_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };

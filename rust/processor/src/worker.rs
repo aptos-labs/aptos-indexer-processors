@@ -10,6 +10,7 @@ use crate::{
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
+        token_v2_processor::TokenV2TransactionProcessor,
         Processor,
     },
     schema::ledger_infos,
@@ -189,13 +190,16 @@ impl Worker {
             Processor::FungibleAssetProcessor => {
                 Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
             },
+            Processor::StakeProcessor => {
+                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
+            },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
                 self.ans_address.clone(),
                 self.nft_points_contract.clone(),
             )),
-            Processor::StakeProcessor => {
-                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
+            Processor::TokenV2Processor => {
+                Arc::new(TokenV2TransactionProcessor::new(self.db_pool.clone()))
             },
         };
         let processor_name = processor.name();

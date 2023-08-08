@@ -8,10 +8,8 @@ use crate::{
     models::{
         coin_models::coin_utils::COIN_ADDR,
         default_models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
-        token_models::{
-            token_utils::URI_LENGTH,
-            v2_token_utils::{ObjectWithMetadata, ResourceReference, TokenV2},
-        },
+        token_models::token_utils::URI_LENGTH,
+        token_v2_models::v2_token_utils::{ObjectWithMetadata, ResourceReference, TokenV2},
     },
     utils::util::{deserialize_from_string, truncate_str},
 };
