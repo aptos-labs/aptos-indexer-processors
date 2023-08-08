@@ -15,7 +15,7 @@ use crate::{
             },
             v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
         },
-        token_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
+        token_v2_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
     },
     schema,
     utils::{

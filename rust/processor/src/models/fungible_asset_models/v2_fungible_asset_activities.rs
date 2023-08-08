@@ -15,7 +15,7 @@ use crate::{
             coin_activities::CoinActivity,
             coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
         },
-        token_models::v2_token_utils::TokenStandard,
+        token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_activities,
     utils::{database::PgPoolConnection, util::standardize_address},

@@ -6,12 +6,14 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    token_utils::{TokenDataIdType, TokenEvent},
     v2_token_datas::TokenDataV2,
     v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
 };
 use crate::{
-    models::fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
+    models::{
+        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
+        token_models::token_utils::{TokenDataIdType, TokenEvent},
+    },
     schema::token_activities_v2,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
