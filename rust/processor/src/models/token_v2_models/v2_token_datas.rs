@@ -5,12 +5,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{
-    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    token_utils::TokenWriteSet,
-    v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping},
-};
+use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping};
 use crate::{
+    models::token_models::{
+        collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+        token_utils::TokenWriteSet,
+    },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
@@ -232,10 +232,27 @@ impl TokenDataV2 {
         Ok(None)
     }
 
+    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
+    /// 1. If metadata is present with a token object, then is a token
+    /// 2. If metadata is not present, we will do a lookup in the db.
+    pub fn is_address_fungible_token(
+        conn: &mut PgPoolConnection,
+        address: &str,
+        token_v2_metadata: &TokenV2AggregatedDataMapping,
+    ) -> bool {
+        if let Some(metadata) = token_v2_metadata.get(address) {
+            metadata.token.is_some()
+        } else {
+            // Look up in the db
+            Self::query_is_address_token(conn, address)
+        }
+    }
+
     /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
     /// and if we can't find after 3 times, we'll assume that it's not a token.
-    /// TODO: An improvement is that we'll make another query to see if address is a coin.
-    pub fn is_address_token(conn: &mut PgPoolConnection, address: &str) -> bool {
+    /// TODO: An improvement is to combine this with is_address_coin. To do this well we need
+    /// a k-v store
+    fn query_is_address_token(conn: &mut PgPoolConnection, address: &str) -> bool {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;

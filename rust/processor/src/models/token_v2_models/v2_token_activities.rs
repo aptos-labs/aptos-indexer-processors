@@ -6,12 +6,14 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    token_utils::{TokenDataIdType, TokenEvent},
     v2_token_datas::TokenDataV2,
     v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
 };
 use crate::{
-    models::coin_models::v2_fungible_asset_utils::FungibleAssetEvent,
+    models::{
+        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
+        token_models::token_utils::{TokenDataIdType, TokenEvent},
+    },
     schema::token_activities_v2,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
@@ -87,15 +89,10 @@ impl TokenActivityV2 {
             if let Some(metadata) = token_v2_metadata.get(&event_account_address) {
                 let object_core = &metadata.object.object_core;
                 let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
-                let maybe_token_data_id = fungible_asset.metadata.get_reference_address();
-                // Now we try to see if the fungible asset is actually a token. If it's not token, return early
-                let is_token = if token_v2_metadata.get(&maybe_token_data_id).is_some() {
-                    true
-                } else {
-                    // Look up in the db
-                    TokenDataV2::is_address_token(conn, &maybe_token_data_id)
-                };
-                if !is_token {
+                let token_data_id = fungible_asset.metadata.get_reference_address();
+                // Exit early if it's not a token
+                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
+                {
                     return Ok(None);
                 }
 
@@ -114,13 +111,14 @@ impl TokenActivityV2 {
                         before_value: None,
                         after_value: None,
                     },
+                    _ => return Ok(None),
                 };
 
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     event_index,
                     event_account_address,
-                    token_data_id: maybe_token_data_id.clone(),
+                    token_data_id: token_data_id.clone(),
                     property_version_v1: BigDecimal::zero(),
                     type_: event_type.to_string(),
                     from_address: token_activity_helper.from_address,

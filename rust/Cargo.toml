@@ -57,6 +57,7 @@ serde = { version = "1.0.137", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_yaml = "0.8.24"
 sha2 = "0.9.3"
+sha3 = "0.9.1"
 tempfile = "3.3.0"
 toml = "0.7.4"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }

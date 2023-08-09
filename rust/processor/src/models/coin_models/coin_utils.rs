@@ -17,6 +17,7 @@ use tracing::error;
 
 pub const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const COIN_TYPE_HASH_LENGTH: usize = 5000;
+const COIN_TYPE_MAX: usize = 1000;
 /**
  * This file defines deserialized coin types as defined in our 0x1 contracts.
  */
@@ -99,6 +100,7 @@ pub struct CoinStoreResource {
     pub coin: Coin,
     pub deposit_events: DepositEventResource,
     pub withdraw_events: WithdrawEventResource,
+    pub frozen: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -194,8 +196,23 @@ impl CoinInfoType {
         hash_str(&self.coin_type.to_string())
     }
 
+    /// This function gets the hash of the owner address and the coin type, similar to
+    /// how token v2 gets the named object address for the fungible asset store.
+    pub fn get_storage_id(coin_type: &str, owner_address: &str) -> String {
+        let key = format!("{}::{}", owner_address, coin_type);
+        format!("0x{}", hash_str(&key))
+    }
+
     pub fn get_coin_type_trunc(&self) -> String {
         truncate_str(&self.coin_type, COIN_TYPE_HASH_LENGTH)
+    }
+
+    pub fn get_coin_type_below_max(&self) -> Option<String> {
+        if self.coin_type.len() > COIN_TYPE_MAX {
+            None
+        } else {
+            Some(self.coin_type.clone())
+        }
     }
 }
 

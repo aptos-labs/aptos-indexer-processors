@@ -110,15 +110,7 @@ impl TokenOwnership {
                 Some(tm.get_owner_address()),
                 Some(tm.table_type.clone()),
             ),
-            None => {
-                tracing::warn!(
-                    transaction_version = txn_version,
-                    table_handle = table_handle,
-                    "Missing table handle metadata for TokenStore. {:?}",
-                    table_handle_to_owner
-                );
-                (None, None, None)
-            },
+            None => (None, None, None),
         };
 
         Ok(Some((
