@@ -4,22 +4,12 @@ import json
 
 from dataclasses import dataclass
 from utils.models.general_models import NextVersionToProcess
-from aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
 from aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
-from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
-from sqlalchemy import DDL, Engine, create_engine
-from sqlalchemy import event
-from typing import Any, Callable, TypedDict
-from prometheus_client import start_http_server
-import http.server
-import socketserver
-import threading
-import sys
-import traceback
 from abc import ABC, abstractmethod
+from sqlalchemy.dialects.postgresql import insert
 
 
 @dataclass
@@ -57,9 +47,15 @@ class TransactionsProcessor(ABC):
 
     def update_last_processed_version(self, last_processed_version) -> None:
         with Session() as session, session.begin():
-            session.merge(
-                NextVersionToProcess(
-                    indexer_name=self.name(),
-                    next_version=last_processed_version + 1,
-                )
+            insert_stmt = insert(NextVersionToProcess).values(
+                indexer_name=self.name(), next_version=last_processed_version + 1
             )
+            on_conflict_do_update_stmt = insert_stmt.on_conflict_do_update(
+                index_elements=["indexer_name"],
+                set_=dict(insert_stmt.excluded.items()),
+                where=(
+                    insert_stmt.excluded["next_version"]
+                    > NextVersionToProcess.next_version
+                ),
+            )
+            session.execute(on_conflict_do_update_stmt)

@@ -6,6 +6,7 @@ from utils.models.annotated_types import (
     StringPrimaryKeyType,
     BigIntegerType,
     UpdatedAtType,
+    BooleanType,
 )
 
 

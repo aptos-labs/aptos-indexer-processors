@@ -1,3 +1,4 @@
+processor_name: "nft_marketplace_v2_processor"
 grpc_data_stream_endpoint: "34.30.218.153:50051"
 grpc_data_stream_api_key: "<grpc_data_stream_api_key>"
 db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"
@@ -7,8 +8,8 @@ indexer_grpc_http2_ping_timeout_in_secs: 5
 
 # If there is no version in the DB, start processor from starting_version_default
 # starting_version_default: <starting_version_default>
-# Even if there is a version stored in the DB, start processor from starting_version_override
-# starting_version_override: 113880
+# Even if there is a version stored in the DB, start processor from starting_version_backfill
+# starting_version_backfill: 113880
 
 # Optionally stop processor after ending_version
 # ending_version: 114000

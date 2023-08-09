@@ -17,8 +17,8 @@ config = Config.from_yaml_file(args.config)
 starting_version = 0
 if config.starting_version_default != None:
     starting_version = config.starting_version_default
-if config.starting_version_override != None:
-    starting_version = config.starting_version_override
+if config.starting_version_backfill != None:
+    starting_version = config.starting_version_backfill
 metadata = (
     ("x-aptos-data-authorization", config.grpc_data_stream_api_key),
     ("x-aptos-request-name", "ambassador token indexer"),
