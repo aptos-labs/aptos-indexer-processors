@@ -4,7 +4,7 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::ans_models::ans_lookup::{
-        AddressToPrimaryNameRecord, CurrentAnsLookup, CurrentAnsLookupPK,
+        AddressToPrimaryNameRecord, AnsLookup, AnsLookupPK, CurrentAnsLookup, CurrentAnsLookupPK,
     },
     schema,
     utils::database::{
@@ -72,6 +72,7 @@ impl ProcessorTrait for AnsTransactionProcessor {
 
         let mut all_current_ans_lookups: HashMap<CurrentAnsLookupPK, CurrentAnsLookup> =
             HashMap::new();
+        let mut all_ans_lookups: HashMap<AnsLookupPK, AnsLookup> = HashMap::new();
 
         // Map to track all the ans records in this transaction. This is used to lookup a previous ANS record
         // that is in the same transaction batch.
@@ -79,7 +80,7 @@ impl ProcessorTrait for AnsTransactionProcessor {
 
         for txn in &transactions {
             // ANS lookups
-            let current_ans_lookups = CurrentAnsLookup::from_transaction(
+            let (current_ans_lookups, ans_lookups) = CurrentAnsLookup::from_transaction(
                 txn,
                 &all_current_ans_lookups,
                 &address_to_primary_name_records,
@@ -88,6 +89,7 @@ impl ProcessorTrait for AnsTransactionProcessor {
                 &mut conn,
             );
             all_current_ans_lookups.extend(current_ans_lookups);
+            all_ans_lookups.extend(ans_lookups);
 
             // Create address_to_primary_name_records from all_current_ans_lookups. We have to recreate this every time because
             // registered_address may be None in the current_ans_lookups, so we don't know which value to delete from the map.
@@ -107,8 +109,16 @@ impl ProcessorTrait for AnsTransactionProcessor {
         let mut all_current_ans_lookups = all_current_ans_lookups
             .into_values()
             .collect::<Vec<CurrentAnsLookup>>();
+        let mut all_ans_lookups = all_ans_lookups.into_values().collect::<Vec<AnsLookup>>();
         all_current_ans_lookups.sort_by(|a: &CurrentAnsLookup, b| {
             a.domain.cmp(&b.domain).then(a.subdomain.cmp(&b.subdomain))
+        });
+        all_ans_lookups.sort_by(|a: &AnsLookup, b| {
+            (&a.transaction_version, &a.domain, &a.subdomain).cmp(&(
+                &b.transaction_version,
+                &b.domain,
+                &b.subdomain,
+            ))
         });
 
         // Insert values to db
@@ -118,6 +128,7 @@ impl ProcessorTrait for AnsTransactionProcessor {
             start_version,
             end_version,
             all_current_ans_lookups,
+            all_ans_lookups,
         );
 
         match tx_result {
@@ -148,6 +159,7 @@ fn insert_to_db(
     start_version: u64,
     end_version: u64,
     current_ans_lookups: Vec<CurrentAnsLookup>,
+    ans_lookups: Vec<AnsLookup>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -158,16 +170,18 @@ fn insert_to_db(
     match conn
         .build_transaction()
         .read_write()
-        .run::<_, Error, _>(|pg_conn| insert_to_db_impl(pg_conn, &current_ans_lookups))
-    {
+        .run::<_, Error, _>(|pg_conn| {
+            insert_to_db_impl(pg_conn, &current_ans_lookups, &ans_lookups)
+        }) {
         Ok(_) => Ok(()),
         Err(_) => conn
             .build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
                 let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
+                let ans_lookups = clean_data_for_db(ans_lookups, true);
 
-                insert_to_db_impl(pg_conn, &current_ans_lookups)
+                insert_to_db_impl(pg_conn, &current_ans_lookups, &ans_lookups)
             }),
     }
 }
@@ -175,8 +189,10 @@ fn insert_to_db(
 fn insert_to_db_impl(
     conn: &mut PgConnection,
     current_ans_lookups: &[CurrentAnsLookup],
+    ans_lookups: &[AnsLookup],
 ) -> Result<(), diesel::result::Error> {
     insert_current_ans_lookups(conn, current_ans_lookups)?;
+    insert_ans_lookups(conn, ans_lookups)?;
     Ok(())
 }
 
@@ -206,6 +222,27 @@ fn insert_current_ans_lookups(
                     )),
                     Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
                 )?;
+    }
+    Ok(())
+}
+
+fn insert_ans_lookups(
+    conn: &mut PgConnection,
+    items_to_insert: &[AnsLookup],
+) -> Result<(), diesel::result::Error> {
+    use schema::ans_lookup::dsl::*;
+
+    let chunks = get_chunks(items_to_insert.len(), AnsLookup::field_count());
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::ans_lookup::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, domain, subdomain))
+                .do_nothing(),
+            None,
+        )?;
     }
     Ok(())
 }
