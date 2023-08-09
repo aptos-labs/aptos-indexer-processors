@@ -6,9 +6,6 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    token_utils::TokenWriteSet,
-    tokens::TableHandleToOwner,
     v2_token_datas::TokenDataV2,
     v2_token_utils::{
         ObjectWithMetadata, TokenStandard, TokenV2AggregatedDataMapping, TokenV2Burned,
@@ -16,8 +13,13 @@ use super::{
 };
 use crate::{
     models::{
-        coin_models::v2_fungible_asset_utils::V2FungibleAssetResource,
         default_models::move_resources::MoveResource,
+        fungible_asset_models::v2_fungible_asset_utils::V2FungibleAssetResource,
+        token_models::{
+            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            token_utils::TokenWriteSet,
+            tokens::TableHandleToOwner,
+        },
     },
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     utils::{
@@ -357,6 +359,7 @@ impl TokenOwnershipV2 {
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
+        conn: &mut PgPoolConnection,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
@@ -379,7 +382,12 @@ impl TokenOwnershipV2 {
             if let Some(metadata) = token_v2_metadata.get(&resource.address) {
                 let object_core = &metadata.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
-                let storage_id = token_data_id.clone();
+                // Exit early if it's not a token
+                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
+                {
+                    return Ok(None);
+                }
+                let storage_id = resource.address.clone();
                 let is_soulbound = inner.frozen;
                 let amount = inner.balance;
                 let owner_address = object_core.get_owner_address();
@@ -475,15 +483,7 @@ impl TokenOwnershipV2 {
                         Some(tm.table_type.clone()),
                     )
                 },
-                None => {
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        table_handle = table_handle,
-                        "Missing table handle metadata for TokenStore. {:?}",
-                        table_handle_to_owner
-                    );
-                    (None, None, None)
-                },
+                None => (None, None, None),
             };
 
             Ok(Some((
@@ -561,15 +561,7 @@ impl TokenOwnershipV2 {
                         Some(tm.table_type.clone()),
                     )
                 },
-                None => {
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        table_handle = table_handle,
-                        "Missing table handle metadata for TokenStore. {:?}",
-                        table_handle_to_owner
-                    );
-                    (None, None, None)
-                },
+                None => (None, None, None),
             };
 
             Ok(Some((

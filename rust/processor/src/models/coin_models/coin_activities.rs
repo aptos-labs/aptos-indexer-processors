@@ -12,6 +12,13 @@ use super::{
     coin_utils::{CoinEvent, EventGuidResource},
 };
 use crate::{
+    models::{
+        default_models::signatures::Signature,
+        fungible_asset_models::v2_fungible_asset_activities::{
+            CoinType, CurrentCoinBalancePK, EventToCoinType, BURN_GAS_EVENT_CREATION_NUM,
+            BURN_GAS_EVENT_INDEX, GAS_FEE_EVENT,
+        },
+    },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
     utils::util::{get_entry_function_from_user_request, standardize_address},
@@ -25,18 +32,6 @@ use chrono::NaiveDateTime;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
-// We will never have a negative number on chain so this will avoid collision in postgres
-const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
-const BURN_GAS_EVENT_INDEX: i64 = -1;
-
-type OwnerAddress = String;
-type CoinType = String;
-// Primary key of the current_coin_balances table, i.e. (owner_address, coin_type)
-pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
-pub type EventToCoinType = HashMap<EventGuidResource, CoinType>;
-
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
     transaction_version,
@@ -60,6 +55,7 @@ pub struct CoinActivity {
     pub block_height: i64,
     pub transaction_timestamp: chrono::NaiveDateTime,
     pub event_index: Option<i64>,
+    pub gas_fee_payer_address: Option<String>,
 }
 
 impl CoinActivity {
@@ -84,6 +80,7 @@ impl CoinActivity {
         let mut coin_infos: HashMap<CoinType, CoinInfo> = HashMap::new();
         let mut current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
             HashMap::new();
+        // This will help us get the coin type when we see coin deposit/withdraw events for coin activities
         let mut all_event_to_coin_type: EventToCoinType = HashMap::new();
         let mut all_coin_supply = Vec::new();
 
@@ -251,10 +248,11 @@ impl CoinActivity {
             block_height,
             transaction_timestamp,
             event_index: Some(event_index),
+            gas_fee_payer_address: None,
         }
     }
 
-    fn get_gas_event(
+    pub fn get_gas_event(
         txn_info: &TransactionInfo,
         user_transaction_request: &UserTransactionRequest,
         entry_function_id_str: &Option<String>,
@@ -264,6 +262,18 @@ impl CoinActivity {
     ) -> Self {
         let aptos_coin_burned =
             BigDecimal::from(txn_info.gas_used * user_transaction_request.gas_unit_price);
+        let signature = user_transaction_request
+            .signature
+            .as_ref()
+            .unwrap_or_else(|| {
+                tracing::error!(
+                    transaction_version = transaction_version,
+                    "User transaction must have signature"
+                );
+                panic!("User transaction must have signature")
+            });
+        let gas_fee_payer_address =
+            Signature::get_fee_payer_address(signature, transaction_version);
 
         Self {
             transaction_version,
@@ -282,6 +292,7 @@ impl CoinActivity {
             block_height,
             transaction_timestamp,
             event_index: Some(BURN_GAS_EVENT_INDEX),
+            gas_fee_payer_address,
         }
     }
 }

@@ -8,7 +8,7 @@
 use crate::{
     models::{
         default_models::user_transactions::UserTransaction,
-        token_models::v2_token_utils::ObjectWithMetadata,
+        token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
     schema::account_transactions,
     utils::util::standardize_address,

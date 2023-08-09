@@ -4,16 +4,14 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::token_utils::{NAME_LENGTH, URI_LENGTH};
 use crate::{
     models::{
-        coin_models::{
-            coin_utils::COIN_ADDR,
-            v2_fungible_asset_utils::{
-                FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
-            },
-        },
+        coin_models::coin_utils::COIN_ADDR,
         default_models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
+        fungible_asset_models::v2_fungible_asset_utils::{
+            FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+        },
+        token_models::token_utils::{NAME_LENGTH, URI_LENGTH},
     },
     utils::util::{
         deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,

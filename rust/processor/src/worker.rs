@@ -6,9 +6,11 @@ use crate::{
     processors::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
+        fungible_asset_processor::FungibleAssetTransactionProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
+        token_v2_processor::TokenV2TransactionProcessor,
         Processor,
     },
     schema::ledger_infos,
@@ -28,10 +30,6 @@ use aptos_indexer_protos::{
     transaction::v1::Transaction,
 };
 use aptos_moving_average::MovingAverage;
-use diesel::{
-    pg::PgConnection,
-    r2d2::{ConnectionManager, PooledConnection},
-};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
 use prost::Message;
@@ -40,8 +38,6 @@ use tokio::sync::mpsc::error::TryRecvError;
 use tonic::Streaming;
 use tracing::{error, info};
 
-pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
-pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// GRPC request metadata key for the token ID.
 const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
@@ -191,13 +187,19 @@ impl Worker {
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
+            Processor::FungibleAssetProcessor => {
+                Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
+            },
+            Processor::StakeProcessor => {
+                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
+            },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
                 self.ans_address.clone(),
                 self.nft_points_contract.clone(),
             )),
-            Processor::StakeProcessor => {
-                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
+            Processor::TokenV2Processor => {
+                Arc::new(TokenV2TransactionProcessor::new(self.db_pool.clone()))
             },
         };
         let processor_name = processor.name();

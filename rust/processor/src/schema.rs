@@ -48,6 +48,8 @@ diesel::table! {
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
         event_index -> Nullable<Int8>,
+        #[max_length = 66]
+        gas_fee_payer_address -> Nullable<Varchar>,
     }
 }
 
@@ -265,6 +267,25 @@ diesel::table! {
         shares -> Numeric,
         #[max_length = 66]
         parent_table_handle -> Varchar,
+    }
+}
+
+diesel::table! {
+    current_fungible_asset_balances (storage_id) {
+        #[max_length = 66]
+        storage_id -> Varchar,
+        #[max_length = 66]
+        owner_address -> Varchar,
+        #[max_length = 1000]
+        asset_type -> Varchar,
+        is_primary -> Bool,
+        is_frozen -> Bool,
+        amount -> Numeric,
+        last_transaction_timestamp -> Timestamp,
+        last_transaction_version -> Int8,
+        #[max_length = 10]
+        token_standard -> Varchar,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -515,6 +536,80 @@ diesel::table! {
         data -> Jsonb,
         inserted_at -> Timestamp,
         event_index -> Nullable<Int8>,
+    }
+}
+
+diesel::table! {
+    fungible_asset_activities (transaction_version, event_index) {
+        transaction_version -> Int8,
+        event_index -> Int8,
+        #[max_length = 66]
+        owner_address -> Varchar,
+        #[max_length = 66]
+        storage_id -> Varchar,
+        #[max_length = 1000]
+        asset_type -> Varchar,
+        is_frozen -> Nullable<Bool>,
+        amount -> Nullable<Numeric>,
+        #[sql_name = "type"]
+        type_ -> Varchar,
+        is_gas_fee -> Bool,
+        #[max_length = 66]
+        gas_fee_payer_address -> Nullable<Varchar>,
+        is_transaction_success -> Bool,
+        #[max_length = 1000]
+        entry_function_id_str -> Nullable<Varchar>,
+        block_height -> Int8,
+        #[max_length = 10]
+        token_standard -> Varchar,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    fungible_asset_balances (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 66]
+        storage_id -> Varchar,
+        #[max_length = 66]
+        owner_address -> Varchar,
+        #[max_length = 1000]
+        asset_type -> Varchar,
+        is_primary -> Bool,
+        is_frozen -> Bool,
+        amount -> Numeric,
+        transaction_timestamp -> Timestamp,
+        #[max_length = 10]
+        token_standard -> Varchar,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    fungible_asset_metadata (asset_type) {
+        #[max_length = 1000]
+        asset_type -> Varchar,
+        #[max_length = 66]
+        creator_address -> Varchar,
+        #[max_length = 32]
+        name -> Varchar,
+        #[max_length = 10]
+        symbol -> Varchar,
+        decimals -> Int4,
+        #[max_length = 512]
+        icon_uri -> Nullable<Varchar>,
+        #[max_length = 512]
+        project_uri -> Nullable<Varchar>,
+        last_transaction_version -> Int8,
+        last_transaction_timestamp -> Timestamp,
+        #[max_length = 66]
+        supply_aggregator_table_handle_v1 -> Nullable<Varchar>,
+        supply_aggregator_table_key_v1 -> Nullable<Text>,
+        #[max_length = 10]
+        token_standard -> Varchar,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -938,6 +1033,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_collections_v2,
     current_delegated_staking_pool_balances,
     current_delegator_balances,
+    current_fungible_asset_balances,
     current_objects,
     current_staking_pool_voter,
     current_table_items,
@@ -951,6 +1047,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     delegated_staking_pool_balances,
     delegated_staking_pools,
     events,
+    fungible_asset_activities,
+    fungible_asset_balances,
+    fungible_asset_metadata,
     indexer_status,
     ledger_infos,
     move_modules,
