@@ -10,9 +10,21 @@ diesel::table! {
 }
 
 diesel::table! {
-    alembic_version (version_num) {
-        #[max_length = 32]
-        version_num -> Varchar,
+    ans_lookup (transaction_version, domain, subdomain) {
+        transaction_version -> Int8,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Nullable<Timestamp>,
+        #[max_length = 128]
+        token_name -> Varchar,
+        is_primary -> Nullable<Bool>,
+        is_deleted -> Bool,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1029,7 +1041,7 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
-    alembic_version,
+    ans_lookup,
     block_metadata_transactions,
     coin_activities,
     coin_balances,

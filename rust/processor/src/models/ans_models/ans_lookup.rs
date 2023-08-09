@@ -6,11 +6,12 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    schema::current_ans_lookup,
+    schema::{ans_lookup, current_ans_lookup},
     utils::{
         database::PgPoolConnection,
         util::{
-            bigdecimal_to_u64, deserialize_from_string, parse_timestamp_secs, standardize_address,
+            bigdecimal_to_u64, deserialize_from_string, parse_timestamp, parse_timestamp_secs,
+            standardize_address,
         },
     },
 };
@@ -33,6 +34,8 @@ type Subdomain = String;
 pub type AddressToPrimaryNameRecord = HashMap<String, CurrentAnsLookup>;
 // PK of current_ans_lookup, i.e. domain and subdomain name
 pub type CurrentAnsLookupPK = (Domain, Subdomain);
+// PK of ans_lookup, i.e. transaction version, domain, and subdomain
+pub type AnsLookupPK = (i64, Domain, Subdomain);
 
 #[derive(Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(domain, subdomain))]
@@ -65,6 +68,22 @@ pub struct CurrentAnsLookupDataQuery {
     pub is_deleted: bool,
 }
 
+#[derive(Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(transaction_version, domain, subdomain))]
+#[diesel(table_name = ans_lookup)]
+#[diesel(treat_none_as_null = true)]
+pub struct AnsLookup {
+    pub transaction_version: i64,
+    pub domain: String,
+    pub subdomain: String,
+    pub registered_address: Option<String>,
+    pub expiration_timestamp: chrono::NaiveDateTime,
+    pub token_name: String,
+    pub is_primary: bool,
+    pub is_deleted: bool,
+    pub transaction_timestamp: chrono::NaiveDateTime,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct OptionalString {
     vec: Vec<String>,
@@ -93,10 +112,15 @@ impl CurrentAnsLookup {
         maybe_ans_primary_names_table_handle: Option<String>,
         maybe_ans_name_records_table_handle: Option<String>,
         conn: &mut PgPoolConnection,
-    ) -> HashMap<CurrentAnsLookupPK, Self> {
+    ) -> (
+        HashMap<CurrentAnsLookupPK, Self>,
+        HashMap<AnsLookupPK, AnsLookup>,
+    ) {
         let mut new_current_ans_lookups: HashMap<CurrentAnsLookupPK, Self> = HashMap::new();
+        let mut new_ans_lookups: HashMap<AnsLookupPK, AnsLookup> = HashMap::new();
 
         let txn_version = transaction.version as i64;
+        let txn_timestamp = parse_timestamp(transaction.timestamp.as_ref().unwrap(), txn_version);
         let txn_data = transaction
             .txn_data
             .as_ref()
@@ -119,7 +143,7 @@ impl CurrentAnsLookup {
 
             // Extract name record changes
             for wsc in &transaction_info.changes {
-                let current_ans_lookups_res = match wsc.change.as_ref().unwrap() {
+                let res = match wsc.change.as_ref().unwrap() {
                     WriteSetChange::WriteTableItem(write_table_item) => {
                         let table_handle = write_table_item.handle.as_str();
                         if table_handle != ans_name_records_table_handle.as_str() {
@@ -128,6 +152,7 @@ impl CurrentAnsLookup {
                         Self::from_name_record_table_write_table_item_v1(
                             write_table_item,
                             txn_version,
+                            txn_timestamp,
                             current_ans_lookups,
                             conn,
                         )
@@ -140,12 +165,16 @@ impl CurrentAnsLookup {
                         Self::from_name_record_table_delete_table_item_v1(
                             delete_table_item,
                             txn_version,
+                            txn_timestamp,
                         )
                     },
                     _ => continue,
                 };
-                match current_ans_lookups_res {
-                    Ok(ans_lookups) => new_current_ans_lookups.extend(ans_lookups),
+                match res {
+                    Ok((current_ans_lookups, ans_lookups)) => {
+                        new_current_ans_lookups.extend(current_ans_lookups);
+                        new_ans_lookups.extend(ans_lookups);
+                    },
                     Err(e) => {
                         tracing::error!("Failed to parse name record table item. Error: {:?}", e);
                         continue;
@@ -155,7 +184,7 @@ impl CurrentAnsLookup {
 
             // Extract primary name reverse lookup changes
             for wsc in &transaction_info.changes {
-                let current_ans_lookup_res = match wsc.change.as_ref().unwrap() {
+                let res = match wsc.change.as_ref().unwrap() {
                     WriteSetChange::WriteTableItem(write_table_item) => {
                         let table_handle = write_table_item.handle.as_str();
                         if table_handle != ans_primary_names_table_handle.as_str() {
@@ -164,6 +193,7 @@ impl CurrentAnsLookup {
                         Self::from_primary_name_record_table_write_table_item_v1(
                             write_table_item,
                             txn_version,
+                            txn_timestamp,
                             address_to_primary_name_record,
                             conn,
                         )
@@ -176,6 +206,7 @@ impl CurrentAnsLookup {
                         Self::from_primary_name_record_table_delete_table_item_v1(
                             delete_table_item,
                             txn_version,
+                            txn_timestamp,
                             address_to_primary_name_record,
                             conn,
                         )
@@ -183,11 +214,28 @@ impl CurrentAnsLookup {
                     _ => continue,
                 };
 
-                match current_ans_lookup_res {
-                    Ok(ans_lookups) => {
-                        for (record_key, name_record) in ans_lookups {
+                match res {
+                    Ok((current_ans_lookups, ans_lookups)) => {
+                        for (record_key, name_record) in current_ans_lookups {
                             // Name record may already exist in current_ans_lookup, so need to upsert here
                             new_current_ans_lookups
+                                .entry(record_key.clone())
+                                .and_modify(|e| {
+                                    e.registered_address = name_record.registered_address.clone();
+                                    // name_record.expiration_timestamp may be zero if primary name wsc occurs before name record wsc,
+                                    // so return the larger of the two timestamps
+                                    e.expiration_timestamp = cmp::max(
+                                        name_record.expiration_timestamp,
+                                        e.expiration_timestamp,
+                                    );
+                                    // name_record.is_primary may be false here, so use OR to preserve is_primary status
+                                    e.is_primary = name_record.is_primary || e.is_primary;
+                                    e.is_deleted = name_record.is_deleted;
+                                })
+                                .or_insert(name_record);
+                        }
+                        for (record_key, name_record) in ans_lookups {
+                            new_ans_lookups
                                 .entry(record_key.clone())
                                 .and_modify(|e| {
                                     e.registered_address = name_record.registered_address.clone();
@@ -214,7 +262,7 @@ impl CurrentAnsLookup {
                 }
             }
         }
-        new_current_ans_lookups
+        (new_current_ans_lookups, new_ans_lookups)
     }
 
     // Parse the primary name reverse record from write table item.
@@ -223,10 +271,15 @@ impl CurrentAnsLookup {
     pub fn from_primary_name_record_table_write_table_item_v1(
         write_table_item: &WriteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
         address_to_primary_name_record: &AddressToPrimaryNameRecord,
         conn: &mut PgPoolConnection,
-    ) -> anyhow::Result<HashMap<CurrentAnsLookupPK, Self>> {
+    ) -> anyhow::Result<(
+        HashMap<CurrentAnsLookupPK, Self>,
+        HashMap<AnsLookupPK, AnsLookup>,
+    )> {
         let mut new_current_ans_lookups = HashMap::new();
+        let mut new_ans_lookups = HashMap::new();
 
         let table_item_data = write_table_item.data.as_ref().unwrap();
         let key_type = table_item_data.key_type.as_str();
@@ -259,7 +312,25 @@ impl CurrentAnsLookup {
                     previous_primary_record.domain.clone(),
                     previous_primary_record.subdomain.clone(),
                 ),
-                previous_primary_record,
+                previous_primary_record.clone(),
+            );
+            new_ans_lookups.insert(
+                (
+                    txn_version,
+                    previous_primary_record.domain.clone(),
+                    previous_primary_record.subdomain.clone(),
+                ),
+                AnsLookup {
+                    transaction_version: txn_version,
+                    domain: previous_primary_record.domain,
+                    subdomain: previous_primary_record.subdomain,
+                    registered_address: previous_primary_record.registered_address,
+                    expiration_timestamp: previous_primary_record.expiration_timestamp,
+                    token_name: previous_primary_record.token_name,
+                    is_primary: false,
+                    is_deleted: previous_primary_record.is_deleted,
+                    transaction_timestamp: txn_timestamp,
+                },
             );
         }
 
@@ -283,17 +354,42 @@ impl CurrentAnsLookup {
                 is_deleted: false,
             },
         );
+        new_ans_lookups.insert(
+            (
+                txn_version,
+                primary_name_record.get_domain().clone(),
+                primary_name_record.get_subdomain().clone(),
+            ),
+            AnsLookup {
+                transaction_version: txn_version,
+                domain: primary_name_record.get_domain(),
+                subdomain: primary_name_record.get_subdomain(),
+                registered_address: Some(String::from(key)),
+                // Default to zero
+                expiration_timestamp: chrono::NaiveDateTime::from_timestamp_opt(0, 0)
+                    .unwrap_or_default(),
+                token_name: primary_name_record.get_token_name(),
+                is_primary: true,
+                is_deleted: false,
+                transaction_timestamp: txn_timestamp,
+            },
+        );
 
-        Ok(new_current_ans_lookups)
+        Ok((new_current_ans_lookups, new_ans_lookups))
     }
 
     pub fn from_primary_name_record_table_delete_table_item_v1(
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
         address_to_primary_name_record: &AddressToPrimaryNameRecord,
         conn: &mut PgPoolConnection,
-    ) -> anyhow::Result<HashMap<CurrentAnsLookupPK, Self>> {
+    ) -> anyhow::Result<(
+        HashMap<CurrentAnsLookupPK, Self>,
+        HashMap<AnsLookupPK, AnsLookup>,
+    )> {
         let mut new_current_ans_lookups = HashMap::new();
+        let mut new_ans_lookups = HashMap::new();
 
         let table_item_data = delete_table_item.data.as_ref().unwrap();
         let key_type = table_item_data.key_type.as_str();
@@ -318,7 +414,7 @@ impl CurrentAnsLookup {
                         lookup_key = &registered_address,
                         "Failed to get ans record for registered address. You probably should backfill db."
                     );
-                return Ok(HashMap::new());
+                return Ok((HashMap::new(), HashMap::new()));
             },
         };
         // Update the lookup's name record with the new data and return
@@ -329,19 +425,42 @@ impl CurrentAnsLookup {
                 previous_name_record.domain.clone(),
                 previous_name_record.subdomain.clone(),
             ),
-            previous_name_record,
+            previous_name_record.clone(),
+        );
+        new_ans_lookups.insert(
+            (
+                txn_version,
+                previous_name_record.domain.clone(),
+                previous_name_record.subdomain.clone(),
+            ),
+            AnsLookup {
+                transaction_version: txn_version,
+                domain: previous_name_record.domain,
+                subdomain: previous_name_record.subdomain,
+                registered_address: previous_name_record.registered_address,
+                expiration_timestamp: previous_name_record.expiration_timestamp,
+                token_name: previous_name_record.token_name,
+                is_primary: false,
+                is_deleted: previous_name_record.is_deleted,
+                transaction_timestamp: txn_timestamp,
+            },
         );
 
-        Ok(new_current_ans_lookups)
+        Ok((new_current_ans_lookups, new_ans_lookups))
     }
 
     pub fn from_name_record_table_write_table_item_v1(
         write_table_item: &WriteTableItem,
         txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
         current_ans_lookups: &HashMap<CurrentAnsLookupPK, Self>,
         conn: &mut PgPoolConnection,
-    ) -> anyhow::Result<HashMap<CurrentAnsLookupPK, Self>> {
+    ) -> anyhow::Result<(
+        HashMap<CurrentAnsLookupPK, Self>,
+        HashMap<AnsLookupPK, AnsLookup>,
+    )> {
         let mut new_current_ans_lookups = HashMap::new();
+        let mut new_ans_lookups = HashMap::new();
 
         // Parse name record.
         // The table key has the domain and subdomain.
@@ -383,7 +502,25 @@ impl CurrentAnsLookup {
                     previous_name_record.domain.clone(),
                     previous_name_record.subdomain.clone(),
                 ),
-                previous_name_record,
+                previous_name_record.clone(),
+            );
+            new_ans_lookups.insert(
+                (
+                    txn_version,
+                    previous_name_record.domain.clone(),
+                    previous_name_record.subdomain.clone(),
+                ),
+                AnsLookup {
+                    transaction_version: txn_version,
+                    domain: previous_name_record.domain,
+                    subdomain: previous_name_record.subdomain,
+                    registered_address: previous_name_record.registered_address,
+                    expiration_timestamp: previous_name_record.expiration_timestamp,
+                    token_name: previous_name_record.token_name,
+                    is_primary: previous_name_record.is_primary,
+                    is_deleted: previous_name_record.is_deleted,
+                    transaction_timestamp: txn_timestamp,
+                },
             );
         } else {
             // If it doesn't exist, create a new DB item
@@ -403,15 +540,38 @@ impl CurrentAnsLookup {
                     is_deleted: false,
                 },
             );
+            new_ans_lookups.insert(
+                (
+                    txn_version,
+                    name_record_key.get_domain().clone(),
+                    name_record_key.get_subdomain().clone(),
+                ),
+                AnsLookup {
+                    transaction_version: txn_version,
+                    domain: name_record_key.get_domain(),
+                    subdomain: name_record_key.get_subdomain(),
+                    registered_address: name_record.get_target_address(),
+                    expiration_timestamp: name_record.get_expiration_time(),
+                    token_name: name_record_key.get_token_name(),
+                    is_primary: false,
+                    is_deleted: false,
+                    transaction_timestamp: txn_timestamp,
+                },
+            );
         }
-        Ok(new_current_ans_lookups)
+        Ok((new_current_ans_lookups, new_ans_lookups))
     }
 
     pub fn from_name_record_table_delete_table_item_v1(
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
-    ) -> anyhow::Result<HashMap<CurrentAnsLookupPK, Self>> {
+        txn_timestamp: chrono::NaiveDateTime,
+    ) -> anyhow::Result<(
+        HashMap<CurrentAnsLookupPK, Self>,
+        HashMap<AnsLookupPK, AnsLookup>,
+    )> {
         let mut new_current_ans_lookups = HashMap::new();
+        let mut new_ans_lookups = HashMap::new();
 
         let table_item_data = delete_table_item.data.as_ref().unwrap();
         let key_type = table_item_data.key_type.as_str();
@@ -432,6 +592,7 @@ impl CurrentAnsLookup {
                 subdomain: name_record_key.get_subdomain().clone(),
                 registered_address: None,
                 last_transaction_version: txn_version,
+                // Default to zero
                 expiration_timestamp: chrono::NaiveDateTime::from_timestamp_opt(0, 0)
                     .unwrap_or_default(),
                 token_name: name_record_key.get_token_name(),
@@ -439,7 +600,27 @@ impl CurrentAnsLookup {
                 is_deleted: true,
             },
         );
-        Ok(new_current_ans_lookups)
+        new_ans_lookups.insert(
+            (
+                txn_version,
+                name_record_key.get_domain().clone(),
+                name_record_key.get_subdomain().clone(),
+            ),
+            AnsLookup {
+                transaction_version: txn_version,
+                domain: name_record_key.get_domain(),
+                subdomain: name_record_key.get_subdomain(),
+                registered_address: None,
+                // Default to zero
+                expiration_timestamp: chrono::NaiveDateTime::from_timestamp_opt(0, 0)
+                    .unwrap_or_default(),
+                token_name: name_record_key.get_token_name(),
+                is_primary: false,
+                is_deleted: true,
+                transaction_timestamp: txn_timestamp,
+            },
+        );
+        Ok((new_current_ans_lookups, new_ans_lookups))
     }
 
     fn lookup_name_record_by_primary_address(
