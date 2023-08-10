@@ -70,8 +70,6 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         start_version: int,
         end_version: int,
     ) -> ProcessingResult:
-        parsed_objs = []
-
         assert self.config.custom_config, "Custom config must be set for this processor"
         marketplace_contract_address = str(
             self.config.custom_config["marketplace_contract_address"]

@@ -7,10 +7,12 @@ from utils.models.annotated_types import (
     TimestampType,
 )
 from utils.models.general_models import Base
+from utils.models.schema_names import EXAMPLE
 
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = ({"schema": EXAMPLE},)
 
     sequence_number: BigIntegerPrimaryKeyType
     creation_number: BigIntegerPrimaryKeyType
