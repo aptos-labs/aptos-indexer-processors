@@ -308,7 +308,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "fun",
+                      "name": "delegated_staking_activities",
                       "schema": "public"
                     }
                   }
