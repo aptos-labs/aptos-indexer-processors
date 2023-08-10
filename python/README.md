@@ -48,12 +48,12 @@ python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=
    - In this tutorial, we want to extract data about transaction events. In `models.py`, you can define an Events data model.
    - The example uses Postgres. For now only Postgres is supported and we use SQLAlchemy ORM to interact with the Postgres database.
 
-6. Define a transaction parsing function and create and run a `TransactionsProcessor`.
+6. Create a processor.
 
-   - In `processor.py`, we have implemented a `parse` function which accepts a `transaction_pb2.Transaction` as a parameter. The `parse` function filters out all non-user transactions and reads a transaction and its associated events. It returns a list of `Event` db model objects.
-   - Initialize a `TransactionsProcessor` with the parsing function and call `process()`.
+   - Extend `TransactionsProcessor`.
+   - In `process_transactions()`, implement the parsing logic and insert the rows into DB.
 
-7. Run `poetry run python -m processors.example_event_processor.processor -c config.yaml` to start indexing!
+7. Run `poetry run python -m processors.main -c config.yaml` to start indexing!
 
 8. (Optional) Run locally in Docker
 

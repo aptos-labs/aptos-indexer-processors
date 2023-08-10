@@ -1,7 +1,7 @@
 from aptos.transaction.v1 import transaction_pb2
 from processors.example_event_processor.models import Event
 from typing import List
-
+from utils.transactions_processor import ProcessingResult
 from utils import general_utils
 from utils.transactions_processor import TransactionsProcessor
 from utils.models.schema_names import EXAMPLE
@@ -21,7 +21,7 @@ class ExampleEventProcessor(TransactionsProcessor):
         transactions: list[transaction_pb2.Transaction],
         start_version: int,
         end_version: int,
-    ) -> None:
+    ) -> ProcessingResult:
         event_db_objs: List[Event] = []
 
         for transaction in transactions:
@@ -63,6 +63,11 @@ class ExampleEventProcessor(TransactionsProcessor):
                 event_db_objs.append(event_db_obj)
 
         self.insert_to_db(event_db_objs)
+
+        return ProcessingResult(
+            start_version=start_version,
+            end_version=end_version,
+        )
 
     def insert_to_db(self, parsed_objs: List[Event]) -> None:
         with Session() as session, session.begin():

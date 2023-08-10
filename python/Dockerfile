@@ -16,4 +16,4 @@ COPY /aptos /app/aptos
 COPY /utils/ /app/utils
 COPY /processors/ /app/processors
 
-CMD ["poetry", "run", "python", "-m", "processors.example_event_processor.processor", "--config", "/app/config/config.yaml"]
+CMD ["poetry", "run", "python", "-m", "processors.main", "--config", "/app/config/config.yaml"]

@@ -33,11 +33,10 @@ class IndexerProcessorServer:
     config: Config
     num_concurrent_processing_tasks: int
 
-    def __init__(self, config: Config, perf_transactions: str | None = None):
+    def __init__(self, config: Config):
         print("[Parser] Kicking off")
 
         self.config = config
-        self.perf_transactions = perf_transactions
 
         # Instantiate the correct processor based on config
         match self.config.processor_name:
@@ -96,10 +95,7 @@ class IndexerProcessorServer:
 
         # Get starting version from DB
         starting_version = self.config.get_starting_version(self.processor.name())
-        if self.perf_transactions:
-            ending_version = starting_version + int(self.perf_transactions) - 1
-        else:
-            ending_version = self.config.ending_version
+        ending_version = self.config.ending_version
 
         # Setup GRPC settings
         metadata = (
@@ -117,8 +113,6 @@ class IndexerProcessorServer:
                 self.config.indexer_grpc_http2_ping_timeout_in_secs * 1000,
             ),
         ]
-
-        perf_start_time = perf_counter()
 
         # Connect to indexer grpc endpoint
         with grpc.insecure_channel(
@@ -148,6 +142,7 @@ class IndexerProcessorServer:
             responses = iter(responses)
 
             while True:
+                perf_start_time = perf_counter()
                 transaction_batches: List[List[transaction_pb2.Transaction]] = []
 
                 # Get batches of transactions for processing
@@ -254,10 +249,17 @@ class IndexerProcessorServer:
                 self.processor.update_last_processed_version(batch_end)
                 PROCESSED_TRANSACTIONS_COUNTER.inc(len(processed_versions))
 
+                perf_end_time = perf_counter()
+
                 print(
                     json.dumps(
                         {
-                            "message": f"[Parser] Processed transactions {batch_start} to {batch_end}"
+                            "message": f"[Parser] Processed transactions",
+                            "processor_name": self.processor.name(),
+                            "start_version": str(batch_start),
+                            "end_version": str(batch_end),
+                            "batch_size": str(batch_end - batch_start + 1),
+                            "tps": f"{(batch_end - batch_start + 1) / (perf_end_time - perf_start_time)}",
                         }
                     ),
                     flush=True,
@@ -274,12 +276,6 @@ class IndexerProcessorServer:
                         flush=True,
                     )
                     break
-
-        perf_stop_time = perf_counter()
-        if self.perf_transactions:
-            print(
-                f"Elapsed TPS: {int(self.perf_transactions) / (perf_stop_time - perf_start_time)}"
-            )
 
     def init_db_tables(self, schema_name: str) -> None:
         engine = create_engine(self.config.db_connection_uri)
