@@ -7,3 +7,5 @@ pub mod delegator_pools;
 pub mod proposal_votes;
 pub mod stake_utils;
 pub mod staking_pool_voter;
+pub mod current_delegated_voter;
+

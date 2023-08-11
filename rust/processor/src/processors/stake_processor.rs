@@ -11,6 +11,7 @@ use crate::{
         },
         proposal_votes::ProposalVote,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
+        current_delegated_voter::CurrentDelegatedVoter,
     },
     schema,
     utils::database::{
@@ -304,6 +305,38 @@ fn insert_current_delegator_pool_balances(
             Some(
                 " WHERE current_delegated_staking_pool_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
             ),
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_current_delegated_voter(
+    conn: &mut PgConnection,
+    item_to_insert: &[CurrentDelegatedVoter],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_delegated_voter::dsl::*;
+
+    let chunks = get_chunks(
+        item_to_insert.len(),
+        CurrentDelegatedVoter::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_delegated_voter::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict((delegation_pool_address, delegator_address))
+                .do_update()
+                .set((
+                    delegator_address.eq(excluded(delegator_address)),
+                    delegation_pool_address.eq(excluded(delegation_pool_address)),
+                    voter.eq(excluded(voter)),
+                    pending_voter.eq(excluded(pending_voter)),
+                    transaction_timestamp.eq(excluded(transaction_timestamp)),
+                    transaction_version.eq(excluded(transaction_version)),
+                    table_handle.eq(excluded(table_handle)),
+                )),
+                None,
         )?;
     }
     Ok(())
