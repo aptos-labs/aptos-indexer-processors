@@ -7,6 +7,7 @@ use crate::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
+        nft_metadata_processor::NFTMetadataProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
@@ -66,6 +67,8 @@ pub struct Worker {
     pub number_concurrent_processing_tasks: usize,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
+    pub pubsub_topic_name: Option<String>,
+    pub google_application_credentials: Option<String>,
 }
 
 impl Worker {
@@ -81,6 +84,8 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         ans_address: Option<String>,
         nft_points_contract: Option<String>,
+        pubsub_topic_name: Option<String>,
+        google_application_credentials: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -108,6 +113,8 @@ impl Worker {
             number_concurrent_processing_tasks,
             ans_address,
             nft_points_contract,
+            pubsub_topic_name,
+            google_application_credentials,
         }
     }
 
@@ -200,6 +207,22 @@ impl Worker {
             )),
             Processor::TokenV2Processor => {
                 Arc::new(TokenV2TransactionProcessor::new(self.db_pool.clone()))
+            },
+            Processor::NFTMetadataProcessor => {
+                let pubsub_topic_name = self
+                    .pubsub_topic_name
+                    .clone()
+                    .expect("pubsub_topic_name is required for NFTMetadataProcessor");
+
+                // Crate reads from authentication from file specified in GOOGLE_APPLICATION_CREDENTIALS env var
+                if let Some(credentials) = self.google_application_credentials.clone() {
+                    std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+                }
+
+                Arc::new(NFTMetadataProcessor::new(
+                    self.db_pool.clone(),
+                    pubsub_topic_name,
+                ))
             },
         };
         let processor_name = processor.name();
@@ -409,8 +432,9 @@ impl Worker {
                     PROCESSOR_INVOCATIONS_COUNT
                         .with_label_values(&[processor_name])
                         .inc();
+
                     let processed_result = processor_clone
-                        .process_transactions(transactions, start_version, end_version)
+                        .process_transactions(transactions, start_version, end_version, db_chain_id) // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
