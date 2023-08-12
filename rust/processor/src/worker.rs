@@ -215,12 +215,9 @@ impl Worker {
                     .expect("pubsub_topic_name is required for NFTMetadataProcessor");
 
                 // Crate reads from authentication from file specified in GOOGLE_APPLICATION_CREDENTIALS env var
-                std::env::set_var(
-                    "GOOGLE_APPLICATION_CREDENTIALS",
-                    self.google_application_credentials.clone().expect(
-                        "google_application_credentials is required for NFTMetadataProcessor",
-                    ),
-                );
+                if let Some(credentials) = self.google_application_credentials.clone() {
+                    std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+                }
 
                 Arc::new(NFTMetadataProcessor::new(
                     self.db_pool.clone(),
