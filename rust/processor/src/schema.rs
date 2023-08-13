@@ -10,8 +10,9 @@ diesel::table! {
 }
 
 diesel::table! {
-    ans_lookup (transaction_version, domain, subdomain) {
+    ans_lookup (transaction_version, wsc_index) {
         transaction_version -> Int8,
+        wsc_index -> Int8,
         #[max_length = 64]
         domain -> Varchar,
         #[max_length = 64]
@@ -19,11 +20,46 @@ diesel::table! {
         #[max_length = 66]
         registered_address -> Nullable<Varchar>,
         expiration_timestamp -> Nullable<Timestamp>,
-        #[max_length = 128]
+        #[max_length = 140]
         token_name -> Varchar,
-        is_primary -> Nullable<Bool>,
+        is_primary -> Bool,
         is_deleted -> Bool,
-        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    ans_lookups (transaction_version, wsc_index) {
+        transaction_version -> Int8,
+        wsc_index -> Int8,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Nullable<Timestamp>,
+        #[max_length = 140]
+        token_name -> Varchar,
+        is_primary -> Bool,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    ans_primary_name (transaction_version, wsc_index, domain, subdomain) {
+        transaction_version -> Int8,
+        wsc_index -> Int8,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        #[max_length = 140]
+        token_name -> Varchar,
+        is_primary -> Bool,
         inserted_at -> Timestamp,
     }
 }
@@ -189,6 +225,22 @@ diesel::table! {
         token_name -> Varchar,
         is_primary -> Bool,
         is_deleted -> Bool,
+    }
+}
+
+diesel::table! {
+    current_ans_primary_name (registered_address, domain, subdomain) {
+        #[max_length = 66]
+        registered_address -> Varchar,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 140]
+        token_name -> Varchar,
+        is_primary -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1042,6 +1094,8 @@ diesel::table! {
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
     ans_lookup,
+    ans_lookups,
+    ans_primary_name,
     block_metadata_transactions,
     coin_activities,
     coin_balances,
@@ -1050,6 +1104,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     collection_datas,
     collections_v2,
     current_ans_lookup,
+    current_ans_primary_name,
     current_coin_balances,
     current_collection_datas,
     current_collections_v2,
