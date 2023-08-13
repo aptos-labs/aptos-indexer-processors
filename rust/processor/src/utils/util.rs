@@ -398,6 +398,13 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
     current_timestamp - transaction_time
 }
 
+/// Get name from unwrapped move type
+/// E.g. 0x1::domain::Name will return Name
+pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
+    let t: Vec<&str> = move_type.split("::").collect();
+    t.last().unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
