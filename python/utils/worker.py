@@ -47,7 +47,12 @@ class IndexerProcessorServer:
             case ProcessorName.NFT_MARKETPLACE_V2_PROCESSOR.value:
                 self.processor = NFTMarketplaceV2Processor()
             case _:
-                raise Exception("Invalid processor name")
+                raise Exception(
+                    "Invalid processor name"
+                    "\n[ERROR]: The specified processor name was invalid or not found.\n"
+                    "         - If you are using a custom processor, make sure to add it to the ProcessorName enum in utils/processor_name.py.\n"
+                    "         - Ensure the IndexerProcessorServer constructor in utils/worker.py uses the new enum value.\n"
+                )
 
         self.processor.config = self.config
 
