@@ -1,0 +1,21 @@
+[package]
+name = "Coin Flip"
+version = "0.0.1"
+
+[addresses]
+deployer = "_"
+coin_flip = "_"
+
+[dev-addresses]
+deployer = "0x2b9b1704c56ae52555383c2d0bd16bedacb761bbda67dc63f9d234ab79399c95"
+coin_flip = "0x33cf54b3cb66c618d7eb830e79d2d01a57112bc87b86d87d60630b7a0a5ad4a6"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "devnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.AptosTokenObjects]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "devnet"
+subdir = "aptos-move/framework/aptos-token-objects"
