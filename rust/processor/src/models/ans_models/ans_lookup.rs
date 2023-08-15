@@ -22,7 +22,18 @@ pub type CurrentAnsLookupPK = (Domain, Subdomain);
 // PK of current_ans_primary_name, i.e. registered_address
 pub type CurrentAnsPrimaryNamePK = String;
 
-#[derive(Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Clone,
+    Default,
+    Debug,
+    Deserialize,
+    FieldCount,
+    Identifiable,
+    Insertable,
+    Serialize,
+    PartialEq,
+    Eq,
+)]
 #[diesel(primary_key(domain, subdomain))]
 #[diesel(table_name = current_ans_lookup)]
 #[diesel(treat_none_as_null = true)]
@@ -51,7 +62,18 @@ pub struct AnsLookup {
     pub is_deleted: bool,
 }
 
-#[derive(Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Clone,
+    Default,
+    Debug,
+    Deserialize,
+    FieldCount,
+    Identifiable,
+    Insertable,
+    Serialize,
+    PartialEq,
+    Eq,
+)]
 #[diesel(primary_key(registered_address, token_name))]
 #[diesel(table_name = current_ans_primary_name)]
 #[diesel(treat_none_as_null = true)]
@@ -78,18 +100,43 @@ pub struct AnsPrimaryName {
     pub is_deleted: bool,
 }
 
+impl Ord for CurrentAnsLookup {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.domain
+            .cmp(&other.domain)
+            .then(self.subdomain.cmp(&other.subdomain))
+    }
+}
+
+impl PartialOrd for CurrentAnsLookup {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl CurrentAnsLookup {
+    pub fn pk(&self) -> CurrentAnsLookupPK {
+        (self.domain.clone(), self.subdomain.clone())
+    }
+
     // Parse name record from write table item.
     // The table key has the domain and subdomain.
     // The table value data has the metadata (expiration, property version, target address).
     pub fn parse_name_record_from_write_table_item_v1(
         write_table_item: &WriteTableItem,
-        ans_name_records_table_handle: &Option<String>,
+        ans_v1_name_records_table_handle: &Option<String>,
         txn_version: i64,
         write_set_change_index: i64,
     ) -> anyhow::Result<Option<(Self, AnsLookup)>> {
-        let table_handle = write_table_item.handle.as_ref();
-        if table_handle != ans_name_records_table_handle.clone().unwrap_or_default() {
+        let table_handle = standardize_address(&write_table_item.handle.to_string());
+        if table_handle
+            != standardize_address(
+                ans_v1_name_records_table_handle
+                    .clone()
+                    .unwrap_or_default()
+                    .as_str(),
+            )
+        {
             return Ok(None);
         }
         if let Some(data) = write_table_item.data.as_ref() {
@@ -99,7 +146,8 @@ impl CurrentAnsLookup {
             if let Some(AnsTableItem::NameRecordKeyV1(name_record_key)) =
                 &AnsTableItem::from_table_item(key_type_name, &data.key, txn_version)?
             {
-                let value_type_name = get_name_from_unnested_move_type(data.value_type.as_ref());
+                let value_type_name: &str =
+                    get_name_from_unnested_move_type(data.value_type.as_ref());
                 if let Some(AnsTableItem::NameRecordV1(name_record)) =
                     &AnsTableItem::from_table_item(value_type_name, &data.value, txn_version)?
                 {
@@ -135,12 +183,19 @@ impl CurrentAnsLookup {
     // the rest of the fields to default values.
     pub fn parse_name_record_from_delete_table_item_v1(
         delete_table_item: &DeleteTableItem,
-        ans_name_records_table_handle: &Option<String>,
+        ans_v1_name_records_table_handle: &Option<String>,
         txn_version: i64,
         write_set_change_index: i64,
     ) -> anyhow::Result<Option<(Self, AnsLookup)>> {
-        let table_handle = delete_table_item.handle.as_ref();
-        if table_handle != ans_name_records_table_handle.clone().unwrap_or_default() {
+        let table_handle = standardize_address(&delete_table_item.handle.to_string());
+        if table_handle
+            != standardize_address(
+                ans_v1_name_records_table_handle
+                    .clone()
+                    .unwrap_or_default()
+                    .as_str(),
+            )
+        {
             return Ok(None);
         }
         if let Some(data) = delete_table_item.data.as_ref() {
@@ -176,18 +231,41 @@ impl CurrentAnsLookup {
     }
 }
 
+impl Ord for CurrentAnsPrimaryName {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.registered_address.cmp(&other.registered_address)
+    }
+}
+
+impl PartialOrd for CurrentAnsPrimaryName {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl CurrentAnsPrimaryName {
+    pub fn pk(&self) -> CurrentAnsPrimaryNamePK {
+        self.registered_address.clone()
+    }
+
     // Parse the primary name reverse record from write table item.
     // The table key is the target address the primary name points to.
     // The table value data has the domain and subdomain of the primary name.
     pub fn parse_primary_name_record_from_write_table_item_v1(
         write_table_item: &WriteTableItem,
-        ans_primary_names_table_handle: &Option<String>,
+        ans_v1_primary_names_table_handle: &Option<String>,
         txn_version: i64,
         write_set_change_index: i64,
     ) -> anyhow::Result<Option<(Self, AnsPrimaryName)>> {
-        let table_handle = write_table_item.handle.as_str();
-        if table_handle != ans_primary_names_table_handle.clone().unwrap_or_default() {
+        let table_handle = standardize_address(&write_table_item.handle.to_string());
+        if table_handle
+            != standardize_address(
+                ans_v1_primary_names_table_handle
+                    .clone()
+                    .unwrap_or_default()
+                    .as_str(),
+            )
+        {
             return Ok(None);
         }
         if let Some(data) = write_table_item.data.as_ref() {
@@ -196,7 +274,8 @@ impl CurrentAnsPrimaryName {
             if data.key_type != "address" {
                 return Ok(None);
             }
-            let registered_address = standardize_address(data.key.as_ref());
+            let decoded_key: String = serde_json::from_str(data.key.as_str()).unwrap();
+            let registered_address = standardize_address(decoded_key.as_str());
             let value_type_name = get_name_from_unnested_move_type(data.value_type.as_ref());
             if let Some(AnsTableItem::NameRecordKeyV1(name_record_key)) =
                 &AnsTableItem::from_table_item(value_type_name, &data.value, txn_version)?
@@ -229,12 +308,19 @@ impl CurrentAnsPrimaryName {
     // We need to lookup which domain the address points to so we can mark it as non-primary.
     pub fn parse_primary_name_record_from_delete_table_item_v1(
         delete_table_item: &DeleteTableItem,
-        ans_primary_names_table_handle: &Option<String>,
+        ans_v1_primary_names_table_handle: &Option<String>,
         txn_version: i64,
         write_set_change_index: i64,
     ) -> anyhow::Result<Option<(Self, AnsPrimaryName)>> {
-        let table_handle = delete_table_item.handle.as_str();
-        if table_handle != ans_primary_names_table_handle.clone().unwrap_or_default() {
+        let table_handle = standardize_address(&delete_table_item.handle.to_string());
+        if table_handle
+            != standardize_address(
+                ans_v1_primary_names_table_handle
+                    .clone()
+                    .unwrap_or_default()
+                    .as_str(),
+            )
+        {
             return Ok(None);
         }
         if let Some(data) = delete_table_item.data.as_ref() {
@@ -243,7 +329,8 @@ impl CurrentAnsPrimaryName {
             if data.key_type != "address" {
                 return Ok(None);
             }
-            let registered_address = standardize_address(data.key.as_ref());
+            let decoded_key: String = serde_json::from_str(data.key.as_str()).unwrap();
+            let registered_address = standardize_address(decoded_key.as_str());
             return Ok(Some((
                 Self {
                     registered_address: registered_address.clone(),
@@ -251,7 +338,7 @@ impl CurrentAnsPrimaryName {
                     subdomain: None,
                     token_name: None,
                     last_transaction_version: txn_version,
-                    is_deleted: false,
+                    is_deleted: true,
                 },
                 AnsPrimaryName {
                     transaction_version: txn_version,
@@ -260,7 +347,7 @@ impl CurrentAnsPrimaryName {
                     domain: None,
                     subdomain: None,
                     token_name: None,
-                    is_deleted: false,
+                    is_deleted: true,
                 },
             )));
         }

@@ -66,8 +66,8 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub ans_primary_names_table_handle: Option<String>,
-    pub ans_name_records_table_handle: Option<String>,
+    pub ans_v1_primary_names_table_handle: Option<String>,
+    pub ans_v1_name_records_table_handle: Option<String>,
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
@@ -84,8 +84,8 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        ans_primary_names_table_handle: Option<String>,
-        ans_name_records_table_handle: Option<String>,
+        ans_v1_primary_names_table_handle: Option<String>,
+        ans_v1_name_records_table_handle: Option<String>,
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
         google_application_credentials: Option<String>,
@@ -114,8 +114,8 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            ans_primary_names_table_handle,
-            ans_name_records_table_handle,
+            ans_v1_primary_names_table_handle,
+            ans_v1_name_records_table_handle,
             nft_points_contract,
             pubsub_topic_name,
             google_application_credentials,
@@ -229,8 +229,8 @@ impl Worker {
             },
             Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
                 self.db_pool.clone(),
-                self.ans_primary_names_table_handle.clone(),
-                self.ans_name_records_table_handle.clone(),
+                self.ans_v1_primary_names_table_handle.clone(),
+                self.ans_v1_name_records_table_handle.clone(),
             )),
         };
         let processor_name = processor.name();
@@ -359,7 +359,8 @@ impl Worker {
             let mut transactions_batches = vec![];
             let mut last_fetched_version = batch_start_version as i64 - 1;
             for task_index in 0..concurrent_tasks {
-                let receive_status = match task_index {
+                let receive_status: Result<(u64, Vec<Transaction>), TryRecvError> = match task_index
+                {
                     0 => {
                         // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
                         receiver.recv().await.ok_or(TryRecvError::Disconnected)

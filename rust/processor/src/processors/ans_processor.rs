@@ -25,25 +25,25 @@ use tracing::error;
 pub const NAME: &str = "ans_processor";
 pub struct AnsTransactionProcessor {
     connection_pool: PgDbPool,
-    ans_primary_names_table_handle: Option<String>,
-    ans_name_records_table_handle: Option<String>,
+    ans_v1_primary_names_table_handle: Option<String>,
+    ans_v1_name_records_table_handle: Option<String>,
 }
 
 impl AnsTransactionProcessor {
     pub fn new(
         connection_pool: PgDbPool,
-        ans_primary_names_table_handle: Option<String>,
-        ans_name_records_table_handle: Option<String>,
+        ans_v1_primary_names_table_handle: Option<String>,
+        ans_v1_name_records_table_handle: Option<String>,
     ) -> Self {
         tracing::info!(
-            ans_primary_names_table_handle = ans_primary_names_table_handle,
-            ans_name_records_table_handle = ans_name_records_table_handle,
+            ans_v1_primary_names_table_handle = ans_v1_primary_names_table_handle,
+            ans_v1_name_records_table_handle = ans_v1_name_records_table_handle,
             "init AnsProcessor"
         );
         Self {
             connection_pool,
-            ans_primary_names_table_handle,
-            ans_name_records_table_handle,
+            ans_v1_primary_names_table_handle,
+            ans_v1_name_records_table_handle,
         }
     }
 }
@@ -141,9 +141,9 @@ fn insert_current_ans_lookups(
                         registered_address.eq(excluded(registered_address)),
                         expiration_timestamp.eq(excluded(expiration_timestamp)),
                         last_transaction_version.eq(excluded(last_transaction_version)),
-                        inserted_at.eq(excluded(inserted_at)),
                         token_name.eq(excluded(token_name)),
                         is_deleted.eq(excluded(is_deleted)),
+                        inserted_at.eq(excluded(inserted_at)),
                     )),
                     Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
                 )?;
@@ -165,7 +165,16 @@ fn insert_ans_lookups(
             diesel::insert_into(schema::ans_lookup::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    registered_address.eq(excluded(registered_address)),
+                    domain.eq(excluded(domain)),
+                    subdomain.eq(excluded(subdomain)),
+                    expiration_timestamp.eq(excluded(expiration_timestamp)),
+                    token_name.eq(excluded(token_name)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -193,6 +202,7 @@ fn insert_current_ans_primary_names(
                     token_name.eq(excluded(token_name)),
                     is_deleted.eq(excluded(is_deleted)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -214,7 +224,15 @@ fn insert_ans_primary_names(
             diesel::insert_into(schema::ans_primary_name::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    registered_address.eq(excluded(registered_address)),
+                    domain.eq(excluded(domain)),
+                    subdomain.eq(excluded(subdomain)),
+                    token_name.eq(excluded(token_name)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -243,8 +261,8 @@ impl ProcessorTrait for AnsTransactionProcessor {
             all_ans_primary_names,
         ) = parse_ans(
             &transactions,
-            self.ans_name_records_table_handle.clone(),
-            self.ans_primary_names_table_handle.clone(),
+            self.ans_v1_primary_names_table_handle.clone(),
+            self.ans_v1_name_records_table_handle.clone(),
         );
 
         // Insert values to db
@@ -281,8 +299,8 @@ impl ProcessorTrait for AnsTransactionProcessor {
 
 fn parse_ans(
     transactions: &[Transaction],
-    maybe_ans_primary_names_table_handle: Option<String>,
-    maybe_ans_name_records_table_handle: Option<String>,
+    maybe_ans_v1_primary_names_table_handle: Option<String>,
+    maybe_ans_v1_name_records_table_handle: Option<String>,
 ) -> (
     Vec<CurrentAnsLookup>,
     Vec<AnsLookup>,
@@ -311,7 +329,7 @@ fn parse_ans(
                     if let Some((current_ans_lookup, ans_lookup)) =
                         CurrentAnsLookup::parse_name_record_from_write_table_item_v1(
                             table_item,
-                            &maybe_ans_name_records_table_handle,
+                            &maybe_ans_v1_name_records_table_handle,
                             txn_version,
                             wsc_index as i64,
                         )
@@ -323,19 +341,13 @@ fn parse_ans(
                             panic!();
                         })
                     {
-                        all_current_ans_lookups.insert(
-                            (
-                                current_ans_lookup.domain.clone(),
-                                current_ans_lookup.subdomain.clone(),
-                            ),
-                            current_ans_lookup,
-                        );
+                        all_current_ans_lookups.insert(current_ans_lookup.pk(), current_ans_lookup);
                         all_ans_lookups.push(ans_lookup);
                     }
                     if let Some((current_primary_name, primary_name)) =
                         CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
                             table_item,
-                            &maybe_ans_primary_names_table_handle,
+                            &maybe_ans_v1_primary_names_table_handle,
                             txn_version,
                             wsc_index as i64,
                         )
@@ -347,10 +359,8 @@ fn parse_ans(
                             panic!();
                         })
                     {
-                        all_current_ans_primary_names.insert(
-                            current_primary_name.registered_address.clone(),
-                            current_primary_name,
-                        );
+                        all_current_ans_primary_names
+                            .insert(current_primary_name.pk(), current_primary_name);
                         all_ans_primary_names.push(primary_name);
                     }
                 },
@@ -358,7 +368,7 @@ fn parse_ans(
                     if let Some((current_ans_lookup, ans_lookup)) =
                         CurrentAnsLookup::parse_name_record_from_delete_table_item_v1(
                             table_item,
-                            &maybe_ans_name_records_table_handle,
+                            &maybe_ans_v1_name_records_table_handle,
                             txn_version,
                             wsc_index as i64,
                         )
@@ -370,19 +380,13 @@ fn parse_ans(
                             panic!();
                         })
                     {
-                        all_current_ans_lookups.insert(
-                            (
-                                current_ans_lookup.domain.clone(),
-                                current_ans_lookup.subdomain.clone(),
-                            ),
-                            current_ans_lookup,
-                        );
+                        all_current_ans_lookups.insert(current_ans_lookup.pk(), current_ans_lookup);
                         all_ans_lookups.push(ans_lookup);
                     }
                     if let Some((current_primary_name, primary_name)) =
                         CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
                             table_item,
-                            &maybe_ans_primary_names_table_handle,
+                            &maybe_ans_v1_primary_names_table_handle,
                             txn_version,
                             wsc_index as i64,
                         )
@@ -394,10 +398,8 @@ fn parse_ans(
                             panic!();
                         })
                     {
-                        all_current_ans_primary_names.insert(
-                            current_primary_name.registered_address.clone(),
-                            current_primary_name,
-                        );
+                        all_current_ans_primary_names
+                            .insert(current_primary_name.pk(), current_primary_name);
                         all_ans_primary_names.push(primary_name);
                     }
                 },
@@ -414,9 +416,8 @@ fn parse_ans(
         .into_values()
         .collect::<Vec<CurrentAnsPrimaryName>>();
 
-    all_current_ans_lookups
-        .sort_by(|a, b| a.domain.cmp(&b.domain).then(a.subdomain.cmp(&b.subdomain)));
-    all_current_ans_primary_names.sort_by(|a, b| a.registered_address.cmp(&b.registered_address));
+    all_current_ans_lookups.sort();
+    all_current_ans_primary_names.sort();
     (
         all_current_ans_lookups,
         all_ans_lookups,
