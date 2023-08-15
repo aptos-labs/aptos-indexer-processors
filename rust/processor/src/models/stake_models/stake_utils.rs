@@ -9,7 +9,6 @@ use anyhow::{Context, Result};
 use aptos_indexer_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 const STAKE_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -224,7 +223,14 @@ impl StakeEvent {
 }
 
 pub enum VoteDelegationTableItem {
-    VoteDelegation(VoteDelegationResource),
+    VoteDelegationMap(VoteDelegationMap),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VoteDelegationMap {
+    pub hash: String,
+    pub key: String,
+    pub value: VoteDelegationResource,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -235,11 +241,11 @@ pub struct VoteDelegationResource {
 
 impl VoteDelegationResource {
     pub fn get_voter(&self) -> String {
-        self.voter
+        standardize_address(&self.voter)
     }
 
     pub fn get_pending_voter(&self) -> String {
-        self.pending_voter
+        standardize_address(&self.pending_voter)
     }
 }
 
@@ -251,20 +257,18 @@ impl VoteDelegationTableItem {
     ) -> Result<Option<Self>> {
         match data_type {
             "vector<0x1::smart_table::Entry<address, 0x1::delegation_pool::VoteDelegation>>" => {
-                serde_json::from_str(data.clone()).map(|inner| Some(VoteDelegationTableItem::VoteDelegation(inner)))
+                let deserialized: Vec<VoteDelegationMap> =
+                    serde_json::from_str(data).context(format!(
+                        "version {} failed! failed to parse type {}, data {:?}",
+                        txn_version, data_type, data
+                    ))?;
+                Ok(Some(VoteDelegationTableItem::VoteDelegationMap(
+                    deserialized[0].clone(),
+                )))
             },
             _ => Ok(None),
         }
-        .context(format!(
-            "version {} failed! failed to parse type {}, data {:?}",
-            txn_version, data_type, data
-        ))
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct VotDelegationMapResource {
-    pub map: HashMap<String, VoteDelegationResource>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -294,8 +298,12 @@ impl DelgationVoteGovernanceRecordsResource {
         txn_version: i64,
     ) -> Result<Option<Self>> {
         match data_type {
-            "0x1::delegation_pool::GovernanceRecords" => {
-                serde_json::from_value(data.clone()).map(|inner| Some(DelgationVoteGovernanceRecordsResource::GovernanceRecords(inner)))
+            x if x == format!("{}::delegation_pool::GovernanceRecords", STAKE_ADDR) => {
+                serde_json::from_value(data.clone()).map(|inner| {
+                    Some(DelgationVoteGovernanceRecordsResource::GovernanceRecords(
+                        inner,
+                    ))
+                })
             },
             _ => Ok(None),
         }
@@ -310,18 +318,12 @@ impl DelgationVoteGovernanceRecordsResource {
         txn_version: i64,
     ) -> Result<Option<Self>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-
         let resource = MoveResource::from_write_resource(
             write_resource,
             0, // Placeholder, this isn't used anyway
             txn_version,
             0, // Placeholder, this isn't used anyway
         );
-        // Handle the Result and Option separately
-        match Self::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version) {
-            Ok(Some(inner)) => Ok(Some(inner)),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-        }
+        Self::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)
     }
 }
