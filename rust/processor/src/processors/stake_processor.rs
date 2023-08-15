@@ -4,6 +4,7 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::stake_models::{
+        current_delegated_voter::{CurrentDelegatedVoter, CurrentDelegatedVoterMap},
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, CurrentDelegatorBalanceMap},
         delegator_pools::{
@@ -11,7 +12,6 @@ use crate::{
         },
         proposal_votes::ProposalVote,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
-        current_delegated_voter::CurrentDelegatedVoter,
     },
     schema,
     utils::database::{
@@ -57,6 +57,7 @@ fn insert_to_db_impl(
     delegator_pools: &[DelegatorPool],
     delegator_pool_balances: &[DelegatorPoolBalance],
     current_delegator_pool_balances: &[CurrentDelegatorPoolBalance],
+    current_delegated_voter: &[CurrentDelegatedVoter],
 ) -> Result<(), diesel::result::Error> {
     insert_current_stake_pool_voter(conn, current_stake_pool_voters)?;
     insert_proposal_votes(conn, proposal_votes)?;
@@ -65,6 +66,7 @@ fn insert_to_db_impl(
     insert_delegator_pools(conn, delegator_pools)?;
     insert_delegator_pool_balances(conn, delegator_pool_balances)?;
     insert_current_delegator_pool_balances(conn, current_delegator_pool_balances)?;
+    insert_current_delegated_voter(conn, current_delegated_voter)?;
     Ok(())
 }
 
@@ -80,6 +82,7 @@ fn insert_to_db(
     delegator_pools: Vec<DelegatorPool>,
     delegator_pool_balances: Vec<DelegatorPoolBalance>,
     current_delegator_pool_balances: Vec<CurrentDelegatorPoolBalance>,
+    current_delegated_voter: Vec<CurrentDelegatedVoter>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -100,6 +103,7 @@ fn insert_to_db(
                 &delegator_pools,
                 &delegator_pool_balances,
                 &current_delegator_pool_balances,
+                &current_delegated_voter,
             )
         }) {
         Ok(_) => Ok(()),
@@ -115,6 +119,7 @@ fn insert_to_db(
                 let delegator_pool_balances = clean_data_for_db(delegator_pool_balances, true);
                 let current_delegator_pool_balances =
                     clean_data_for_db(current_delegator_pool_balances, true);
+                let current_delegated_voter = clean_data_for_db(current_delegated_voter, true);
 
                 insert_to_db_impl(
                     pg_conn,
@@ -125,6 +130,7 @@ fn insert_to_db(
                     &delegator_pools,
                     &delegator_pool_balances,
                     &current_delegator_pool_balances,
+                    &current_delegated_voter,
                 )
             }),
     }
@@ -316,10 +322,7 @@ fn insert_current_delegated_voter(
 ) -> Result<(), diesel::result::Error> {
     use schema::current_delegated_voter::dsl::*;
 
-    let chunks = get_chunks(
-        item_to_insert.len(),
-        CurrentDelegatedVoter::field_count(),
-    );
+    let chunks = get_chunks(item_to_insert.len(), CurrentDelegatedVoter::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
@@ -328,15 +331,15 @@ fn insert_current_delegated_voter(
                 .on_conflict((delegation_pool_address, delegator_address))
                 .do_update()
                 .set((
-                    delegator_address.eq(excluded(delegator_address)),
-                    delegation_pool_address.eq(excluded(delegation_pool_address)),
                     voter.eq(excluded(voter)),
                     pending_voter.eq(excluded(pending_voter)),
-                    transaction_timestamp.eq(excluded(transaction_timestamp)),
-                    transaction_version.eq(excluded(transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
                     table_handle.eq(excluded(table_handle)),
                 )),
-                None,
+                Some(
+                    " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
+                ),
         )?;
     }
     Ok(())
@@ -364,6 +367,7 @@ impl ProcessorTrait for StakeTransactionProcessor {
         let mut all_delegator_pools: DelegatorPoolMap = HashMap::new();
         let mut all_delegator_pool_balances = vec![];
         let mut all_current_delegator_pool_balances = HashMap::new();
+        let mut all_current_delegated_voter: CurrentDelegatedVoterMap = HashMap::new();
 
         for txn in &transactions {
             // Add votes data
@@ -387,6 +391,11 @@ impl ProcessorTrait for StakeTransactionProcessor {
             all_delegator_pools.extend(delegator_pools);
             all_delegator_pool_balances.append(&mut delegator_pool_balances);
             all_current_delegator_pool_balances.extend(current_delegator_pool_balances);
+
+            // Add current delegated voter
+            let current_delegated_voter =
+                CurrentDelegatedVoter::from_transaction(txn, &mut conn).unwrap();
+            all_current_delegated_voter.extend(current_delegated_voter);
         }
 
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
@@ -402,6 +411,9 @@ impl ProcessorTrait for StakeTransactionProcessor {
         let mut all_current_delegator_pool_balances = all_current_delegator_pool_balances
             .into_values()
             .collect::<Vec<CurrentDelegatorPoolBalance>>();
+        let mut all_current_delegated_voter = all_current_delegated_voter
+            .into_values()
+            .collect::<Vec<CurrentDelegatedVoter>>();
 
         // Sort by PK
         all_current_stake_pool_voters
@@ -416,6 +428,10 @@ impl ProcessorTrait for StakeTransactionProcessor {
         all_delegator_pools.sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
         all_current_delegator_pool_balances
             .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
+        all_current_delegated_voter.sort_by(|a, b| {
+            (&a.delegation_pool_address, &a.delegator_address)
+                .cmp(&(&b.delegation_pool_address, &b.delegator_address))
+        });
 
         let tx_result = insert_to_db(
             &mut conn,
@@ -429,6 +445,7 @@ impl ProcessorTrait for StakeTransactionProcessor {
             all_delegator_pools,
             all_delegator_pool_balances,
             all_current_delegator_pool_balances,
+            all_current_delegated_voter,
         );
 
         match tx_result {
