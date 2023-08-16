@@ -2,22 +2,29 @@
 
 In this tutorial, we're going to walk you through all the steps involved with creating a very basic custom indexer processor to track events and data on the Aptos blockchain.
 
-We use a very simple smart contract called **Coin Flip** that emits events for us. The smart contract is already deployed, and you mostly don't need to understand it unless you're curious to mess with it or change things. It's located in the `python/processors/coin_flip/move` folder.
+We use a very simple smart contract called **Coin Flip** that has already emitted events for us. 
+
+The smart contract is already deployed, and you mostly don't need to understand it unless you're curious to mess with it or change things. It's located in the `python/processors/coin_flip/move` folder.
 
 We've provided the example code for the modules involved. This tutorial assumes you've set up your environment and already have the following:
 
 - An API key for the GRPC backend. If you do not have one, you should use your API gateway to obtain one [here](https://github.com/aptos-labs/aptos-indexer-processors)
 - The [Aptos CLI](https://aptos.dev/tools/aptos-cli/)
 - [Python](https://www.python.org/downloads/) and [Poetry](https://python-poetry.org/docs/#installing-with-the-official-installer)
+- This cloned repository on your local machine `https://github.com/aptos-labs/aptos-indexer-processors`
+
+We use postgresql as our database in this tutorial. You're free to use whatever you want, but this tutorial is geared towards postgresql for the sake of simplicity. We use the following database configuration and tools:
 - [Postgresql](https://www.postgresql.org/download/)
     - We will use a database hosted on `localhost` on the port `5432`, which should be the default
     - When you create your username, keep track of it and the password you use for it
     - You can view a tutorial for installing postgresql and psql [here](https://www.digitalocean.com/community/tutorials/how-to-install-postgresql-on-ubuntu-22-04-quickstart) tool to set up your database more quickly
-- This cloned repository on your local machine `https://github.com/aptos-labs/aptos-indexer-processors`
+    - If you want to easily view your database data, consider using a GUI like [DBeaver](https://dbeaver.io/) or [pgAdmin](https://www.pgadmin.org/)
 
 Explaining how to create a database is beyond the scope of this tutorial, so if you don't know how to do it, you could check out tutorials on how to create a database with the `psql` tool.
 
-## Setup your database
+## Setup your environment
+
+### Setup the postgresql database
 
 Make sure to start the `postgresql` service:
 
@@ -36,6 +43,26 @@ brew services start postgresql
 Create your database with the name `coin_flip`, where our username is `user` and our password is `password`.
 
 If your database is set up correctly, and you have the `psql` tool, you should be able to run the command `psql -d coin_flip`.
+
+### Setup your local environment with poetry and grpc
+
+If you haven't yet, make sure to read the main indexer [README guide](https://github.com/aptos-labs/aptos-indexer-processors).
+
+You can also check out the python-specific broad overview of how to create an indexer processor [here](https://github.com/aptos-labs/aptos-indexer-processors/tree/main/python).
+
+At the very least, make sure to install these tools and setup your poetry environment:
+
+```shell
+pip install grpcio-tools
+poetry install
+
+python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python  \
+          proto/aptos/bigquery_schema/v1/transaction.proto  \
+          proto/aptos/indexer/v1/raw_data.proto \
+          proto/aptos/internal/fullnode/v1/fullnode_data.proto \
+          proto/aptos/transaction/v1/transaction.proto \
+          proto/aptos/util/timestamp/timestamp.proto
+```
 
 ## Configure your indexer processor
 
@@ -72,9 +99,28 @@ Copy the contents below and save it to a file called `config.yaml`. Save it in t
     - typescript
 ```
 
-Once you have your config.yaml file open, you only need to change one field:
+Once you have your config.yaml file open, you only need to change one field, if you just want to run the processor as is:
 ```yaml
 grpc_data_stream_api_key: "<YOUR_API_KEY_HERE>"
+```
+
+### More customization with config.yaml
+
+However, if you'd like to customize things further, you can change some of the other fields.
+
+If you'd like to start at a specific version, you can specify that in the config.yaml file with:
+```yaml
+starting_version_default: 123456789
+```
+
+This is the transaction version the indexer starts looking for events at. If the indexer has already processed transactions past this version, **it will skip all of them and go to the latest version stored.**
+
+The rows in `next_versions_to_process` are the `indexer_name` as the primary key and the `next_version` to process field, along with the `updated_at`.
+
+If you want to **force** the indexer to backfill data (overwrite/rewrite data) from previous versions even though it's already indexed past it, you can specify this in the config.yaml file with:
+
+```yaml
+starting_version_backfill: 123456789
 ```
 
 If you want to use a different network, change the `grpc_data_stream_endpoint` field to the corresponding desired value:
@@ -86,7 +132,7 @@ testnet: 34.64.252.224:50051   # asia
 mainnet: 34.30.218.153:50051
 ```
 
-If these values don't work for you, check out the `README.md` at the root folder of the repository. 
+If these ip addresses don't work for you, they might be outdated. Check out the `README.md` at the root folder of the repository for the latest endpoints. 
 
 If you're using a different database name or processor name, change the `processor_name` field and the `db_connection_uri` to your specific needs. Here's the general structure of the field:
 
@@ -94,7 +140,7 @@ If you're using a different database name or processor name, change the `process
 db_connection_uri: "postgresql://username:password@database_url:port_number/database_name"
 ```
 
-### Add your processor name to your processor
+### Add your processor & schema names to the configuration files
 
 First, let's create the name for the database schema we're going to use. We use `coin_flip` in our example, so we need to add it in two places:
 
@@ -120,10 +166,140 @@ match self.config.processor_name:
         self.processor = CoinFlipProcessor()
 ```
 
-### Create your database model
+3. Add it to the `python/utils/models/schema_names.py` file:
 
-In `coin_flip/models.py`, you can see our current model:
+```python
+EXAMPLE = "example"
+NFT_MARKETPLACE_SCHEMA_NAME = "nft_marketplace"
+NFT_MARKETPLACE_V2_SCHEMA_NAME = "nft_marketplace_v2"
+COIN_FLIP_SCHEMA_NAME = "coin_flip"
+```
 
+### Explanation of the event emission in the Move contract
+
+In our Move contract (in `coin_flip/move/sources/coin_flip.move`), each user has an object associated with their account. The object has a `CoinFlipStats` resource on it that tracks the total number of wins and losses a user has and is in charge of emitting events.
+
+```rust
+// CoinFlipStats object/resource definition
+#[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+struct CoinFlipStats has key {
+    wins: u64,
+    losses: u64,
+    event_handle: EventHandle<CoinFlipEvent>,  // 
+    delete_ref: DeleteRef,
+}
+
+// event emission in `flip_coin`
+fun flip_coin(
+    user: &signer,
+    prediction: bool,
+    nonce: u64,
+) acquires CoinFlipStats {
+    // ...
+    let (heads, correct_prediction) = flip(prediction, nonce);
+
+    if (correct_prediction) {
+        coin_flip_stats.wins = coin_flip_stats.wins + 1;
+    } else {
+        coin_flip_stats.losses = coin_flip_stats.losses + 1;
+    };
+
+    event::emit_event<CoinFlipEvent>(
+        &mut coin_flip_stats.event_handle,
+        CoinFlipEvent {
+            prediction: prediction,
+            result: heads,
+            wins: coin_flip_stats.wins,
+            losses: coin_flip_stats.losses,
+        }
+    );
+}
+```
+The events emitted are of type `CoinFlipEvent`, shown below:
+```rust
+struct CoinFlipEvent has copy, drop, store {
+    prediction: bool,     // true = heads, false = tails
+    result: bool,
+    wins: u64,
+    losses: u64,
+}
+```
+
+### Viewing and understanding how the event data is emitted and processed
+
+When we submit a transaction that calls the `coin_flip` entry function, the indexer parses the events and records the data of each event that occurred in the transaction.
+
+Within the `data` field of each `Event` type, we see the arbitrary event data emitted. We use this data to store the event data in our database.
+
+If you wanted to see the event data for yourself, you could add something like this to your `processor.py` file:
+
+```python
+for event_index, event in enumerate(user_transaction.events):
+    # ... other code
+
+    # Convert your on-chain data scheme to database-friendly values
+    # Our on-chain struct looks like this:
+    #   struct CoinFlipEvent has copy, drop, store {
+    #       prediction: bool,
+    #       result: bool,
+    #       timestamp: u64,
+    #   }
+    # These values are stored in the `data` field of the event as JSON fields/values
+    # Load the data into a json object and then use it as a regular dictionary
+    data = json.loads(event.data)
+    print(json.dumps(data, indent=3))
+```
+In our case, it prints something like this out:
+
+```json
+{
+    'losses': '49',
+    'prediction': False,
+    'result': True,
+    'wins': '51'
+}
+```
+
+So we'll get our data like this:
+
+```python
+prediction = bool(data["prediction"])
+result = bool(data["result"])
+wins = int(data["wins"])
+losses = int(data["losses"])
+
+# We have extra data to insert into the database, because we want to process our data.
+# Calculate the total
+win_percentage = wins / (wins + losses)
+```
+
+And then we add it to our event list with this:
+
+```python
+# Create an instance of CoinFlipEvent
+event_db_obj = CoinFlipEvent(
+    sequence_number=sequence_number,
+    creation_number=creation_number,
+    account_address=account_address,
+    transaction_version=transaction_version,
+    transaction_timestamp=transaction_timestamp,
+    prediction=prediction,
+    result=result,
+    wins=wins,
+    losses=losses,
+    win_percentage=win_percentage,
+    inserted_at=datetime.now(),
+    event_index=event_index,  # when multiple events of the same type are emitted in a single transaction, this is the index of the event in the transaction
+)
+event_db_objs.append(event_db_obj)
+```
+### Creating your database model
+
+Now that we know how we store our CoinFlipEvents in our database, let's go backwards a bit and clarify how we *create* this model for the database to use.
+
+We need to structure the `CoinFlipEvent` class in `models.py` to reflect the structure in our Move contract:
+
+```python
 class CoinFlipEvent(Base):
     __tablename__ = "coin_flip_events"
     __table_args__ = ({"schema": COIN_FLIP_SCHEMA_NAME},)
@@ -131,12 +307,35 @@ class CoinFlipEvent(Base):
     sequence_number: BigIntegerPrimaryKeyType
     creation_number: BigIntegerPrimaryKeyType
     account_address: StringPrimaryKeyType
-    prediction: BooleanType
-    result: BooleanType
-    wins: BigIntegerType
-    losses: BigIntegerType
-    win_percentage: NumericType
+    prediction: BooleanType     # from event data
+    result: BooleanType         # from event data
+    wins: BigIntegerType        # from event data
+    losses: BigIntegerType      # from event data
+    win_percentage: NumericType # from event data
     transaction_version: BigIntegerType
     transaction_timestamp: TimestampType
     inserted_at: InsertedAtType
     event_index: BigIntegerType
+```
+
+The unmarked fields are from the default event data for every event emitted on Aptos. The marked fields are specifically from the fields we calculated above.
+
+The other fields, __tablename__ and __table_args__, are indications to the python SQLAlchemy library as to what database and schema name we are using.
+
+## Running the indexer processor
+
+Now that we have our configuration files and our database and the python database model set up, we can run our processor.
+
+Navigate to the `python` directory of your indexer repository:
+
+```shell
+cd ~/indexer/python
+```
+
+And then run the following command:
+
+```shell
+poetry run python -m processors.main -c processors/coin_flip/config.yaml
+```
+
+If you're processing events correctly, the events should now show up in your database.
