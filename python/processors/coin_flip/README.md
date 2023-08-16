@@ -231,25 +231,55 @@ When we submit a transaction that calls the `coin_flip` entry function, the inde
 
 Within the `data` field of each `Event` type, we see the arbitrary event data emitted. We use this data to store the event data in our database.
 
-If you wanted to see the event data for yourself, you could add something like this to your `processor.py` file:
+The processor loops over each event in each transaction to process all event data. There are a *lot* of various types of events that can occur in a transaction- so we need to write a filtering function to deal with various events we don't want to store in our database.
+
+This is the simple iterative structure for our event List:
 
 ```python
 for event_index, event in enumerate(user_transaction.events):
-    # ... other code
+    # Skip events that don't match our filter criteria
+    if not CoinFlipProcessor.included_event_type(event.type_str):
+        continue
+```
 
-    # Convert your on-chain data scheme to database-friendly values
-    # Our on-chain struct looks like this:
-    #   struct CoinFlipEvent has copy, drop, store {
-    #       prediction: bool,
-    #       result: bool,
-    #       timestamp: u64,
-    #   }
-    # These values are stored in the `data` field of the event as JSON fields/values
-    # Load the data into a json object and then use it as a regular dictionary
+where the `included_event_type` function is a static method in our `CoinFlipProcessor` class:
+
+```python
+@staticmethod
+def included_event_type(event_type: str) -> bool:
+    parsed_tag = event_type.split("::")
+    module_address = parsed_tag[0]
+    module_name = parsed_tag[1]
+    event_type = parsed_tag[2]
+    # Now we can filter out events that are not of type CoinFlipEvent
+    # We can filter by the module address, module name, and event type
+    # If someone deploys a different version of our contract with the same event type, we may want to index it one day.
+    # So we could only check the event type instead of the full string
+    # For our sake, check the full string
+    return (
+        module_address
+        == "0xe57752173bc7c57e9b61c84895a75e53cd7c0ef0855acd81d31cb39b0e87e1d0"
+        and module_name == "coin_flip"
+        and event_type == "CoinFlipEvent"
+    )
+```
+
+If you wanted to see the event data for yourself inside the processor loop, you could add something like this to your `processor.py` file:
+
+```python
+for event_index, event in enumerate(user_transaction.events):
+    # Skip events that don't match our filter criteria
+    if not CoinFlipProcessor.included_event_type(event.type_str):
+        continue
+
+    # ...
+
+    # Load the data into a json object and then use/view it as a regular dictionary
     data = json.loads(event.data)
     print(json.dumps(data, indent=3))
 ```
-In our case, it prints something like this out:
+In our case, a single event prints this out:
+
 
 ```json
 {
@@ -307,11 +337,11 @@ class CoinFlipEvent(Base):
     sequence_number: BigIntegerPrimaryKeyType
     creation_number: BigIntegerPrimaryKeyType
     account_address: StringPrimaryKeyType
-    prediction: BooleanType     # from event data
-    result: BooleanType         # from event data
-    wins: BigIntegerType        # from event data
-    losses: BigIntegerType      # from event data
-    win_percentage: NumericType # from event data
+    prediction: BooleanType     # from (event.data["prediction"]
+    result: BooleanType         # from (event.data["result"]
+    wins: BigIntegerType        # from (event.data["wins"]
+    losses: BigIntegerType      # from (event.data["losses"]
+    win_percentage: NumericType # calculated from the above
     transaction_version: BigIntegerType
     transaction_timestamp: TimestampType
     inserted_at: InsertedAtType
