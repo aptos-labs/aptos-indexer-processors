@@ -70,21 +70,7 @@ class CoinFlipProcessor(TransactionsProcessor):
                 # We have extra data to insert into the database, because we want to process our data.
                 # Calculate the total
                 win_percentage = wins / (wins + losses)
-                print(win_percentage)
-                print(
-                    sequence_number,
-                    creation_number,
-                    account_address,
-                    transaction_version,
-                    transaction_timestamp,
-                    prediction,
-                    result,
-                    wins,
-                    losses,
-                    win_percentage,
-                    datetime.now(),
-                    event_index,  # when multiple events of the same type are emitted in a single transaction, this is the index of the event in the transaction
-                )
+
                 # Create an instance of CoinFlipEvent
                 event_db_obj = CoinFlipEvent(
                     sequence_number=sequence_number,
