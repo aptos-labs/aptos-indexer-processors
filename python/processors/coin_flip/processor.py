@@ -10,6 +10,9 @@ from utils.processor_name import ProcessorName
 import json
 from datetime import datetime
 
+MODULE_ADDRESS = general_utils.standardize_address(
+    "0xe57752173bc7c57e9b61c84895a75e53cd7c0ef0855acd81d31cb39b0e87e1d0"
+)
 
 class CoinFlipProcessor(TransactionsProcessor):
     def name(self) -> str:
@@ -78,12 +81,11 @@ class CoinFlipProcessor(TransactionsProcessor):
                     account_address=account_address,
                     transaction_version=transaction_version,
                     transaction_timestamp=transaction_timestamp,
+                    losses=losses,
                     prediction=prediction,
                     result=result,
                     wins=wins,
-                    losses=losses,
                     win_percentage=win_percentage,
-                    inserted_at=datetime.now(),
                     event_index=event_index,  # when multiple events of the same type are emitted in a single transaction, this is the index of the event in the transaction
                 )
                 event_db_objs.append(event_db_obj)
@@ -103,7 +105,9 @@ class CoinFlipProcessor(TransactionsProcessor):
     @staticmethod
     def included_event_type(event_type: str) -> bool:
         parsed_tag = event_type.split("::")
-        module_address = parsed_tag[0]
+        module_address = general_utils.standardize_address(
+            parsed_tag[0]
+        )
         module_name = parsed_tag[1]
         event_type = parsed_tag[2]
         # Now we can filter out events that are not of type CoinFlipEvent
@@ -112,8 +116,7 @@ class CoinFlipProcessor(TransactionsProcessor):
         # So we could only check the event type instead of the full string
         # For our sake, check the full string
         return (
-            module_address
-            == "0xe57752173bc7c57e9b61c84895a75e53cd7c0ef0855acd81d31cb39b0e87e1d0"
+            module_address == MODULE_ADDRESS
             and module_name == "coin_flip"
             and event_type == "CoinFlipEvent"
         )
