@@ -1,5 +1,5 @@
 {
-  "resource_version": 319,
+  "resource_version": 242,
   "metadata": {
     "version": 3,
     "sources": [
@@ -1335,6 +1335,23 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "current_token_datas_v2",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "array_relationships": [
+              {
+                "name": "composed_nfts",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_data_id": "owner_address"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_token_ownerships_v2",
                       "schema": "public"
                     }
                   }
