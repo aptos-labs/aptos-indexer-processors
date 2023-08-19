@@ -48,13 +48,4 @@ def sort_stake_events(event):
 	# default to processing other events after staking events
 	return order.get(event.type_str.split('::')[-1], 999999999)
 
-def sort_all_stake_events(event):
-    # token stake always has to come last in the sorted stake events, because there's a lockup period afterwards
-    order = {
-        'TokenStakeEvent': 3,
-        'TokenUnstakeEvent': 2,
-        'DistributeRewardEvent': 1
-    }
 
-    # return a tuple with two elements: transaction version and event type sorting
-    return (event['transaction_version'], order.get(event['type'].split('::')[-1], 999999999))
