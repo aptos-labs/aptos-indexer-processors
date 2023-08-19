@@ -26,6 +26,7 @@ StringType = Mapped[Annotated[str, mapped_column(String)]]
 # Nullable types
 NullableNumericType = Mapped[Annotated[float, mapped_column(Numeric, nullable=True)]]
 NullableStringType = Mapped[Annotated[str, mapped_column(String, nullable=True)]]
+NullableTimestampType = Mapped[Annotated[datetime, mapped_column(DateTime(timezone=True), nullable=True)]]
 
 # Timestamp types
 TimestampType = Mapped[Annotated[datetime, mapped_column(DateTime(timezone=True))]]

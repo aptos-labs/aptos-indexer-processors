@@ -46,7 +46,7 @@ def sort_stake_events(event):
 	}
 
 	# default to processing other events after staking events
-	return order.get(event.type.split('::')[-1], 999999999)
+	return order.get(event.type_str.split('::')[-1], 999999999)
 
 def sort_all_stake_events(event):
     # token stake always has to come last in the sorted stake events, because there's a lockup period afterwards
