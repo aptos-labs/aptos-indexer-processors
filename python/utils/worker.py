@@ -26,6 +26,7 @@ from processors.example_event_processor.processor import ExampleEventProcessor
 from processors.nft_orderbooks.nft_marketplace_processor import NFTMarketplaceProcesser
 from processors.nft_marketplace_v2.processor import NFTMarketplaceV2Processor
 from processors.coin_flip.processor import CoinFlipProcessor
+from processors.toad_stake.processor import ToadStakeProcessor
 
 INDEXER_GRPC_BLOB_STORAGE_SIZE = 1000
 
@@ -49,6 +50,8 @@ class IndexerProcessorServer:
                 self.processor = NFTMarketplaceV2Processor()
             case ProcessorName.COIN_FLIP.value:
                 self.processor = CoinFlipProcessor()
+            case ProcessorName.TOAD_STAKE.value:
+                self.processor = ToadStakeProcessor()
             case _:
                 raise Exception(
                     "Invalid processor name"

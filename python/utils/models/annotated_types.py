@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, DateTime, func, Numeric, String
+from sqlalchemy import BigInteger, Boolean, DateTime, func, Numeric, String, SmallInteger
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import mapped_column, Mapped
 from datetime import datetime
@@ -14,6 +14,7 @@ NumericPrimaryKeyType = Mapped[
     Annotated[float, mapped_column(Numeric, primary_key=True)]
 ]
 StringPrimaryKeyType = Mapped[Annotated[str, mapped_column(String, primary_key=True)]]
+SmallIntegerPrimaryKeyType = Mapped[Annotated[SmallInteger, mapped_column(SmallInteger, primary_key=True)]]
 
 # Normal types
 BigIntegerType = Mapped[Annotated[int, mapped_column(BigInteger)]]

@@ -7,19 +7,19 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class GetTransactionsRequest(_message.Message):
-    __slots__ = ["starting_version", "transactions_count", "batch_size"]
+    __slots__ = ["batch_size", "starting_version", "transactions_count"]
+    BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     TRANSACTIONS_COUNT_FIELD_NUMBER: _ClassVar[int]
-    BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
+    batch_size: int
     starting_version: int
     transactions_count: int
-    batch_size: int
     def __init__(self, starting_version: _Optional[int] = ..., transactions_count: _Optional[int] = ..., batch_size: _Optional[int] = ...) -> None: ...
 
 class TransactionsResponse(_message.Message):
-    __slots__ = ["transactions", "chain_id"]
-    TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["chain_id", "transactions"]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
-    transactions: _containers.RepeatedCompositeFieldContainer[_transaction_pb2.Transaction]
+    TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     chain_id: int
+    transactions: _containers.RepeatedCompositeFieldContainer[_transaction_pb2.Transaction]
     def __init__(self, transactions: _Optional[_Iterable[_Union[_transaction_pb2.Transaction, _Mapping]]] = ..., chain_id: _Optional[int] = ...) -> None: ...
