@@ -7,6 +7,7 @@ use crate::{
         ans_processor::AnsTransactionProcessor,
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
+        default_processor2::DefaultProcessor2,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
         nft_metadata_processor::NFTMetadataProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
@@ -198,6 +199,7 @@ impl Worker {
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
+            Processor::DefaultProcessor2 => Arc::new(DefaultProcessor2::new(self.db_pool.clone())),
             Processor::FungibleAssetProcessor => {
                 Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
             },
