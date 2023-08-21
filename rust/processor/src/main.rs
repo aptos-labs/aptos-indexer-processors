@@ -29,6 +29,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
+    pub spanner_db: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -53,6 +54,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.nft_points_contract.clone(),
             self.pubsub_topic_name.clone(),
             self.google_application_credentials.clone(),
+            self.spanner_db.clone(),
         )
         .await;
         worker.run().await;

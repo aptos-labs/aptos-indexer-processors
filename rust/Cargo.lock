@@ -858,6 +858,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "google-cloud-googleapis"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5453af21ac0cc1f3b2cfb5b687c174e701c10ec2d5c286aff7ca8cbbf08d31b4"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic",
+]
+
+[[package]]
+name = "google-cloud-longrunning"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb766dfca432c4347c4a6d831e92dc34919d668ad85617066ec5346abb130f90"
+dependencies = [
+ "google-cloud-gax",
+ "google-cloud-googleapis 0.11.0",
+ "prost",
+ "tonic",
+]
+
+[[package]]
 name = "google-cloud-metadata"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -878,10 +901,34 @@ dependencies = [
  "async-stream",
  "google-cloud-auth",
  "google-cloud-gax",
- "google-cloud-googleapis",
+ "google-cloud-googleapis 0.10.0",
  "google-cloud-token",
  "prost-types",
  "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "google-cloud-spanner"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60616251b9e62af1d4c741cf4ff5dbf1240b0bb67863fe3c5ff857bfd9954f84"
+dependencies = [
+ "async-trait",
+ "base64 0.21.2",
+ "bigdecimal",
+ "google-cloud-auth",
+ "google-cloud-gax",
+ "google-cloud-googleapis 0.11.0",
+ "google-cloud-longrunning",
+ "google-cloud-token",
+ "parking_lot",
+ "prost-types",
+ "serde",
+ "thiserror",
+ "time 0.3.23",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1643,8 +1690,9 @@ dependencies = [
  "futures",
  "futures-util",
  "gcloud-sdk",
- "google-cloud-googleapis",
+ "google-cloud-googleapis 0.10.0",
  "google-cloud-pubsub",
+ "google-cloud-spanner",
  "hex",
  "once_cell",
  "prometheus",
