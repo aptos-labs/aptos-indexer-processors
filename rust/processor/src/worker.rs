@@ -359,8 +359,7 @@ impl Worker {
             let mut transactions_batches = vec![];
             let mut last_fetched_version = batch_start_version as i64 - 1;
             for task_index in 0..concurrent_tasks {
-                let receive_status: Result<(u64, Vec<Transaction>), TryRecvError> = match task_index
-                {
+                let receive_status = match task_index {
                     0 => {
                         // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
                         receiver.recv().await.ok_or(TryRecvError::Disconnected)

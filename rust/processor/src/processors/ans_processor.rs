@@ -4,8 +4,7 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::ans_models::ans_lookup::{
-        AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsLookupPK, CurrentAnsPrimaryName,
-        CurrentAnsPrimaryNamePK,
+        AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName,
     },
     schema,
     utils::database::{
@@ -307,11 +306,10 @@ fn parse_ans(
     Vec<CurrentAnsPrimaryName>,
     Vec<AnsPrimaryName>,
 ) {
-    let mut all_current_ans_lookups: HashMap<CurrentAnsLookupPK, CurrentAnsLookup> = HashMap::new();
-    let mut all_ans_lookups: Vec<AnsLookup> = vec![];
-    let mut all_current_ans_primary_names: HashMap<CurrentAnsPrimaryNamePK, CurrentAnsPrimaryName> =
-        HashMap::new();
-    let mut all_ans_primary_names: Vec<AnsPrimaryName> = vec![];
+    let mut all_current_ans_lookups = HashMap::new();
+    let mut all_ans_lookups = vec![];
+    let mut all_current_ans_primary_names = HashMap::new();
+    let mut all_ans_primary_names = vec![];
 
     for transaction in transactions {
         let txn_version = transaction.version as i64;
