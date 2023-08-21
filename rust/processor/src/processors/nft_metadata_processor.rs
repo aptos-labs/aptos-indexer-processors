@@ -3,10 +3,14 @@
 
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
-    models::token_v2_models::v2_token_datas::{
-        CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2,
+    models::token_v2_models::{
+        v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
+        v2_token_utils::{ObjectWithMetadata, TokenV2AggregatedData, TokenV2AggregatedDataMapping},
     },
-    utils::{database::PgDbPool, util::parse_timestamp},
+    utils::{
+        database::PgDbPool,
+        util::{parse_timestamp, standardize_address},
+    },
 };
 use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -104,6 +108,31 @@ fn parse_v2_token(transactions: &[Transaction]) -> Vec<CurrentTokenDataV2> {
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
+        let mut token_v2_metadata_helper: TokenV2AggregatedDataMapping = HashMap::new();
+        for (_, wsc) in transaction_info.changes.iter().enumerate() {
+            if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                if let Some(object) =
+                    ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
+                {
+                    token_v2_metadata_helper.insert(
+                        standardize_address(&wr.address.to_string()),
+                        TokenV2AggregatedData {
+                            aptos_collection: None,
+                            fixed_supply: None,
+                            object,
+                            unlimited_supply: None,
+                            property_map: None,
+                            transfer_event: None,
+                            token: None,
+                            fungible_asset_metadata: None,
+                            fungible_asset_supply: None,
+                            fungible_asset_store: None,
+                        },
+                    );
+                }
+            }
+        }
+
         for (index, wsc) in transaction_info.changes.iter().enumerate() {
             let wsc_index = index as i64;
             match wsc.change.as_ref().unwrap() {
@@ -127,7 +156,7 @@ fn parse_v2_token(transactions: &[Transaction]) -> Vec<CurrentTokenDataV2> {
                         txn_version,
                         wsc_index,
                         txn_timestamp,
-                        &HashMap::new(),
+                        &token_v2_metadata_helper,
                     )
                     .unwrap()
                     {
