@@ -30,6 +30,7 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 google-cloud-googleapis = { workspace = true }
 google-cloud-pubsub = { workspace = true }
+google-cloud-spanner = { workspace = true }
 hex = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }

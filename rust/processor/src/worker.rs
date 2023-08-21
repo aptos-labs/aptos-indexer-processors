@@ -75,6 +75,7 @@ pub struct Worker {
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
+    pub spanner_db: Option<String>,
 }
 
 impl Worker {
@@ -93,6 +94,7 @@ impl Worker {
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
         google_application_credentials: Option<String>,
+        spanner_db: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -123,6 +125,7 @@ impl Worker {
             nft_points_contract,
             pubsub_topic_name,
             google_application_credentials,
+            spanner_db,
         }
     }
 
@@ -180,7 +183,19 @@ impl Worker {
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
-            Processor::DefaultProcessor2 => Arc::new(DefaultProcessor2::new(self.db_pool.clone())),
+            Processor::DefaultProcessor2 => {
+                let spanner_db = self
+                    .spanner_db
+                    .clone()
+                    .expect("spanner_db is required for DefaultProcessor2");
+
+                // Crate reads from authentication from file specified in GOOGLE_APPLICATION_CREDENTIALS env var
+                if let Some(credentials) = self.google_application_credentials.clone() {
+                    std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+                }
+
+                Arc::new(DefaultProcessor2::new(self.db_pool.clone(), spanner_db))
+            },
             Processor::FungibleAssetProcessor => {
                 Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
             },
