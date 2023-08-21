@@ -17,6 +17,7 @@ use async_trait::async_trait;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::client::{Client, ClientConfig};
 use std::{collections::HashMap, fmt::Debug};
+use tracing::info;
 
 pub const NAME: &str = "nft_metadata_processor";
 pub struct NFTMetadataProcessor {
@@ -72,6 +73,13 @@ impl ProcessorTrait for NFTMetadataProcessor {
 
         // Publish all parsed CurrentTokenDataV2 to Pubsub
         for token_data in parse_v2_token(&transactions) {
+            info!(
+                token_data_id = token_data.token_data_id,
+                token_uri = token_data.token_uri,
+                toransaction_version = token_data.last_transaction_version,
+                "[NFT Metadata Crawler] Publishing to queue"
+            );
+
             publisher
                 .publish(PubsubMessage {
                     data: format!(
