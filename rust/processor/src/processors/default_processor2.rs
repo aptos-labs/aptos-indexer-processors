@@ -13,7 +13,7 @@ pub struct DefaultProcessor2 {
 }
 
 impl DefaultProcessor2 {
-    pub fn new(connection_pool: PgDbPool) -> Self {
+    pub fn new(connection_pool: PgDbPool, spanner_db: String) -> Self {
         tracing::info!("init DefaultProcessor2");
         Self { connection_pool }
     }
