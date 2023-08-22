@@ -1,6 +1,7 @@
 import argparse
 from utils.config import Config
 from utils.worker import IndexerProcessorServer
+import asyncio
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -11,4 +12,4 @@ if __name__ == "__main__":
     indexer_server = IndexerProcessorServer(
         config,
     )
-    indexer_server.run()
+    asyncio.run(indexer_server.run())
