@@ -1,0 +1,10 @@
+ALTER TABLE current_ans_lookup DROP COLUMN IF EXISTS is_deleted;
+DROP INDEX IF EXISTS capn_tn_index;
+DROP INDEX IF EXISTS capn_insat_index;
+DROP INDEX IF EXISTS apn_tn_index;
+DROP INDEX IF EXISTS apn_insat_index;
+DROP INDEX IF EXISTS al_tn_index;
+DROP INDEX IF EXISTS al_insat_index;
+DROP TABLE IF EXISTS current_ans_primary_name;
+DROP TABLE IF EXISTS ans_primary_name;
+DROP TABLE IF EXISTS ans_lookup;
