@@ -259,7 +259,7 @@ diesel::table! {
         #[max_length = 66]
         delegator_address -> Varchar,
         #[max_length = 66]
-        table_handle -> Varchar,
+        table_handle -> Nullable<Varchar>,
         #[max_length = 66]
         voter -> Nullable<Varchar>,
         #[max_length = 66]

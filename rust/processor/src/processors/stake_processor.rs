@@ -4,22 +4,26 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::stake_models::{
-        current_delegated_voter::{CurrentDelegatedVoter, CurrentDelegatedVoterMap},
+        current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, CurrentDelegatorBalanceMap},
         delegator_pools::{
             CurrentDelegatorPoolBalance, DelegatorPool, DelegatorPoolBalance, DelegatorPoolMap,
         },
         proposal_votes::ProposalVote,
+        stake_utils::DelegationVoteGovernanceRecordsResource,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+    utils::{
+        database::{
+            clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        },
+        util::{parse_timestamp, standardize_address},
     },
 };
 use anyhow::bail;
-use aptos_indexer_protos::transaction::v1::Transaction;
+use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -336,6 +340,7 @@ fn insert_current_delegated_voter(
                     last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     table_handle.eq(excluded(table_handle)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
                     " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
@@ -366,7 +371,11 @@ impl ProcessorTrait for StakeTransactionProcessor {
         let mut all_delegator_pools: DelegatorPoolMap = HashMap::new();
         let mut all_delegator_pool_balances = vec![];
         let mut all_current_delegator_pool_balances = HashMap::new();
-        let mut all_current_delegated_voter: CurrentDelegatedVoterMap = HashMap::new();
+
+        let mut active_pool_to_staking_pool = HashMap::new();
+        // structs needed to get delegated voters
+        let mut all_current_delegated_voter = HashMap::new();
+        let mut all_vote_delegation_handle_to_pool_address = HashMap::new();
 
         for txn in &transactions {
             // Add votes data
@@ -379,11 +388,6 @@ impl ProcessorTrait for StakeTransactionProcessor {
             let mut delegator_activities = DelegatedStakingActivity::from_transaction(txn).unwrap();
             all_delegator_activities.append(&mut delegator_activities);
 
-            // Add delegator balances
-            let delegator_balances =
-                CurrentDelegatorBalance::from_transaction(txn, &mut conn).unwrap();
-            all_delegator_balances.extend(delegator_balances);
-
             // Add delegator pools
             let (delegator_pools, mut delegator_pool_balances, current_delegator_pool_balances) =
                 DelegatorPool::from_transaction(txn).unwrap();
@@ -391,10 +395,85 @@ impl ProcessorTrait for StakeTransactionProcessor {
             all_delegator_pool_balances.append(&mut delegator_pool_balances);
             all_current_delegator_pool_balances.extend(current_delegator_pool_balances);
 
-            // Add current delegated voter
-            let current_delegated_voter =
-                CurrentDelegatedVoter::from_transaction(txn, &mut conn).unwrap();
-            all_current_delegated_voter.extend(current_delegated_voter);
+            // Moving the transaction code here is the new paradigm to avoid redoing a lot of the duplicate work
+            // Currently only delegator voting follows this paradigm
+            // TODO: refactor all the other staking code to follow this paradigm
+            let txn_version = txn.version as i64;
+            let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
+            let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
+            // adding some metadata for subsequent parsing
+            for wsc in &transaction_info.changes {
+                if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                    if let Some(DelegationVoteGovernanceRecordsResource::GovernanceRecords(inner)) =
+                        DelegationVoteGovernanceRecordsResource::from_write_resource(
+                            write_resource,
+                            txn_version,
+                        )?
+                    {
+                        let delegation_pool_address =
+                            standardize_address(&write_resource.address.to_string());
+                        let vote_delegation_handle =
+                            inner.vote_delegation.buckets.inner.get_handle();
+
+                        all_vote_delegation_handle_to_pool_address
+                            .insert(vote_delegation_handle, delegation_pool_address.clone());
+                    }
+                    if let Some(map) =
+                        CurrentDelegatorBalance::get_active_pool_to_staking_pool_mapping(
+                            write_resource,
+                            txn_version,
+                        )
+                        .unwrap()
+                    {
+                        active_pool_to_staking_pool.extend(map);
+                    }
+                }
+            }
+
+            // Add delegator balances
+            let delegator_balances = CurrentDelegatorBalance::from_transaction(
+                txn,
+                &active_pool_to_staking_pool,
+                &mut conn,
+            )
+            .unwrap();
+            all_delegator_balances.extend(delegator_balances);
+
+            // this write table item indexing is to get delegator address, table handle, and voter & pending voter
+            for wsc in &transaction_info.changes {
+                if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
+                    if let Some(voter) = CurrentDelegatedVoter::from_write_table_item(
+                        write_table_item,
+                        txn_version,
+                        txn_timestamp,
+                        &all_vote_delegation_handle_to_pool_address,
+                        &mut conn,
+                    )
+                    .unwrap()
+                    {
+                        all_current_delegated_voter.insert(voter.pk(), voter);
+                    }
+                }
+            }
+
+            // we need one last loop to prefill delegators that got in before the delegated voting contract was deployed
+            for wsc in &transaction_info.changes {
+                if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
+                    if let Some(voter) =
+                        CurrentDelegatedVoter::get_delegators_pre_contract_deployment(
+                            write_table_item,
+                            txn_version,
+                            txn_timestamp,
+                            &active_pool_to_staking_pool,
+                            &all_current_delegated_voter,
+                            &mut conn,
+                        )
+                        .unwrap()
+                    {
+                        all_current_delegated_voter.insert(voter.pk(), voter);
+                    }
+                }
+            }
         }
 
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
@@ -427,10 +506,7 @@ impl ProcessorTrait for StakeTransactionProcessor {
         all_delegator_pools.sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
         all_current_delegator_pool_balances
             .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
-        all_current_delegated_voter.sort_by(|a, b| {
-            (&a.delegation_pool_address, &a.delegator_address)
-                .cmp(&(&b.delegation_pool_address, &b.delegator_address))
-        });
+        all_current_delegated_voter.sort();
 
         let tx_result = insert_to_db(
             &mut conn,

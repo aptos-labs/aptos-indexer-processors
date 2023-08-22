@@ -228,9 +228,14 @@ pub enum VoteDelegationTableItem {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VoteDelegationMap {
-    pub hash: String,
-    pub key: String,
+    key: String,
     pub value: VoteDelegationResource,
+}
+
+impl VoteDelegationMap {
+    pub fn get_delegator_address(&self) -> String {
+        standardize_address(&self.key)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -287,11 +292,11 @@ pub struct VoteDelegationInnerResource {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum DelgationVoteGovernanceRecordsResource {
+pub enum DelegationVoteGovernanceRecordsResource {
     GovernanceRecords(GovernanceRecordsResource),
 }
 
-impl DelgationVoteGovernanceRecordsResource {
+impl DelegationVoteGovernanceRecordsResource {
     pub fn from_resource(
         data_type: &str,
         data: &serde_json::Value,
@@ -300,7 +305,7 @@ impl DelgationVoteGovernanceRecordsResource {
         match data_type {
             x if x == format!("{}::delegation_pool::GovernanceRecords", STAKE_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| {
-                    Some(DelgationVoteGovernanceRecordsResource::GovernanceRecords(
+                    Some(DelegationVoteGovernanceRecordsResource::GovernanceRecords(
                         inner,
                     ))
                 })
