@@ -14,6 +14,7 @@ MODULE_ADDRESS = general_utils.standardize_address(
     "0xe57752173bc7c57e9b61c84895a75e53cd7c0ef0855acd81d31cb39b0e87e1d0"
 )
 
+
 class CoinFlipProcessor(TransactionsProcessor):
     def name(self) -> str:
         return ProcessorName.COIN_FLIP.value
@@ -105,9 +106,7 @@ class CoinFlipProcessor(TransactionsProcessor):
     @staticmethod
     def included_event_type(event_type: str) -> bool:
         parsed_tag = event_type.split("::")
-        module_address = general_utils.standardize_address(
-            parsed_tag[0]
-        )
+        module_address = general_utils.standardize_address(parsed_tag[0])
         module_name = parsed_tag[1]
         event_type = parsed_tag[2]
         # Now we can filter out events that are not of type CoinFlipEvent
