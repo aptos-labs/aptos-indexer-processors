@@ -2,7 +2,6 @@ import argparse
 import grpc
 import json
 
-from utils.models.general_models import NextVersionToProcess
 from aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
 from aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
@@ -11,7 +10,7 @@ from utils.session import Session
 from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
 from sqlalchemy import DDL, create_engine
 from sqlalchemy import event
-from typing import List
+from typing import Iterator, List
 from prometheus_client.twisted import MetricsResource
 from twisted.web.server import Site
 from twisted.web.resource import Resource
@@ -27,6 +26,7 @@ from processors.nft_orderbooks.nft_marketplace_processor import NFTMarketplacePr
 from processors.nft_marketplace_v2.processor import NFTMarketplaceV2Processor
 
 INDEXER_GRPC_BLOB_STORAGE_SIZE = 1000
+INDEXER_GRPC_MIN_SEC_BETWEEN_GRPC_RECONNECTS = 60
 
 
 class IndexerProcessorServer:
@@ -92,9 +92,25 @@ class IndexerProcessorServer:
 
     def run(self):
         # Run DB migrations
-        print("[Parser] Initializing DB tables")
+
+        print(
+            json.dumps(
+                {
+                    "processor_name": self.processor.name(),
+                    "message": "[Parser] Initializing DB tables",
+                }
+            ),
+            flush=True,
+        )
         self.init_db_tables(self.processor.schema())
-        print("[Parser] DB tables initialized")
+        print(
+            json.dumps(
+                {
+                    "processor_name": self.processor.name(),
+                    "message": "[Parser] DB tables initialized",
+                }
+            )
+        )
 
         self.start_health_and_monitoring_ports()
 
@@ -102,185 +118,232 @@ class IndexerProcessorServer:
         starting_version = self.config.get_starting_version(self.processor.name())
         ending_version = self.config.ending_version
 
-        # Setup GRPC settings
-        metadata = (
-            ("x-aptos-data-authorization", self.config.grpc_data_stream_api_key),
-            ("x-aptos-request-name", self.processor.name()),
-        )
-        options = [
-            ("grpc.max_receive_message_length", -1),
-            (
-                "grpc.keepalive_time_ms",
-                self.config.indexer_grpc_http2_ping_interval_in_secs * 1000,
-            ),
-            (
-                "grpc.keepalive_timeout_ms",
-                self.config.indexer_grpc_http2_ping_timeout_in_secs * 1000,
-            ),
-        ]
+        # Initialize the batch information for tracking
+        batch_start_version = starting_version
+        batch_end_version = None
+        prev_processed_start_version = None
+        prev_processed_end_version = None
 
-        # Connect to indexer grpc endpoint
-        with grpc.insecure_channel(
-            self.config.grpc_data_stream_endpoint, options=options
-        ) as channel:
+        print(
+            json.dumps(
+                {
+                    "processor_name": self.processor.name(),
+                    "message": "[Parser] Connecting and making requests to GRPC endpoint",
+                }
+            ),
+            flush=True,
+        )
+
+        # Add reconnection stuff here
+        response_stream = self.get_transaction_response_stream(starting_version)
+        print(
+            json.dumps(
+                {
+                    "processor_name": self.processor.name(),
+                    "message": f"[Parser] Successfully connected to GRPC endpoint: {self.config.grpc_data_stream_endpoint}",
+                    "starting_version": starting_version,
+                }
+            ),
+            flush=True,
+        )
+
+        grpc_last_reconnection_time = None
+        while True:
+            perf_start_time = perf_counter()
+            transaction_batches: List[List[transaction_pb2.Transaction]] = []
+
+            # Get batches of transactions for processing
+            for _ in range(self.num_concurrent_processing_tasks):
+                response = None
+
+                try:
+                    response = next(response_stream)
+                except grpc.RpcError:
+                    # Handle GRPC reconnection
+                    if grpc_last_reconnection_time:
+                        sec_since_last_reconnection = (
+                            perf_counter() - grpc_last_reconnection_time
+                        )
+                        if (
+                            sec_since_last_reconnection
+                            < INDEXER_GRPC_MIN_SEC_BETWEEN_GRPC_RECONNECTS
+                        ):
+                            print(
+                                json.dumps(
+                                    {
+                                        "processor_name": self.processor.name(),
+                                        "message": "[Parser] Recently reconnected to GRPC stream. Will not retry",
+                                        "starting_version": starting_version,
+                                    }
+                                ),
+                                flush=True,
+                            )
+                            sys.exit(1)
+                    else:
+                        grpc_last_reconnection_time = perf_counter()
+                        print(
+                            json.dumps(
+                                {
+                                    "processor_name": self.processor.name(),
+                                    "message": "[Parser] Reconnecting to GRPC",
+                                    "starting_version": starting_version,
+                                }
+                            ),
+                            flush=True,
+                        )
+                        response_stream = self.get_transaction_response_stream(
+                            # Start from the last batch version fetched + 1
+                            batch_end_version + 1
+                            if batch_end_version
+                            else starting_version
+                        )
+                        continue
+
+                assert response is not None
+                transactions = list(response.transactions)
+
+                current_batch_size = len(transactions)
+                if current_batch_size == 0:
+                    print(
+                        json.dumps(
+                            {
+                                "processor_name": self.processor.name(),
+                                "message": "[Parser] Received empty batch from GRPC stream",
+                                "starting_version": starting_version,
+                            }
+                        ),
+                        flush=True,
+                    )
+                    sys.exit(1)
+
+                batch_start_version = transactions[0].version
+                batch_end_version = transactions[-1].version
+
+                # If ending version is in the current batch, truncate the transactions in this batcch
+                if ending_version != None and batch_end_version >= ending_version:
+                    batch_end_version = ending_version
+                    transactions = transactions[
+                        : batch_end_version - batch_start_version + 1
+                    ]
+                    current_batch_size = len(transactions)
+
+                transaction_batches.append(transactions)
+
+                # If it is a partial batch, then skip polling and head to process it first.
+                if current_batch_size < INDEXER_GRPC_BLOB_STORAGE_SIZE:
+                    break
+
+            # Process transactions in batches
+            threads: List[IndexerProcessorServer.WorkerThread] = []
+            for transactions in transaction_batches:
+                thread = IndexerProcessorServer.WorkerThread(
+                    self.processor, transactions
+                )
+                threads.append(thread)
+                thread.start()
+
+            # Wait for processor threads to finish
+            for thread in threads:
+                thread.join()
+
+            # Update state depending on the results of the batch processing
+            processed_versions: List[ProcessingResult] = []
+            for thread in threads:
+                processing_result = thread.processing_result
+                exception = thread.exception
+
+                # TODO: Log errors metric
+                if thread.exception:
+                    print(
+                        json.dumps(
+                            {
+                                "processor_name": self.processor.name(),
+                                "message": f"[Parser] Error processing transactions {processing_result.start_version} to {processing_result.end_version}",
+                                "error": type(exception).__name__,
+                                "error_stacktrace": traceback.format_exception(
+                                    exception
+                                ),
+                            },
+                            indent=4,
+                        )
+                    )
+                    sys.exit(1)
+                elif processing_result:
+                    processed_versions.append(processing_result)
+
+            # Make sure there are no gaps and advance states
+            processed_versions.sort(key=lambda x: x.start_version)
+
+            for version in processed_versions:
+                if prev_processed_start_version == None:
+                    if version.start_version != starting_version:
+                        print(
+                            json.dumps(
+                                {
+                                    "processor_name": self.processor.name(),
+                                    "message": "[Parser] Detected gap in processed transactions",
+                                    "error": f"Gap between transactions {starting_version} and {version.start_version}",
+                                }
+                            )
+                        )
+                    prev_processed_start_version = version.start_version
+                    prev_processed_end_version = version.end_version
+                else:
+                    assert prev_processed_end_version
+                    if prev_processed_end_version + 1 != version.start_version:
+                        print(
+                            json.dumps(
+                                {
+                                    "processor_name": self.processor.name(),
+                                    "message": "[Parser] Detected gap in processed transactions",
+                                    "error": f"Gap between transactions {prev_processed_end_version} and {version.start_version}",
+                                }
+                            )
+                        )
+                        sys.exit(1)
+                    else:
+                        prev_processed_start_version = version.start_version
+                        prev_processed_end_version = version.end_version
+
+            processed_batch_start = processed_versions[0].start_version
+            processed_batch_end = processed_versions[-1].end_version
+
+            batch_start_version = processed_batch_end + 1
+
+            # TODO: Update latest processed version metric
+            self.processor.update_last_processed_version(processed_batch_end)
+            PROCESSED_TRANSACTIONS_COUNTER.inc(len(processed_versions))
+
+            perf_end_time = perf_counter()
+
             print(
                 json.dumps(
                     {
-                        "message": f"Connected to grpc data stream endpoint: {self.config.grpc_data_stream_endpoint}",
-                        "starting_version": starting_version,
+                        "message": f"[Parser] Processed transactions",
+                        "processor_name": self.processor.name(),
+                        "start_version": str(processed_batch_start),
+                        "end_version": str(processed_batch_end),
+                        "batch_size": str(
+                            processed_batch_end - processed_batch_start + 1
+                        ),
+                        "tps": f"{(processed_batch_end - processed_batch_start + 1) / (perf_end_time - perf_start_time)}",
                     }
                 ),
                 flush=True,
             )
 
-            batch_start_version = starting_version
-            batch_end_version = None
-            prev_processed_start_version = None
-            prev_processed_end_version = None
-
-            # Create GPRC request and get the responses
-            stub = raw_data_pb2_grpc.RawDataStub(channel)
-            request = raw_data_pb2.GetTransactionsRequest(
-                starting_version=batch_start_version
-            )
-            responses = stub.GetTransactions(request, metadata=metadata)
-            responses = iter(responses)
-
-            while True:
-                perf_start_time = perf_counter()
-                transaction_batches: List[List[transaction_pb2.Transaction]] = []
-
-                # Get batches of transactions for processing
-                for _ in range(self.num_concurrent_processing_tasks):
-                    response = next(responses)
-                    transactions = response.transactions
-
-                    current_batch_size = len(transactions)
-                    if current_batch_size == 0:
-                        print("[Parser] Received empty batch from GRPC stream")
-                        sys.exit(1)
-
-                    batch_start_version = transactions[0].version
-                    batch_end_version = transactions[-1].version
-
-                    # If ending version is in the current batch, truncate the transactions in this batcch
-                    if ending_version != None and batch_end_version >= ending_version:
-                        batch_end_version = ending_version
-                        transactions = transactions[
-                            : batch_end_version - batch_start_version + 1
-                        ]
-                        current_batch_size = len(transactions)
-
-                    transaction_batches.append(transactions)
-
-                    # If it is a partial batch, then skip polling and head to process it first.
-                    if current_batch_size < INDEXER_GRPC_BLOB_STORAGE_SIZE:
-                        break
-
-                # Process transactions in batches
-                threads: List[IndexerProcessorServer.WorkerThread] = []
-                for transactions in transaction_batches:
-                    thread = IndexerProcessorServer.WorkerThread(
-                        self.processor, transactions
-                    )
-                    threads.append(thread)
-                    thread.start()
-
-                # Wait for processor threads to finish
-                for thread in threads:
-                    thread.join()
-
-                # Update state depending on the results of the batch processing
-                processed_versions: List[ProcessingResult] = []
-                for thread in threads:
-                    processing_result = thread.processing_result
-                    exception = thread.exception
-
-                    # TODO: Log errors metric
-                    if thread.exception:
-                        print(
-                            json.dumps(
-                                {
-                                    "message": f"[Parser] Error processing transactions {processing_result.start_version} to {processing_result.end_version}",
-                                    "error": str(exception),
-                                    "error_stacktrace": traceback.format_exception(
-                                        exception
-                                    ),
-                                }
-                            )
-                        )
-                        sys.exit(1)
-                    elif processing_result:
-                        processed_versions.append(processing_result)
-
-                # Make sure there are no gaps and advance states
-                processed_versions.sort(key=lambda x: x.start_version)
-
-                for version in processed_versions:
-                    if prev_processed_start_version == None:
-                        if version.start_version != starting_version:
-                            print(
-                                json.dumps(
-                                    {
-                                        "message": "[Parser] Detected gap in processed transactions",
-                                        "error": f"Gap between transactions {starting_version} and {version.start_version}",
-                                    }
-                                )
-                            )
-                        prev_processed_start_version = version.start_version
-                        prev_processed_end_version = version.end_version
-                    else:
-                        assert prev_processed_end_version
-                        if prev_processed_end_version + 1 != version.start_version:
-                            print(
-                                json.dumps(
-                                    {
-                                        "message": "[Parser] Detected gap in processed transactions",
-                                        "error": f"Gap between transactions {prev_processed_end_version} and {version.start_version}",
-                                    }
-                                )
-                            )
-                            sys.exit(1)
-                        else:
-                            prev_processed_start_version = version.start_version
-                            prev_processed_end_version = version.end_version
-
-                batch_start = processed_versions[0].start_version
-                batch_end = processed_versions[-1].end_version
-
-                batch_start_version = batch_end + 1
-
-                # TODO: Update latest processed version metric
-                self.processor.update_last_processed_version(batch_end)
-                PROCESSED_TRANSACTIONS_COUNTER.inc(len(processed_versions))
-
-                perf_end_time = perf_counter()
-
+            # Stop processing if reached ending version
+            if processed_batch_end == ending_version:
                 print(
                     json.dumps(
                         {
-                            "message": f"[Parser] Processed transactions",
                             "processor_name": self.processor.name(),
-                            "start_version": str(batch_start),
-                            "end_version": str(batch_end),
-                            "batch_size": str(batch_end - batch_start + 1),
-                            "tps": f"{(batch_end - batch_start + 1) / (perf_end_time - perf_start_time)}",
+                            "message": f"[Parser] Reached ending version {ending_version}. Exiting...",
                         }
                     ),
                     flush=True,
                 )
-
-                # Stop processing if reached ending version
-                if batch_end == ending_version:
-                    print(
-                        json.dumps(
-                            {
-                                "message": f"[Parser] Reached ending version {ending_version}. Exiting..."
-                            }
-                        ),
-                        flush=True,
-                    )
-                    break
+                break
 
     def init_db_tables(self, schema_name: str) -> None:
         engine = create_engine(self.config.db_connection_uri)
@@ -313,6 +376,36 @@ class IndexerProcessorServer:
         t = threading.Thread(target=start_health_server, daemon=True)
         # TODO: Handles the exit signal and gracefully shutdown the server.
         t.start()
+
+    def get_transaction_response_stream(
+        self, starting_version: int
+    ) -> Iterator[raw_data_pb2.TransactionsResponse]:
+        # Setup GRPC settings
+        metadata = (
+            ("x-aptos-data-authorization", self.config.grpc_data_stream_api_key),
+            ("x-aptos-request-name", self.processor.name()),
+        )
+        options = [
+            ("grpc.max_receive_message_length", -1),
+            (
+                "grpc.keepalive_time_ms",
+                self.config.indexer_grpc_http2_ping_interval_in_secs * 1000,
+            ),
+            (
+                "grpc.keepalive_timeout_ms",
+                self.config.indexer_grpc_http2_ping_timeout_in_secs * 1000,
+            ),
+        ]
+
+        channel = grpc.insecure_channel(
+            self.config.grpc_data_stream_endpoint, options=options
+        )
+
+        # Create GPRC request and get the responses
+        stub = raw_data_pb2_grpc.RawDataStub(channel)
+        request = raw_data_pb2.GetTransactionsRequest(starting_version=starting_version)
+        responses = stub.GetTransactions(request, metadata=metadata)
+        return iter(responses)
 
 
 @event.listens_for(Base.metadata, "before_create")
