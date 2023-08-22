@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
-use crate::utils::database::PgDbPool;
+use crate::{models::default_models::transactions::TransactionModel, utils::database::PgDbPool};
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use google_cloud_spanner::{
@@ -59,10 +59,26 @@ impl ProcessorTrait for DefaultProcessor2 {
         let mutations = transactions
             .iter()
             .map(|transaction| {
+                let (txn, txn_detail, event, write_set_change, wsc_detail) =
+                    TransactionModel::from_transaction(&transaction);
                 insert_or_update(
                     "transactions",
-                    &["transaction_version", "json_dump"],
-                    &[&(transaction.version as i64), &"{\"test\": \"hi\"}"],
+                    &[
+                        "transaction_version",
+                        "transaction",
+                        "transaction_detail",
+                        "event",
+                        "write_set_change",
+                        "write_set_change_details",
+                    ],
+                    &[
+                        &(transaction.version as i64),
+                        &(serde_json::to_string(&txn).unwrap_or_default()),
+                        &(serde_json::to_string(&txn_detail).unwrap_or_default()),
+                        &(serde_json::to_string(&event).unwrap_or_default()),
+                        &(serde_json::to_string(&write_set_change).unwrap_or_default()),
+                        &(serde_json::to_string(&wsc_detail).unwrap_or_default()),
+                    ],
                 )
             })
             .collect();
