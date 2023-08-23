@@ -4,9 +4,11 @@
 use crate::{
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
+        ans_processor::AnsTransactionProcessor,
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
+        nft_metadata_processor::NFTMetadataProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
@@ -64,8 +66,11 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub ans_address: Option<String>,
+    pub ans_v1_primary_names_table_handle: Option<String>,
+    pub ans_v1_name_records_table_handle: Option<String>,
     pub nft_points_contract: Option<String>,
+    pub pubsub_topic_name: Option<String>,
+    pub google_application_credentials: Option<String>,
 }
 
 impl Worker {
@@ -79,8 +84,11 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        ans_address: Option<String>,
+        ans_v1_primary_names_table_handle: Option<String>,
+        ans_v1_name_records_table_handle: Option<String>,
         nft_points_contract: Option<String>,
+        pubsub_topic_name: Option<String>,
+        google_application_credentials: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -106,8 +114,11 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            ans_address,
+            ans_v1_primary_names_table_handle,
+            ans_v1_name_records_table_handle,
             nft_points_contract,
+            pubsub_topic_name,
+            google_application_credentials,
         }
     }
 
@@ -195,12 +206,32 @@ impl Worker {
             },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
-                self.ans_address.clone(),
                 self.nft_points_contract.clone(),
             )),
             Processor::TokenV2Processor => {
                 Arc::new(TokenV2TransactionProcessor::new(self.db_pool.clone()))
             },
+            Processor::NFTMetadataProcessor => {
+                let pubsub_topic_name = self
+                    .pubsub_topic_name
+                    .clone()
+                    .expect("pubsub_topic_name is required for NFTMetadataProcessor");
+
+                // Crate reads from authentication from file specified in GOOGLE_APPLICATION_CREDENTIALS env var
+                if let Some(credentials) = self.google_application_credentials.clone() {
+                    std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+                }
+
+                Arc::new(NFTMetadataProcessor::new(
+                    self.db_pool.clone(),
+                    pubsub_topic_name,
+                ))
+            },
+            Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
+                self.db_pool.clone(),
+                self.ans_v1_primary_names_table_handle.clone(),
+                self.ans_v1_name_records_table_handle.clone(),
+            )),
         };
         let processor_name = processor.name();
 
@@ -409,8 +440,9 @@ impl Worker {
                     PROCESSOR_INVOCATIONS_COUNT
                         .with_label_values(&[processor_name])
                         .inc();
+
                     let processed_result = processor_clone
-                        .process_transactions(transactions, start_version, end_version)
+                        .process_transactions(transactions, start_version, end_version, db_chain_id) // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS

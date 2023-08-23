@@ -23,8 +23,12 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
-    pub ans_address: Option<String>,
+    // TODO: Move these vars into individual config structs for different processors.
+    pub ans_v1_primary_names_table_handle: Option<String>,
+    pub ans_v1_name_records_table_handle: Option<String>,
     pub nft_points_contract: Option<String>,
+    pub pubsub_topic_name: Option<String>,
+    pub google_application_credentials: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -44,8 +48,11 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            self.ans_address.clone(),
+            self.ans_v1_primary_names_table_handle.clone(),
+            self.ans_v1_name_records_table_handle.clone(),
             self.nft_points_contract.clone(),
+            self.pubsub_topic_name.clone(),
+            self.google_application_credentials.clone(),
         )
         .await;
         worker.run().await;

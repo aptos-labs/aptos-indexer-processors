@@ -9,14 +9,7 @@
 
 In this tutorial, we will be going over how to create and run the Example Event Processor. All source code is in `aptos-indexer-processors/python/processors/example_event_processor`.
 
-1. Install all dependencies
-
-```
-pip install grpcio-tools
-poetry install
-```
-
-2. Download the example:
+1. Download the example:
 
 ```
 # Clone the repository to get the example code:
@@ -25,7 +18,14 @@ $ git clone https://github.com/aptos-labs/aptos-indexer-processors
 $ cd aptos-indexer-processors/python
 ```
 
-3. Generate Protobuf from the root folder aptos-indexer-processors
+2. Install all dependencies
+
+```
+pip install grpcio-tools
+poetry install
+```
+
+3. Generate Protobuf from the root folder `aptos-indexer-processors`
 
 ```
 python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python  \
