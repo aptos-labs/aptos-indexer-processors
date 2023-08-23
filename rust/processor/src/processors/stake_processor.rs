@@ -443,17 +443,16 @@ impl ProcessorTrait for StakeTransactionProcessor {
             // this write table item indexing is to get delegator address, table handle, and voter & pending voter
             for wsc in &transaction_info.changes {
                 if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
-                    if let Some(voter) = CurrentDelegatedVoter::from_write_table_item(
+                    let voter_map = CurrentDelegatedVoter::from_write_table_item(
                         write_table_item,
                         txn_version,
                         txn_timestamp,
                         &all_vote_delegation_handle_to_pool_address,
                         &mut conn,
                     )
-                    .unwrap()
-                    {
-                        all_current_delegated_voter.insert(voter.pk(), voter);
-                    }
+                    .unwrap();
+
+                    all_current_delegated_voter.extend(voter_map);
                 }
             }
 

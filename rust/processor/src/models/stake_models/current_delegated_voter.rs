@@ -71,48 +71,53 @@ impl CurrentDelegatedVoter {
         txn_timestamp: chrono::NaiveDateTime,
         vote_delegation_handle_to_pool_address: &VoteDelegationTableHandleToPool,
         conn: &mut PgPoolConnection,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<CurrentDelegatedVoterMap> {
+        let mut delegated_voter_map: CurrentDelegatedVoterMap = HashMap::new();
+
         let table_item_data = write_table_item.data.as_ref().unwrap();
         let table_handle = standardize_address(&write_table_item.handle);
-        if let Some(VoteDelegationTableItem::VoteDelegationMap(inner)) =
+        if let Some(VoteDelegationTableItem::VoteDelegationMap(vote_delegation_maps)) =
             VoteDelegationTableItem::from_table_item_type(
                 table_item_data.value_type.as_str(),
                 &table_item_data.value,
                 txn_version,
             )?
         {
-            let delegator_address = inner.get_delegator_address();
-            let voter = inner.value.get_voter();
-            let pending_voter = inner.value.get_pending_voter();
+            for inner in vote_delegation_maps {
+                let delegator_address = inner.get_delegator_address();
+                let voter = inner.value.get_voter();
+                let pending_voter = inner.value.get_pending_voter();
 
-            let pool_address = match vote_delegation_handle_to_pool_address.get(&table_handle) {
-                Some(pool_address) => pool_address.clone(),
-                None => {
-                    // look up from db
-                    Self::get_delegation_pool_address_by_table_handle(conn, &table_handle)
-                        .unwrap_or_else(|_| {
-                            tracing::error!(
-                                transaction_version = txn_version,
-                                lookup_key = &table_handle,
-                                "Missing pool address for table handle. You probably should backfill db.",
-                            );
-                            return "".to_string();
-                        })
-                },
-            };
-            if !pool_address.is_empty() {
-                return Ok(Some(CurrentDelegatedVoter {
-                    delegator_address,
-                    delegation_pool_address: pool_address,
-                    voter: Some(voter),
-                    pending_voter: Some(pending_voter),
-                    last_transaction_timestamp: txn_timestamp,
-                    last_transaction_version: txn_version,
-                    table_handle: Some(table_handle),
-                }));
+                let pool_address = match vote_delegation_handle_to_pool_address.get(&table_handle) {
+                    Some(pool_address) => pool_address.clone(),
+                    None => {
+                        // look up from db
+                        Self::get_delegation_pool_address_by_table_handle(conn, &table_handle)
+                            .unwrap_or_else(|_| {
+                                tracing::error!(
+                                    transaction_version = txn_version,
+                                    lookup_key = &table_handle,
+                                    "Missing pool address for table handle. You probably should backfill db.",
+                                );
+                                "".to_string()
+                            })
+                    },
+                };
+                if !pool_address.is_empty() {
+                    let delegated_voter = CurrentDelegatedVoter {
+                        delegator_address: delegator_address.clone(),
+                        delegation_pool_address: pool_address.clone(),
+                        voter: Some(voter.clone()),
+                        pending_voter: Some(pending_voter.clone()),
+                        last_transaction_timestamp: txn_timestamp,
+                        last_transaction_version: txn_version,
+                        table_handle: Some(table_handle.clone()),
+                    };
+                    delegated_voter_map.insert((pool_address, delegator_address), delegated_voter);
+                }
             }
         }
-        Ok(None)
+        Ok(delegated_voter_map)
     }
 
     /// For delegators that have delegated before the vote delegation contract deployment, we

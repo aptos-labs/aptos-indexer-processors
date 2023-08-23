@@ -223,7 +223,7 @@ impl StakeEvent {
 }
 
 pub enum VoteDelegationTableItem {
-    VoteDelegationMap(VoteDelegationMap),
+    VoteDelegationMap(Vec<VoteDelegationMap>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -262,13 +262,13 @@ impl VoteDelegationTableItem {
     ) -> Result<Option<Self>> {
         match data_type {
             "vector<0x1::smart_table::Entry<address, 0x1::delegation_pool::VoteDelegation>>" => {
-                let deserialized: Vec<VoteDelegationMap> =
-                    serde_json::from_str(data).context(format!(
+                let vote_delegation_map_vector: Vec<VoteDelegationMap> = serde_json::from_str(data)
+                    .context(format!(
                         "version {} failed! failed to parse type {}, data {:?}",
                         txn_version, data_type, data
                     ))?;
                 Ok(Some(VoteDelegationTableItem::VoteDelegationMap(
-                    deserialized[0].clone(),
+                    vote_delegation_map_vector.clone(),
                 )))
             },
             _ => Ok(None),
