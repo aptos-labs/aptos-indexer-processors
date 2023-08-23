@@ -164,16 +164,7 @@ fn insert_ans_lookups(
             diesel::insert_into(schema::ans_lookup::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_update()
-                .set((
-                    registered_address.eq(excluded(registered_address)),
-                    domain.eq(excluded(domain)),
-                    subdomain.eq(excluded(subdomain)),
-                    expiration_timestamp.eq(excluded(expiration_timestamp)),
-                    token_name.eq(excluded(token_name)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -223,15 +214,7 @@ fn insert_ans_primary_names(
             diesel::insert_into(schema::ans_primary_name::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_update()
-                .set((
-                    registered_address.eq(excluded(registered_address)),
-                    domain.eq(excluded(domain)),
-                    subdomain.eq(excluded(subdomain)),
-                    token_name.eq(excluded(token_name)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
