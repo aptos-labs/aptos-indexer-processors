@@ -42,7 +42,7 @@ use tracing::{error, info};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// GRPC request metadata key for the token ID.
-const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
+const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
@@ -639,9 +639,12 @@ pub fn grpc_request_builder(
         transactions_count,
         ..GetTransactionsRequest::default()
     });
-    request
-        .metadata_mut()
-        .insert(GRPC_AUTH_TOKEN_HEADER, grpc_auth_token.parse().unwrap());
+    request.metadata_mut().insert(
+        GRPC_API_GATEWAY_API_KEY_HEADER,
+        format!("Bearer {}", grpc_auth_token.clone())
+            .parse()
+            .unwrap(),
+    );
     request
         .metadata_mut()
         .insert(GRPC_REQUEST_NAME_HEADER, processor_name.parse().unwrap());
