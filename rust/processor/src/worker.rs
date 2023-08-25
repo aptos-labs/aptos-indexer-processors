@@ -246,9 +246,6 @@ impl Worker {
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
         let (tx, mut receiver) = tokio::sync::mpsc::channel::<(u64, Vec<Transaction>)>(BUFFER_SIZE);
-        // An Arc of mutex protected counter.
-        let channel_size = Arc::new(std::sync::Mutex::new(0));
-        let channel_size_clone = channel_size.clone();
         let auth_token = self.auth_token.clone();
         tokio::spawn(async move {
             info!(
@@ -288,14 +285,11 @@ impl Worker {
                                 panic!("[Parser] Error sending datastream response to channel.")
                             },
                         }
-                        // increase the counter.
-                        let mut size = channel_size_clone.lock().unwrap();
-                        *size += 1;
                         info!(
                             processor_name = processor_name,
                             start_version = start_version,
                             end_version = end_version,
-                            channel_size = *size,
+                            channel_size = BUFFER_SIZE - tx.capacity(),
                             channel_recv_latency_in_secs =
                                 last_insertion_time.elapsed().as_secs_f64(),
                             "[Parser] Received chunk of transactions."
@@ -344,7 +338,18 @@ impl Worker {
                     },
                 }
             }
-            // All senders are dropped here; channel is closed.
+            loop {
+                let channel_capacity = tx.capacity();
+                info!(
+                    processor_name = processor_name,
+                    channel_size = BUFFER_SIZE - channel_capacity,
+                    "[Parser] Waiting for channel to be empty"
+                );
+                if channel_capacity == BUFFER_SIZE {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
             info!("[Parser] The stream is ended.")
         });
 
@@ -404,8 +409,6 @@ impl Worker {
                         last_fetched_version =
                             transactions.as_slice().last().unwrap().version as i64;
                         transactions_batches.push(transactions);
-                        let mut size = channel_size.lock().unwrap();
-                        *size -= 1;
                     },
                     // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
                     Err(TryRecvError::Empty) => {
@@ -531,13 +534,11 @@ impl Worker {
                 .unwrap();
 
             ma.tick_now(batch_end - batch_start + 1);
-            let channel_size = *channel_size.lock().unwrap();
             info!(
                 processor_name = processor_name,
                 start_version = batch_start,
                 end_version = batch_end,
                 batch_size = batch_end - batch_start + 1,
-                channel_size = channel_size,
                 tps = (ma.avg() * 1000.0) as u64,
                 "[Parser] Processed transactions.",
             );
