@@ -132,8 +132,8 @@ impl FungibleAssetActivity {
             CoinEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
         {
             let amount = match inner {
-                CoinEvent::WithdrawCoinEvent(inner) => inner.amount.clone(),
-                CoinEvent::DepositCoinEvent(inner) => inner.amount.clone(),
+                CoinEvent::WithdrawCoinEvent(inner) => inner.amount,
+                CoinEvent::DepositCoinEvent(inner) => inner.amount,
             };
             let event_key = event.key.as_ref().context("event must have a key")?;
             let event_move_guid = EventGuidResource {
@@ -154,7 +154,7 @@ impl FungibleAssetActivity {
             Ok(Some(Self {
                 transaction_version: txn_version,
                 event_index,
-                owner_address: event_move_guid.addr.clone(),
+                owner_address: event_move_guid.addr,
                 storage_id,
                 asset_type: coin_type,
                 is_frozen: None,
