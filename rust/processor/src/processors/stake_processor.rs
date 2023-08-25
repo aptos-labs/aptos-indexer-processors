@@ -4,21 +4,26 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::stake_models::{
+        current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, CurrentDelegatorBalanceMap},
         delegator_pools::{
             CurrentDelegatorPoolBalance, DelegatorPool, DelegatorPoolBalance, DelegatorPoolMap,
         },
         proposal_votes::ProposalVote,
+        stake_utils::DelegationVoteGovernanceRecordsResource,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+    utils::{
+        database::{
+            clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        },
+        util::{parse_timestamp, standardize_address},
     },
 };
 use anyhow::bail;
-use aptos_indexer_protos::transaction::v1::Transaction;
+use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -56,6 +61,7 @@ fn insert_to_db_impl(
     delegator_pools: &[DelegatorPool],
     delegator_pool_balances: &[DelegatorPoolBalance],
     current_delegator_pool_balances: &[CurrentDelegatorPoolBalance],
+    current_delegated_voter: &[CurrentDelegatedVoter],
 ) -> Result<(), diesel::result::Error> {
     insert_current_stake_pool_voter(conn, current_stake_pool_voters)?;
     insert_proposal_votes(conn, proposal_votes)?;
@@ -64,6 +70,7 @@ fn insert_to_db_impl(
     insert_delegator_pools(conn, delegator_pools)?;
     insert_delegator_pool_balances(conn, delegator_pool_balances)?;
     insert_current_delegator_pool_balances(conn, current_delegator_pool_balances)?;
+    insert_current_delegated_voter(conn, current_delegated_voter)?;
     Ok(())
 }
 
@@ -79,6 +86,7 @@ fn insert_to_db(
     delegator_pools: Vec<DelegatorPool>,
     delegator_pool_balances: Vec<DelegatorPoolBalance>,
     current_delegator_pool_balances: Vec<CurrentDelegatorPoolBalance>,
+    current_delegated_voter: Vec<CurrentDelegatedVoter>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -99,6 +107,7 @@ fn insert_to_db(
                 &delegator_pools,
                 &delegator_pool_balances,
                 &current_delegator_pool_balances,
+                &current_delegated_voter,
             )
         }) {
         Ok(_) => Ok(()),
@@ -114,6 +123,7 @@ fn insert_to_db(
                 let delegator_pool_balances = clean_data_for_db(delegator_pool_balances, true);
                 let current_delegator_pool_balances =
                     clean_data_for_db(current_delegator_pool_balances, true);
+                let current_delegated_voter = clean_data_for_db(current_delegated_voter, true);
 
                 insert_to_db_impl(
                     pg_conn,
@@ -124,6 +134,7 @@ fn insert_to_db(
                     &delegator_pools,
                     &delegator_pool_balances,
                     &current_delegator_pool_balances,
+                    &current_delegated_voter,
                 )
             }),
     }
@@ -309,6 +320,36 @@ fn insert_current_delegator_pool_balances(
     Ok(())
 }
 
+fn insert_current_delegated_voter(
+    conn: &mut PgConnection,
+    item_to_insert: &[CurrentDelegatedVoter],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_delegated_voter::dsl::*;
+
+    let chunks = get_chunks(item_to_insert.len(), CurrentDelegatedVoter::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_delegated_voter::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict((delegation_pool_address, delegator_address))
+                .do_update()
+                .set((
+                    voter.eq(excluded(voter)),
+                    pending_voter.eq(excluded(pending_voter)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    table_handle.eq(excluded(table_handle)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+                Some(
+                    " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
+                ),
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl ProcessorTrait for StakeTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -332,6 +373,11 @@ impl ProcessorTrait for StakeTransactionProcessor {
         let mut all_delegator_pool_balances = vec![];
         let mut all_current_delegator_pool_balances = HashMap::new();
 
+        let mut active_pool_to_staking_pool = HashMap::new();
+        // structs needed to get delegated voters
+        let mut all_current_delegated_voter = HashMap::new();
+        let mut all_vote_delegation_handle_to_pool_address = HashMap::new();
+
         for txn in &transactions {
             // Add votes data
             let current_stake_pool_voter = CurrentStakingPoolVoter::from_transaction(txn).unwrap();
@@ -343,17 +389,91 @@ impl ProcessorTrait for StakeTransactionProcessor {
             let mut delegator_activities = DelegatedStakingActivity::from_transaction(txn).unwrap();
             all_delegator_activities.append(&mut delegator_activities);
 
-            // Add delegator balances
-            let delegator_balances =
-                CurrentDelegatorBalance::from_transaction(txn, &mut conn).unwrap();
-            all_delegator_balances.extend(delegator_balances);
-
             // Add delegator pools
             let (delegator_pools, mut delegator_pool_balances, current_delegator_pool_balances) =
                 DelegatorPool::from_transaction(txn).unwrap();
             all_delegator_pools.extend(delegator_pools);
             all_delegator_pool_balances.append(&mut delegator_pool_balances);
             all_current_delegator_pool_balances.extend(current_delegator_pool_balances);
+
+            // Moving the transaction code here is the new paradigm to avoid redoing a lot of the duplicate work
+            // Currently only delegator voting follows this paradigm
+            // TODO: refactor all the other staking code to follow this paradigm
+            let txn_version = txn.version as i64;
+            let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
+            let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
+            // adding some metadata for subsequent parsing
+            for wsc in &transaction_info.changes {
+                if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                    if let Some(DelegationVoteGovernanceRecordsResource::GovernanceRecords(inner)) =
+                        DelegationVoteGovernanceRecordsResource::from_write_resource(
+                            write_resource,
+                            txn_version,
+                        )?
+                    {
+                        let delegation_pool_address =
+                            standardize_address(&write_resource.address.to_string());
+                        let vote_delegation_handle =
+                            inner.vote_delegation.buckets.inner.get_handle();
+
+                        all_vote_delegation_handle_to_pool_address
+                            .insert(vote_delegation_handle, delegation_pool_address.clone());
+                    }
+                    if let Some(map) =
+                        CurrentDelegatorBalance::get_active_pool_to_staking_pool_mapping(
+                            write_resource,
+                            txn_version,
+                        )
+                        .unwrap()
+                    {
+                        active_pool_to_staking_pool.extend(map);
+                    }
+                }
+            }
+
+            // Add delegator balances
+            let delegator_balances = CurrentDelegatorBalance::from_transaction(
+                txn,
+                &active_pool_to_staking_pool,
+                &mut conn,
+            )
+            .unwrap();
+            all_delegator_balances.extend(delegator_balances);
+
+            // this write table item indexing is to get delegator address, table handle, and voter & pending voter
+            for wsc in &transaction_info.changes {
+                if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
+                    let voter_map = CurrentDelegatedVoter::from_write_table_item(
+                        write_table_item,
+                        txn_version,
+                        txn_timestamp,
+                        &all_vote_delegation_handle_to_pool_address,
+                        &mut conn,
+                    )
+                    .unwrap();
+
+                    all_current_delegated_voter.extend(voter_map);
+                }
+            }
+
+            // we need one last loop to prefill delegators that got in before the delegated voting contract was deployed
+            for wsc in &transaction_info.changes {
+                if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
+                    if let Some(voter) =
+                        CurrentDelegatedVoter::get_delegators_pre_contract_deployment(
+                            write_table_item,
+                            txn_version,
+                            txn_timestamp,
+                            &active_pool_to_staking_pool,
+                            &all_current_delegated_voter,
+                            &mut conn,
+                        )
+                        .unwrap()
+                    {
+                        all_current_delegated_voter.insert(voter.pk(), voter);
+                    }
+                }
+            }
         }
 
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
@@ -369,6 +489,9 @@ impl ProcessorTrait for StakeTransactionProcessor {
         let mut all_current_delegator_pool_balances = all_current_delegator_pool_balances
             .into_values()
             .collect::<Vec<CurrentDelegatorPoolBalance>>();
+        let mut all_current_delegated_voter = all_current_delegated_voter
+            .into_values()
+            .collect::<Vec<CurrentDelegatedVoter>>();
 
         // Sort by PK
         all_current_stake_pool_voters
@@ -383,6 +506,7 @@ impl ProcessorTrait for StakeTransactionProcessor {
         all_delegator_pools.sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
         all_current_delegator_pool_balances
             .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
+        all_current_delegated_voter.sort();
 
         let tx_result = insert_to_db(
             &mut conn,
@@ -396,6 +520,7 @@ impl ProcessorTrait for StakeTransactionProcessor {
             all_delegator_pools,
             all_delegator_pool_balances,
             all_current_delegator_pool_balances,
+            all_current_delegated_voter,
         );
 
         match tx_result {

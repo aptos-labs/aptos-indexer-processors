@@ -4,6 +4,7 @@
 use crate::{
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
+        ans_processor::AnsTransactionProcessor,
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
@@ -65,7 +66,8 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub ans_address: Option<String>,
+    pub ans_v1_primary_names_table_handle: Option<String>,
+    pub ans_v1_name_records_table_handle: Option<String>,
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
@@ -82,7 +84,8 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        ans_address: Option<String>,
+        ans_v1_primary_names_table_handle: Option<String>,
+        ans_v1_name_records_table_handle: Option<String>,
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
         google_application_credentials: Option<String>,
@@ -111,7 +114,8 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            ans_address,
+            ans_v1_primary_names_table_handle,
+            ans_v1_name_records_table_handle,
             nft_points_contract,
             pubsub_topic_name,
             google_application_credentials,
@@ -202,7 +206,6 @@ impl Worker {
             },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
-                self.ans_address.clone(),
                 self.nft_points_contract.clone(),
             )),
             Processor::TokenV2Processor => {
@@ -224,6 +227,11 @@ impl Worker {
                     pubsub_topic_name,
                 ))
             },
+            Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
+                self.db_pool.clone(),
+                self.ans_v1_primary_names_table_handle.clone(),
+                self.ans_v1_name_records_table_handle.clone(),
+            )),
         };
         let processor_name = processor.name();
 

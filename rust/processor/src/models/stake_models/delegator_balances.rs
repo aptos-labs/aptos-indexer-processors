@@ -312,9 +312,9 @@ impl CurrentDelegatorBalance {
 
     pub fn from_transaction(
         transaction: &Transaction,
+        active_pool_to_staking_pool: &ShareToStakingPoolMapping,
         conn: &mut PgPoolConnection,
     ) -> anyhow::Result<CurrentDelegatorBalanceMap> {
-        let mut active_pool_to_staking_pool: ShareToStakingPoolMapping = HashMap::new();
         let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = HashMap::new();
         let mut inactive_share_to_pool: ShareToPoolMapping = HashMap::new();
         let mut current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
@@ -323,12 +323,6 @@ impl CurrentDelegatorBalance {
         // Do a first pass to get the mapping of active_share table handles to staking pool resource        let txn_version = transaction.version as i64;
         for wsc in &transaction.info.as_ref().unwrap().changes {
             if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                if let Some(map) =
-                    Self::get_active_pool_to_staking_pool_mapping(write_resource, txn_version)
-                        .unwrap()
-                {
-                    active_pool_to_staking_pool.extend(map);
-                }
                 if let Some(map) =
                     Self::get_inactive_pool_to_staking_pool_mapping(write_resource, txn_version)
                         .unwrap()
@@ -352,7 +346,7 @@ impl CurrentDelegatorBalance {
                     if let Some(balance) = Self::get_active_share_from_delete_table_item(
                         table_item,
                         txn_version,
-                        &active_pool_to_staking_pool,
+                        active_pool_to_staking_pool,
                     )
                     .unwrap()
                     {
@@ -372,7 +366,7 @@ impl CurrentDelegatorBalance {
                     if let Some(balance) = Self::get_active_share_from_write_table_item(
                         table_item,
                         txn_version,
-                        &active_pool_to_staking_pool,
+                        active_pool_to_staking_pool,
                     )
                     .unwrap()
                     {

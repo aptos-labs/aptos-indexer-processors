@@ -10,6 +10,41 @@ diesel::table! {
 }
 
 diesel::table! {
+    ans_lookup (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Nullable<Timestamp>,
+        #[max_length = 140]
+        token_name -> Varchar,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    ans_primary_name (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 66]
+        registered_address -> Varchar,
+        #[max_length = 64]
+        domain -> Nullable<Varchar>,
+        #[max_length = 64]
+        subdomain -> Nullable<Varchar>,
+        #[max_length = 140]
+        token_name -> Nullable<Varchar>,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     block_metadata_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -168,6 +203,23 @@ diesel::table! {
         inserted_at -> Timestamp,
         #[max_length = 140]
         token_name -> Varchar,
+        is_deleted -> Bool,
+    }
+}
+
+diesel::table! {
+    current_ans_primary_name (registered_address) {
+        #[max_length = 66]
+        registered_address -> Varchar,
+        #[max_length = 64]
+        domain -> Nullable<Varchar>,
+        #[max_length = 64]
+        subdomain -> Nullable<Varchar>,
+        #[max_length = 140]
+        token_name -> Nullable<Varchar>,
+        is_deleted -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -249,6 +301,24 @@ diesel::table! {
         inactive_table_handle -> Varchar,
         #[max_length = 66]
         active_table_handle -> Varchar,
+    }
+}
+
+diesel::table! {
+    current_delegated_voter (delegation_pool_address, delegator_address) {
+        #[max_length = 66]
+        delegation_pool_address -> Varchar,
+        #[max_length = 66]
+        delegator_address -> Varchar,
+        #[max_length = 66]
+        table_handle -> Nullable<Varchar>,
+        #[max_length = 66]
+        voter -> Nullable<Varchar>,
+        #[max_length = 66]
+        pending_voter -> Nullable<Varchar>,
+        last_transaction_version -> Int8,
+        last_transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1020,6 +1090,8 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
+    ans_lookup,
+    ans_primary_name,
     block_metadata_transactions,
     coin_activities,
     coin_balances,
@@ -1028,10 +1100,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     collection_datas,
     collections_v2,
     current_ans_lookup,
+    current_ans_primary_name,
     current_coin_balances,
     current_collection_datas,
     current_collections_v2,
     current_delegated_staking_pool_balances,
+    current_delegated_voter,
     current_delegator_balances,
     current_fungible_asset_balances,
     current_objects,

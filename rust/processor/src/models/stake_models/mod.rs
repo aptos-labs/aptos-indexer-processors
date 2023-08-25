@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod current_delegated_voter;
 pub mod delegator_activities;
 pub mod delegator_balances;
 pub mod delegator_pools;

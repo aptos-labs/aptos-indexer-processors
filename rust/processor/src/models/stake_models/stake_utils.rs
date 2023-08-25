@@ -221,3 +221,114 @@ impl StakeEvent {
         ))
     }
 }
+
+pub enum VoteDelegationTableItem {
+    VoteDelegationVector(Vec<VoteDelegationVector>),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VoteDelegationVector {
+    key: String,
+    pub value: VoteDelegationResource,
+}
+
+impl VoteDelegationVector {
+    pub fn get_delegator_address(&self) -> String {
+        standardize_address(&self.key)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VoteDelegationResource {
+    pub voter: String,
+    pub pending_voter: String,
+}
+
+impl VoteDelegationResource {
+    pub fn get_voter(&self) -> String {
+        standardize_address(&self.voter)
+    }
+
+    pub fn get_pending_voter(&self) -> String {
+        standardize_address(&self.pending_voter)
+    }
+}
+
+impl VoteDelegationTableItem {
+    pub fn from_table_item_type(
+        data_type: &str,
+        data: &str,
+        txn_version: i64,
+    ) -> Result<Option<Self>> {
+        match data_type {
+            "vector<0x1::smart_table::Entry<address, 0x1::delegation_pool::VoteDelegation>>" => {
+                let vote_delegation_vector: Vec<VoteDelegationVector> = serde_json::from_str(data)
+                    .context(format!(
+                        "version {} failed! failed to parse type {}, data {:?}",
+                        txn_version, data_type, data
+                    ))?;
+                Ok(Some(VoteDelegationTableItem::VoteDelegationVector(
+                    vote_delegation_vector.clone(),
+                )))
+            },
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GovernanceRecordsResource {
+    pub vote_delegation: VoteDelegationBucketsResource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VoteDelegationBucketsResource {
+    pub buckets: VoteDelegationInnerResource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VoteDelegationInnerResource {
+    pub inner: Table,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum DelegationVoteGovernanceRecordsResource {
+    GovernanceRecords(GovernanceRecordsResource),
+}
+
+impl DelegationVoteGovernanceRecordsResource {
+    pub fn from_resource(
+        data_type: &str,
+        data: &serde_json::Value,
+        txn_version: i64,
+    ) -> Result<Option<Self>> {
+        match data_type {
+            x if x == format!("{}::delegation_pool::GovernanceRecords", STAKE_ADDR) => {
+                serde_json::from_value(data.clone()).map(|inner| {
+                    Some(DelegationVoteGovernanceRecordsResource::GovernanceRecords(
+                        inner,
+                    ))
+                })
+            },
+            _ => Ok(None),
+        }
+        .context(format!(
+            "version {} failed! failed to parse type {}, data {:?}",
+            txn_version, data_type, data
+        ))
+    }
+
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+        Self::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)
+    }
+}

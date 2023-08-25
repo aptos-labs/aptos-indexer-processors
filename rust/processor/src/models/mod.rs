@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod ans_models;
 pub mod coin_models;
 pub mod default_models;
 pub mod fungible_asset_models;
