@@ -660,11 +660,14 @@ pub async fn get_stream(
     auth_token: String,
     processor_name: String,
 ) -> Streaming<TransactionsResponse> {
+    let config = tonic::transport::channel::ClientTlsConfig::new();
     let channel = tonic::transport::Channel::from_shared(format!(
         "https://{}",
         indexer_grpc_data_service_address.clone()
     ))
     .expect("[Parser] Endpoint is not a valid URI")
+    .tls_config(config)
+    .expect("[Parser] Failed to create TLS config")
     .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
     .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
     info!(
