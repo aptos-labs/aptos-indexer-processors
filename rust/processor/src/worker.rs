@@ -661,7 +661,7 @@ pub async fn get_stream(
     processor_name: String,
 ) -> Streaming<TransactionsResponse> {
     let channel = tonic::transport::Channel::from_shared(format!(
-        "http://{}",
+        "https://{}",
         indexer_grpc_data_service_address.clone()
     ))
     .expect("[Parser] Endpoint is not a valid URI")
