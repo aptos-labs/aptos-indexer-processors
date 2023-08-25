@@ -32,6 +32,7 @@ import { chdir } from "node:process";
 import { promisify } from "node:util";
 const sleep = promisify(setTimeout);
 
+// argv[1] is the file path to the script
 chdir(dirname(process.argv[1]) + "/.."); // change workdir to the root of the repo
 // install repo pnpm dependencies
 execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
@@ -102,11 +103,11 @@ const imageLatestTarget = `${DOCKERHUB}/${targetImage}:latest`;
 console.info(chalk.green(`INFO: copying ${imageSource} to ${imageGitShaTarget}`));
 await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
 await $`${crane} copy ${imageSource} ${imageGitShaTarget}`;
-await $`${crane} copy ${imageSource} ${imageLatestTarget}`;
+await $`${crane} tag ${imageSource} ${imageLatestTarget}`;
 if(parsedArgs.VERSION_TAG !== null) {
     const imageVersionTagTarget = `${DOCKERHUB}/${targetImage}:${parsedArgs.VERSION_TAG}`;
     console.info(chalk.green(`INFO: copying ${imageSource} to ${imageVersionTagTarget}`));
-    await $`${crane} copy ${imageSource} ${imageVersionTagTarget}`;
+    await $`${crane} tag ${imageSource} ${imageVersionTagTarget}`;
 }
 
 
