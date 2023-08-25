@@ -14,6 +14,7 @@ use crate::{
 };
 use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
+use futures_util::future::try_join_all;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::client::{Client, ClientConfig};
 use std::{
@@ -102,9 +103,15 @@ impl ProcessorTrait for NFTMetadataProcessor {
             end_version = end_version,
             "[NFT Metadata Crawler] Publishing to queue"
         );
-        for awaiter in publisher.publish_bulk(pubsub_messages).await {
-            awaiter.get().await?;
-        }
+
+        try_join_all(
+            publisher
+                .publish_bulk(pubsub_messages)
+                .await
+                .into_iter()
+                .map(|awaiter| awaiter.get()),
+        )
+        .await?;
 
         Ok((start_version, end_version))
     }
