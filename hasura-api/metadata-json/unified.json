@@ -1,5 +1,5 @@
 {
-  "resource_version": 242,
+  "resource_version": 326,
   "metadata": {
     "version": 3,
     "sources": [
@@ -610,7 +610,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -776,13 +776,40 @@
                   "columns": [
                     "domain",
                     "expiration_timestamp",
+                    "is_deleted",
                     "last_transaction_version",
                     "registered_address",
-                    "subdomain"
+                    "subdomain",
+                    "token_name"
                   ],
                   "filter": {},
                   "limit": 100
                 }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_aptos_names",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "is_primary",
+                    "domain",
+                    "registered_address",
+                    "subdomain",
+                    "expiration_timestamp",
+                    "token_name",
+                    "last_transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
               }
             ]
           },
@@ -956,6 +983,31 @@
           },
           {
             "table": {
+              "name": "current_delegated_voter",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "delegation_pool_address",
+                    "delegator_address",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "pending_voter",
+                    "table_handle",
+                    "voter"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "current_delegator_balances",
               "schema": "public"
             },
@@ -1093,7 +1145,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -1257,7 +1309,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -1658,7 +1710,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -1901,7 +1953,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -1916,7 +1968,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -1986,7 +2038,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
@@ -2001,7 +2053,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "current_ans_lookup",
+                      "name": "current_aptos_names",
                       "schema": "public"
                     }
                   }
