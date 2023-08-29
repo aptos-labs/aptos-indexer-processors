@@ -3,6 +3,7 @@ on:
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
   pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
       - main
@@ -23,31 +24,42 @@ permissions:
 
 jobs:
   Build:
-    strategy:
-      matrix:
-        example: [python, rust]
+    if: |
+      (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'build-python') ||
+        contains(github.event.pull_request.labels.*.name, 'build-rust')
+      )
     runs-on: ubuntu-latest
+    env:
+      PROCESSOR_TO_BUILD: ${{ join(github.event.pull_request.labels.*.name, ',') }}
     steps:
-      - uses: actions/checkout@v3
-      - name: Install pnpm & protoc-gen-ts
-        uses: pnpm/action-setup@v2
-        with:
-          version: 7.12.2
-      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-      - name: install rust prost plugin
-        run: |
-          cargo install protoc-gen-prost
-          cargo install protoc-gen-prost-serde
-          cargo install protoc-gen-prost-crate
-          cargo install protoc-gen-tonic
-      - name: Generate the protos
-        uses: bufbuild/buf-setup-action@v1.24.0
-      - run: pip install grpcio-tools
-      - run: ./build_protos.sh
-      - uses: ./.github/actions/docker-setup
-        with:
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      - run: ./scripts/build-and-push-images.sh ${{ matrix.example }}
+      # - uses: actions/checkout@v3
+      # - name: Install pnpm & protoc-gen-ts
+      #   uses: pnpm/action-setup@v2
+      #   with:
+      #     version: 7.12.2
+      # - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
+      # - name: Install Protoc
+      #   uses: arduino/setup-protoc@v2
+      # - name: install rust prost plugin
+      #   run: |
+      #     cargo install protoc-gen-prost
+      #     cargo install protoc-gen-prost-serde
+      #     cargo install protoc-gen-prost-crate
+      #     cargo install protoc-gen-tonic
+      # - name: Generate the protos
+      #   uses: bufbuild/buf-setup-action@v1.24.0
+      # - run: pip install grpcio-tools
+      # - run: ./build_protos.sh
+      # - uses: ./.github/actions/docker-setup
+      #   with:
+      #     GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      #     GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      - run: |
+          for processor in $(echo "$PROCESSOR_TO_BUILD" | tr ',' '\n'); do
+            if [[ "$processor" == *"build-rust"* || "$processor" == *"build-python"* ]]; then
+              echo "Processor: $processor"
+            fi
+          done
