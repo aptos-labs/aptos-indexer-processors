@@ -42,7 +42,7 @@ use tracing::{error, info};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// GRPC request metadata key for the token ID.
-const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
+const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
@@ -246,9 +246,6 @@ impl Worker {
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
         let (tx, mut receiver) = tokio::sync::mpsc::channel::<(u64, Vec<Transaction>)>(BUFFER_SIZE);
-        // An Arc of mutex protected counter.
-        let channel_size = Arc::new(std::sync::Mutex::new(0));
-        let channel_size_clone = channel_size.clone();
         let auth_token = self.auth_token.clone();
         tokio::spawn(async move {
             info!(
@@ -265,87 +262,119 @@ impl Worker {
             let mut last_insertion_time = std::time::Instant::now();
             let mut next_version_to_fetch = batch_start_version;
             let mut last_reconnection_time: Option<std::time::Instant> = None;
-            while let Some(current_item) = resp_stream.next().await {
-                match current_item {
-                    Ok(r) => {
-                        let start_version = r.transactions.as_slice().first().unwrap().version;
-                        let end_version = r.transactions.as_slice().last().unwrap().version;
-                        next_version_to_fetch = end_version + 1;
+            loop {
+                while let Some(current_item) = resp_stream.next().await {
+                    match current_item {
+                        Ok(r) => {
+                            let start_version = r.transactions.as_slice().first().unwrap().version;
+                            let end_version = r.transactions.as_slice().last().unwrap().version;
+                            next_version_to_fetch = end_version + 1;
 
-                        TRANSMITTED_BYTES_COUNT
-                            .with_label_values(&[processor_name])
-                            .inc_by(r.encoded_len() as u64);
-                        let chain_id = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
-                        match tx.send((chain_id, r.transactions)).await {
-                            Ok(()) => {},
-                            Err(e) => {
-                                error!(
-                                    processor_name = processor_name,
-                                    stream_address = indexer_grpc_data_service_address.clone(),
-                                    error = ?e,
-                                    "[Parser] Error sending datastream response to channel."
-                                );
-                                panic!("[Parser] Error sending datastream response to channel.")
-                            },
-                        }
-                        // increase the counter.
-                        let mut size = channel_size_clone.lock().unwrap();
-                        *size += 1;
+                            TRANSMITTED_BYTES_COUNT
+                                .with_label_values(&[processor_name])
+                                .inc_by(r.encoded_len() as u64);
+                            let chain_id = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
+                            match tx.send((chain_id, r.transactions)).await {
+                                Ok(()) => {},
+                                Err(e) => {
+                                    error!(
+                                        processor_name = processor_name,
+                                        stream_address = indexer_grpc_data_service_address.clone(),
+                                        error = ?e,
+                                        "[Parser] Error sending datastream response to channel."
+                                    );
+                                    panic!("[Parser] Error sending datastream response to channel.")
+                                },
+                            }
+                            info!(
+                                processor_name = processor_name,
+                                start_version = start_version,
+                                end_version = end_version,
+                                channel_size = BUFFER_SIZE - tx.capacity(),
+                                channel_recv_latency_in_secs =
+                                    last_insertion_time.elapsed().as_secs_f64(),
+                                "[Parser] Received chunk of transactions."
+                            );
+                            last_insertion_time = std::time::Instant::now();
+                        },
+                        Err(rpc_error) => {
+                            // Handle reconnection later on
+                            tracing::warn!(
+                                processor_name = processor_name,
+                                stream_address = indexer_grpc_data_service_address.clone(),
+                                error = ?rpc_error,
+                                "[Parser] Error receiving datastream response."
+                            );
+                            break;
+                        },
+                    }
+                }
+
+                // Wait for the fetched transactions to finish processing before closing the channel
+                loop {
+                    let channel_capacity = tx.capacity();
+                    info!(
+                        processor_name = processor_name,
+                        channel_size = BUFFER_SIZE - channel_capacity,
+                        "[Parser] Waiting for channel to be empty"
+                    );
+                    if channel_capacity == BUFFER_SIZE {
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+                info!("[Parser] The stream is ended.");
+
+                // Don't try to reconnect if we've reached ending_version
+                if let Some(ending_version) = ending_version {
+                    if next_version_to_fetch > ending_version {
                         info!(
                             processor_name = processor_name,
-                            start_version = start_version,
-                            end_version = end_version,
-                            channel_size = *size,
-                            channel_recv_latency_in_secs =
-                                last_insertion_time.elapsed().as_secs_f64(),
-                            "[Parser] Received chunk of transactions."
-                        );
-                        last_insertion_time = std::time::Instant::now();
-                    },
-                    Err(rpc_error) => {
-                        tracing::warn!(
-                            processor_name = processor_name,
                             stream_address = indexer_grpc_data_service_address.clone(),
-                            error = ?rpc_error,
-                            "[Parser] Error receiving datastream response."
-                        );
-                        if let Some(lrt) = last_reconnection_time {
-                            let elapsed = lrt.elapsed().as_secs();
-                            if elapsed < MIN_SEC_BETWEEN_GRPC_RECONNECTS {
-                                error!(
-                                    processor_name = processor_name,
-                                    stream_address = indexer_grpc_data_service_address.clone(),
-                                    seconds_since_last_retry = elapsed,
-                                    "[Parser] Recently reconnected. Will not retry.",
-                                );
-                                panic!("[Parser] Recently reconnected. Will not retry.")
-                            }
-                        }
-                        last_reconnection_time = Some(std::time::Instant::now());
-                        // Reconnecting
-                        tracing::warn!(
-                            processor_name = processor_name,
-                            stream_address = indexer_grpc_data_service_address.clone(),
-                            starting_version = next_version_to_fetch,
                             ending_version = ending_version,
-                            "[Parser] Reconnecting to GRPC."
+                            "[Parser] Reached ending version.",
                         );
-                        resp_stream = get_stream(
-                            indexer_grpc_data_service_address.clone(),
-                            indexer_grpc_http2_ping_interval,
-                            indexer_grpc_http2_ping_timeout,
-                            next_version_to_fetch,
-                            ending_version,
-                            auth_token.clone(),
-                            processor_name.to_string(),
-                        )
-                        .await;
-                        continue;
-                    },
+                        break;
+                    }
                 }
+
+                // Handle reconnection logic
+                tracing::warn!(
+                    processor_name = processor_name,
+                    stream_address = indexer_grpc_data_service_address.clone(),
+                    "[Parser] Error receiving datastream response."
+                );
+                if let Some(lrt) = last_reconnection_time {
+                    let elapsed: u64 = lrt.elapsed().as_secs();
+                    if elapsed < MIN_SEC_BETWEEN_GRPC_RECONNECTS {
+                        error!(
+                            processor_name = processor_name,
+                            stream_address = indexer_grpc_data_service_address.clone(),
+                            seconds_since_last_retry = elapsed,
+                            "[Parser] Recently reconnected. Will not retry.",
+                        );
+                        panic!("[Parser] Recently reconnected. Will not retry.")
+                    }
+                }
+                last_reconnection_time = Some(std::time::Instant::now());
+                tracing::warn!(
+                    processor_name = processor_name,
+                    stream_address = indexer_grpc_data_service_address.clone(),
+                    starting_version = next_version_to_fetch,
+                    ending_version = ending_version,
+                    "[Parser] Reconnecting to GRPC."
+                );
+                resp_stream = get_stream(
+                    indexer_grpc_data_service_address.clone(),
+                    indexer_grpc_http2_ping_interval,
+                    indexer_grpc_http2_ping_timeout,
+                    next_version_to_fetch,
+                    ending_version,
+                    auth_token.clone(),
+                    processor_name.to_string(),
+                )
+                .await;
             }
-            // All senders are dropped here; channel is closed.
-            info!("[Parser] The stream is ended.")
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -404,8 +433,6 @@ impl Worker {
                         last_fetched_version =
                             transactions.as_slice().last().unwrap().version as i64;
                         transactions_batches.push(transactions);
-                        let mut size = channel_size.lock().unwrap();
-                        *size -= 1;
                     },
                     // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
                     Err(TryRecvError::Empty) => {
@@ -531,13 +558,11 @@ impl Worker {
                 .unwrap();
 
             ma.tick_now(batch_end - batch_start + 1);
-            let channel_size = *channel_size.lock().unwrap();
             info!(
                 processor_name = processor_name,
                 start_version = batch_start,
                 end_version = batch_end,
                 batch_size = batch_end - batch_start + 1,
-                channel_size = channel_size,
                 tps = (ma.avg() * 1000.0) as u64,
                 "[Parser] Processed transactions.",
             );
@@ -614,9 +639,12 @@ pub fn grpc_request_builder(
         transactions_count,
         ..GetTransactionsRequest::default()
     });
-    request
-        .metadata_mut()
-        .insert(GRPC_AUTH_TOKEN_HEADER, grpc_auth_token.parse().unwrap());
+    request.metadata_mut().insert(
+        GRPC_API_GATEWAY_API_KEY_HEADER,
+        format!("Bearer {}", grpc_auth_token.clone())
+            .parse()
+            .unwrap(),
+    );
     request
         .metadata_mut()
         .insert(GRPC_REQUEST_NAME_HEADER, processor_name.parse().unwrap());
@@ -632,11 +660,14 @@ pub async fn get_stream(
     auth_token: String,
     processor_name: String,
 ) -> Streaming<TransactionsResponse> {
+    let config = tonic::transport::channel::ClientTlsConfig::new();
     let channel = tonic::transport::Channel::from_shared(format!(
-        "http://{}",
+        "https://{}",
         indexer_grpc_data_service_address.clone()
     ))
     .expect("[Parser] Endpoint is not a valid URI")
+    .tls_config(config)
+    .expect("[Parser] Failed to create TLS config")
     .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
     .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
     info!(
