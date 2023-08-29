@@ -2,12 +2,13 @@
 
 # Stage 1: Build the binary
 
-FROM rust as builder
+FROM rust:slim-bullseye as builder
 
 WORKDIR /app
 
 COPY --link . /app
 
+RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev lld
 RUN cargo build --locked --release -p processor
 RUN cp target/release/processor /usr/local/bin
 

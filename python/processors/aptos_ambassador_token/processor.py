@@ -6,40 +6,30 @@ import json
 from aptos.indexer.v1 import raw_data_pb2_grpc
 from aptos.indexer.v1 import raw_data_pb2
 from aptos.transaction.v1 import transaction_pb2
+from utils.processor_name import ProcessorName
 from utils.config import Config
 from utils.general_utils import standardize_address
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-c", "--config", help="Path to config file", required=True)
-args = parser.parse_args()
-config = Config.from_yaml_file(args.config)
-starting_version = 0
-if config.starting_version_default != None:
-    starting_version = config.starting_version_default
-if config.starting_version_backfill != None:
-    starting_version = config.starting_version_backfill
-metadata = (
-    ("x-aptos-data-authorization", config.grpc_data_stream_api_key),
-    ("x-aptos-request-name", "ambassador token indexer"),
-)
-options = [("grpc.max_receive_message_length", -1)]
+from utils.transactions_processor import TransactionsProcessor, ProcessingResult
+from utils.models.schema_names import EXAMPLE
 
 qualified_module_name = "0x9bfdd4efe15f4d8aa145bef5f64588c7c391bcddaf34f9e977f59bd93b498f2a::ambassador"
 qualified_event_name = qualified_module_name + "::LevelUpdateEvent"
 qualified_resource_name = qualified_module_name + "::AmbassadorLevel"
 
-with grpc.insecure_channel(config.grpc_data_stream_endpoint, options=options) as channel:
-    stub = raw_data_pb2_grpc.RawDataStub(channel)
-    current_transaction_version = starting_version
-
-    for response in stub.GetTransactions(
-        raw_data_pb2.GetTransactionsRequest(starting_version=starting_version),
-        metadata=metadata,
-    ):
-        for transaction in response.transactions:
-            assert transaction.version == current_transaction_version
-
+class AptosAmbassadorTokenProcessor(TransactionsProcessor):
+    def name(self) -> str:
+        return ProcessorName.EXAMPLE_AMBASSADOR_TOKEN_PROCESSOR.value
+    
+    def schema(self) -> str:
+        return EXAMPLE
+    
+    def process_transactions(
+        self,
+        transactions: list[transaction_pb2.Transaction],
+        start_version: int,
+        end_version: int,
+    ) -> ProcessingResult:
+        for transaction in transactions:
             found = False
             if transaction.type == transaction_pb2.Transaction.TRANSACTION_TYPE_USER:
                 for event in transaction.user.events:
@@ -84,4 +74,7 @@ with grpc.insecure_channel(config.grpc_data_stream_endpoint, options=options) as
                     ))
                     print('\n\n')
 
-            current_transaction_version += 1
+        return ProcessingResult(
+            start_version=start_version,
+            end_version=end_version,
+        )
