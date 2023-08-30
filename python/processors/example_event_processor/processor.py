@@ -1,4 +1,4 @@
-from aptos.transaction.v1 import transaction_pb2
+from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
 from processors.example_event_processor.models import Event
 from typing import List
 from utils.transactions_processor import ProcessingResult

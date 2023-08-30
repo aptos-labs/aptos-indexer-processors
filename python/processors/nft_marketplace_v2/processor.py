@@ -1,7 +1,7 @@
 import json
 
 from typing import Dict, List
-from aptos.transaction.v1 import transaction_pb2
+from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
 from processors.nft_orderbooks.nft_marketplace_enums import MarketplaceName
 from processors.nft_marketplace_v2.nft_marketplace_models import (
     CurrentNFTMarketplaceListing,

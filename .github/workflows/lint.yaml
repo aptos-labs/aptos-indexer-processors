@@ -19,20 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-      - uses: snok/install-poetry@v1
+      - uses: ./.github/actions/python-setup
         with:
-          version: 1.4.2
-      - run: >
-          pip install grpcio-tools &&
-          python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python
-          proto/aptos/bigquery_schema/v1/transaction.proto
-          proto/aptos/indexer/v1/raw_data.proto
-          proto/aptos/internal/fullnode/v1/fullnode_data.proto
-          proto/aptos/transaction/v1/transaction.proto
-          proto/aptos/util/timestamp/timestamp.proto
-      - run: poetry install
-        working-directory: python
+          pyproject_directory: python
       - run: poetry run poe lint
         working-directory: python
 

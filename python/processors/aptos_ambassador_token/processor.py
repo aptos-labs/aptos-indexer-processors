@@ -3,9 +3,9 @@ import grpc
 import ast
 import json
 
-from aptos.indexer.v1 import raw_data_pb2_grpc
-from aptos.indexer.v1 import raw_data_pb2
-from aptos.transaction.v1 import transaction_pb2
+from aptos_indexer_protos.aptos.indexer.v1 import raw_data_pb2_grpc
+from aptos_indexer_protos.aptos.indexer.v1 import raw_data_pb2
+from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
 from utils.processor_name import ProcessorName
 from utils.config import Config
 from utils.general_utils import standardize_address
@@ -19,10 +19,10 @@ qualified_resource_name = qualified_module_name + "::AmbassadorLevel"
 class AptosAmbassadorTokenProcessor(TransactionsProcessor):
     def name(self) -> str:
         return ProcessorName.EXAMPLE_AMBASSADOR_TOKEN_PROCESSOR.value
-    
+
     def schema(self) -> str:
         return EXAMPLE
-    
+
     def process_transactions(
         self,
         transactions: list[transaction_pb2.Transaction],

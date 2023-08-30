@@ -2,8 +2,8 @@ import argparse
 import grpc
 import json
 
-from aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
-from aptos.transaction.v1 import transaction_pb2
+from aptos_indexer_protos.aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
+from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session

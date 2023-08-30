@@ -8,8 +8,8 @@ readme = "README.md"
 [tool.poe.tasks]
 lint = ["pyright", "format-check"]
 pyright = "pyright"
-format-check = "black --diff -v --check --exclude (aptos|proto_autogen) ."
-format = "black --exclude (aptos|proto_autogen) ."
+format-check = "black --diff -v --check --exclude (aptos|proto_autogen|aptos-indexer-protos|.venv) ."
+format = "black --exclude (aptos|proto_autogen|aptos-indexer-protos|.venv) ."
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -18,7 +18,7 @@ psycopg2 = "^2.9.6"
 PyYAML = "^6.0"
 SQLAlchemy = "^2.0.9"
 grpcio-tools = "^1.53.0"
-protobuf = "^4.22.3"
+protobuf = "^4.24.2"
 pydantic = "^1.10.7"
 postgres = "^4.0"
 google-cloud-bigquery-storage = "^2.19.1"
@@ -27,6 +27,7 @@ prometheus-client = "^0.17.1"
 twisted = "^22.10.0"
 grpclib = "^0.4.5"
 alembic = "^1.11.1"
+aptos_indexer_protos = { path = "./aptos-indexer-protos", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.53.0"
@@ -39,4 +40,4 @@ requires = ["poetry-core>=1.4.2"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
-exclude = ["aptos", "**/proto_autogen"]
+exclude = ["aptos", "**/proto_autogen", "aptos-indexer-protos", "**/.venv"]

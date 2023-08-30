@@ -1,20 +1,21 @@
 #!/bin/bash
-# This script is to generate the protobuf files; currently there is no easy way for python code
-# without using remote registry or compiling github.com/grpc/grpc from source.
-#
-# The next step is to replace python generation from python cli to `grpc_python``.
+
+# Change to current directory.
+cd "$(dirname "$0")"
+
+# Generate code for Rust and TS.
 for file in *.gen.yaml
 do
-    # Skip Python for now.
+    # For Python we use the Python toolchain.
     if [[ $file == *"python"* ]]; then
         continue
     fi
     buf generate --template "$file"
 done
 
-python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python \
-    proto/aptos/bigquery_schema/v1/transaction.proto \
-    proto/aptos/indexer/v1/raw_data.proto \
-    proto/aptos/internal/fullnode/v1/fullnode_data.proto \
-    proto/aptos/transaction/v1/transaction.proto \
-    proto/aptos/util/timestamp/timestamp.proto
+# Generate code for Python. Currently there is no easy way to use buf for Python
+# without using a remote registry or compiling github.com/grpc/grpc from source,
+# so instead we use the Python toolchain, specifically grpc_tools.protoc.
+cd python/aptos-indexer-protos
+poetry install
+poetry run poe generate
