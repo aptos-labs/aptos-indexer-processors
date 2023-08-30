@@ -8,6 +8,7 @@ use crate::{
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
         default_processor2::DefaultProcessor2,
+        dummy_processor::DummyProcessor,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
         nft_metadata_processor::NFTMetadataProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
@@ -195,6 +196,19 @@ impl Worker {
                 }
 
                 Arc::new(DefaultProcessor2::new(self.db_pool.clone(), spanner_db))
+            },
+            Processor::DummyProcessor => {
+                let spanner_db = self
+                    .spanner_db
+                    .clone()
+                    .expect("spanner_db is required for DummyProcessor");
+
+                // Crate reads from authentication from file specified in GOOGLE_APPLICATION_CREDENTIALS env var
+                if let Some(credentials) = self.google_application_credentials.clone() {
+                    std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+                }
+
+                Arc::new(DummyProcessor::new(self.db_pool.clone(), spanner_db))
             },
             Processor::FungibleAssetProcessor => {
                 Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
