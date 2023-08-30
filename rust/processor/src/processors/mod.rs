@@ -5,6 +5,7 @@ pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
 pub mod default_processor2;
+pub mod dummy_processor;
 pub mod fungible_asset_processor;
 pub mod nft_metadata_processor;
 pub mod processor_trait;
@@ -16,6 +17,7 @@ use self::{
     ans_processor::NAME as ANS_PROCESSOR_NAME, coin_processor::NAME as COIN_PROCESSOR_NAME,
     default_processor::NAME as DEFAULT_PROCESSOR_NAME,
     default_processor2::NAME as DEFAULT_PROCESSOR2_NAME,
+    dummy_processor::NAME as DUMMY_PROCESSOR_NAME,
     fungible_asset_processor::NAME as FUNGIBLE_ASSET_PROCESSOR_NAME,
     nft_metadata_processor::NAME as NFT_METADATA_PROCESSOR_NAME,
     stake_processor::NAME as STAKE_PROCESSOR_NAME, token_processor::NAME as TOKEN_PROCESSOR_NAME,
@@ -32,6 +34,7 @@ pub enum Processor {
     TokenV2Processor,
     NFTMetadataProcessor,
     AnsProcessor,
+    DummyProcessor,
 }
 
 impl Processor {
@@ -46,6 +49,7 @@ impl Processor {
             TOKEN_V2_PROCESSOR_NAME => Self::TokenV2Processor,
             NFT_METADATA_PROCESSOR_NAME => Self::NFTMetadataProcessor,
             ANS_PROCESSOR_NAME => Self::AnsProcessor,
+            DUMMY_PROCESSOR_NAME => Self::DummyProcessor,
             _ => panic!("Processor unsupported {}", input_str),
         }
     }
