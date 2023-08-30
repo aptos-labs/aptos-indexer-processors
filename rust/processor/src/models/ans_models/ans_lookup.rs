@@ -5,15 +5,18 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::ans_utils::AnsTableItem;
+use super::ans_utils::{AnsTableItem, NameRecordV2, SetReverseLookupEvent};
 use crate::{
     schema::{ans_lookup, ans_primary_name, current_ans_lookup, current_ans_primary_name},
     utils::util::{get_name_from_unnested_move_type, standardize_address},
 };
-use aptos_indexer_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
+use aptos_indexer_protos::transaction::v1::{
+    DeleteTableItem, Event, WriteResource, WriteTableItem,
+};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 type Domain = String;
 type Subdomain = String;
@@ -221,6 +224,46 @@ impl CurrentAnsLookup {
         }
         Ok(None)
     }
+
+    pub fn parse_name_record_from_write_resource_v2(
+        write_resource: &WriteResource,
+        maybe_ans_v2_contract_address: &Option<String>,
+        txn_version: i64,
+        write_set_change_index: i64,
+    ) -> anyhow::Result<Option<(Self, AnsLookup)>> {
+        if let Some(ans_v2_contract_address) = maybe_ans_v2_contract_address {
+            if let Some(inner) = NameRecordV2::from_write_resource(
+                write_resource,
+                ans_v2_contract_address,
+                txn_version,
+            )
+            .unwrap()
+            {
+                return Ok(Some((
+                    Self {
+                        domain: inner.get_domain_trunc(),
+                        subdomain: inner.get_subdomain_trunc(),
+                        registered_address: inner.get_target_address(),
+                        expiration_timestamp: inner.get_expiration_time(),
+                        token_name: inner.get_token_name(),
+                        last_transaction_version: txn_version,
+                        is_deleted: false,
+                    },
+                    AnsLookup {
+                        transaction_version: txn_version,
+                        write_set_change_index,
+                        domain: inner.get_domain_trunc().clone(),
+                        subdomain: inner.get_subdomain_trunc().clone(),
+                        registered_address: inner.get_target_address().clone(),
+                        expiration_timestamp: inner.get_expiration_time(),
+                        token_name: inner.get_token_name(),
+                        is_deleted: false,
+                    },
+                )));
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl Ord for CurrentAnsPrimaryName {
@@ -330,6 +373,66 @@ impl CurrentAnsPrimaryName {
                         },
                     )));
                 }
+            }
+        }
+        Ok(None)
+    }
+
+    // Parse v2 primary name record from SetReverseLookupEvent
+    pub fn parse_v2_primary_name_record_from_event(
+        event: &Event,
+        txn_version: i64,
+        event_index: i64,
+        ans_v2_contract_address: &str,
+        // TODO: Use this when we migrate to single table to check if domain has been set to a new target address
+        // before unsetting primary name
+        _all_current_ans_primary_names: &HashMap<CurrentAnsPrimaryNamePK, CurrentAnsPrimaryName>,
+    ) -> anyhow::Result<Option<(Self, AnsPrimaryName)>> {
+        if let Some(set_reverse_lookup_event) =
+            SetReverseLookupEvent::from_event(event, ans_v2_contract_address, txn_version).unwrap()
+        {
+            if set_reverse_lookup_event.get_curr_domain_trunc().is_empty() {
+                // Handle case where the address's primary name is unset
+                return Ok(Some((
+                    Self {
+                        registered_address: set_reverse_lookup_event.get_account_addr().clone(),
+                        domain: None,
+                        subdomain: None,
+                        token_name: None,
+                        last_transaction_version: txn_version,
+                        is_deleted: true,
+                    },
+                    AnsPrimaryName {
+                        transaction_version: txn_version,
+                        write_set_change_index: -event_index,
+                        registered_address: set_reverse_lookup_event.get_account_addr().clone(),
+                        domain: None,
+                        subdomain: None,
+                        token_name: None,
+                        is_deleted: true,
+                    },
+                )));
+            } else {
+                // Handle case where the address is set to a new primary name
+                return Ok(Some((
+                    Self {
+                        registered_address: set_reverse_lookup_event.get_account_addr().clone(),
+                        domain: Some(set_reverse_lookup_event.get_curr_domain_trunc()),
+                        subdomain: Some(set_reverse_lookup_event.get_curr_subdomain_trunc()),
+                        token_name: Some(set_reverse_lookup_event.get_curr_token_name()),
+                        last_transaction_version: txn_version,
+                        is_deleted: false,
+                    },
+                    AnsPrimaryName {
+                        transaction_version: txn_version,
+                        write_set_change_index: -event_index,
+                        registered_address: set_reverse_lookup_event.get_account_addr().clone(),
+                        domain: Some(set_reverse_lookup_event.get_curr_domain_trunc()),
+                        subdomain: Some(set_reverse_lookup_event.get_curr_subdomain_trunc()),
+                        token_name: Some(set_reverse_lookup_event.get_curr_token_name()),
+                        is_deleted: false,
+                    },
+                )));
             }
         }
         Ok(None)

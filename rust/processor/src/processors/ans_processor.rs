@@ -3,8 +3,9 @@
 
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
-    models::ans_models::ans_lookup::{
-        AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName,
+    models::ans_models::{
+        ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
+        ans_utils::{MigrationBurnEvent, RenewNameEvent},
     },
     schema,
     utils::database::{
@@ -13,12 +14,15 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::{
-    write_set_change::Change as WriteSetChange, Transaction,
+    transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 use tracing::error;
 
 pub const NAME: &str = "ans_processor";
@@ -26,6 +30,9 @@ pub struct AnsTransactionProcessor {
     connection_pool: PgDbPool,
     ans_v1_primary_names_table_handle: Option<String>,
     ans_v1_name_records_table_handle: Option<String>,
+    ans_v1_creator_address: Option<String>,
+    ans_v2_contract_address: Option<String>,
+    ans_v2_migration_burn_address: Option<String>,
 }
 
 impl AnsTransactionProcessor {
@@ -33,16 +40,25 @@ impl AnsTransactionProcessor {
         connection_pool: PgDbPool,
         ans_v1_primary_names_table_handle: Option<String>,
         ans_v1_name_records_table_handle: Option<String>,
+        ans_v1_creator_address: Option<String>,
+        ans_v2_contract_address: Option<String>,
+        ans_v2_migration_burn_address: Option<String>,
     ) -> Self {
         tracing::info!(
             ans_v1_primary_names_table_handle = ans_v1_primary_names_table_handle,
             ans_v1_name_records_table_handle = ans_v1_name_records_table_handle,
+            ans_v1_creator_address = ans_v1_creator_address,
+            ans_v2_contract_address = ans_v2_contract_address,
+            ans_v2_migration_burn_address = ans_v2_migration_burn_address,
             "init AnsProcessor"
         );
         Self {
             connection_pool,
             ans_v1_primary_names_table_handle,
             ans_v1_name_records_table_handle,
+            ans_v1_creator_address,
+            ans_v2_contract_address,
+            ans_v2_migration_burn_address,
         }
     }
 }
@@ -245,6 +261,9 @@ impl ProcessorTrait for AnsTransactionProcessor {
             &transactions,
             self.ans_v1_primary_names_table_handle.clone(),
             self.ans_v1_name_records_table_handle.clone(),
+            self.ans_v1_creator_address.clone(),
+            self.ans_v2_contract_address.clone(),
+            self.ans_v2_migration_burn_address.clone(),
         );
 
         // Insert values to db
@@ -283,6 +302,9 @@ fn parse_ans(
     transactions: &[Transaction],
     maybe_ans_v1_primary_names_table_handle: Option<String>,
     maybe_ans_v1_name_records_table_handle: Option<String>,
+    maybe_ans_v1_creator_address: Option<String>,
+    maybe_ans_v2_contract_address: Option<String>,
+    maybe_ans_v2_migration_burn_address: Option<String>,
 ) -> (
     Vec<CurrentAnsLookup>,
     Vec<AnsLookup>,
@@ -296,36 +318,99 @@ fn parse_ans(
 
     for transaction in transactions {
         let txn_version = transaction.version as i64;
-
-        // Extracts from user transactions. Other transactions won't have any ANS changes
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
         let transaction_info = transaction
             .info
             .as_ref()
             .expect("Transaction info doesn't exist!");
 
-        for (wsc_index, wsc) in transaction_info.changes.iter().enumerate() {
-            match wsc.change.as_ref().unwrap() {
-                // TODO: Add ANS v2 indexing
-                WriteSetChange::WriteTableItem(table_item) => {
-                    if let Some((current_ans_lookup, ans_lookup)) =
-                        CurrentAnsLookup::parse_name_record_from_write_table_item_v1(
-                            table_item,
-                            &maybe_ans_v1_name_records_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
-                                error = ?e,
-                                "Error parsing ANS name record from write table item"
-                            );
-                            panic!();
-                        })
+        // Extracts from user transactions. Other transactions won't have any ANS changes
+
+        if let TxnData::User(user_txn) = txn_data {
+            // TODO: Use the v2_renew_name_events to preserve metadata once we switch to a single ANS table to store everything
+            let mut v2_renew_name_events = vec![];
+            let mut migration_burn_events = HashSet::new();
+
+            // Parse V2 ANS Events. We only care about the following events:
+            // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
+            // 2. SetReverseLookupEvents: parse to get current_ans_primary_names
+            // 3. ANS V1 burn events: If we see a V1 burn event, we ignore the V1 wsc's in this transaction
+            if let (
+                Some(ans_v1_creator_address),
+                Some(ans_v2_contract_address),
+                Some(ans_v2_migration_burn_address),
+            ) = (
+                maybe_ans_v1_creator_address.clone(),
+                maybe_ans_v2_contract_address.clone(),
+                maybe_ans_v2_migration_burn_address.clone(),
+            ) {
+                for (event_index, event) in user_txn.events.iter().enumerate() {
+                    if let Some(renew_name_event) =
+                        RenewNameEvent::from_event(event, &ans_v2_contract_address, txn_version)
+                            .unwrap()
                     {
-                        all_current_ans_lookups.insert(current_ans_lookup.pk(), current_ans_lookup);
-                        all_ans_lookups.push(ans_lookup);
+                        v2_renew_name_events.push(renew_name_event);
                     }
-                    if let Some((current_primary_name, primary_name)) =
+                    if let Some((current_ans_lookup, ans_lookup)) =
+                        CurrentAnsPrimaryName::parse_v2_primary_name_record_from_event(
+                            event,
+                            txn_version,
+                            event_index as i64,
+                            &ans_v2_contract_address,
+                            &all_current_ans_primary_names,
+                        )
+                        .unwrap()
+                    {
+                        all_current_ans_primary_names
+                            .insert(current_ans_lookup.pk(), current_ans_lookup);
+                        all_ans_primary_names.push(ans_lookup);
+                    }
+
+                    if let Some(migration_burn_event) = MigrationBurnEvent::from_event(
+                        event,
+                        &ans_v1_creator_address,
+                        &ans_v2_migration_burn_address,
+                    )
+                    .unwrap()
+                    {
+                        migration_burn_events.insert(migration_burn_event.burned_v1_token_name);
+                    }
+                }
+            }
+
+            // Parse V1 ANS write set changes
+            for (wsc_index, wsc) in transaction_info.changes.iter().enumerate() {
+                match wsc.change.as_ref().unwrap() {
+                    // TODO: Don't index v1 changes if token burn detected
+                    WriteSetChange::WriteTableItem(table_item) => {
+                        if let Some((current_ans_lookup, ans_lookup)) =
+                            CurrentAnsLookup::parse_name_record_from_write_table_item_v1(
+                                table_item,
+                                &maybe_ans_v1_name_records_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                            .unwrap_or_else(|e| {
+                                error!(
+                                    error = ?e,
+                                    "Error parsing ANS v1 name record from write table item"
+                                );
+                                panic!();
+                            })
+                        {
+                            // Don't index this v1 wsc if it's been migrated to v2
+                            if migration_burn_events.contains(&current_ans_lookup.token_name) {
+                                continue;
+                            }
+
+                            all_current_ans_lookups
+                                .insert(current_ans_lookup.pk(), current_ans_lookup);
+                            all_ans_lookups.push(ans_lookup);
+                        }
+                        if let Some((current_primary_name, primary_name)) =
                         CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
                             table_item,
                             &maybe_ans_v1_primary_names_table_handle,
@@ -335,36 +420,49 @@ fn parse_ans(
                         .unwrap_or_else(|e| {
                             error!(
                                 error = ?e,
-                                "Error parsing ANS primary name from write table item"
+                                "Error parsing ANS v1 primary name from write table item"
                             );
                             panic!();
                         })
                     {
+                        // Don't index this v1 wsc if it's been migrated to v2
+                        if let Some(token_name) = current_primary_name.clone().token_name {
+                            if migration_burn_events.contains(&token_name) {
+                                continue;
+                            }
+                        }
+
                         all_current_ans_primary_names
                             .insert(current_primary_name.pk(), current_primary_name);
                         all_ans_primary_names.push(primary_name);
                     }
-                },
-                WriteSetChange::DeleteTableItem(table_item) => {
-                    if let Some((current_ans_lookup, ans_lookup)) =
-                        CurrentAnsLookup::parse_name_record_from_delete_table_item_v1(
-                            table_item,
-                            &maybe_ans_v1_name_records_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
-                                error = ?e,
-                                "Error parsing ANS name record from delete table item"
-                            );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_lookups.insert(current_ans_lookup.pk(), current_ans_lookup);
-                        all_ans_lookups.push(ans_lookup);
-                    }
-                    if let Some((current_primary_name, primary_name)) =
+                    },
+                    WriteSetChange::DeleteTableItem(table_item) => {
+                        if let Some((current_ans_lookup, ans_lookup)) =
+                            CurrentAnsLookup::parse_name_record_from_delete_table_item_v1(
+                                table_item,
+                                &maybe_ans_v1_name_records_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                            .unwrap_or_else(|e| {
+                                error!(
+                                    error = ?e,
+                                    "Error parsing ANS v1 name record from delete table item"
+                                );
+                                panic!();
+                            })
+                        {
+                            // Don't index this v1 wsc if it's been migrated to v2
+                            if migration_burn_events.contains(&current_ans_lookup.token_name) {
+                                continue;
+                            }
+
+                            all_current_ans_lookups
+                                .insert(current_ans_lookup.pk(), current_ans_lookup);
+                            all_ans_lookups.push(ans_lookup);
+                        }
+                        if let Some((current_primary_name, primary_name)) =
                         CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
                             table_item,
                             &maybe_ans_v1_primary_names_table_handle,
@@ -374,17 +472,49 @@ fn parse_ans(
                         .unwrap_or_else(|e| {
                             error!(
                                 error = ?e,
-                                "Error parsing ANS primary name from delete table item"
+                                "Error parsing ANS v1 primary name from delete table item"
                             );
                             panic!();
                         })
                     {
+                        // Don't index this v1 wsc if it's been migrated to v2
+                        if let Some(token_name) = current_primary_name.clone().token_name {
+                            if migration_burn_events.contains(&token_name) {
+                                continue;
+                            }
+                        }
+
                         all_current_ans_primary_names
                             .insert(current_primary_name.pk(), current_primary_name);
                         all_ans_primary_names.push(primary_name);
                     }
-                },
-                _ => continue,
+                    },
+                    WriteSetChange::WriteResource(write_resource) => {
+                        if let Some((current_ans_lookup, ans_lookup)) =
+                            CurrentAnsLookup::parse_name_record_from_write_resource_v2(
+                                write_resource,
+                                &maybe_ans_v2_contract_address,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                            .unwrap_or_else(|e| {
+                                error!(
+                                    error = ?e,
+                                    "Error parsing ANS v2 name record from write resource"
+                                );
+                                panic!();
+                            })
+                        {
+                            all_current_ans_lookups
+                                .insert(current_ans_lookup.pk(), current_ans_lookup);
+                            all_ans_lookups.push(ans_lookup);
+                        }
+                    },
+                    // For ANS V2, there are no delete resource changes
+                    // 1. Unsetting a primary name will show up as a ReverseRecord write resource with empty fields
+                    // 2. Name record v2 tokens are never deleted
+                    _ => continue,
+                }
             }
         }
     }
