@@ -4,7 +4,7 @@ import json
 
 from dataclasses import dataclass
 from utils.models.general_models import NextVersionToProcess
-from aptos.transaction.v1 import transaction_pb2
+from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
