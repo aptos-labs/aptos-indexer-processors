@@ -25,7 +25,7 @@ fi
 set -e
 set -x
 
-cargo xclippy
+cargo +nightly xclippy
 
 # We require the nightly build of cargo fmt
 # to provide stricter rust formatting.
