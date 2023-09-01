@@ -29,26 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install pnpm & protoc-gen-ts
-        uses: pnpm/action-setup@v2
-        with:
-          version: 7.12.2
-      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-      - name: install rust prost plugin
+      - name: Install deps and run linter
         run: |
-          cargo install protoc-gen-prost
-          cargo install protoc-gen-prost-serde
-          cargo install protoc-gen-prost-crate
-          cargo install protoc-gen-tonic
-      - name: Generate the protos
-        uses: bufbuild/buf-setup-action@v1.24.0
-      - run: buf generate --template buf.rust.gen.yaml
-      - run: |
           cargo install cargo-sort
           rustup update
           rustup toolchain install nightly
+          rustup component add clippy --toolchain nightly
           rustup component add rustfmt --toolchain nightly
           scripts/rust_lint.sh --check
         working-directory: rust

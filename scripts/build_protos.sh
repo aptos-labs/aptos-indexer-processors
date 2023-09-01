@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Change to current directory.
+set -e
+
+# Change to root directory.
 cd "$(dirname "$0")"
+cd ..
 
 # Generate code for Rust and TS.
 for file in *.gen.yaml

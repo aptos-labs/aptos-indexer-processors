@@ -1,7 +1,9 @@
-inputs:
-  GIT_CREDENTIALS:
-    description: "Optional credentials to pass to git"
-    required: false
+name: "Rust setup"
+description: |
+  Runs an opinionated and unified Rust setup action. It does the following:
+  * Installs deps for Rust
+  * Installs the Rust toolchain
+  * Sets up the cargo cache
 
 runs:
   using: composite
@@ -19,16 +21,5 @@ runs:
     - name: Run cargo cache
       uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
 
-    - name: install protoc and related tools
-      shell: bash
-      run: scripts/dev_setup.sh -b -r
-
     - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
       shell: bash
-
-    - name: Setup git credentials
-      if: inputs.GIT_CREDENTIALS != ''
-      shell: bash
-      run: |
-        git config --global credential.helper store
-        echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials

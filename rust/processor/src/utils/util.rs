@@ -272,7 +272,7 @@ fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
     }
 }
 
-fn string_null_byte_replacement(value: &mut str) -> String {
+fn string_null_byte_replacement(value: &str) -> String {
     value.replace('\u{0000}', "").replace("\\u0000", "")
 }
 
