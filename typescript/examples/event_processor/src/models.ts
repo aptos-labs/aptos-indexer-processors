@@ -1,31 +1,32 @@
+import { Base } from "@aptos-labs/aptos-processor-sdk";
 import { Column, Entity, PrimaryColumn } from "typeorm";
-import { BaseEntity } from "../../../utils/common_models/Base";
 
 @Entity("events")
-export class Event extends BaseEntity {
+export class Event extends Base {
   @PrimaryColumn({ type: "bigint" })
-  sequenceNumber!: string;
+  transactionVersion!: string;
 
+  // This is the order of the event in the events list in the trannsaction.
   @PrimaryColumn({ type: "bigint" })
+  eventIndex!: string;
+
+  @Column({ type: "bigint" })
   creationNumber!: string;
 
-  @PrimaryColumn()
+  @Column()
   accountAddress!: string;
 
   @Column({ type: "bigint" })
-  transactionVersion!: string;
+  sequenceNumber!: string;
+
+  @Column()
+  type!: string;
 
   @Column({ type: "bigint" })
   transactionBlockHeight!: string;
 
   @Column()
-  type!: string;
-
-  @Column()
   data!: string;
-
-  @Column({ type: "bigint" })
-  eventIndex!: string;
 
   @Column({ type: "timestamptz", nullable: true })
   inserted_at!: Date;
