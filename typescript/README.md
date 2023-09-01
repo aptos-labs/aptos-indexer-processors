@@ -2,7 +2,7 @@
 
 ### Prerequisite
 
-- `node`: The code is tested with Node 0.18.x. Later version should work too.
+- `node`: The code is tested with Node 18. Later versions should work too.
 
 ### Basic Tutorial
 
@@ -11,7 +11,7 @@ In this tutorial, we will be going over how to create and run the Example Write 
 1. Install all the dependencies:
 
 ```
-npm install
+pnpm install
 ```
 
 2. Download the example:

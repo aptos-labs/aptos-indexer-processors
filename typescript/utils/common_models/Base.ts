@@ -7,12 +7,12 @@ import {
 
 export abstract class BaseEntity {
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @Index()
   @DeleteDateColumn()
-  deletedAt: Date;
+  deletedAt!: Date;
 }
