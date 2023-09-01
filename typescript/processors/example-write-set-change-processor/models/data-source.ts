@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { SnakeNamingStrategy } from "typeorm-naming-strategies";
-import { Event } from "@/processors/example-write-set-change-processor/models/Event";
-import { NextVersionToProcess } from "@/utils/common_models/NextVersionToProcess";
+import { Event } from "./Event";
+import { NextVersionToProcess } from "../../../utils/common_models/NextVersionToProcess";
 
 export function createDataSource(
   host: string,
@@ -10,7 +10,7 @@ export function createDataSource(
   username: string | undefined,
   password: string | undefined,
   database: string,
-  enableSSL: boolean
+  enableSSL: boolean,
 ) {
   return new DataSource({
     namingStrategy: new SnakeNamingStrategy(),

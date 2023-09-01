@@ -1,41 +1,41 @@
-import { Transaction } from "@/aptos/transaction/v1/transaction_pb";
-import { Timestamp } from "@/aptos/util/timestamp/timestamp_pb";
-import { Event } from "@/processors/example-write-set-change-processor/models/Event";
+import { aptos } from "@aptos-labs/aptos-indexer-protos";
+import { Event } from "./models/Event";
 
 export const INDEXER_NAME = "ts_example_indexer";
 
-function grpcTimestampToDate(timestamp: Timestamp) {
-  const seconds = timestamp.getSeconds();
-  const nanos = timestamp.getNanos();
-  const milliseconds = seconds * 1000 + nanos / 1000000;
+function grpcTimestampToDate(timestamp: aptos.util.timestamp.Timestamp) {
+  const seconds = timestamp.seconds!;
+  const nanos = timestamp.nanos!;
+  const milliseconds = Number(seconds) * 1000 + nanos / 1000000;
   const date = new Date(milliseconds);
   return date;
 }
 
-export function parse(transaction: Transaction): Event[] {
+export function parse(transaction: aptos.transaction.v1.Transaction): Event[] {
   // Custom filtering: Filter out all transactions that are not User Transactions
   if (
-    transaction.getType() != Transaction.TransactionType.TRANSACTION_TYPE_USER
+    transaction.type !=
+    aptos.transaction.v1.Transaction_TransactionType.TRANSACTION_TYPE_USER
   ) {
     return [];
   }
 
   // Parse Transaction object
-  const transactionVersion = transaction.getVersion();
-  const transactionBlockHeight = transaction.getBlockHeight();
-  const insertedAt = grpcTimestampToDate(transaction.getTimestamp());
+  const transactionVersion = transaction.version!;
+  const transactionBlockHeight = transaction.blockHeight!;
+  const insertedAt = grpcTimestampToDate(transaction.timestamp!);
 
-  const userTransaction = transaction.getUser();
+  const userTransaction = transaction.user!;
 
-  const events = userTransaction.getEventsList();
+  const events = userTransaction.events!;
 
   return events.map((event, i) => {
     const eventEntity = new Event();
-    eventEntity.sequenceNumber = event.getSequenceNumber().toString();
-    eventEntity.creationNumber = event.getKey().getCreationNumber().toString();
-    eventEntity.accountAddress = `0x${event.getKey().getAccountAddress()}`;
-    eventEntity.type = event.getTypeStr();
-    eventEntity.data = event.getData();
+    eventEntity.sequenceNumber = event.sequenceNumber!.toString();
+    eventEntity.creationNumber = event.key!.creationNumber!.toString();
+    eventEntity.accountAddress = `0x${event.key!.accountAddress}`;
+    eventEntity.type = event.typeStr!;
+    eventEntity.data = event.data!;
     eventEntity.eventIndex = i.toString();
     eventEntity.transactionVersion = transactionVersion.toString();
     eventEntity.transactionBlockHeight = transactionBlockHeight.toString();
