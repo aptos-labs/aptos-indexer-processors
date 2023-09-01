@@ -25,6 +25,8 @@ use std::{
 use tracing::info;
 
 pub const NAME: &str = "nft_metadata_processor";
+pub const CHUNK_SIZE: usize = 1000;
+
 pub struct NFTMetadataProcessor {
     connection_pool: PgDbPool,
     pubsub_topic_name: String,
@@ -77,7 +79,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
         let publisher = topic.new_publisher(None);
 
         // Publish all parsed CurrentTokenDataV2 to Pubsub
-        let pubsub_messages = parse_v2_token(&transactions)
+        let pubsub_messages: Vec<PubsubMessage> = parse_v2_token(&transactions)
             .iter()
             .map(|token_data| PubsubMessage {
                 data: format!(
@@ -104,14 +106,21 @@ impl ProcessorTrait for NFTMetadataProcessor {
             "[NFT Metadata Crawler] Publishing to queue"
         );
 
-        try_join_all(
-            publisher
-                .publish_bulk(pubsub_messages)
-                .await
-                .into_iter()
-                .map(|awaiter| awaiter.get()),
-        )
-        .await?;
+        let chunks: Vec<Vec<PubsubMessage>> = pubsub_messages
+            .chunks(CHUNK_SIZE)
+            .map(|chunk| chunk.to_vec())
+            .collect();
+
+        for chunk in chunks {
+            try_join_all(
+                publisher
+                    .publish_bulk(chunk)
+                    .await
+                    .into_iter()
+                    .map(|awaiter| awaiter.get()),
+            )
+            .await?;
+        }
 
         Ok((start_version, end_version))
     }
