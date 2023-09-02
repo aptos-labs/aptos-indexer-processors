@@ -32,10 +32,15 @@ import { chdir } from "node:process";
 import { promisify } from "node:util";
 const sleep = promisify(setTimeout);
 
-// argv[1] is the file path to the script
-chdir(dirname(process.argv[1]) + "/.."); // change workdir to the root of the repo
-// install repo pnpm dependencies
+// Change workdir to the location of the script.
+chdir(dirname(process.argv[1]));
+
+// Install deps.
 execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
+
+// Change workdir to the root of the repo.
+chdir(dirname(process.argv[1]) + "/..");
+
 await import("zx/globals");
 
 const REQUIRED_ARGS = ["LANGUAGE", "GIT_SHA", "GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US"];
