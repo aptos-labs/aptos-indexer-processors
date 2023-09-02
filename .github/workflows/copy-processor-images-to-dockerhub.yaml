@@ -47,6 +47,7 @@ jobs:
       - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
         with:
           run_install: false
+          package_json_file: scripts/package.json
 
       - name: Release Images
         env:
