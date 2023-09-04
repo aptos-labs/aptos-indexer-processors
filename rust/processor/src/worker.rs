@@ -13,7 +13,7 @@ use crate::{
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
         token_v2_processor::TokenV2TransactionProcessor,
-        Processor,
+        Processor, econia_processor::EconiaTransactionProcessor,
     },
     schema::ledger_infos,
     utils::{
@@ -92,6 +92,7 @@ impl Worker {
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
         google_application_credentials: Option<String>,
+        econia_address: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -213,6 +214,9 @@ impl Worker {
                 self.ans_v1_primary_names_table_handle.clone(),
                 self.ans_v1_name_records_table_handle.clone(),
             )),
+            Processor::EconiaProcessor => {
+                Arc::new(EconiaTransactionProcessor::new(self.db_pool.clone()))
+            },
         };
         let processor_name = processor.name();
 
