@@ -1,8 +1,10 @@
 import * as yaml from "js-yaml";
 import * as fs from "fs";
 
-// This class represents the basic configuration required to connect to the txn stream
-// and the database.
+/**
+ * This class represents the basic configuration required for the worker to connect to
+ * the txn stream and the database.
+ */
 class Config {
   constructor(
     public chain_id: bigint,

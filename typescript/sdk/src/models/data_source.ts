@@ -4,7 +4,10 @@ import { SnakeNamingStrategy } from "typeorm-naming-strategies";
 import { NextVersionToProcess } from "./next_version_to_process";
 import { Base } from "./base";
 
-// TODO: Do migrations stuff??, the below function takes migrations as an argument.
+/**
+ * This function returns a DataSource, something akin to a DB connection object.
+ * When dataSource.initialize() is called it runs any necessary DB migrations.
+ */
 export function createDataSource({
   host,
   port,

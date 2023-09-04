@@ -13,9 +13,11 @@ import { Base } from "./models/base";
 import { TransactionsProcessor } from "./processor";
 import { DataSource } from "typeorm";
 
-/// This worker class is responsible for connecting to the txn stream and dispatching
-/// transactions to the provided processor. It is responsible for tracking which
-/// version it has processed up to and checkpointing that version in the database.
+/**
+ * This worker class is responsible for connecting to the txn stream and dispatching
+ * transactions to the provided processor. It is responsible for tracking which
+ * version it has processed up to and checkpointing that version in the database.
+ */
 export class Worker {
   // Base configuration required to connect to the database and the data stream.
   config: Config;
@@ -61,9 +63,11 @@ export class Worker {
     this.dataSource = dataSource;
   }
 
-  // This function is the main entry point for the processor. It will connect to the txn
-  // stream and start processing transactions. It will call the provided parse function to
-  // parse transactions and insert the parsed data into the database.
+  /**
+   * This function is the main entry point for the processor. It will connect to the txn
+   * stream and start processing transactions. It will call the provided parse function to
+   * parse transactions and insert the parsed data into the database.
+   */
   async run({ perf }: { perf?: number } = {}) {
     await this.dataSource.initialize();
 
@@ -92,7 +96,9 @@ export class Worker {
 
     const startingVersion = BigInt(this.config.starting_version || 0n);
 
-    console.log(`Requesting stream starting from version ${startingVersion}`);
+    console.log(
+      `[Parser] Requesting stream starting from version ${startingVersion}`,
+    );
 
     const request: aptos.indexer.v1.GetTransactionsRequest = {
       startingVersion,
@@ -128,15 +134,11 @@ export class Worker {
           );
         }
 
-        if (transactions == null) {
-          return;
-        }
-
         const startVersion = transactions[0].version!;
         const endVersion = transactions[transactions.length - 1].version!;
 
         console.log({
-          message: "Response received",
+          message: "[Parser] Response received",
           startVersion: startVersion,
         });
 
@@ -183,7 +185,7 @@ export class Worker {
             .upsert(nextVersionToProcess, ["indexerName"]);
 
           console.log({
-            message: "Successfully processed transactions",
+            message: "[Parser] Successfully processed transactions",
             last_success_transaction_version: currentTxnVersion,
           });
         }
@@ -193,7 +195,7 @@ export class Worker {
         if (perf && totalTransactions >= Number(perf)) {
           timer.stop();
           console.log(
-            `It took ${timer.ms()} ms to process ${totalTransactions} txns`,
+            `[Parser] It took ${timer.ms()} ms to process ${totalTransactions} txns`,
           );
           exit(0);
         }
@@ -209,7 +211,7 @@ export class Worker {
     });
 
     stream.on("status", function (status) {
-      console.log(status);
+      console.log(`[Parser] ${status}`);
       // process status
     });
   }

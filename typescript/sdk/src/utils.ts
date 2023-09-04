@@ -1,5 +1,8 @@
 import { aptos } from "@aptos-labs/aptos-indexer-protos";
 
+/**
+ * Convert a grpc timestamp to a Date object.
+ */
 export function grpcTimestampToDate(
   timestamp: aptos.util.timestamp.Timestamp,
 ): Date {

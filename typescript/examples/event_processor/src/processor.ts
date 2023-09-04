@@ -9,7 +9,7 @@ import { DataSource } from "typeorm";
 
 export class EventProcessor extends TransactionsProcessor {
   name(): string {
-    return "EventProcessor";
+    return "event_processor";
   }
 
   processTransactions({
