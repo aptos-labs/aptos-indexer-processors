@@ -48,7 +48,7 @@ impl ProcessorTrait for DummyProcessor {
 
     async fn process_transactions(
         &self,
-        _: Vec<Transaction>,
+        transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -57,12 +57,19 @@ impl ProcessorTrait for DummyProcessor {
         let config = ClientConfig::default().with_auth().await?;
         let client = Client::new(self.spanner_db.clone(), config).await?;
 
-        let stmt = Statement::new("SELECT * FROM transactions LIMIT 100");
-        let mut tx = client.single().await?;
-        let mut iter = tx.query(stmt).await?;
-        while let Some(row) = iter.next().await? {
-            let guild_id = row.column_by_name::<i64>("transaction_version");
-            info!("guild_id: {:?}", guild_id);
+        for transaction in transactions {
+            let stmt = Statement::new(format!(
+                "SELECT * FROM transactions WHERE transaction_version >= '{}' AND transaction_version <= '{}'",
+                start_version, transaction.version
+            ));
+            let mut tx = client.single().await?;
+            for _ in 0..10 {
+                let mut iter = tx.query(stmt.clone()).await?;
+                while let Some(row) = iter.next().await? {
+                    let transaction_version = row.column_by_name::<i64>("transaction_version");
+                    info!("transaction_version: {:?}", transaction_version);
+                }
+            }
         }
 
         Ok((start_version, end_version))
