@@ -1,0 +1,73 @@
+name: "E2E Docker Test"
+on:
+  push:
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+
+# cancel redundant builds
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # these used in the setup script
+  VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
+  FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
+  INDEXER_GRPC_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
+
+jobs:
+  Python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      # checkout aptos-core main so we can use its deploy script
+      # this should go in a composite action so we can test all processors using the same setup that requires the grpc
+      - name: Checkout aptos-core
+        uses: actions/checkout@v3
+        with:
+          repository: aptos-labs/aptos-core
+          ref: main
+          path: aptos-core
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Install grpcurl
+        uses: aptos-labs/aptos-core/.github/actions/install-grpcurl@main
+
+      - name: Set up and verify indexer GRPC local docker
+        shell: bash
+        run: ./testsuite/indexer_grpc_local.py --verbose start
+        working-directory: aptos-core
+
+      # run the processor
+
+      - name: Copy the config
+        shell: bash
+        run: mv docker-compose-config.yaml.example config.yaml
+        working-directory: python
+
+      - name: Run the python processor
+        shell: bash
+        working-directory: python
+        run: docker compose up --build --force-recreate
+
+      # debug info on error
+
+      - name: Debug docker network
+        run: docker network inspect aptos-docker-compose-shared
+
+      - name: Print aptos-core docker-compose validator-testnet logs on failure
+        if: ${{ failure() }}
+        working-directory: aptos-core/docker/compose/validator-testnet
+        run: docker-compose logs
+
+      - name: Print aptos-core docker-compose indexer-grpc logs on failure
+        if: ${{ failure() }}
+        working-directory: aptos-core/docker/compose/indexer-grpc
+        run: docker-compose logs
