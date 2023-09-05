@@ -14,5 +14,5 @@ extern crate diesel;
 pub mod models;
 pub mod processors;
 pub mod schema;
-mod utils;
+pub mod utils;
 pub mod worker;
