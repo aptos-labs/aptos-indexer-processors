@@ -10,13 +10,11 @@ on:
       version_tag:
         required: false
         type: string
-        description: the version tag to use for the image tag.
+        description: After we copy the image from GAR to DockerHub, we will add this tag to the image. For example v1.0.4.
       GIT_SHA:
         required: true
         type: string
-        description: the git sha to use for the image tag.
-
-
+        description: The git SHA you want to copy from GAR to DockerHub. For example de766ae36a1c74212d370aae75bf234320612bbc.
 
 permissions:
   contents: read
@@ -25,7 +23,7 @@ permissions:
 jobs:
   copy-processor-images:
     # Run on a machine with more local storage for large docker images
-    runs-on: medium-perf-docker-with-local-ssd
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
 
@@ -44,14 +42,18 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+      - uses: pnpm/action-setup@d882d12c64e032187b2edb46d3a0d003b7a43598 # pin https://github.com/pnpm/action-setup/releases/tag/v2.4.0
         with:
           run_install: false
           package_json_file: scripts/package.json
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: scripts
 
       - name: Release Images
         env:
           FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
           GIT_SHA: ${{ inputs.GIT_SHA }}
           GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
-        run: ./scripts/release-processor-images.mjs --language=${{ inputs.processor_language }} --version-tag=${{ inputs.version_tag }} --wait-for-image-seconds=3600
+        run: pnpm release-processor-images --language=${{ inputs.processor_language }} --version-tag=${{ inputs.version_tag }} --wait-for-image-seconds=3600
+        working-directory: scripts
