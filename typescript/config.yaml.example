@@ -1,5 +1,0 @@
-chain_id: 2
-grpc_data_stream_endpoint: "35.223.137.149:50051"
-grpc_data_stream_api_key: <api_key>
-db_connection_uri: <e.g. postgresql://postgres:123456@localhost/postgres>
-starting_version: <e.g. 516294465>
