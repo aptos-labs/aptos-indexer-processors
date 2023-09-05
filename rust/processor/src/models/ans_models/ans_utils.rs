@@ -231,7 +231,7 @@ impl AnsWriteResource {
         let data = write_resource.data.as_str();
 
         match type_str.clone() {
-            x if x == format!("{}::domains::NameRecord", ans_v2_contract_address) => {
+            x if x == format!("{}::v2_domains::NameRecord", ans_v2_contract_address) => {
                 serde_json::from_str(data).map(|inner| Some(Self::NameRecordV2(inner)))
             },
             _ => Ok(None),
@@ -398,7 +398,8 @@ impl MigrationBurnEvent {
         let token_data_id_type = deposit_event.id.token_data_id;
 
         // Check that token belongs to ANS V1 collection
-        if !(token_data_id_type.get_creator_address() == ans_v1_collection_creator_addres
+        if !(token_data_id_type.get_creator_address()
+            == standardize_address(ans_v1_collection_creator_addres)
             && token_data_id_type.get_collection_trunc() == "Aptos Names V1")
         {
             return Ok(None);
@@ -419,10 +420,10 @@ impl V2AnsEvent {
     pub fn is_event_supported(event_type: &str, ans_v2_contract_address: &str) -> bool {
         [
             format!(
-                "{}::domains::SetReverseLookupEvent",
+                "{}::v2_domains::SetReverseLookupEvent",
                 ans_v2_contract_address
             ),
-            format!("{}::domains::RenewNameEvent", ans_v2_contract_address),
+            format!("{}::v2_domains::RenewNameEvent", ans_v2_contract_address),
         ]
         .contains(&event_type.to_string())
     }
@@ -442,13 +443,13 @@ impl V2AnsEvent {
         match type_str.clone() {
             x if x
                 == format!(
-                    "{}::domains::SetReverseLookupEvent",
+                    "{}::v2_domains::SetReverseLookupEvent",
                     ans_v2_contract_address
                 ) =>
             {
                 serde_json::from_str(data).map(|inner| Some(Self::SetReverseLookupEvent(inner)))
             },
-            x if x == format!("{}::domains::RenewNameEvent", ans_v2_contract_address) => {
+            x if x == format!("{}::v2_domains::RenewNameEvent", ans_v2_contract_address) => {
                 serde_json::from_str(data).map(|inner| Some(Self::RenewNameEvent(inner)))
             },
             _ => Ok(None),

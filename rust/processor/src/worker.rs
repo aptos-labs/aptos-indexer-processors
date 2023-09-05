@@ -70,11 +70,6 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    // pub ans_v1_primary_names_table_handle: Option<String>,
-    // pub ans_v1_name_records_table_handle: Option<String>,
-    // pub ans_v1_creator_address: Option<String>,
-    // pub ans_v2_contract_address: Option<String>,
-    // pub ans_v2_migration_burn_address: Option<String>,
     pub custom_processor_configs: Option<CustomProcessorConfigs>,
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
@@ -92,11 +87,6 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        // ans_v1_primary_names_table_handle: Option<String>,
-        // ans_v1_name_records_table_handle: Option<String>,
-        // ans_v1_creator_address: Option<String>,
-        // ans_v2_contract_address: Option<String>,
-        // ans_v2_migration_burn_address: Option<String>,
         custom_processor_configs: Option<CustomProcessorConfigs>,
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
@@ -126,11 +116,6 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            // ans_v1_primary_names_table_handle,
-            // ans_v1_name_records_table_handle,
-            // ans_v1_creator_address,
-            // ans_v2_contract_address,
-            // ans_v2_migration_burn_address,
             custom_processor_configs,
             nft_points_contract,
             pubsub_topic_name,
@@ -224,11 +209,6 @@ impl Worker {
             Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
                 self.db_pool.clone(),
                 self.custom_processor_configs.clone(),
-                // self.ans_v1_primary_names_table_handle.clone(),
-                // self.ans_v1_name_records_table_handle.clone(),
-                // self.ans_v1_creator_address.clone(),
-                // self.ans_v2_contract_address.clone(),
-                // self.ans_v2_migration_burn_address.clone(),
             )),
         };
         let processor_name = processor.name();
@@ -722,6 +702,7 @@ pub async fn create_fetcher_loop(
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
             info!("[Parser] The stream is ended.");
+            break;
         } else {
             // The rest is to see if we need to reconnect
             if is_success {
