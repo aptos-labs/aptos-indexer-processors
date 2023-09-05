@@ -13,6 +13,8 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = "1.70"
 
 [dependencies]
+econia_db = { package = "dbv2", path = "../../../../dbv2" }
+
 anyhow = { workspace = true }
 aptos-indexer-protos = { workspace = true }
 aptos-moving-average = { workspace = true }
