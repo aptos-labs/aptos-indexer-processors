@@ -88,10 +88,10 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let mut conn = self.get_conn();
         let (_, txn_details, _, _, _) = TransactionModel::from_transactions(&transactions);
 
-        // create a hashmap to store block_height to timestamp
+        // Create a hashmap to store block_height to timestamp.
         let mut block_height_to_timestamp: HashMap<i64, DateTime<Utc>> = HashMap::new();
 
-        // iterate through the transactions and populate the map
+        // Iterate through the transactions and populate the map.
         for txn_detail in txn_details {
             match txn_detail {
                 TransactionDetail::User(user_transaction, _) => {
