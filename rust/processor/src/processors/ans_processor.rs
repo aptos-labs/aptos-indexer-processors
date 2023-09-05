@@ -8,8 +8,11 @@ use crate::{
         ans_utils::{MigrationBurnEvent, RenewNameEvent},
     },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+    utils::{
+        custom_configs::CustomProcessorConfigs,
+        database::{
+            clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        },
     },
 };
 use anyhow::bail;
@@ -28,22 +31,36 @@ use tracing::error;
 pub const NAME: &str = "ans_processor";
 pub struct AnsTransactionProcessor {
     connection_pool: PgDbPool,
-    ans_v1_primary_names_table_handle: Option<String>,
-    ans_v1_name_records_table_handle: Option<String>,
-    ans_v1_creator_address: Option<String>,
-    ans_v2_contract_address: Option<String>,
-    ans_v2_migration_burn_address: Option<String>,
+    ans_v1_primary_names_table_handle: String,
+    ans_v1_name_records_table_handle: String,
+    ans_v1_creator_address: String,
+    ans_v2_contract_address: String,
+    ans_v2_migration_burn_address: String,
 }
 
 impl AnsTransactionProcessor {
     pub fn new(
         connection_pool: PgDbPool,
-        ans_v1_primary_names_table_handle: Option<String>,
-        ans_v1_name_records_table_handle: Option<String>,
-        ans_v1_creator_address: Option<String>,
-        ans_v2_contract_address: Option<String>,
-        ans_v2_migration_burn_address: Option<String>,
+        custom_processor_configs: Option<CustomProcessorConfigs>,
     ) -> Self {
+        if custom_processor_configs.is_none() {
+            panic!("Custom processor configs are required for AnsProcessor");
+        }
+
+        let custom_processor_configs = custom_processor_configs.unwrap();
+        if custom_processor_configs.ans_processor_config.is_none() {
+            panic!("AnsProcessorConfig is required for AnsProcessor");
+        }
+
+        let ans_processor_config = custom_processor_configs.ans_processor_config.unwrap();
+        let ans_v1_primary_names_table_handle =
+            ans_processor_config.ans_v1_primary_names_table_handle;
+        let ans_v1_name_records_table_handle =
+            ans_processor_config.ans_v1_name_records_table_handle;
+        let ans_v1_creator_address = ans_processor_config.ans_v1_creator_address;
+        let ans_v2_contract_address = ans_processor_config.ans_v2_contract_address;
+        let ans_v2_migration_burn_address = ans_processor_config.ans_v2_migration_burn_address;
+
         tracing::info!(
             ans_v1_primary_names_table_handle = ans_v1_primary_names_table_handle,
             ans_v1_name_records_table_handle = ans_v1_name_records_table_handle,
@@ -300,11 +317,11 @@ impl ProcessorTrait for AnsTransactionProcessor {
 
 fn parse_ans(
     transactions: &[Transaction],
-    maybe_ans_v1_primary_names_table_handle: Option<String>,
-    maybe_ans_v1_name_records_table_handle: Option<String>,
-    maybe_ans_v1_creator_address: Option<String>,
-    maybe_ans_v2_contract_address: Option<String>,
-    maybe_ans_v2_migration_burn_address: Option<String>,
+    ans_v1_primary_names_table_handle: String,
+    ans_v1_name_records_table_handle: String,
+    ans_v1_creator_address: String,
+    ans_v2_contract_address: String,
+    ans_v2_migration_burn_address: String,
 ) -> (
     Vec<CurrentAnsLookup>,
     Vec<AnsLookup>,
@@ -338,46 +355,36 @@ fn parse_ans(
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
             // 2. SetReverseLookupEvents: parse to get current_ans_primary_names
             // 3. ANS V1 burn events: If we see a V1 burn event, we ignore the V1 wsc's in this transaction
-            if let (
-                Some(ans_v1_creator_address),
-                Some(ans_v2_contract_address),
-                Some(ans_v2_migration_burn_address),
-            ) = (
-                maybe_ans_v1_creator_address.clone(),
-                maybe_ans_v2_contract_address.clone(),
-                maybe_ans_v2_migration_burn_address.clone(),
-            ) {
-                for (event_index, event) in user_txn.events.iter().enumerate() {
-                    if let Some(renew_name_event) =
-                        RenewNameEvent::from_event(event, &ans_v2_contract_address, txn_version)
-                            .unwrap()
-                    {
-                        v2_renew_name_events.push(renew_name_event);
-                    }
-                    if let Some((current_ans_lookup, ans_lookup)) =
-                        CurrentAnsPrimaryName::parse_v2_primary_name_record_from_event(
-                            event,
-                            txn_version,
-                            event_index as i64,
-                            &ans_v2_contract_address,
-                            &all_current_ans_primary_names,
-                        )
+            for (event_index, event) in user_txn.events.iter().enumerate() {
+                if let Some(renew_name_event) =
+                    RenewNameEvent::from_event(event, &ans_v2_contract_address, txn_version)
                         .unwrap()
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_ans_lookup.pk(), current_ans_lookup);
-                        all_ans_primary_names.push(ans_lookup);
-                    }
-
-                    if let Some(migration_burn_event) = MigrationBurnEvent::from_event(
+                {
+                    v2_renew_name_events.push(renew_name_event);
+                }
+                if let Some((current_ans_lookup, ans_lookup)) =
+                    CurrentAnsPrimaryName::parse_v2_primary_name_record_from_event(
                         event,
-                        &ans_v1_creator_address,
-                        &ans_v2_migration_burn_address,
+                        txn_version,
+                        event_index as i64,
+                        &ans_v2_contract_address,
+                        &all_current_ans_primary_names,
                     )
                     .unwrap()
-                    {
-                        migration_burn_events.insert(migration_burn_event.burned_v1_token_name);
-                    }
+                {
+                    all_current_ans_primary_names
+                        .insert(current_ans_lookup.pk(), current_ans_lookup);
+                    all_ans_primary_names.push(ans_lookup);
+                }
+
+                if let Some(migration_burn_event) = MigrationBurnEvent::from_event(
+                    event,
+                    &ans_v1_creator_address,
+                    &ans_v2_migration_burn_address,
+                )
+                .unwrap()
+                {
+                    migration_burn_events.insert(migration_burn_event.burned_v1_token_name);
                 }
             }
 
@@ -389,7 +396,7 @@ fn parse_ans(
                         if let Some((current_ans_lookup, ans_lookup)) =
                             CurrentAnsLookup::parse_name_record_from_write_table_item_v1(
                                 table_item,
-                                &maybe_ans_v1_name_records_table_handle,
+                                &ans_v1_name_records_table_handle,
                                 txn_version,
                                 wsc_index as i64,
                             )
@@ -413,7 +420,7 @@ fn parse_ans(
                         if let Some((current_primary_name, primary_name)) =
                         CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
                             table_item,
-                            &maybe_ans_v1_primary_names_table_handle,
+                            &ans_v1_primary_names_table_handle,
                             txn_version,
                             wsc_index as i64,
                         )
@@ -441,7 +448,7 @@ fn parse_ans(
                         if let Some((current_ans_lookup, ans_lookup)) =
                             CurrentAnsLookup::parse_name_record_from_delete_table_item_v1(
                                 table_item,
-                                &maybe_ans_v1_name_records_table_handle,
+                                &ans_v1_name_records_table_handle,
                                 txn_version,
                                 wsc_index as i64,
                             )
@@ -465,7 +472,7 @@ fn parse_ans(
                         if let Some((current_primary_name, primary_name)) =
                         CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
                             table_item,
-                            &maybe_ans_v1_primary_names_table_handle,
+                            &ans_v1_primary_names_table_handle,
                             txn_version,
                             wsc_index as i64,
                         )
@@ -493,7 +500,7 @@ fn parse_ans(
                         if let Some((current_ans_lookup, ans_lookup)) =
                             CurrentAnsLookup::parse_name_record_from_write_resource_v2(
                                 write_resource,
-                                &maybe_ans_v2_contract_address,
+                                &ans_v2_contract_address,
                                 txn_version,
                                 wsc_index as i64,
                             )
