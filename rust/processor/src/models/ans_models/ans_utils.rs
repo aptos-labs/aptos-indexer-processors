@@ -14,9 +14,8 @@ use crate::{
         truncate_str,
     },
 };
-use aptos_indexer_protos::transaction::v1::{Event, WriteResource};
-
 use anyhow::Context;
+use aptos_indexer_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
