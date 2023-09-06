@@ -48,14 +48,14 @@ fn hex_to_string(hex: &str) -> String {
 }
 
 fn opt_value_to_big_decimal(value: Option<&Value>) -> BigDecimal {
-    let lot_size_str = value
+    let string = value
         .and_then(Value::as_str)
         .expect("key not found or not a string");
-    BigDecimal::from_str(lot_size_str).expect("Failed to parse BigDecimal")
+    BigDecimal::from_str(string).expect("Failed to parse BigDecimal")
 }
 
-fn value_is_not_empty_string(val: &Value) -> bool {
-    val.as_str().expect("Value is not a string").is_empty() == false
+fn value_is_empty_string(val: &Value) -> bool {
+    val.as_str().expect("Value is not a string").is_empty()
 }
 
 fn insert_market_registration_events(
@@ -64,6 +64,9 @@ fn insert_market_registration_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
+        // If we try to insert an event twice, as according to its transaction
+        // version and event index, the second insertion will just be dropped
+        // and lost to the wind. It will not return an error.
         diesel::insert_into(market_registration_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -132,24 +135,31 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 let base_account_address;
                 let base_module_name;
                 let base_struct_name;
-                if value_is_not_empty_string(&event.data["base_name_generic"]) {
+                if value_is_empty_string(&event.data["base_name_generic"]) {
+                    base_name_generic = None;
+                    base_account_address = Some(String::from(
+                        // cannot panic because account_address always exists as a string
+                        // assuming base_name_generic was empty
+                        event.data["base_type"]["account_address"].as_str().unwrap(),
+                    ));
+                    let base_module_name_hex =
+                        // cannot panic because module_name always exists as a string
+                        // assuming base_name_generic was empty
+                        event.data["base_type"]["module_name"].as_str().unwrap();
+                    let base_struct_name_hex =
+                        // cannot panic because struct_name always exists as a string
+                        // assuming base_name_generic was empty
+                        event.data["base_type"]["struct_name"].as_str().unwrap();
+                    base_module_name = Some(hex_to_string(base_module_name_hex));
+                    base_struct_name = Some(hex_to_string(base_struct_name_hex));
+                } else {
                     base_name_generic = Some(String::from(
+                        // cannot panic because base_name_generic always exists as a string
                         event.data["base_name_generic"].as_str().unwrap(),
                     ));
                     base_account_address = None;
                     base_module_name = None;
                     base_struct_name = None;
-                } else {
-                    base_name_generic = None;
-                    base_account_address = Some(String::from(
-                        event.data["base_type"]["account_address"].as_str().unwrap(),
-                    ));
-                    let base_module_name_hex =
-                        event.data["base_type"]["module_name"].as_str().unwrap();
-                    let base_struct_name_hex =
-                        event.data["base_type"]["struct_name"].as_str().unwrap();
-                    base_module_name = Some(hex_to_string(base_module_name_hex));
-                    base_struct_name = Some(hex_to_string(base_struct_name_hex));
                 }
                 let quote_account_address = String::from(
                     event.data["quote_type"]["account_address"]
@@ -157,8 +167,10 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         .unwrap(),
                 );
                 let quote_module_name_hex =
+                    // cannot panic because module_name always exists as a string
                     event.data["quote_type"]["module_name"].as_str().unwrap();
                 let quote_struct_name_hex =
+                    // cannot panic because struct_name always exists as a string
                     event.data["quote_type"]["struct_name"].as_str().unwrap();
                 let quote_module_name = hex_to_string(quote_module_name_hex);
                 let quote_struct_name = hex_to_string(quote_struct_name_hex);
