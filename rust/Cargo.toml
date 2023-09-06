@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "aptos-indexer-protos",
     "moving-average",
+    "post-processor",
     "processor",
     "server-framework",
 ]
@@ -55,6 +56,12 @@ prometheus = { version = "0.13.0", default-features = false }
 prost = "0.11.9"
 prost-types = "0.11.9"
 regex = "1.5.5"
+reqwest = { version = "0.11.20", features = [
+    "blocking",
+    "cookies",
+    "json",
+    "stream",
+] }
 serde = { version = "1.0.137", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_yaml = "0.8.24"
