@@ -7,7 +7,6 @@ use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use google_cloud_spanner::{
     client::{Client, ClientConfig},
-    reader::AsyncIterator,
     statement::Statement,
 };
 use std::fmt::Debug;
@@ -58,18 +57,14 @@ impl ProcessorTrait for DummyProcessor {
         let client = Client::new(self.spanner_db.clone(), config).await?;
 
         for transaction in transactions {
-            let stmt = Statement::new(format!(
+            let query = format!(
                 "SELECT * FROM transactions WHERE transaction_version >= '{}' AND transaction_version <= '{}'",
                 start_version, transaction.version
-            ));
+            );
+            let stmt = Statement::new(query.clone());
             let mut tx = client.single().await?;
-            for _ in 0..10 {
-                let mut iter = tx.query(stmt.clone()).await?;
-                while let Some(row) = iter.next().await? {
-                    let transaction_version = row.column_by_name::<i64>("transaction_version");
-                    info!("transaction_version: {:?}", transaction_version);
-                }
-            }
+            tx.query(stmt.clone()).await?;
+            info!("Queried transaction {:?}", query);
         }
 
         Ok((start_version, end_version))
