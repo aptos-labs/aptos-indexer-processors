@@ -9,7 +9,7 @@ use google_cloud_spanner::{
     client::{Client, ClientConfig},
     statement::Statement,
 };
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Instant};
 use tracing::info;
 
 pub const NAME: &str = "dummy_processor";
@@ -57,6 +57,7 @@ impl ProcessorTrait for DummyProcessor {
         let client = Client::new(self.spanner_db.clone(), config).await?;
 
         for transaction in transactions {
+            let start_time = Instant::now();
             let query = format!(
                 "SELECT * FROM transactions WHERE transaction_version >= '{}' AND transaction_version <= '{}'",
                 start_version, transaction.version
@@ -64,7 +65,11 @@ impl ProcessorTrait for DummyProcessor {
             let stmt = Statement::new(query.clone());
             let mut tx = client.single().await?;
             tx.query(stmt.clone()).await?;
-            info!("Queried transaction {:?}", query);
+            info!(
+                time_elapsed = start_time.elapsed().as_secs_f64(),
+                query = query,
+                "Queried transaction"
+            );
         }
 
         Ok((start_version, end_version))
