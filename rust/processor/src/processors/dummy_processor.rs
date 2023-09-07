@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
-use crate::utils::database::PgDbPool;
+use crate::{
+    models::default_models::{
+        transactions::TransactionModel, write_set_changes::WriteSetChangeDetail,
+    },
+    utils::database::PgDbPool,
+};
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use google_cloud_spanner::{
     client::{Client, ClientConfig},
     statement::Statement,
 };
-use std::{fmt::Debug, time::Instant};
+use std::{collections::HashMap, fmt::Debug, time::Instant};
 use tracing::info;
 
 pub const NAME: &str = "dummy_processor";
@@ -56,11 +61,23 @@ impl ProcessorTrait for DummyProcessor {
         let config = ClientConfig::default().with_auth().await?;
         let client = Client::new(self.spanner_db.clone(), config).await?;
 
+        let mut table_metadata = HashMap::new();
         for transaction in transactions {
+            let (_, _, _, _, wsc_detail) = TransactionModel::from_transaction(&transaction);
+            let _ = wsc_detail.iter().map(|detail| {
+                if let WriteSetChangeDetail::Table(_, _, metadata) = detail {
+                    if let Some(meta) = metadata {
+                        table_metadata.insert(meta.handle.clone(), meta.clone());
+                    }
+                }
+            });
+        }
+
+        for metadata in table_metadata.into_values() {
             let start_time = Instant::now();
             let query = format!(
-                "SELECT * FROM transactions WHERE transaction_version = '{}'",
-                transaction.version
+                "SELECT * FROM table_metadatas WHERE handle = '{}'",
+                metadata.handle
             );
             let stmt = Statement::new(query.clone());
             let mut tx = client.single().await?;

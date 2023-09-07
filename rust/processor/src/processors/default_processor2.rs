@@ -65,10 +65,10 @@ impl ProcessorTrait for DefaultProcessor2 {
         let client = Client::new(self.spanner_db.clone(), config).await?;
 
         let mut mutations = Vec::new();
+        let mut table_metadata = HashMap::new();
         let _ = transactions.iter().map(|transaction| {
             let (txn, txn_detail, event, write_set_change, wsc_detail) =
                 TransactionModel::from_transaction(&transaction);
-            let mut table_metadata = HashMap::new();
 
             let _ = wsc_detail.iter().map(|detail| {
                 if let WriteSetChangeDetail::Table(_, _, metadata) = detail {
@@ -77,18 +77,6 @@ impl ProcessorTrait for DefaultProcessor2 {
                     }
                 }
             });
-
-            let _ = table_metadata
-                .into_values()
-                .collect::<Vec<TableMetadata>>()
-                .iter()
-                .map(|detail| {
-                    mutations.push(insert_or_update(
-                        "table_metadatas",
-                        &["handle", "key_type", "value_type"],
-                        &[&detail.handle, &detail.key_type, &detail.value_type],
-                    ))
-                });
 
             mutations.push(insert_or_update(
                 "transactions",
@@ -110,6 +98,18 @@ impl ProcessorTrait for DefaultProcessor2 {
                 ],
             ));
         });
+
+        let _ = table_metadata
+            .into_values()
+            .collect::<Vec<TableMetadata>>()
+            .iter()
+            .map(|detail| {
+                mutations.push(insert_or_update(
+                    "table_metadatas",
+                    &["handle", "key_type", "value_type"],
+                    &[&detail.handle, &detail.key_type, &detail.value_type],
+                ))
+            });
 
         let chunks = mutations.chunks(CHUNK_SIZE).map(|chunk| chunk.to_vec());
         for chunk in chunks {
