@@ -6,7 +6,7 @@ use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
     move_tables::{CurrentTableItem, TableItem, TableMetadata},
-    transactions::{Transaction, TransactionQuery},
+    transactions::Transaction,
 };
 use crate::{schema::write_set_changes, utils::util::standardize_address};
 use aptos_indexer_protos::transaction::v1::{
@@ -27,21 +27,6 @@ pub struct WriteSetChange {
     transaction_block_height: i64,
     pub type_: String,
     pub address: String,
-}
-
-/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
-#[derive(Associations, Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(belongs_to(TransactionQuery, foreign_key = transaction_version))]
-#[diesel(primary_key(transaction_version, index))]
-#[diesel(table_name = write_set_changes)]
-pub struct WriteSetChangeQuery {
-    pub transaction_version: i64,
-    pub index: i64,
-    pub hash: String,
-    transaction_block_height: i64,
-    pub type_: String,
-    pub address: String,
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl WriteSetChange {
