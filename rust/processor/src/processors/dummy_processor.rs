@@ -59,14 +59,14 @@ impl ProcessorTrait for DummyProcessor {
         for transaction in transactions {
             let start_time = Instant::now();
             let query = format!(
-                "SELECT * FROM transactions WHERE transaction_version >= '{}' AND transaction_version <= '{}'",
-                start_version, transaction.version
+                "SELECT * FROM transactions WHERE transaction_version = '{}'",
+                transaction.version
             );
             let stmt = Statement::new(query.clone());
             let mut tx = client.single().await?;
             tx.query(stmt.clone()).await?;
             info!(
-                time_elapsed = start_time.elapsed().as_secs_f64(),
+                time_elapsed = start_time.elapsed().as_nanos(),
                 query = query,
                 "Queried transaction"
             );
