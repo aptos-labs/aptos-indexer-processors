@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct AnsProcessorConfig {
     pub ans_v1_primary_names_table_handle: String,
     pub ans_v1_name_records_table_handle: String,
-    pub ans_v1_creator_address: String,
     pub ans_v2_contract_address: String,
-    pub ans_v2_migration_burn_address: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

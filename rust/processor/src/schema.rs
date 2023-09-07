@@ -28,6 +28,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    ans_lookup_v2 (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 140]
+        token_name -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Timestamp,
+        is_primary -> Bool,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     ans_primary_name (transaction_version, write_set_change_index) {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
@@ -204,6 +223,24 @@ diesel::table! {
         #[max_length = 140]
         token_name -> Varchar,
         is_deleted -> Bool,
+    }
+}
+
+diesel::table! {
+    current_ans_lookup_v2 (domain, subdomain) {
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 140]
+        token_name -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Timestamp,
+        is_primary -> Bool,
+        is_deleted -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1088,9 +1125,19 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(block_metadata_transactions -> transactions (version));
+diesel::joinable!(events -> transactions (transaction_version));
+diesel::joinable!(move_modules -> transactions (transaction_version));
+diesel::joinable!(move_resources -> transactions (transaction_version));
+diesel::joinable!(signatures -> transactions (transaction_version));
+diesel::joinable!(table_items -> transactions (transaction_version));
+diesel::joinable!(user_transactions -> transactions (version));
+diesel::joinable!(write_set_changes -> transactions (transaction_version));
+
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
     ans_lookup,
+    ans_lookup_v2,
     ans_primary_name,
     block_metadata_transactions,
     coin_activities,
@@ -1100,6 +1147,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     collection_datas,
     collections_v2,
     current_ans_lookup,
+    current_ans_lookup_v2,
     current_ans_primary_name,
     current_coin_balances,
     current_collection_datas,

@@ -248,13 +248,27 @@ impl AnsWriteResource {
 pub struct RenewNameEvent {
     domain_name: String,
     #[serde(deserialize_with = "deserialize_from_string")]
-    expiration_time_sec: BigDecimal,
-    is_primary_name: bool,
+    expiration_time_secs: BigDecimal,
+    pub is_primary_name: bool,
     subdomain_name: OptionalString,
     target_address: OptionalString,
 }
 
 impl RenewNameEvent {
+    pub fn get_domain_trunc(&self) -> String {
+        truncate_str(self.domain_name.as_str(), DOMAIN_LENGTH)
+    }
+
+    pub fn get_subdomain_trunc(&self) -> String {
+        truncate_str(
+            self.subdomain_name
+                .get_string()
+                .unwrap_or_default()
+                .as_str(),
+            DOMAIN_LENGTH,
+        )
+    }
+
     pub fn from_event(
         event: &Event,
         ans_v2_contract_address: &str,
