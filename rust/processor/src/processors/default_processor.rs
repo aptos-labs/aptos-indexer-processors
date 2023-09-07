@@ -279,7 +279,7 @@ fn insert_events(
             conn,
             diesel::insert_into(schema::events::table)
                 .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((account_address, creation_number, sequence_number))
+                .on_conflict((transaction_version, event_index))
                 .do_nothing(),
             None,
         )?;
