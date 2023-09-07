@@ -4,8 +4,7 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::default_models::{
-        move_tables::TableMetadata, transactions::TransactionModel,
-        write_set_changes::WriteSetChangeDetail,
+        transactions::TransactionModel, write_set_changes::WriteSetChangeDetail,
     },
     utils::database::PgDbPool,
 };
@@ -66,7 +65,8 @@ impl ProcessorTrait for DefaultProcessor2 {
 
         let mut mutations = Vec::new();
         let mut table_metadata = HashMap::new();
-        let _ = transactions.iter().map(|transaction| {
+
+        for transaction in transactions {
             let (txn, txn_detail, event, write_set_change, wsc_detail) =
                 TransactionModel::from_transaction(&transaction);
 
@@ -97,19 +97,15 @@ impl ProcessorTrait for DefaultProcessor2 {
                     &(serde_json::to_string(&wsc_detail).unwrap_or_default()),
                 ],
             ));
-        });
+        }
 
-        let _ = table_metadata
-            .into_values()
-            .collect::<Vec<TableMetadata>>()
-            .iter()
-            .map(|detail| {
-                mutations.push(insert_or_update(
-                    "table_metadatas",
-                    &["handle", "key_type", "value_type"],
-                    &[&detail.handle, &detail.key_type, &detail.value_type],
-                ))
-            });
+        for detail in table_metadata.into_values() {
+            mutations.push(insert_or_update(
+                "table_metadatas",
+                &["handle", "key_type", "value_type"],
+                &[&detail.handle, &detail.key_type, &detail.value_type],
+            ));
+        }
 
         let chunks = mutations.chunks(CHUNK_SIZE).map(|chunk| chunk.to_vec());
         for chunk in chunks {
