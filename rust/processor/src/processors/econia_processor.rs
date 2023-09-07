@@ -4,6 +4,7 @@ use crate::{
     utils::database::{execute_with_better_error, PgDbPool},
 };
 
+use anyhow::anyhow;
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
@@ -41,21 +42,24 @@ impl Debug for EconiaTransactionProcessor {
     }
 }
 
-fn hex_to_string(hex: &str) -> String {
+fn hex_to_string(hex: &str) -> anyhow::Result<String> {
+    if !hex.starts_with("0x") {
+        return Err(anyhow!("Hex string is not 0x-prefixed"));
+    }
+
     let hex_no_prefix = &hex[2..];
-    let hex_bytes = hex::decode(hex_no_prefix).unwrap();
-    String::from_utf8(hex_bytes).unwrap()
+    let hex_bytes =
+        hex::decode(hex_no_prefix).map_err(|e| anyhow!("Failed to decode hex: {}", e))?;
+
+    String::from_utf8(hex_bytes)
+        .map_err(|e| anyhow!("Failed to convert hex bytes to utf-8 string: {}", e))
 }
 
-fn opt_value_to_big_decimal(value: Option<&Value>) -> BigDecimal {
+fn opt_value_to_big_decimal(value: Option<&Value>) -> anyhow::Result<BigDecimal> {
     let string = value
         .and_then(Value::as_str)
-        .expect("key not found or not a string");
-    BigDecimal::from_str(string).expect("Failed to parse BigDecimal")
-}
-
-fn value_is_empty_string(val: &Value) -> bool {
-    val.as_str().expect("Value is not a string").is_empty()
+        .ok_or_else(|| anyhow!("key not found or not a string"))?;
+    Ok(BigDecimal::from_str(string)?)
 }
 
 fn insert_market_registration_events(
@@ -123,47 +127,40 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 }
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
-                let market_id = opt_value_to_big_decimal(event.data.get("market_id"));
-                let lot_size = opt_value_to_big_decimal(event.data.get("lot_size"));
-                let tick_size = opt_value_to_big_decimal(event.data.get("tick_size"));
-                let min_size = opt_value_to_big_decimal(event.data.get("min_size"));
-                let underwriter_id = opt_value_to_big_decimal(event.data.get("underwriter_id"));
+                let market_id = opt_value_to_big_decimal(event.data.get("market_id"))?;
+                let lot_size = opt_value_to_big_decimal(event.data.get("lot_size"))?;
+                let tick_size = opt_value_to_big_decimal(event.data.get("tick_size"))?;
+                let min_size = opt_value_to_big_decimal(event.data.get("min_size"))?;
+                let underwriter_id = opt_value_to_big_decimal(event.data.get("underwriter_id"))?;
                 let time = *block_height_to_timestamp
                     .get(&event.transaction_block_height)
+                    // cannot panic because the loop beforehand populates the block height times
                     .unwrap();
-                let base_name_generic;
-                let base_account_address;
-                let base_module_name;
-                let base_struct_name;
-                if value_is_empty_string(&event.data["base_name_generic"]) {
-                    base_name_generic = None;
-                    base_account_address = Some(String::from(
-                        // cannot panic because account_address always exists as a string
-                        // assuming base_name_generic was empty
-                        event.data["base_type"]["account_address"].as_str().unwrap(),
-                    ));
-                    let base_module_name_hex =
-                        // cannot panic because module_name always exists as a string
-                        // assuming base_name_generic was empty
-                        event.data["base_type"]["module_name"].as_str().unwrap();
-                    let base_struct_name_hex =
-                        // cannot panic because struct_name always exists as a string
-                        // assuming base_name_generic was empty
-                        event.data["base_type"]["struct_name"].as_str().unwrap();
-                    base_module_name = Some(hex_to_string(base_module_name_hex));
-                    base_struct_name = Some(hex_to_string(base_struct_name_hex));
-                } else {
-                    base_name_generic = Some(String::from(
-                        // cannot panic because base_name_generic always exists as a string
-                        event.data["base_name_generic"].as_str().unwrap(),
-                    ));
-                    base_account_address = None;
-                    base_module_name = None;
-                    base_struct_name = None;
-                }
+                let (base_name_generic, base_account_address, base_module_name, base_struct_name) =
+                    // cannot panic because base_namme_generic is always present as a perhaps-empty string
+                    if event.data["base_name_generic"].as_str().unwrap().is_empty() {
+                        (
+                            None,
+                            // Unwrap to assert as Some, account_address must exist given empty base name
+                            Some(String::from(event.data["base_type"]["account_address"].as_str().unwrap())),
+                            // Unwrap to assert as Some, module_name must exist given empty base name
+                            Some(hex_to_string(event.data["base_type"]["module_name"].as_str().unwrap())?),
+                            // Unwrap to assert as Some, struct_name must exist given empty base name
+                            Some(hex_to_string(event.data["base_type"]["struct_name"].as_str().unwrap())?),
+                        )
+                    } else {
+                        (
+                            // Unwrap to assert as Some, base_name_generic must exist given above condition
+                            Some(String::from(event.data["base_name_generic"].as_str().unwrap())),
+                            None,
+                            None,
+                            None,
+                        )
+                    };
                 let quote_account_address = String::from(
                     event.data["quote_type"]["account_address"]
                         .as_str()
+                        // cannot panic because account_address always exists as a string
                         .unwrap(),
                 );
                 let quote_module_name_hex =
@@ -172,8 +169,8 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 let quote_struct_name_hex =
                     // cannot panic because struct_name always exists as a string
                     event.data["quote_type"]["struct_name"].as_str().unwrap();
-                let quote_module_name = hex_to_string(quote_module_name_hex);
-                let quote_struct_name = hex_to_string(quote_struct_name_hex);
+                let quote_module_name = hex_to_string(quote_module_name_hex)?;
+                let quote_struct_name = hex_to_string(quote_struct_name_hex)?;
 
                 let market_registration_event = MarketRegistrationEvent {
                     txn_version,
@@ -200,8 +197,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
                 insert_market_registration_events(pg_conn, market_registration_events)
-            })
-            .expect("Expected a successful insertion into the table");
+            })?;
 
         Ok((start_version, end_version))
     }
