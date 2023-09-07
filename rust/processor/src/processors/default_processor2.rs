@@ -2,17 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
-use crate::{models::default_models::transactions::TransactionModel, utils::database::PgDbPool};
+use crate::{
+    models::default_models::{
+        move_tables::TableMetadata, transactions::TransactionModel,
+        write_set_changes::WriteSetChangeDetail,
+    },
+    utils::database::PgDbPool,
+};
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use google_cloud_spanner::{
     client::{Client, ClientConfig},
     mutation::insert_or_update,
 };
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 use tracing::info;
 
 pub const NAME: &str = "default_processor2";
+pub const CHUNK_SIZE: usize = 1000;
+
 pub struct DefaultProcessor2 {
     connection_pool: PgDbPool,
     spanner_db: String,
@@ -56,41 +64,64 @@ impl ProcessorTrait for DefaultProcessor2 {
         let config = ClientConfig::default().with_auth().await?;
         let client = Client::new(self.spanner_db.clone(), config).await?;
 
-        let mutations = transactions
-            .iter()
-            .map(|transaction| {
-                let (txn, txn_detail, event, write_set_change, wsc_detail) =
-                    TransactionModel::from_transaction(&transaction);
-                insert_or_update(
-                    "transactions",
-                    &[
-                        "transaction_version",
-                        "transaction",
-                        "transaction_detail",
-                        "event",
-                        "write_set_change",
-                        "write_set_change_details",
-                    ],
-                    &[
-                        &(transaction.version as i64),
-                        &(serde_json::to_string(&txn).unwrap_or_default()),
-                        &(serde_json::to_string(&txn_detail).unwrap_or_default()),
-                        &(serde_json::to_string(&event).unwrap_or_default()),
-                        &(serde_json::to_string(&write_set_change).unwrap_or_default()),
-                        &(serde_json::to_string(&wsc_detail).unwrap_or_default()),
-                    ],
-                )
-            })
-            .collect();
+        let mut mutations = Vec::new();
+        let _ = transactions.iter().map(|transaction| {
+            let (txn, txn_detail, event, write_set_change, wsc_detail) =
+                TransactionModel::from_transaction(&transaction);
+            let mut table_metadata = HashMap::new();
 
-        if let Some(commit_timestamp) = client.apply(mutations).await? {
-            info!(
-                spanner_info = self.spanner_db.clone(),
-                commit_timestamp = commit_timestamp.seconds,
-                start_version = start_version,
-                end_version = end_version,
-                "Inserted or updated transaction",
-            );
+            let _ = wsc_detail.iter().map(|detail| {
+                if let WriteSetChangeDetail::Table(_, _, metadata) = detail {
+                    if let Some(meta) = metadata {
+                        table_metadata.insert(meta.handle.clone(), meta.clone());
+                    }
+                }
+            });
+
+            let _ = table_metadata
+                .into_values()
+                .collect::<Vec<TableMetadata>>()
+                .iter()
+                .map(|detail| {
+                    mutations.push(insert_or_update(
+                        "table_metadatas",
+                        &["handle", "key_type", "value_type"],
+                        &[&detail.handle, &detail.key_type, &detail.value_type],
+                    ))
+                });
+
+            mutations.push(insert_or_update(
+                "transactions",
+                &[
+                    "transaction_version",
+                    "transaction",
+                    "transaction_detail",
+                    "event",
+                    "write_set_change",
+                    "write_set_change_details",
+                ],
+                &[
+                    &(transaction.version as i64),
+                    &(serde_json::to_string(&txn).unwrap_or_default()),
+                    &(serde_json::to_string(&txn_detail).unwrap_or_default()),
+                    &(serde_json::to_string(&event).unwrap_or_default()),
+                    &(serde_json::to_string(&write_set_change).unwrap_or_default()),
+                    &(serde_json::to_string(&wsc_detail).unwrap_or_default()),
+                ],
+            ));
+        });
+
+        let chunks = mutations.chunks(CHUNK_SIZE).map(|chunk| chunk.to_vec());
+        for chunk in chunks {
+            if let Some(commit_timestamp) = client.apply(chunk).await? {
+                info!(
+                    spanner_info = self.spanner_db.clone(),
+                    commit_timestamp = commit_timestamp.seconds,
+                    start_version = start_version,
+                    end_version = end_version,
+                    "Inserted or updated transaction",
+                );
+            }
         }
 
         Ok((start_version, end_version))
