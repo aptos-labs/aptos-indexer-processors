@@ -90,6 +90,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
         let client = Client::new(config).await?;
         let topic = client.topic(&self.pubsub_topic_name.clone());
         let publisher = topic.new_publisher(None);
+        let ordering_key = get_current_timestamp();
 
         // Publish CurrentTokenDataV2 and CurrentCollectionV2 from transactions
         let (token_datas, collections) =
@@ -109,7 +110,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
                     db_chain_id.expect("db_chain_id must not be null"),
                 )
                 .into(),
-                ordering_key: get_current_timestamp(),
+                ordering_key: ordering_key.clone(),
                 ..Default::default()
             })
         }
@@ -125,7 +126,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
                     db_chain_id.expect("db_chain_id must not be null"),
                 )
                 .into(),
-                ordering_key: get_current_timestamp(),
+                ordering_key: ordering_key.clone(),
                 ..Default::default()
             })
         }
@@ -274,6 +275,7 @@ fn parse_v2_token(
     (current_token_datas_v2, current_collections_v2)
 }
 
+/// Get current system timestamp in milliseconds for ordering key
 fn get_current_timestamp() -> String {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
