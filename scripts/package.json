@@ -1,0 +1,18 @@
+{
+  "name": "scripts",
+  "description": "Scripts for aptos-indexer-processors",
+  "version": "1.0.0",
+  "packageManager": "pnpm@8.6.2",
+  "main": "index.js",
+  "scripts": {
+      "release-processor-images": "./release-processor-images.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "=4.8.4",
+    "zx": "^7.1.1"
+  },
+  "peerDependencies": {}
+}

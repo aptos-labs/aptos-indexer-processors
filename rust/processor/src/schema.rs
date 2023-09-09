@@ -305,6 +305,24 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_delegated_voter (delegation_pool_address, delegator_address) {
+        #[max_length = 66]
+        delegation_pool_address -> Varchar,
+        #[max_length = 66]
+        delegator_address -> Varchar,
+        #[max_length = 66]
+        table_handle -> Nullable<Varchar>,
+        #[max_length = 66]
+        voter -> Nullable<Varchar>,
+        #[max_length = 66]
+        pending_voter -> Nullable<Varchar>,
+        last_transaction_version -> Int8,
+        last_transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_delegator_balances (delegator_address, pool_address, pool_type, table_handle) {
         #[max_length = 66]
         delegator_address -> Varchar,
@@ -1087,6 +1105,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_collection_datas,
     current_collections_v2,
     current_delegated_staking_pool_balances,
+    current_delegated_voter,
     current_delegator_balances,
     current_fungible_asset_balances,
     current_objects,

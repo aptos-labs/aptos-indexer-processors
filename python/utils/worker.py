@@ -2,9 +2,8 @@ import argparse
 import grpc
 import json
 
-from utils.models.general_models import NextVersionToProcess
-from aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
-from aptos.transaction.v1 import transaction_pb2
+from aptos_indexer_protos.aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
+from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
 from utils.config import Config
 from utils.models.general_models import Base
 from utils.session import Session
@@ -26,6 +25,7 @@ from processors.example_event_processor.processor import ExampleEventProcessor
 from processors.nft_orderbooks.nft_marketplace_processor import NFTMarketplaceProcesser
 from processors.nft_marketplace_v2.processor import NFTMarketplaceV2Processor
 from processors.coin_flip.processor import CoinFlipProcessor
+from processors.aptos_ambassador_token.processor import AptosAmbassadorTokenProcessor
 
 INDEXER_GRPC_BLOB_STORAGE_SIZE = 1000
 
@@ -49,6 +49,8 @@ class IndexerProcessorServer:
                 self.processor = NFTMarketplaceV2Processor()
             case ProcessorName.COIN_FLIP.value:
                 self.processor = CoinFlipProcessor()
+            case ProcessorName.EXAMPLE_AMBASSADOR_TOKEN_PROCESSOR.value:
+                self.processor = AptosAmbassadorTokenProcessor()
             case _:
                 raise Exception(
                     "Invalid processor name"
@@ -107,7 +109,7 @@ class IndexerProcessorServer:
 
         # Setup GRPC settings
         metadata = (
-            ("x-aptos-data-authorization", self.config.grpc_data_stream_api_key),
+            ("authorization", "Bearer " + self.config.grpc_data_stream_api_key),
             ("x-aptos-request-name", self.processor.name()),
         )
         options = [
@@ -123,8 +125,10 @@ class IndexerProcessorServer:
         ]
 
         # Connect to indexer grpc endpoint
-        with grpc.insecure_channel(
-            self.config.grpc_data_stream_endpoint, options=options
+        with grpc.secure_channel(
+            self.config.grpc_data_stream_endpoint,
+            options=options,
+            credentials=grpc.ssl_channel_credentials(),
         ) as channel:
             print(
                 json.dumps(

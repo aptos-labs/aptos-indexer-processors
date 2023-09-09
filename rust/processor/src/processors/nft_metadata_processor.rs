@@ -14,12 +14,19 @@ use crate::{
 };
 use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
+use futures_util::future::try_join_all;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::client::{Client, ClientConfig};
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tracing::info;
 
 pub const NAME: &str = "nft_metadata_processor";
+pub const CHUNK_SIZE: usize = 1000;
+
 pub struct NFTMetadataProcessor {
     connection_pool: PgDbPool,
     pubsub_topic_name: String,
@@ -72,30 +79,47 @@ impl ProcessorTrait for NFTMetadataProcessor {
         let publisher = topic.new_publisher(None);
 
         // Publish all parsed CurrentTokenDataV2 to Pubsub
-        for token_data in parse_v2_token(&transactions) {
-            info!(
-                token_data_id = token_data.token_data_id,
-                token_uri = token_data.token_uri,
-                toransaction_version = token_data.last_transaction_version,
-                "[NFT Metadata Crawler] Publishing to queue"
-            );
+        let pubsub_messages: Vec<PubsubMessage> = parse_v2_token(&transactions)
+            .iter()
+            .map(|token_data| PubsubMessage {
+                data: format!(
+                    "{},{},{},{},{},false",
+                    token_data.token_data_id,
+                    token_data.token_uri,
+                    token_data.last_transaction_version,
+                    token_data.last_transaction_timestamp,
+                    db_chain_id.expect("db_chain_id must not be null"),
+                )
+                .into(),
+                ordering_key: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis()
+                    .to_string(),
+                ..Default::default()
+            })
+            .collect();
 
-            publisher
-                .publish(PubsubMessage {
-                    data: format!(
-                        "{},{},{},{},{},false",
-                        token_data.token_data_id,
-                        token_data.token_uri,
-                        token_data.last_transaction_version,
-                        token_data.last_transaction_timestamp,
-                        db_chain_id.expect("db_chain_id must not be null"),
-                    )
-                    .into(),
-                    ..Default::default()
-                })
-                .await
-                .get()
-                .await?;
+        info!(
+            start_version = start_version,
+            end_version = end_version,
+            "[NFT Metadata Crawler] Publishing to queue"
+        );
+
+        let chunks: Vec<Vec<PubsubMessage>> = pubsub_messages
+            .chunks(CHUNK_SIZE)
+            .map(|chunk| chunk.to_vec())
+            .collect();
+
+        for chunk in chunks {
+            try_join_all(
+                publisher
+                    .publish_bulk(chunk)
+                    .await
+                    .into_iter()
+                    .map(|awaiter| awaiter.get()),
+            )
+            .await?;
         }
 
         Ok((start_version, end_version))

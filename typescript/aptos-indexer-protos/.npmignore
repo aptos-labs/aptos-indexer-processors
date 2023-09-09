@@ -1,0 +1,7 @@
+CONTRIBUTING.md
+generate.sh
+coverage
+node_modules
+.aptos
+.env
+examples/
