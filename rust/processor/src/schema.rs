@@ -594,7 +594,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    events (account_address, creation_number, sequence_number) {
+    events (transaction_version, event_index) {
         sequence_number -> Int8,
         creation_number -> Int8,
         #[max_length = 66]
@@ -605,7 +605,7 @@ diesel::table! {
         type_ -> Text,
         data -> Jsonb,
         inserted_at -> Timestamp,
-        event_index -> Nullable<Int8>,
+        event_index -> Int8,
     }
 }
 

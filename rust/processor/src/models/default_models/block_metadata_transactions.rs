@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::transactions::{Transaction, TransactionQuery};
+use super::transactions::Transaction;
 use crate::{
     schema::block_metadata_transactions,
     utils::util::{parse_timestamp, standardize_address},
@@ -33,26 +33,6 @@ pub struct BlockMetadataTransaction {
     pub proposer: String,
     pub failed_proposer_indices: serde_json::Value,
     pub timestamp: chrono::NaiveDateTime,
-}
-
-/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
-#[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Queryable, Serialize,
-)]
-#[diesel(belongs_to(TransactionQuery, foreign_key = version))]
-#[diesel(primary_key(version))]
-#[diesel(table_name = block_metadata_transactions)]
-pub struct BlockMetadataTransactionQuery {
-    pub version: i64,
-    pub block_height: i64,
-    pub id: String,
-    pub round: i64,
-    pub epoch: i64,
-    pub previous_block_votes_bitvec: serde_json::Value,
-    pub proposer: String,
-    pub failed_proposer_indices: serde_json::Value,
-    pub timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl BlockMetadataTransaction {
