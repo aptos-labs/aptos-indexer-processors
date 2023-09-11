@@ -308,7 +308,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "delegated_staking_activities",
+                      "name": "fungible_asset_activities",
                       "schema": "public"
                     }
                   }
