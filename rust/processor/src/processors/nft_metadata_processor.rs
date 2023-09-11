@@ -120,7 +120,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
                 data: format!(
                     "{},{},{},{},{},false",
                     collection.collection_id,
-                    collection.uri,
+                    collection.uri.trim(),
                     collection.last_transaction_version,
                     collection.last_transaction_timestamp,
                     db_chain_id.expect("db_chain_id must not be null"),
