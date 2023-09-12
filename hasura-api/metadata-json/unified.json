@@ -1,5 +1,5 @@
 {
-  "resource_version": 268,
+  "resource_version": 340,
   "metadata": {
     "version": 3,
     "sources": [
@@ -1254,6 +1254,21 @@
               "schema": "public"
             },
             "object_relationships": [
+              {
+                "name": "aptos_name",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_name": "token_name"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_aptos_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
               {
                 "name": "current_collection",
                 "using": {
