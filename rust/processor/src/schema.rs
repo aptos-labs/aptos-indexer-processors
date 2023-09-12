@@ -85,6 +85,7 @@ diesel::table! {
         event_index -> Nullable<Int8>,
         #[max_length = 66]
         gas_fee_payer_address -> Nullable<Varchar>,
+        storage_refund_amount -> Numeric,
     }
 }
 
@@ -634,6 +635,7 @@ diesel::table! {
         token_standard -> Varchar,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        storage_refund_amount -> Numeric,
     }
 }
 
