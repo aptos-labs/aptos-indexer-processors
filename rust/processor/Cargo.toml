@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-api-types = { workspace = true }
 aptos-indexer-protos = { workspace = true }
 aptos-moving-average = { workspace = true }
 async-trait = { workspace = true }
@@ -27,7 +28,6 @@ diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
-gcloud-sdk = { workspace = true }
 google-cloud-googleapis = { workspace = true }
 google-cloud-pubsub = { workspace = true }
 hex = { workspace = true }
