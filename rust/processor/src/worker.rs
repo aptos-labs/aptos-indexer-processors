@@ -22,6 +22,7 @@ use crate::{
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT, TRANSMITTED_BYTES_COUNT,
         },
+        custom_configs::CustomProcessorConfigs,
         database::{execute_with_better_error, new_db_pool, PgDbPool},
         util::time_diff_since_pb_timestamp_in_secs,
     },
@@ -69,8 +70,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub ans_v1_primary_names_table_handle: Option<String>,
-    pub ans_v1_name_records_table_handle: Option<String>,
+    pub custom_processor_configs: Option<CustomProcessorConfigs>,
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
@@ -87,8 +87,7 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        ans_v1_primary_names_table_handle: Option<String>,
-        ans_v1_name_records_table_handle: Option<String>,
+        custom_processor_configs: Option<CustomProcessorConfigs>,
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
         google_application_credentials: Option<String>,
@@ -117,8 +116,7 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            ans_v1_primary_names_table_handle,
-            ans_v1_name_records_table_handle,
+            custom_processor_configs,
             nft_points_contract,
             pubsub_topic_name,
             google_application_credentials,
@@ -210,8 +208,7 @@ impl Worker {
             },
             Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
                 self.db_pool.clone(),
-                self.ans_v1_primary_names_table_handle.clone(),
-                self.ans_v1_name_records_table_handle.clone(),
+                self.custom_processor_configs.clone(),
             )),
         };
         let processor_name = processor.name();
@@ -705,6 +702,7 @@ pub async fn create_fetcher_loop(
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
             info!("[Parser] The stream is ended.");
+            break;
         } else {
             // The rest is to see if we need to reconnect
             if is_success {
