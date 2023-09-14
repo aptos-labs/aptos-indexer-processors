@@ -4,12 +4,12 @@ This repository contains the protobuf definitions for the Aptos Indexer tech sta
 
 ## Usage
 Import generated classes like this:
-```
+```python
 from aptos_indexer_protos.aptos.transaction.v1.transaction_pb2 import Transaction
 ```
 
 Then use them like this:
-```
+```python
 def parse(transaction: Transaction):
     # Parse the transaction.
 ```

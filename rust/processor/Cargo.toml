@@ -10,7 +10,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.70"
+rust-version = { workspace = true }
 
 [dependencies]
 econia_db = { package = "dbv2", path = "../../../../dbv2" }

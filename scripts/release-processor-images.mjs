@@ -26,16 +26,14 @@
 // GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US="${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}" ./docker/release-processor-images.mjs --language=rust --wait-for-image-seconds=1800
 
 
-import { execSync } from "node:child_process";
 import { dirname } from "node:path";
 import { chdir } from "node:process";
 import { promisify } from "node:util";
 const sleep = promisify(setTimeout);
 
-// argv[1] is the file path to the script
-chdir(dirname(process.argv[1]) + "/.."); // change workdir to the root of the repo
-// install repo pnpm dependencies
-execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
+// Change workdir to the root of the repo.
+chdir(dirname(process.argv[1]) + "/..");
+
 await import("zx/globals");
 
 const REQUIRED_ARGS = ["LANGUAGE", "GIT_SHA", "GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US"];
@@ -56,6 +54,9 @@ for (const arg of OPTIONAL_ARGS) {
   const argValue = argv[arg.toLowerCase().replaceAll("_", "-")] ?? process.env[arg];
   parsedArgs[arg] = argValue;
 }
+
+// Default 10 seconds.
+parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
 let crane;
 
@@ -81,35 +82,34 @@ if (process.env.CI === "true") {
   crane = "crane";
 }
 
-
 function getImage(language) {
     const sourceImage = `indexer-client-examples/${language}`;
     const targetImage = `indexer-processor-${language}`;
-
     return {sourceImage, targetImage};
 }
 
 const GCP_ARTIFACT_PROCESSOR_REPO_US = parsedArgs.GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US;
 const DOCKERHUB = "docker.io/aptoslabs";
-const {sourceImage, targetImage} = getImage(parsedArgs.LANGUAGE);
-console.log(targetImage);
-// default 10 seconds
-parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
+const {sourceImage, targetImage} = getImage(parsedArgs.LANGUAGE);
+console.info(chalk.yellow(`INFO: Target image: ${targetImage}`));
 
 const imageSource = `${GCP_ARTIFACT_PROCESSOR_REPO_US}/${sourceImage}:${parsedArgs.GIT_SHA}`;
 const imageGitShaTarget = `${DOCKERHUB}/${targetImage}:${parsedArgs.GIT_SHA}`;
-const imageLatestTarget = `${DOCKERHUB}/${targetImage}:latest`;
-console.info(chalk.green(`INFO: copying ${imageSource} to ${imageGitShaTarget}`));
-await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
-await $`${crane} copy ${imageSource} ${imageGitShaTarget}`;
-await $`${crane} tag ${imageSource} ${imageLatestTarget}`;
-if(parsedArgs.VERSION_TAG !== null) {
-    const imageVersionTagTarget = `${DOCKERHUB}/${targetImage}:${parsedArgs.VERSION_TAG}`;
-    console.info(chalk.green(`INFO: copying ${imageSource} to ${imageVersionTagTarget}`));
-    await $`${crane} tag ${imageSource} ${imageVersionTagTarget}`;
-}
 
+console.info(chalk.green(`INFO: Waiting for ${imageSource} to become available in the source repo`));
+await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
+
+console.info(chalk.green(`INFO: Copying ${imageSource} to ${imageGitShaTarget}`));
+await $`${crane} copy ${imageSource} ${imageGitShaTarget}`;
+
+console.info(chalk.green(`INFO: Tagging image as latest`));
+await $`${crane} tag ${imageGitShaTarget} latest`;
+
+if(parsedArgs.VERSION_TAG !== null) {
+    console.info(chalk.green(`INFO: Tagging image as ${parsedArgs.VERSION_TAG}`));
+    await $`${crane} tag ${imageGitShaTarget} ${parsedArgs.VERSION_TAG}`;
+}
 
 async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds) {
   const WAIT_TIME_IN_BETWEEN_ATTEMPTS = 10000; // 10 seconds in ms

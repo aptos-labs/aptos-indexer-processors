@@ -20,7 +20,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
 
-      - uses: actions/rust-setup
+      - uses: ./.github/actions/rust-setup
 
       # Get the version of the crate on crates.io
       - name: Get current version

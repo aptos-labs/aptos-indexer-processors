@@ -28,28 +28,27 @@ This guide will get you started with creating an Aptos indexer with custom parsi
 
 ## Dev Guide
 
-### Installation
+### Development
+If you update the proto definitions in `proto/`, you can regenerate them for all languages by running this script:
+```
+./scripts/build_protos.sh
+```
 
+Make sure you have the following deps installed:
 ```bash
 # Install buf
 brew install bufbuild/buf/buf
 
-# For Rust generated code
+# For generating Rust code
 cargo install protoc-gen-prost
 cargo install protoc-gen-prost-serde
 cargo install protoc-gen-prost-crate
 cargo install protoc-gen-tonic
 
-# For TS generated code
-pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
+# For generating TS code
+pnpm install -g protoc-gen-ts
 
-# For Python generated code
+# For generating Python code
 cd python/aptos-indexer-protos
 poetry install
-```
-
-### Development
-If you update the protos, you can regenerate them for all langauges by running this script:
-```
-./build_protos.sh
 ```

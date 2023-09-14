@@ -29,33 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Install pnpm & protoc-gen-ts
-        uses: pnpm/action-setup@v2
-        with:
-          version: 7.12.2
-      - run: pnpm install -g protoc-gen-ts google-protobuf typescript@4.x.x
-
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-
-      - name: Install rust prost plugins
-        run: |
-          cargo install protoc-gen-prost
-          cargo install protoc-gen-prost-serde
-          cargo install protoc-gen-prost-crate
-          cargo install protoc-gen-tonic
-
-      - name: Install buf
-        uses: bufbuild/buf-setup-action@v1.24.0
-
-      - name: Setup Python
-        uses: ./.github/actions/python-setup
-        with:
-          pyproject_directory: python/aptos-indexer-protos
-
-      - run: ./build_protos.sh
-
       - uses: ./.github/actions/docker-setup
         with:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
