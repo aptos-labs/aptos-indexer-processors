@@ -85,6 +85,7 @@ diesel::table! {
         event_index -> Nullable<Int8>,
         #[max_length = 66]
         gas_fee_payer_address -> Nullable<Varchar>,
+        storage_refund_amount -> Numeric,
     }
 }
 
@@ -594,7 +595,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    events (account_address, creation_number, sequence_number) {
+    events (transaction_version, event_index) {
         sequence_number -> Int8,
         creation_number -> Int8,
         #[max_length = 66]
@@ -605,7 +606,7 @@ diesel::table! {
         type_ -> Text,
         data -> Jsonb,
         inserted_at -> Timestamp,
-        event_index -> Nullable<Int8>,
+        event_index -> Int8,
     }
 }
 
@@ -634,6 +635,7 @@ diesel::table! {
         token_standard -> Varchar,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        storage_refund_amount -> Numeric,
     }
 }
 

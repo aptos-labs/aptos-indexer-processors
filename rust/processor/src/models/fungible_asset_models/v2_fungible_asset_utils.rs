@@ -25,6 +25,30 @@ const FUNGIBLE_ASSET_SYMBOL: usize = 10;
 /// Tracks all fungible asset related data in a hashmap for quick access (keyed on address of the object core)
 pub type FungibleAssetAggregatedDataMapping = HashMap<CurrentObjectPK, FungibleAssetAggregatedData>;
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FeeStatement {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub storage_fee_refund_octas: u64,
+}
+
+impl FeeStatement {
+    pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Option<Self> {
+        if data_type == "0x1::transaction_fee::FeeStatement" {
+            let fee_statement: FeeStatement = serde_json::from_str(data).unwrap_or_else(|_| {
+                tracing::error!(
+                    transaction_version = txn_version,
+                    data = data,
+                    "failed to parse event for fee statement"
+                );
+                panic!();
+            });
+            Some(fee_statement)
+        } else {
+            None
+        }
+    }
+}
+
 /// This contains objects used by fungible assets
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FungibleAssetAggregatedData {

@@ -27,7 +27,6 @@ diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
-gcloud-sdk = { workspace = true }
 google-cloud-googleapis = { workspace = true }
 google-cloud-pubsub = { workspace = true }
 google-cloud-spanner = { workspace = true }
@@ -42,6 +41,7 @@ serde_json = { workspace = true }
 server-framework = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
+time = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }

@@ -1,5 +1,5 @@
 {
-  "resource_version": 326,
+  "resource_version": 340,
   "metadata": {
     "version": 3,
     "sources": [
@@ -308,7 +308,7 @@
                     },
                     "insertion_order": null,
                     "remote_table": {
-                      "name": "delegated_staking_activities",
+                      "name": "fungible_asset_activities",
                       "schema": "public"
                     }
                   }
@@ -634,6 +634,7 @@
                     "is_gas_fee",
                     "is_transaction_success",
                     "owner_address",
+                    "storage_refund_amount",
                     "transaction_timestamp",
                     "transaction_version"
                   ],
@@ -1254,6 +1255,21 @@
             },
             "object_relationships": [
               {
+                "name": "aptos_name",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_name": "token_name"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "current_aptos_names",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
                 "name": "current_collection",
                 "using": {
                   "manual_configuration": {
@@ -1733,6 +1749,7 @@
                     "is_transaction_success",
                     "owner_address",
                     "storage_id",
+                    "storage_refund_amount",
                     "token_standard",
                     "transaction_timestamp",
                     "transaction_version",
