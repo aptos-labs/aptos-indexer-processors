@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api-types = { workspace = true }
 aptos-indexer-protos = { workspace = true }
 aptos-moving-average = { workspace = true }
 async-trait = { workspace = true }
@@ -42,6 +41,7 @@ serde_json = { workspace = true }
 server-framework = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
+time = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
