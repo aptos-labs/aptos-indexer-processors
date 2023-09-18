@@ -1,15 +1,13 @@
 /* eslint-disable */
 import {
-  CallOptions,
   ChannelCredentials,
   Client,
-  ClientOptions,
   ClientReadableStream,
   handleServerStreamingCall,
   makeGenericClientConstructor,
   Metadata,
-  UntypedServiceImplementation,
 } from "@grpc/grpc-js";
+import type { CallOptions, ClientOptions, UntypedServiceImplementation } from "@grpc/grpc-js";
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { Transaction } from "../../transaction/v1/transaction";
