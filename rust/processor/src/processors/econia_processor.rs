@@ -10,8 +10,10 @@ use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
+use econia_db::models::FillEvent;
 use econia_db::models::MarketRegistrationEvent;
 use econia_db::schema::market_registration_events;
+use econia_db::schema::fill_events;
 use serde_json::Value;
 use std::str::FromStr;
 use std::{collections::HashMap, fmt::Debug};
@@ -79,6 +81,21 @@ fn insert_market_registration_events(
     Ok(())
 }
 
+fn insert_fill_events(
+    conn: &mut PgConnection,
+    events: Vec<FillEvent>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        // See comment above re: conflicts
+        diesel::insert_into(fill_events::table)
+            .values(&events)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
+
 #[async_trait]
 impl ProcessorTrait for EconiaTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -116,10 +133,66 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             }
         }
 
+        let fill_type =
+            format!("{}::user::FillEvent", self.econia_address);
+        let mut fill_events = vec![];
+        for transaction in &transactions {
+            let (txn, _, events, _, _) = TransactionModel::from_transaction(&transaction);
+            for (index, event) in events.iter().enumerate() {
+                if event.type_ != fill_type {
+                    continue;
+                }
+                let txn_version = BigDecimal::from(txn.version);
+                let event_idx = BigDecimal::from(index as u64);
+                let time = *block_height_to_timestamp
+                    .get(&event.transaction_block_height)
+                    // cannot panic because the loop beforehand populates the block height times
+                    .unwrap();
+                let emit_address = event.account_address.to_string();
+                let maker_address = String::from(event.data["maker"].as_str().unwrap());
+                let maker_custodian_id = opt_value_to_big_decimal(event.data.get("maker_custodian_id"))?;
+                let maker_order_id = opt_value_to_big_decimal(event.data.get("maker_order_id"))?;
+                let maker_side = event.data.get("maker_side").unwrap().as_bool().unwrap();
+                let market_id = opt_value_to_big_decimal(event.data.get("market_id"))?;
+                let price = opt_value_to_big_decimal(event.data.get("price"))?;
+                let trade_sequence_number = opt_value_to_big_decimal(event.data.get("sequence_number_for_trade"))?;
+                let size = opt_value_to_big_decimal(event.data.get("size"))?;
+                let taker_address = String::from(event.data["taker"].as_str().unwrap());
+                let taker_custodian_id = opt_value_to_big_decimal(event.data.get("taker_custodian_id"))?;
+                let taker_order_id = opt_value_to_big_decimal(event.data.get("taker_order_id"))?;
+                let taker_quote_fees_paid = opt_value_to_big_decimal(event.data.get("taker_quote_fees_paid"))?;
+
+                let fill_event = FillEvent {
+                    txn_version,
+                    event_idx,
+                    emit_address,
+                    time,
+                    maker_address,
+                    maker_custodian_id,
+                    maker_order_id,
+                    maker_side,
+                    market_id,
+                    price,
+                    trade_sequence_number,
+                    size,
+                    taker_address,
+                    taker_custodian_id,
+                    taker_order_id,
+                    taker_quote_fees_paid,
+                };
+                fill_events.push(fill_event);
+            }
+        }
+        conn.build_transaction()
+            .read_write()
+            .run::<_, Error, _>(|pg_conn| {
+                insert_fill_events(pg_conn, fill_events)
+            })?;
+
         let market_registration_type =
             format!("{}::registry::MarketRegistrationEvent", self.econia_address);
         let mut market_registration_events = vec![];
-        for transaction in transactions {
+        for transaction in &transactions {
             let (txn, _, events, _, _) = TransactionModel::from_transaction(&transaction);
             for (index, event) in events.iter().enumerate() {
                 if event.type_ != market_registration_type {
