@@ -6,7 +6,11 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    models::{token_v2_models::v2_token_utils::ObjectWithMetadata, user_transactions_models::user_transactions::UserTransaction}, schema::account_transactions,
+    models::{
+        token_v2_models::v2_token_utils::ObjectWithMetadata,
+        user_transactions_models::user_transactions::UserTransaction,
+    },
+    schema::account_transactions,
     utils::util::standardize_address,
 };
 use aptos_indexer_protos::transaction::v1::{

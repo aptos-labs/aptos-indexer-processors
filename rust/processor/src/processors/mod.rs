@@ -33,7 +33,7 @@ pub enum Processor {
     TokenV2Processor,
     NFTMetadataProcessor,
     AnsProcessor,
-    UserTransactionProcessor
+    UserTransactionProcessor,
 }
 
 impl Processor {
