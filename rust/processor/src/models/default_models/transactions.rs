@@ -7,8 +7,6 @@
 
 use super::{
     block_metadata_transactions::BlockMetadataTransaction,
-    signatures::Signature,
-    user_transactions::UserTransaction,
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
@@ -86,7 +84,7 @@ impl Transaction {
         transaction: &TransactionPB,
     ) -> (
         Self,
-        Option<TransactionDetail>,
+        Option<BlockMetadataTransaction>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
@@ -111,14 +109,6 @@ impl Transaction {
             .expect("Transaction timestamp doesn't exist!");
         match txn_data {
             TxnData::User(user_txn) => {
-                let (user_txn_output, signatures) = UserTransaction::from_transaction(
-                    user_txn,
-                    timestamp,
-                    block_height,
-                    epoch,
-                    version,
-                );
-
                 let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
                     &transaction_info.changes,
                     version,
@@ -143,7 +133,7 @@ impl Transaction {
                         block_height,
                         epoch,
                     ),
-                    Some(TransactionDetail::User(user_txn_output, signatures)),
+                    None,
                     wsc,
                     wsc_detail,
                 )
@@ -187,14 +177,12 @@ impl Transaction {
                         block_height,
                         epoch,
                     ),
-                    Some(TransactionDetail::BlockMetadata(
-                        BlockMetadataTransaction::from_transaction(
-                            block_metadata_txn,
-                            version,
-                            block_height,
-                            epoch,
-                            timestamp,
-                        ),
+                    Some(BlockMetadataTransaction::from_transaction(
+                        block_metadata_txn,
+                        version,
+                        block_height,
+                        epoch,
+                        timestamp,
                     )),
                     wsc,
                     wsc_detail,
@@ -221,32 +209,27 @@ impl Transaction {
         transactions: &[TransactionPB],
     ) -> (
         Vec<Self>,
-        Vec<TransactionDetail>,
+        Vec<BlockMetadataTransaction>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
         let mut txns = vec![];
-        let mut txn_details = vec![];
+        let mut block_metadata_txns = vec![];
         let mut wscs = vec![];
         let mut wsc_details = vec![];
 
         for txn in transactions {
-            let (txn, txn_detail, mut wsc_list, mut wsc_detail_list) = Self::from_transaction(txn);
+            let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
+                Self::from_transaction(txn);
             txns.push(txn);
-            if let Some(a) = txn_detail {
-                txn_details.push(a);
+            if let Some(a) = block_metadata {
+                block_metadata_txns.push(a);
             }
             wscs.append(&mut wsc_list);
             wsc_details.append(&mut wsc_detail_list);
         }
-        (txns, txn_details, wscs, wsc_details)
+        (txns, block_metadata_txns, wscs, wsc_details)
     }
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum TransactionDetail {
-    User(UserTransaction, Vec<Signature>),
-    BlockMetadata(BlockMetadataTransaction),
 }
 
 // Prevent conflicts with other things named `Transaction`

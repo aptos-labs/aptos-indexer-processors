@@ -8,9 +8,7 @@ use crate::{
         move_modules::MoveModule,
         move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
-        signatures::Signature,
-        transactions::{TransactionDetail, TransactionModel},
-        user_transactions::UserTransactionModel,
+        transactions::TransactionModel,
         v2_objects::{CurrentObject, Object},
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
@@ -52,11 +50,7 @@ impl Debug for DefaultTransactionProcessor {
 fn insert_to_db_impl(
     conn: &mut PgConnection,
     txns: &[TransactionModel],
-    (user_transactions, signatures, block_metadata_transactions): (
-        &[UserTransactionModel],
-        &[Signature],
-        &[BlockMetadataTransactionModel],
-    ),
+    block_metadata_transactions: &[BlockMetadataTransactionModel],
     wscs: &[WriteSetChangeModel],
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
         &[MoveModule],
@@ -68,8 +62,6 @@ fn insert_to_db_impl(
     (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
     insert_transactions(conn, txns)?;
-    insert_user_transactions(conn, user_transactions)?;
-    insert_signatures(conn, signatures)?;
     insert_block_metadata_transactions(conn, block_metadata_transactions)?;
     insert_write_set_changes(conn, wscs)?;
     insert_move_modules(conn, move_modules)?;
@@ -88,11 +80,7 @@ fn insert_to_db(
     start_version: u64,
     end_version: u64,
     txns: Vec<TransactionModel>,
-    (user_transactions, signatures, block_metadata_transactions): (
-        Vec<UserTransactionModel>,
-        Vec<Signature>,
-        Vec<BlockMetadataTransactionModel>,
-    ),
+    block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
     wscs: Vec<WriteSetChangeModel>,
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
         Vec<MoveModule>,
@@ -116,11 +104,7 @@ fn insert_to_db(
             insert_to_db_impl(
                 pg_conn,
                 &txns,
-                (
-                    &user_transactions,
-                    &signatures,
-                    &block_metadata_transactions,
-                ),
+                &block_metadata_transactions,
                 &wscs,
                 (
                     &move_modules,
@@ -135,8 +119,6 @@ fn insert_to_db(
         Ok(_) => Ok(()),
         Err(_) => {
             let txns = clean_data_for_db(txns, true);
-            let user_transactions = clean_data_for_db(user_transactions, true);
-            let signatures = clean_data_for_db(signatures, true);
             let block_metadata_transactions = clean_data_for_db(block_metadata_transactions, true);
             let wscs = clean_data_for_db(wscs, true);
             let move_modules = clean_data_for_db(move_modules, true);
@@ -153,11 +135,7 @@ fn insert_to_db(
                     insert_to_db_impl(
                         pg_conn,
                         &txns,
-                        (
-                            &user_transactions,
-                            &signatures,
-                            &block_metadata_transactions,
-                        ),
+                        &block_metadata_transactions,
                         &wscs,
                         (
                             &move_modules,
@@ -185,53 +163,6 @@ fn insert_transactions(
             diesel::insert_into(schema::transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
-            None,
-        )?;
-    }
-    Ok(())
-}
-
-fn insert_user_transactions(
-    conn: &mut PgConnection,
-    items_to_insert: &[UserTransactionModel],
-) -> Result<(), diesel::result::Error> {
-    use schema::user_transactions::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), UserTransactionModel::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::user_transactions::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(version)
-                .do_update()
-                .set((
-                    entry_function_id_str.eq(excluded(entry_function_id_str)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            None,
-        )?;
-    }
-    Ok(())
-}
-
-fn insert_signatures(
-    conn: &mut PgConnection,
-    items_to_insert: &[Signature],
-) -> Result<(), diesel::result::Error> {
-    use schema::signatures::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), Signature::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::signatures::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((
-                    transaction_version,
-                    multi_agent_index,
-                    multi_sig_index,
-                    is_sender_primary,
-                ))
                 .do_nothing(),
             None,
         )?;
@@ -444,22 +375,12 @@ impl ProcessorTrait for DefaultTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        let (txns, txn_details, write_set_changes, wsc_details) =
+        let (txns, block_metadata_txns, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
-        let mut signatures = vec![];
-        let mut user_transactions = vec![];
         let mut block_metadata_transactions = vec![];
-        for detail in txn_details {
-            match detail {
-                TransactionDetail::User(user_txn, sigs) => {
-                    signatures.append(&mut sigs.clone());
-                    user_transactions.push(user_txn.clone());
-                },
-                TransactionDetail::BlockMetadata(bmt) => {
-                    block_metadata_transactions.push(bmt.clone())
-                },
-            }
+        for block_metadata_txn in block_metadata_txns {
+            block_metadata_transactions.push(block_metadata_txn.clone());
         }
         let mut move_modules = vec![];
         let mut move_resources = vec![];
@@ -556,7 +477,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
             start_version,
             end_version,
             txns,
-            (user_transactions, signatures, block_metadata_transactions),
+            block_metadata_transactions,
             write_set_changes,
             (
                 move_modules,

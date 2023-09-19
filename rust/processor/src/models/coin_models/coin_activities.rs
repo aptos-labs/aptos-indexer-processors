@@ -13,14 +13,13 @@ use super::{
 };
 use crate::{
     models::{
-        default_models::signatures::Signature,
         fungible_asset_models::{
             v2_fungible_asset_activities::{
                 CoinType, CurrentCoinBalancePK, EventToCoinType, BURN_GAS_EVENT_CREATION_NUM,
                 BURN_GAS_EVENT_INDEX, GAS_FEE_EVENT,
             },
             v2_fungible_asset_utils::FeeStatement,
-        },
+        }, user_transactions_models::signatures::Signature,
     },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
