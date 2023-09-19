@@ -76,7 +76,7 @@ impl ProcessorStatusChecker {
                 let latency = fullnode_latest_version - processor_latest_version.1;
                 HASURA_API_LATEST_VERSION_LATENCY
                     .with_label_values(&[processor_latest_version.0.as_str()])
-                    .set(latency as i64);
+                    .set(latency);
             }
             tokio::time::sleep(Duration::from_secs(
                 PROCESSOR_STATUS_CHECKER_WAIT_TIME_IN_SECS,
