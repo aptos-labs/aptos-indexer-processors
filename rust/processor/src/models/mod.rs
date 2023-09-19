@@ -4,6 +4,7 @@
 pub mod ans_models;
 pub mod coin_models;
 pub mod default_models;
+pub mod events_models;
 pub mod fungible_asset_models;
 pub mod ledger_info;
 pub mod processor_status;

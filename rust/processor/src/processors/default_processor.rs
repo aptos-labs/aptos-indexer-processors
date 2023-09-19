@@ -5,7 +5,6 @@ use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
-        events::EventModel,
         move_modules::MoveModule,
         move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
@@ -58,7 +57,6 @@ fn insert_to_db_impl(
         &[Signature],
         &[BlockMetadataTransactionModel],
     ),
-    events: &[EventModel],
     wscs: &[WriteSetChangeModel],
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
         &[MoveModule],
@@ -73,7 +71,6 @@ fn insert_to_db_impl(
     insert_user_transactions(conn, user_transactions)?;
     insert_signatures(conn, signatures)?;
     insert_block_metadata_transactions(conn, block_metadata_transactions)?;
-    insert_events(conn, events)?;
     insert_write_set_changes(conn, wscs)?;
     insert_move_modules(conn, move_modules)?;
     insert_move_resources(conn, move_resources)?;
@@ -96,7 +93,6 @@ fn insert_to_db(
         Vec<Signature>,
         Vec<BlockMetadataTransactionModel>,
     ),
-    events: Vec<EventModel>,
     wscs: Vec<WriteSetChangeModel>,
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
         Vec<MoveModule>,
@@ -125,7 +121,6 @@ fn insert_to_db(
                     &signatures,
                     &block_metadata_transactions,
                 ),
-                &events,
                 &wscs,
                 (
                     &move_modules,
@@ -143,7 +138,6 @@ fn insert_to_db(
             let user_transactions = clean_data_for_db(user_transactions, true);
             let signatures = clean_data_for_db(signatures, true);
             let block_metadata_transactions = clean_data_for_db(block_metadata_transactions, true);
-            let events = clean_data_for_db(events, true);
             let wscs = clean_data_for_db(wscs, true);
             let move_modules = clean_data_for_db(move_modules, true);
             let move_resources = clean_data_for_db(move_resources, true);
@@ -164,7 +158,6 @@ fn insert_to_db(
                             &signatures,
                             &block_metadata_transactions,
                         ),
-                        &events,
                         &wscs,
                         (
                             &move_modules,
@@ -261,25 +254,6 @@ fn insert_block_metadata_transactions(
             diesel::insert_into(schema::block_metadata_transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
-            None,
-        )?;
-    }
-    Ok(())
-}
-
-fn insert_events(
-    conn: &mut PgConnection,
-    items_to_insert: &[EventModel],
-) -> Result<(), diesel::result::Error> {
-    use schema::events::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), EventModel::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::events::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, event_index))
                 .do_nothing(),
             None,
         )?;
@@ -470,7 +444,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        let (txns, txn_details, events, write_set_changes, wsc_details) =
+        let (txns, txn_details, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
         let mut signatures = vec![];
@@ -583,7 +557,6 @@ impl ProcessorTrait for DefaultTransactionProcessor {
             end_version,
             txns,
             (user_transactions, signatures, block_metadata_transactions),
-            events,
             write_set_changes,
             (
                 move_modules,

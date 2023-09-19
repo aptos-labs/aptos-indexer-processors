@@ -7,7 +7,6 @@
 
 use super::{
     block_metadata_transactions::BlockMetadataTransaction,
-    events::EventModel,
     signatures::Signature,
     user_transactions::UserTransaction,
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
@@ -88,7 +87,6 @@ impl Transaction {
     ) -> (
         Self,
         Option<TransactionDetail>,
-        Vec<EventModel>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
@@ -146,7 +144,6 @@ impl Transaction {
                         epoch,
                     ),
                     Some(TransactionDetail::User(user_txn_output, signatures)),
-                    EventModel::from_events(&user_txn.events, version, block_height),
                     wsc,
                     wsc_detail,
                 )
@@ -170,7 +167,6 @@ impl Transaction {
                         epoch,
                     ),
                     None,
-                    EventModel::from_events(&genesis_txn.events, version, block_height),
                     wsc,
                     wsc_detail,
                 )
@@ -200,7 +196,6 @@ impl Transaction {
                             timestamp,
                         ),
                     )),
-                    EventModel::from_events(&block_metadata_txn.events, version, block_height),
                     wsc,
                     wsc_detail,
                 )
@@ -218,7 +213,6 @@ impl Transaction {
                 None,
                 vec![],
                 vec![],
-                vec![],
             ),
         }
     }
@@ -228,28 +222,24 @@ impl Transaction {
     ) -> (
         Vec<Self>,
         Vec<TransactionDetail>,
-        Vec<EventModel>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
         let mut txns = vec![];
         let mut txn_details = vec![];
-        let mut events = vec![];
         let mut wscs = vec![];
         let mut wsc_details = vec![];
 
         for txn in transactions {
-            let (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) =
-                Self::from_transaction(txn);
+            let (txn, txn_detail, mut wsc_list, mut wsc_detail_list) = Self::from_transaction(txn);
             txns.push(txn);
             if let Some(a) = txn_detail {
                 txn_details.push(a);
             }
-            events.append(&mut event_list);
             wscs.append(&mut wsc_list);
             wsc_details.append(&mut wsc_detail_list);
         }
-        (txns, txn_details, events, wscs, wsc_details)
+        (txns, txn_details, wscs, wsc_details)
     }
 }
 
