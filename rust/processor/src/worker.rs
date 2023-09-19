@@ -7,13 +7,14 @@ use crate::{
         ans_processor::AnsTransactionProcessor,
         coin_processor::CoinTransactionProcessor,
         default_processor::DefaultTransactionProcessor,
+        events_processor::EventsProcessor,
         fungible_asset_processor::FungibleAssetTransactionProcessor,
         nft_metadata_processor::NFTMetadataProcessor,
         processor_trait::{ProcessingResult, ProcessorTrait},
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
         token_v2_processor::TokenV2TransactionProcessor,
-        Processor, events_processor::EventsProcessor,
+        Processor,
     },
     schema::ledger_infos,
     utils::{
@@ -179,9 +180,7 @@ impl Worker {
             Processor::DefaultProcessor => {
                 Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
             },
-            Processor::EventsProcessor => {
-                Arc::new(EventsProcessor::new(self.db_pool.clone()))
-            },
+            Processor::EventsProcessor => Arc::new(EventsProcessor::new(self.db_pool.clone())),
             Processor::FungibleAssetProcessor => {
                 Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
             },

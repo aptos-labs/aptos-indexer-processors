@@ -122,8 +122,7 @@ impl ProcessorTrait for EventsProcessor {
                 _ => &default,
             };
 
-            let txn_events =
-                EventModel::from_events(raw_events, txn_version, block_height);
+            let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
             events.extend(txn_events);
         }
 

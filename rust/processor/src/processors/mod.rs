@@ -14,8 +14,7 @@ pub mod token_v2_processor;
 
 use self::{
     ans_processor::NAME as ANS_PROCESSOR_NAME, coin_processor::NAME as COIN_PROCESSOR_NAME,
-    default_processor::NAME as DEFAULT_PROCESSOR_NAME,
-    events_processor::NAME as EVENTS_PROCESSOR,
+    default_processor::NAME as DEFAULT_PROCESSOR_NAME, events_processor::NAME as EVENTS_PROCESSOR,
     fungible_asset_processor::NAME as FUNGIBLE_ASSET_PROCESSOR_NAME,
     nft_metadata_processor::NAME as NFT_METADATA_PROCESSOR_NAME,
     stake_processor::NAME as STAKE_PROCESSOR_NAME, token_processor::NAME as TOKEN_PROCESSOR_NAME,
