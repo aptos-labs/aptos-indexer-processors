@@ -98,7 +98,7 @@ fn insert_user_transactions(
                 .on_conflict(version)
                 .do_update()
                 .set((
-                    entry_function_id_str.eq(excluded(entry_function_id_str)),
+                    expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
