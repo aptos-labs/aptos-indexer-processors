@@ -10,9 +10,11 @@ use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
+use econia_db::models::CancelOrderEvent;
 use econia_db::models::PlaceLimitOrderEvent;
 use econia_db::models::FillEvent;
 use econia_db::models::MarketRegistrationEvent;
+use econia_db::schema::cancel_order_events;
 use econia_db::schema::market_registration_events;
 use econia_db::schema::fill_events;
 use econia_db::schema::place_limit_order_events;
@@ -116,6 +118,21 @@ fn insert_place_limit_order_events(
     Ok(())
 }
 
+fn insert_cancel_order_events(
+    conn: &mut PgConnection,
+    events: Vec<CancelOrderEvent>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        // See comment above re: conflicts
+        diesel::insert_into(cancel_order_events::table)
+            .values(&events)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
+
 #[async_trait]
 impl ProcessorTrait for EconiaTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -153,6 +170,48 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             }
         }
 
+        let cancel_order_type =
+            format!("{}::user::CancelOrderEvent", self.econia_address);
+        let mut cancel_order_events = vec![];
+        for transaction in &transactions {
+            let (txn, _, events, _, _) = TransactionModel::from_transaction(&transaction);
+            for (index, event) in events.iter().enumerate() {
+                if event.type_ != cancel_order_type {
+                    continue;
+                }
+                println!("{:?}", &event);
+                let txn_version = BigDecimal::from(txn.version);
+                let event_idx = BigDecimal::from(index as u64);
+                let time = *block_height_to_timestamp
+                    .get(&event.transaction_block_height)
+                    // cannot panic because the loop beforehand populates the block height times
+                    .unwrap();
+                let market_id = opt_value_to_big_decimal(event.data.get("market_id")).unwrap();
+                let maker_address = String::from(event.data["user"].as_str().unwrap());
+                let maker_custodian_id = opt_value_to_big_decimal(event.data.get("custodian_id")).unwrap();
+                let maker_order_id = opt_value_to_big_decimal(event.data.get("order_id")).unwrap();
+                let reason = opt_value_to_big_decimal(event.data.get("reason")).unwrap();
+                
+                let place_limit_order_event = CancelOrderEvent {
+                    txn_version,
+                    event_idx,
+                    time,
+                    maker_address,
+                    maker_custodian_id,
+                    maker_order_id,
+                    market_id,
+                    reason,
+                };
+                cancel_order_events.push(place_limit_order_event);
+            }
+        }
+        conn.build_transaction()
+            .read_write()
+            .run::<_, Error, _>(|pg_conn| {
+                insert_cancel_order_events(pg_conn, cancel_order_events)
+            })?;
+
+
         let place_limit_order_type =
             format!("{}::user::PlaceLimitOrderEvent", self.econia_address);
         let mut place_limit_order_events = vec![];
@@ -162,7 +221,6 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 if event.type_ != place_limit_order_type {
                     continue;
                 }
-                println!("{:?}", &event);
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
                 let time = *block_height_to_timestamp
