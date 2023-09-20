@@ -13,7 +13,7 @@ use crate::{
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
         token_v2_processor::TokenV2TransactionProcessor,
-        Processor,
+        Processor, econia_processor::EconiaTransactionProcessor,
     },
     schema::ledger_infos,
     utils::{
@@ -40,7 +40,7 @@ use tokio::sync::mpsc::error::TryRecvError;
 use tonic::Streaming;
 use tracing::{error, info};
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./../../../../dbv2/migrations");
 /// GRPC request metadata key for the token ID.
 const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
@@ -74,6 +74,7 @@ pub struct Worker {
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
+    pub econia_address: Option<String>,
 }
 
 impl Worker {
@@ -92,6 +93,7 @@ impl Worker {
         nft_points_contract: Option<String>,
         pubsub_topic_name: Option<String>,
         google_application_credentials: Option<String>,
+        econia_address: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -122,6 +124,7 @@ impl Worker {
             nft_points_contract,
             pubsub_topic_name,
             google_application_credentials,
+            econia_address,
         }
     }
 
@@ -213,6 +216,16 @@ impl Worker {
                 self.ans_v1_primary_names_table_handle.clone(),
                 self.ans_v1_name_records_table_handle.clone(),
             )),
+            Processor::EconiaProcessor => {
+                Arc::new(
+                    EconiaTransactionProcessor::new(
+                        self.db_pool.clone(),
+                        self.econia_address
+                            .clone()
+                            .expect("Econia processor requires an exchange address")
+                    )
+                )
+            },
         };
         let processor_name = processor.name();
 
