@@ -5,10 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    models::{
-        default_models::move_resources::MoveResource,
-        token_models::token_utils::DepositTokenEventType,
-    },
+    models::default_models::move_resources::MoveResource,
     utils::util::{
         bigdecimal_to_u64, deserialize_from_string, parse_timestamp_secs, standardize_address,
         truncate_str,
@@ -248,7 +245,7 @@ impl AnsWriteResource {
 pub struct RenewNameEvent {
     domain_name: String,
     #[serde(deserialize_with = "deserialize_from_string")]
-    expiration_time_sec: BigDecimal,
+    expiration_time_secs: BigDecimal,
     is_primary_name: bool,
     subdomain_name: OptionalString,
     target_address: OptionalString,
@@ -370,43 +367,6 @@ impl SetReverseLookupEvent {
         } else {
             Ok(None)
         }
-    }
-}
-
-pub struct MigrationBurnEvent {
-    pub burned_v1_token_name: String,
-}
-
-impl MigrationBurnEvent {
-    pub fn from_event(
-        event: &Event,
-        ans_v1_collection_creator_addres: &str,
-        ans_v2_migration_burn_address: &str,
-    ) -> anyhow::Result<Option<Self>> {
-        let event_type = event.type_str.as_str();
-        let account_address =
-            standardize_address(event.key.as_ref().unwrap().account_address.as_str());
-
-        // Check that token is deposited to ANS migration burn address
-        if !(event_type == "0x3::token::DepositEvent"
-            && account_address == standardize_address(ans_v2_migration_burn_address))
-        {
-            return Ok(None);
-        }
-        let deposit_event: DepositTokenEventType =
-            serde_json::from_str(event.data.as_str()).unwrap();
-        let token_data_id_type = deposit_event.id.token_data_id;
-
-        // Check that token belongs to ANS V1 collection
-        if !(token_data_id_type.get_creator_address()
-            == standardize_address(ans_v1_collection_creator_addres)
-            && token_data_id_type.get_collection_trunc() == "Aptos Names V1")
-        {
-            return Ok(None);
-        }
-        Ok(Some(Self {
-            burned_v1_token_name: token_data_id_type.get_name_trunc(),
-        }))
     }
 }
 

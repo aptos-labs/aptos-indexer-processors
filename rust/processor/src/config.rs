@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::worker::Worker;
+use crate::{utils::custom_configs::CustomProcessorConfigs, worker::Worker};
 use anyhow::{Ok, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
@@ -22,9 +22,8 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
+    pub custom_processor_configs: Option<CustomProcessorConfigs>,
     // TODO: Move these vars into individual config structs for different processors.
-    pub ans_v1_primary_names_table_handle: Option<String>,
-    pub ans_v1_name_records_table_handle: Option<String>,
     pub nft_points_contract: Option<String>,
     pub pubsub_topic_name: Option<String>,
     pub google_application_credentials: Option<String>,
@@ -47,8 +46,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            self.ans_v1_primary_names_table_handle.clone(),
-            self.ans_v1_name_records_table_handle.clone(),
+            self.custom_processor_configs.clone(),
             self.nft_points_contract.clone(),
             self.pubsub_topic_name.clone(),
             self.google_application_credentials.clone(),
