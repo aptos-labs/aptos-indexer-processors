@@ -24,7 +24,7 @@ pub struct WriteSetChange {
     pub transaction_version: i64,
     pub index: i64,
     pub hash: String,
-    transaction_block_height: i64,
+    pub transaction_block_height: i64,
     pub type_: String,
     pub address: String,
 }

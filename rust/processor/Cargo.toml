@@ -13,6 +13,9 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = { workspace = true }
 
 [dependencies]
+my_macros = {version = "0.1.0", path="./macros"}
+syn = "1"
+quote = "1"
 anyhow = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
@@ -39,6 +42,7 @@ prometheus = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 regex = { workspace = true }
+rust_decimal = { version = "1.32.0", features= ["db-tokio-postgres"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 server-framework = { workspace = true }
@@ -46,6 +50,7 @@ sha2 = { workspace = true }
 sha3 = { workspace = true }
 strum = { workspace = true }
 tokio = { workspace = true }
+tokio-postgres = {version = "0.7.10", features = ["with-chrono-0_4", "with-serde_json-1"]}
 tonic = { workspace = true }
 tracing = { workspace = true }
 unescape = { workspace = true }

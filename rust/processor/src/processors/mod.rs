@@ -11,6 +11,7 @@ pub mod account_transactions_processor;
 pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
+pub mod default_processor2;
 pub mod events_processor;
 pub mod fungible_asset_processor;
 pub mod nft_metadata_processor;
@@ -24,6 +25,7 @@ use self::{
     ans_processor::{AnsProcessor, AnsProcessorConfig},
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
+    default_processor2::DefaultProcessor2,
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
@@ -164,6 +166,7 @@ pub enum ProcessorConfig {
     AnsProcessor(AnsProcessorConfig),
     CoinProcessor,
     DefaultProcessor,
+    DefaultProcessor2,
     EventsProcessor,
     FungibleAssetProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
@@ -203,6 +206,7 @@ pub enum Processor {
     AnsProcessor,
     CoinProcessor,
     DefaultProcessor,
+    DefaultProcessor2,
     EventsProcessor,
     FungibleAssetProcessor,
     NftMetadataProcessor,

@@ -7,6 +7,7 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
+        default_processor2::DefaultProcessor2,
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
@@ -178,7 +179,7 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // Build the processor based on the config.
-        let processor = build_processor(&self.processor_config, self.db_pool.clone());
+        let processor = build_processor(&self.processor_config, self.db_pool.clone(), self.postgres_connection_string.clone());
         let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
@@ -358,7 +359,8 @@ impl Worker {
 
             // Process the transactions in parallel
             let mut tasks = vec![];
-            for transactions_pb in transactions_batches {
+            for transactions in transactions_batches {
+                let transactions = transactions.to_vec();
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
@@ -398,9 +400,11 @@ impl Worker {
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS
                             .with_label_values(&[auth_token.as_str(), processor_name])
+                            .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
                     PROCESSOR_INVOCATIONS_COUNT
+                        .with_label_values(&[processor_name])
                         .with_label_values(&[processor_name])
                         .inc();
 
@@ -427,6 +431,7 @@ impl Worker {
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
+                            .with_label_values(&[auth_token.as_str(), processor_name])
                             .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
@@ -554,6 +559,7 @@ impl Worker {
                     Ok(versions) => {
                         PROCESSOR_SUCCESSES_COUNT
                             .with_label_values(&[processor_name])
+                            .with_label_values(&[processor_name])
                             .inc();
                         versions
                     },
@@ -565,6 +571,7 @@ impl Worker {
                             "[Parser] Error processing transactions"
                         );
                         PROCESSOR_ERRORS_COUNT
+                            .with_label_values(&[processor_name])
                             .with_label_values(&[processor_name])
                             .inc();
                         panic!();
@@ -615,6 +622,9 @@ impl Worker {
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
 
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[processor_name])
+                .set(batch_end as i64);
             processor
                 .update_last_processed_version(batch_end)
                 .await
@@ -750,7 +760,7 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
+pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool, postgres_connection_string: String) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
@@ -760,6 +770,7 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
+        ProcessorConfig::DefaultProcessor2 => Processor::from(DefaultProcessor2::new(db_pool, postgres_connection_string)),
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
