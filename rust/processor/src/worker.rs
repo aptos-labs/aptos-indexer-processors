@@ -14,6 +14,7 @@ use crate::{
         stake_processor::StakeTransactionProcessor,
         token_processor::TokenTransactionProcessor,
         token_v2_processor::TokenV2TransactionProcessor,
+        user_transaction_processor::UserTransactionProcessor,
         Processor,
     },
     schema::ledger_infos,
@@ -215,6 +216,9 @@ impl Worker {
                 self.ans_v1_primary_names_table_handle.clone(),
                 self.ans_v1_name_records_table_handle.clone(),
             )),
+            Processor::UserTransactionProcessor => {
+                Arc::new(UserTransactionProcessor::new(self.db_pool.clone()))
+            },
         };
         let processor_name = processor.name();
 

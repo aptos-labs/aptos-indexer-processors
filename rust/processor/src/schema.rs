@@ -1090,6 +1090,8 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(block_metadata_transactions -> transactions (version));
+
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
     ans_lookup,
