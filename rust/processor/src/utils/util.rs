@@ -232,7 +232,15 @@ fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayl
 }
 
 pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
+    let final_ts = if ts.seconds >= MAX_TIMESTAMP_SECS {
+        Timestamp {
+            seconds: MAX_TIMESTAMP_SECS,
+            nanos: 0,
+        }
+    } else {
+        ts.clone()
+    };
+    chrono::NaiveDateTime::from_timestamp_opt(final_ts.seconds, final_ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 

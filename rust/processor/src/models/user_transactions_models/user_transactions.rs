@@ -7,7 +7,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{signatures::Signature, transactions::Transaction};
+use super::signatures::Signature;
 use crate::{
     schema::user_transactions,
     utils::util::{
@@ -23,10 +23,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Associations, Clone, Deserialize, Debug, FieldCount, Identifiable, Insertable, Serialize,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[derive(Clone, Deserialize, Debug, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = user_transactions)]
 pub struct UserTransaction {
