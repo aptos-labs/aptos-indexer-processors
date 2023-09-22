@@ -711,6 +711,7 @@ pub async fn create_fetcher_loop(
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
             info!("[Parser] The stream is ended.");
+            break;
         } else {
             // The rest is to see if we need to reconnect
             if is_success {
