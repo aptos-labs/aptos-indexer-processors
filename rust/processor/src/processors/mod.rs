@@ -10,6 +10,7 @@ pub mod processor_trait;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
+pub mod econia_processor;
 
 use self::{
     ans_processor::NAME as ANS_PROCESSOR_NAME, coin_processor::NAME as COIN_PROCESSOR_NAME,
@@ -18,6 +19,7 @@ use self::{
     nft_metadata_processor::NAME as NFT_METADATA_PROCESSOR_NAME,
     stake_processor::NAME as STAKE_PROCESSOR_NAME, token_processor::NAME as TOKEN_PROCESSOR_NAME,
     token_v2_processor::NAME as TOKEN_V2_PROCESSOR_NAME,
+    econia_processor::NAME as ECONIA_PROCESSOR_NAME,
 };
 
 pub enum Processor {
@@ -29,6 +31,7 @@ pub enum Processor {
     TokenV2Processor,
     NFTMetadataProcessor,
     AnsProcessor,
+    EconiaProcessor,
 }
 
 impl Processor {
@@ -42,6 +45,7 @@ impl Processor {
             TOKEN_V2_PROCESSOR_NAME => Self::TokenV2Processor,
             NFT_METADATA_PROCESSOR_NAME => Self::NFTMetadataProcessor,
             ANS_PROCESSOR_NAME => Self::AnsProcessor,
+            ECONIA_PROCESSOR_NAME => Self::EconiaProcessor,
             _ => panic!("Processor unsupported {}", input_str),
         }
     }

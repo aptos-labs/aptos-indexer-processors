@@ -463,6 +463,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbv2"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "chrono",
+ "diesel",
+]
+
+[[package]]
 name = "diesel"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1637,6 +1646,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "clap",
+ "dbv2",
  "diesel",
  "diesel_migrations",
  "field_count",
