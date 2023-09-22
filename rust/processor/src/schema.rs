@@ -1169,9 +1169,7 @@ diesel::table! {
 diesel::joinable!(block_metadata_transactions -> transactions (version));
 diesel::joinable!(move_modules -> transactions (transaction_version));
 diesel::joinable!(move_resources -> transactions (transaction_version));
-diesel::joinable!(signatures -> transactions (transaction_version));
 diesel::joinable!(table_items -> transactions (transaction_version));
-diesel::joinable!(user_transactions -> transactions (version));
 diesel::joinable!(write_set_changes -> transactions (transaction_version));
 
 diesel::allow_tables_to_appear_in_same_query!(

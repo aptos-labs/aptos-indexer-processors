@@ -7,18 +7,20 @@
 
 use super::{
     ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
-    ans_utils::{NameRecordV2, SetReverseLookupEvent},
+    ans_utils::{get_token_name, NameRecordV2, SetReverseLookupEvent, SubdomainExtV2},
 };
 use crate::{
     models::token_v2_models::v2_token_utils::TokenStandard,
     schema::{
         ans_lookup_v2, ans_primary_name_v2, current_ans_lookup_v2, current_ans_primary_name_v2,
     },
+    utils::util::standardize_address,
 };
 use aptos_indexer_protos::transaction::v1::{Event, WriteResource};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 type Domain = String;
 type Subdomain = String;
@@ -168,19 +170,34 @@ impl CurrentAnsLookupV2 {
         ans_v2_contract_address: &str,
         txn_version: i64,
         write_set_change_index: i64,
+        address_to_subdomain_ext: &HashMap<String, SubdomainExtV2>,
     ) -> anyhow::Result<Option<(Self, AnsLookupV2)>> {
         if let Some(inner) =
             NameRecordV2::from_write_resource(write_resource, ans_v2_contract_address, txn_version)
                 .unwrap()
         {
+            // If this resource account has a SubdomainExt, then it's a subdomain
+            let maybe_subdomain_name = address_to_subdomain_ext
+                .get(&standardize_address(write_resource.address.as_str()))
+                .map(|subdomain_ext| subdomain_ext.get_subdomain_trunc());
+            let subdomain_name = match maybe_subdomain_name.clone() {
+                Some(subdomain) => subdomain,
+                None => "".to_string(),
+            };
+
+            let token_name = get_token_name(
+                inner.get_domain_trunc().as_str(),
+                subdomain_name.clone().as_str(),
+            );
+
             return Ok(Some((
                 Self {
                     domain: inner.get_domain_trunc(),
-                    subdomain: inner.get_subdomain_trunc(),
+                    subdomain: subdomain_name.clone().to_string(),
                     token_standard: TokenStandard::V2.to_string(),
                     registered_address: inner.get_target_address(),
                     expiration_timestamp: inner.get_expiration_time(),
-                    token_name: inner.get_token_name(),
+                    token_name: token_name.clone(),
                     last_transaction_version: txn_version,
                     is_deleted: false,
                 },
@@ -188,11 +205,11 @@ impl CurrentAnsLookupV2 {
                     transaction_version: txn_version,
                     write_set_change_index,
                     domain: inner.get_domain_trunc().clone(),
-                    subdomain: inner.get_subdomain_trunc().clone(),
+                    subdomain: subdomain_name.clone().to_string(),
                     token_standard: TokenStandard::V2.to_string(),
                     registered_address: inner.get_target_address().clone(),
                     expiration_timestamp: inner.get_expiration_time(),
-                    token_name: inner.get_token_name(),
+                    token_name,
                     is_deleted: false,
                 },
             )));
@@ -269,7 +286,7 @@ impl CurrentAnsPrimaryNameV2 {
                     },
                     AnsPrimaryNameV2 {
                         transaction_version: txn_version,
-                        write_set_change_index: -event_index,
+                        write_set_change_index: -(event_index + 1),
                         registered_address: set_reverse_lookup_event.get_account_addr().clone(),
                         token_standard: TokenStandard::V2.to_string(),
                         domain: None,
@@ -292,7 +309,7 @@ impl CurrentAnsPrimaryNameV2 {
                     },
                     AnsPrimaryNameV2 {
                         transaction_version: txn_version,
-                        write_set_change_index: -event_index,
+                        write_set_change_index: -(event_index + 1),
                         registered_address: set_reverse_lookup_event.get_account_addr().clone(),
                         token_standard: TokenStandard::V2.to_string(),
                         domain: Some(set_reverse_lookup_event.get_curr_domain_trunc()),

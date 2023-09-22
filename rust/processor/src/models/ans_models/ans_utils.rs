@@ -44,6 +44,16 @@ impl OptionalBigDecimal {
     }
 }
 
+pub fn get_token_name(domain_name: &str, subdomain_name: &str) -> String {
+    let domain = truncate_str(domain_name, DOMAIN_LENGTH);
+    let subdomain = truncate_str(subdomain_name, DOMAIN_LENGTH);
+    let mut token_name = format!("{}.apt", &domain);
+    if !subdomain.is_empty() {
+        token_name = format!("{}.{}", &subdomain, token_name);
+    }
+    token_name
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct BigDecimalWrapper(#[serde(deserialize_with = "deserialize_from_string")] pub BigDecimal);
 
@@ -71,11 +81,7 @@ impl NameRecordKeyV1 {
     pub fn get_token_name(&self) -> String {
         let domain = self.get_domain_trunc();
         let subdomain = self.get_subdomain_trunc();
-        let mut token_name = format!("{}.apt", &domain);
-        if !subdomain.is_empty() {
-            token_name = format!("{}.{}", &subdomain, token_name);
-        }
-        token_name
+        get_token_name(&domain, &subdomain)
     }
 }
 
@@ -136,55 +142,14 @@ impl AnsTableItem {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NameRecordV2 {
     domain_name: String,
-    subdomain_ext: OptionalSubdomainExt,
     #[serde(deserialize_with = "deserialize_from_string")]
     expiration_time_sec: BigDecimal,
     target_address: OptionalString,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OptionalSubdomainExt {
-    vec: Vec<SubdomainExt>,
-}
-
-impl OptionalSubdomainExt {
-    fn get_subdomain_ext(&self) -> Option<SubdomainExt> {
-        if self.vec.is_empty() {
-            None
-        } else {
-            Some(self.vec[0].clone())
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SubdomainExt {
-    subdomain_expiration_policy: BigDecimal,
-    subdomain_name: String,
-}
-
 impl NameRecordV2 {
     pub fn get_domain_trunc(&self) -> String {
         truncate_str(self.domain_name.as_str(), DOMAIN_LENGTH)
-    }
-
-    pub fn get_subdomain_trunc(&self) -> String {
-        let maybe_subdomain_ext = self.subdomain_ext.get_subdomain_ext();
-        if let Some(subdomain_ext) = maybe_subdomain_ext {
-            return truncate_str(subdomain_ext.subdomain_name.as_str(), DOMAIN_LENGTH);
-        } else {
-            "".to_string()
-        }
-    }
-
-    pub fn get_token_name(&self) -> String {
-        let domain = self.get_domain_trunc();
-        let subdomain = self.get_subdomain_trunc();
-        let mut token_name = format!("{}.apt", &domain);
-        if !subdomain.is_empty() {
-            token_name = format!("{}.{}", &subdomain, token_name);
-        }
-        token_name
     }
 
     pub fn get_expiration_time(&self) -> chrono::NaiveDateTime {
@@ -214,8 +179,39 @@ impl NameRecordV2 {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SubdomainExtV2 {
+    subdomain_expiration_policy: BigDecimal,
+    subdomain_name: String,
+}
+
+impl SubdomainExtV2 {
+    pub fn get_subdomain_trunc(&self) -> String {
+        truncate_str(self.subdomain_name.as_str(), DOMAIN_LENGTH)
+    }
+
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        ans_v2_contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        if let Some(AnsWriteResource::SubdomainExtV2(inner)) =
+            AnsWriteResource::from_write_resource(
+                write_resource,
+                ans_v2_contract_address,
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 pub enum AnsWriteResource {
     NameRecordV2(NameRecordV2),
+    SubdomainExtV2(SubdomainExtV2),
 }
 
 impl AnsWriteResource {
@@ -228,8 +224,11 @@ impl AnsWriteResource {
         let data = write_resource.data.as_str();
 
         match type_str.clone() {
-            x if x == format!("{}::v2_domains::NameRecord", ans_v2_contract_address) => {
+            x if x == format!("{}::v2_1_domains::NameRecord", ans_v2_contract_address) => {
                 serde_json::from_str(data).map(|inner| Some(Self::NameRecordV2(inner)))
+            },
+            x if x == format!("{}::v2_1_domains::SubdomainExt", ans_v2_contract_address) => {
+                serde_json::from_str(data).map(|inner| Some(Self::SubdomainExtV2(inner)))
             },
             _ => Ok(None),
         }
@@ -306,11 +305,7 @@ impl SetReverseLookupEvent {
     pub fn get_curr_token_name(&self) -> String {
         let domain = self.get_curr_domain_trunc();
         let subdomain = self.get_curr_subdomain_trunc();
-        let mut token_name = format!("{}.apt", &domain);
-        if !subdomain.is_empty() {
-            token_name = format!("{}.{}", &subdomain, token_name);
-        }
-        token_name
+        get_token_name(&domain, &subdomain)
     }
 
     pub fn get_curr_expiration_time(&self) -> Option<chrono::NaiveDateTime> {
@@ -342,11 +337,7 @@ impl SetReverseLookupEvent {
     pub fn get_prev_token_name(&self) -> String {
         let domain = self.get_prev_domain_trunc();
         let subdomain = self.get_prev_subdomain_trunc();
-        let mut token_name = format!("{}.apt", &domain);
-        if !subdomain.is_empty() {
-            token_name = format!("{}.{}", &subdomain, token_name);
-        }
-        token_name
+        get_token_name(&domain, &subdomain)
     }
 
     pub fn get_prev_expiration_time(&self) -> Option<chrono::NaiveDateTime> {
@@ -380,10 +371,10 @@ impl V2AnsEvent {
     pub fn is_event_supported(event_type: &str, ans_v2_contract_address: &str) -> bool {
         [
             format!(
-                "{}::v2_domains::SetReverseLookupEvent",
+                "{}::v2_1_domains::SetReverseLookupEvent",
                 ans_v2_contract_address
             ),
-            format!("{}::v2_domains::RenewNameEvent", ans_v2_contract_address),
+            format!("{}::v2_1_domains::RenewNameEvent", ans_v2_contract_address),
         ]
         .contains(&event_type.to_string())
     }
@@ -403,13 +394,13 @@ impl V2AnsEvent {
         match type_str.clone() {
             x if x
                 == format!(
-                    "{}::v2_domains::SetReverseLookupEvent",
+                    "{}::v2_1_domains::SetReverseLookupEvent",
                     ans_v2_contract_address
                 ) =>
             {
                 serde_json::from_str(data).map(|inner| Some(Self::SetReverseLookupEvent(inner)))
             },
-            x if x == format!("{}::v2_domains::RenewNameEvent", ans_v2_contract_address) => {
+            x if x == format!("{}::v2_1_domains::RenewNameEvent", ans_v2_contract_address) => {
                 serde_json::from_str(data).map(|inner| Some(Self::RenewNameEvent(inner)))
             },
             _ => Ok(None),

@@ -8,7 +8,7 @@ use crate::{
         ans_lookup_v2::{
             AnsLookupV2, AnsPrimaryNameV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2,
         },
-        ans_utils::RenewNameEvent,
+        ans_utils::{RenewNameEvent, SubdomainExtV2},
     },
     schema,
     utils::{
@@ -16,6 +16,7 @@ use crate::{
         database::{
             clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
         },
+        util::standardize_address,
     },
 };
 use anyhow::bail;
@@ -482,6 +483,7 @@ fn parse_ans(
         if let TxnData::User(user_txn) = txn_data {
             // TODO: Use the v2_renew_name_events to preserve metadata once we switch to a single ANS table to store everything
             let mut v2_renew_name_events = vec![];
+            let mut v2_address_to_subdomain_ext = HashMap::new();
 
             // Parse V2 ANS Events. We only care about the following events:
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
@@ -505,6 +507,28 @@ fn parse_ans(
                     all_current_ans_primary_names_v2
                         .insert(current_ans_lookup_v2.pk(), current_ans_lookup_v2);
                     all_ans_primary_names_v2.push(ans_lookup_v2);
+                }
+            }
+
+            // Parse V2 ANS subdomain exts
+            for (_, wsc) in transaction_info.changes.iter().enumerate() {
+                match wsc.change.as_ref().unwrap() {
+                    WriteSetChange::WriteResource(write_resource) => {
+                        if let Some(subdomain_ext) = SubdomainExtV2::from_write_resource(
+                            write_resource,
+                            &ans_v2_contract_address,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
+                            // Track resource account -> SubdomainExt to create the full subdomain ANS later
+                            v2_address_to_subdomain_ext.insert(
+                                standardize_address(write_resource.address.as_str()),
+                                subdomain_ext,
+                            );
+                        }
+                    },
+                    _ => continue,
                 }
             }
 
@@ -626,6 +650,7 @@ fn parse_ans(
                                 &ans_v2_contract_address,
                                 txn_version,
                                 wsc_index as i64,
+                                &v2_address_to_subdomain_ext,
                             )
                             .unwrap_or_else(|e| {
                                 error!(
