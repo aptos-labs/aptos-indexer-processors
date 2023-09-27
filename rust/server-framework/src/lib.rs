@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{bail, Context, Ok, Result};
 use backtrace::Backtrace;
 use clap::Parser;
 use prometheus::{Encoder, TextEncoder};
@@ -49,12 +49,12 @@ where
     let main_task_handler = runtime.spawn(async move { config.run().await });
     tokio::select! {
         _ = task_handler => {
-            error!("Probes and metrics handler exited");
-            process::exit(1);
+            error!("Probes and metrics handler unexpectedly exited");
+            bail!("Probes and metrics handler unexpectedly exited");
         },
         _ = main_task_handler => {
-            error!("Main task exited");
-            process::exit(1);
+            error!("Main task unexpectedly exited");
+            bail!("Main task unexpectedly exited");
         },
     }
 }

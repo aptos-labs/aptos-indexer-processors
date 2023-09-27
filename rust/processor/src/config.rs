@@ -1,62 +1,86 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{utils::custom_configs::CustomProcessorConfigs, worker::Worker};
-use anyhow::{Ok, Result};
+use crate::{processors::ProcessorConfig, worker::Worker};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
+use std::time::Duration;
+use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcProcessorConfig {
-    pub processor_name: String,
+    pub processor_config: ProcessorConfig,
     pub postgres_connection_string: String,
-    // TODO: add tls support.
-    pub indexer_grpc_data_service_address: String,
-    // Indexer GRPC http2 ping interval in seconds; default to 30.
-    // tonic ref: https://docs.rs/tonic/latest/tonic/transport/channel/struct.Endpoint.html#method.http2_keep_alive_interval
-    pub indexer_grpc_http2_ping_interval_in_secs: Option<u64>,
-    // Indexer GRPC http2 ping timeout in seconds; default to 10.
-    pub indexer_grpc_http2_ping_timeout_in_secs: Option<u64>,
+    // TODO: Add TLS support.
+    pub indexer_grpc_data_service_address: Url,
+    #[serde(flatten)]
+    pub grpc_http2_config: IndexerGrpcHttp2Config,
     pub auth_token: String,
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
-    pub custom_processor_configs: Option<CustomProcessorConfigs>,
-    // TODO: Move these vars into individual config structs for different processors.
-    pub nft_points_contract: Option<String>,
-    pub pubsub_topic_name: Option<String>,
-    pub google_application_credentials: Option<String>,
 }
 
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
     async fn run(&self) -> Result<()> {
         let mut worker = Worker::new(
-            self.processor_name.clone(),
+            self.processor_config.clone(),
             self.postgres_connection_string.clone(),
             self.indexer_grpc_data_service_address.clone(),
-            std::time::Duration::from_secs(
-                self.indexer_grpc_http2_ping_interval_in_secs.unwrap_or(30),
-            ),
-            std::time::Duration::from_secs(
-                self.indexer_grpc_http2_ping_timeout_in_secs.unwrap_or(10),
-            ),
+            self.grpc_http2_config.clone(),
             self.auth_token.clone(),
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            self.custom_processor_configs.clone(),
-            self.nft_points_contract.clone(),
-            self.pubsub_topic_name.clone(),
-            self.google_application_credentials.clone(),
         )
-        .await;
+        .await
+        .context("Failed to build worker")?;
         worker.run().await;
         Ok(())
     }
 
     fn get_server_name(&self) -> String {
-        "idxproc".to_string()
+        // Get the part before the first _ and trim to 12 characters.
+        let before_underscore = self
+            .processor_config
+            .name()
+            .split('_')
+            .next()
+            .unwrap_or("unknown");
+        before_underscore[..before_underscore.len().min(12)].to_string()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+#[serde(default)]
+pub struct IndexerGrpcHttp2Config {
+    /// Indexer GRPC http2 ping interval in seconds. Defaults to 30.
+    /// Tonic ref: https://docs.rs/tonic/latest/tonic/transport/channel/struct.Endpoint.html#method.http2_keep_alive_interval
+    indexer_grpc_http2_ping_interval_in_secs: u64,
+
+    /// Indexer GRPC http2 ping timeout in seconds. Defaults to 10.
+    indexer_grpc_http2_ping_timeout_in_secs: u64,
+}
+
+impl IndexerGrpcHttp2Config {
+    pub fn grpc_http2_ping_interval_in_secs(&self) -> Duration {
+        Duration::from_secs(self.indexer_grpc_http2_ping_interval_in_secs)
+    }
+
+    pub fn grpc_http2_ping_timeout_in_secs(&self) -> Duration {
+        Duration::from_secs(self.indexer_grpc_http2_ping_timeout_in_secs)
+    }
+}
+
+impl Default for IndexerGrpcHttp2Config {
+    fn default() -> Self {
+        Self {
+            indexer_grpc_http2_ping_interval_in_secs: 30,
+            indexer_grpc_http2_ping_timeout_in_secs: 10,
+        }
     }
 }

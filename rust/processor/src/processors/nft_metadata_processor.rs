@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
@@ -23,6 +23,7 @@ use async_trait::async_trait;
 use futures_util::future::try_join_all;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::client::{Client, ClientConfig};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -30,22 +31,35 @@ use std::{
 };
 use tracing::info;
 
-pub const NAME: &str = "nft_metadata_processor";
 pub const CHUNK_SIZE: usize = 1000;
 
-pub struct NFTMetadataProcessor {
-    connection_pool: PgDbPool,
-    pubsub_topic_name: String,
-    chain_id: u8,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NftMetadataProcessorConfig {
+    pub pubsub_topic_name: String,
+    pub google_application_credentials: Option<String>,
 }
 
-impl NFTMetadataProcessor {
-    pub fn new(connection_pool: PgDbPool, pubsub_topic_name: String) -> Self {
-        tracing::info!("init NFTMetadataProcessor");
+pub struct NftMetadataProcessor {
+    connection_pool: PgDbPool,
+    chain_id: u8,
+    config: NftMetadataProcessorConfig,
+}
+
+impl NftMetadataProcessor {
+    pub fn new(connection_pool: PgDbPool, config: NftMetadataProcessorConfig) -> Self {
+        tracing::info!("init NftMetadataProcessor");
+
+        // Crate reads from authentication from file specified in
+        // GOOGLE_APPLICATION_CREDENTIALS env var.
+        if let Some(credentials) = config.google_application_credentials.clone() {
+            std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+        }
+
         Self {
             connection_pool,
-            pubsub_topic_name,
             chain_id: 0,
+            config,
         }
     }
 
@@ -54,21 +68,21 @@ impl NFTMetadataProcessor {
     }
 }
 
-impl Debug for NFTMetadataProcessor {
+impl Debug for NftMetadataProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
             f,
-            "NFTMetadataProcessor {{ connections: {:?}  idle_connections: {:?} }}",
+            "NftMetadataProcessor {{ connections: {:?}  idle_connections: {:?} }}",
             state.connections, state.idle_connections
         )
     }
 }
 
 #[async_trait]
-impl ProcessorTrait for NFTMetadataProcessor {
+impl ProcessorTrait for NftMetadataProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::NftMetadataProcessor.into()
     }
 
     async fn process_transactions(
@@ -88,7 +102,7 @@ impl ProcessorTrait for NFTMetadataProcessor {
         // Initialize pubsub client
         let config = ClientConfig::default().with_auth().await?;
         let client = Client::new(config).await?;
-        let topic = client.topic(&self.pubsub_topic_name.clone());
+        let topic = client.topic(&self.config.pubsub_topic_name.clone());
         let publisher = topic.new_publisher(None);
         let ordering_key = get_current_timestamp();
 

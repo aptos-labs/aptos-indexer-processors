@@ -24,7 +24,7 @@ pub struct ProcessorStatusQuery {
 
 impl ProcessorStatusQuery {
     pub fn get_by_processor(
-        processor_name: &String,
+        processor_name: &str,
         conn: &mut PgPoolConnection,
     ) -> diesel::QueryResult<Option<Self>> {
         processor_status::table

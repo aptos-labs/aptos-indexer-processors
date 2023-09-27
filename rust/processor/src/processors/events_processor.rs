@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::events_models::events::EventModel,
     schema,
@@ -17,7 +17,6 @@ use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
-pub const NAME: &str = "events_processor";
 pub struct EventsProcessor {
     connection_pool: PgDbPool,
 }
@@ -98,7 +97,7 @@ fn insert_events(
 #[async_trait]
 impl ProcessorTrait for EventsProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::EventsProcessor.into()
     }
 
     async fn process_transactions(

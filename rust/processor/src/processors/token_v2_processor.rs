@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         fungible_asset_models::v2_fungible_asset_utils::{
@@ -45,18 +45,17 @@ use std::{
 };
 use tracing::error;
 
-pub const NAME: &str = "token_v2_processor";
-pub struct TokenV2TransactionProcessor {
+pub struct TokenV2Processor {
     connection_pool: PgDbPool,
 }
 
-impl TokenV2TransactionProcessor {
+impl TokenV2Processor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for TokenV2TransactionProcessor {
+impl Debug for TokenV2Processor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -381,9 +380,9 @@ fn insert_current_token_v2_metadatas(
 }
 
 #[async_trait]
-impl ProcessorTrait for TokenV2TransactionProcessor {
+impl ProcessorTrait for TokenV2Processor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::TokenV2Processor.into()
     }
 
     async fn process_transactions(
