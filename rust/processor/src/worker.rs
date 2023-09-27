@@ -500,7 +500,7 @@ impl Worker {
                     }),
                     None,
                 )
-                .context(r#"[Parser] Error updating chain_id!"#)
+                .context(r"[Parser] Error updating chain_id!")
                 .map(|_| grpc_chain_id as u64)
             },
         }
