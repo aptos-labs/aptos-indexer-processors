@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
@@ -25,18 +25,17 @@ use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "default_processor";
-pub struct DefaultTransactionProcessor {
+pub struct DefaultProcessor {
     connection_pool: PgDbPool,
 }
 
-impl DefaultTransactionProcessor {
+impl DefaultProcessor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for DefaultTransactionProcessor {
+impl Debug for DefaultProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -362,9 +361,9 @@ fn insert_current_objects(
 }
 
 #[async_trait]
-impl ProcessorTrait for DefaultTransactionProcessor {
+impl ProcessorTrait for DefaultProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::DefaultProcessor.into()
     }
 
     async fn process_transactions(

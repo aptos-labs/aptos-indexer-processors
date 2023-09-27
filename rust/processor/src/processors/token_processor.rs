@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::token_models::{
         collection_datas::{CollectionData, CurrentCollectionData},
@@ -25,25 +25,31 @@ use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "token_processor";
-pub struct TokenTransactionProcessor {
-    connection_pool: PgDbPool,
-    nft_points_contract: Option<String>,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TokenProcessorConfig {
+    pub nft_points_contract: Option<String>,
 }
 
-impl TokenTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool, nft_points_contract: Option<String>) -> Self {
+pub struct TokenProcessor {
+    connection_pool: PgDbPool,
+    config: TokenProcessorConfig,
+}
+
+impl TokenProcessor {
+    pub fn new(connection_pool: PgDbPool, config: TokenProcessorConfig) -> Self {
         Self {
             connection_pool,
-            nft_points_contract,
+            config,
         }
     }
 }
 
-impl Debug for TokenTransactionProcessor {
+impl Debug for TokenProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -446,9 +452,9 @@ fn insert_nft_points(
 }
 
 #[async_trait]
-impl ProcessorTrait for TokenTransactionProcessor {
+impl ProcessorTrait for TokenProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::TokenProcessor.into()
     }
 
     async fn process_transactions(
@@ -517,7 +523,8 @@ impl ProcessorTrait for TokenTransactionProcessor {
             all_current_token_claims.extend(current_token_claims);
 
             // NFT points
-            let nft_points_txn = NftPoints::from_transaction(txn, self.nft_points_contract.clone());
+            let nft_points_txn =
+                NftPoints::from_transaction(txn, self.config.nft_points_contract.clone());
             if let Some(nft_points) = nft_points_txn {
                 all_nft_points.push(nft_points);
             }

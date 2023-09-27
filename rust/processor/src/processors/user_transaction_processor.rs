@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
@@ -19,7 +19,6 @@ use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
-pub const NAME: &str = "user_transaction_processor";
 pub struct UserTransactionProcessor {
     connection_pool: PgDbPool,
 }
@@ -134,7 +133,7 @@ fn insert_signatures(
 #[async_trait]
 impl ProcessorTrait for UserTransactionProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::UserTransactionProcessor.into()
     }
 
     async fn process_transactions(

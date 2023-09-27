@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
@@ -12,7 +12,6 @@ use crate::{
     },
     schema,
     utils::{
-        custom_configs::CustomProcessorConfigs,
         database::{
             clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
         },
@@ -26,54 +25,39 @@ use aptos_indexer_protos::transaction::v1::{
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "ans_processor";
-pub struct AnsTransactionProcessor {
-    connection_pool: PgDbPool,
-    ans_v1_primary_names_table_handle: String,
-    ans_v1_name_records_table_handle: String,
-    ans_v2_contract_address: String,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnsProcessorConfig {
+    pub ans_v1_primary_names_table_handle: String,
+    pub ans_v1_name_records_table_handle: String,
+    pub ans_v2_contract_address: String,
 }
 
-impl AnsTransactionProcessor {
-    pub fn new(
-        connection_pool: PgDbPool,
-        custom_processor_configs: Option<CustomProcessorConfigs>,
-    ) -> Self {
-        if custom_processor_configs.is_none() {
-            panic!("Custom processor configs are required for AnsProcessor");
-        }
+pub struct AnsProcessor {
+    connection_pool: PgDbPool,
+    config: AnsProcessorConfig,
+}
 
-        let custom_processor_configs = custom_processor_configs.unwrap();
-        if custom_processor_configs.ans_processor_config.is_none() {
-            panic!("AnsProcessorConfig is required for AnsProcessor");
-        }
-
-        let ans_processor_config = custom_processor_configs.ans_processor_config.unwrap();
-        let ans_v1_primary_names_table_handle =
-            ans_processor_config.ans_v1_primary_names_table_handle;
-        let ans_v1_name_records_table_handle =
-            ans_processor_config.ans_v1_name_records_table_handle;
-        let ans_v2_contract_address = ans_processor_config.ans_v2_contract_address;
-
+impl AnsProcessor {
+    pub fn new(connection_pool: PgDbPool, config: AnsProcessorConfig) -> Self {
         tracing::info!(
-            ans_v1_primary_names_table_handle = ans_v1_primary_names_table_handle,
-            ans_v1_name_records_table_handle = ans_v1_name_records_table_handle,
-            ans_v2_contract_address = ans_v2_contract_address,
+            ans_v1_primary_names_table_handle = config.ans_v1_primary_names_table_handle,
+            ans_v1_name_records_table_handle = config.ans_v1_name_records_table_handle,
+            ans_v2_contract_address = config.ans_v2_contract_address,
             "init AnsProcessor"
         );
         Self {
             connection_pool,
-            ans_v1_primary_names_table_handle,
-            ans_v1_name_records_table_handle,
-            ans_v2_contract_address,
+            config,
         }
     }
 }
 
-impl Debug for AnsTransactionProcessor {
+impl Debug for AnsProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -377,9 +361,9 @@ fn insert_ans_primary_names_v2(
 }
 
 #[async_trait]
-impl ProcessorTrait for AnsTransactionProcessor {
+impl ProcessorTrait for AnsProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::AnsProcessor.into()
     }
 
     async fn process_transactions(
@@ -402,9 +386,9 @@ impl ProcessorTrait for AnsTransactionProcessor {
             all_ans_primary_names_v2,
         ) = parse_ans(
             &transactions,
-            self.ans_v1_primary_names_table_handle.clone(),
-            self.ans_v1_name_records_table_handle.clone(),
-            self.ans_v2_contract_address.clone(),
+            self.config.ans_v1_primary_names_table_handle.clone(),
+            self.config.ans_v1_name_records_table_handle.clone(),
+            self.config.ans_v2_contract_address.clone(),
         );
 
         // Insert values to db

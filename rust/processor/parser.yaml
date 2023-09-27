@@ -1,7 +1,10 @@
-# This is a template yaml for the indexer-grpc parser.
+# This is a template yaml for the indexer processor. It assumes you have a data service
+# running locally, for example as part of local testnet you ran with this command:
+# aptos node run-local-testnet
 health_check_port: 8084
 server_config:
-  processor_name: default_processor
-  postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
-  indexer_grpc_data_service_address: 127.0.0.1:50051
+  processor_config:
+    type: default_processor
+  postgres_connection_string: postgresql://postgres:@localhost:5432/default_processor
+  indexer_grpc_data_service_address: http://127.0.0.1:50051
   auth_token: AUTH_TOKEN

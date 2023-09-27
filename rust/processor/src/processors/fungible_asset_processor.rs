@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         fungible_asset_models::{
@@ -36,19 +36,18 @@ use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "fungible_asset_processor";
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
-pub struct FungibleAssetTransactionProcessor {
+pub struct FungibleAssetProcessor {
     connection_pool: PgDbPool,
 }
 
-impl FungibleAssetTransactionProcessor {
+impl FungibleAssetProcessor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for FungibleAssetTransactionProcessor {
+impl Debug for FungibleAssetProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -243,9 +242,9 @@ fn insert_current_fungible_asset_balances(
 }
 
 #[async_trait]
-impl ProcessorTrait for FungibleAssetTransactionProcessor {
+impl ProcessorTrait for FungibleAssetProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::FungibleAssetProcessor.into()
     }
 
     async fn process_transactions(

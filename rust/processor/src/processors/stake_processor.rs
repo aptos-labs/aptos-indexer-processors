@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
@@ -30,18 +30,17 @@ use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "stake_processor";
-pub struct StakeTransactionProcessor {
+pub struct StakeProcessor {
     connection_pool: PgDbPool,
 }
 
-impl StakeTransactionProcessor {
+impl StakeProcessor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for StakeTransactionProcessor {
+impl Debug for StakeProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -351,9 +350,9 @@ fn insert_current_delegated_voter(
 }
 
 #[async_trait]
-impl ProcessorTrait for StakeTransactionProcessor {
+impl ProcessorTrait for StakeProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::StakeProcessor.into()
     }
 
     async fn process_transactions(
