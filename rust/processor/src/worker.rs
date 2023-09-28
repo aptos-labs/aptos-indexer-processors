@@ -20,7 +20,7 @@ use crate::{
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT, TRANSMITTED_BYTES_COUNT,
         },
-        database::{execute_with_better_error, new_db_pool, PgDbPool},
+        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
         util::time_diff_since_pb_timestamp_in_secs,
     },
 };
@@ -30,7 +30,6 @@ use aptos_indexer_protos::{
     transaction::v1::Transaction,
 };
 use aptos_moving_average::MovingAverage;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
@@ -39,7 +38,6 @@ use tonic::Streaming;
 use tracing::{error, info};
 use url::Url;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// GRPC request metadata key for the token ID.
 const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
@@ -67,6 +65,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
+    pub skip_migrations: bool,
 }
 
 impl Worker {
@@ -79,6 +78,7 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
+        skip_migrations: bool,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -104,6 +104,7 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
+            skip_migrations,
         })
     }
 
@@ -115,15 +116,17 @@ impl Worker {
     /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
         let processor_name = self.processor_config.name();
-        info!(
-            processor_name = processor_name,
-            "[Parser] Running migrations"
-        );
-        self.run_migrations();
-        info!(
-            processor_name = processor_name,
-            "[Parser] Finished migrations"
-        );
+        if !self.skip_migrations {
+            info!(
+                processor_name = processor_name,
+                "[Parser] Running migrations"
+            );
+            self.run_migrations();
+            info!(
+                processor_name = processor_name,
+                "[Parser] Finished migrations"
+            );
+        }
 
         let starting_version_from_db = self
             .get_start_version()
@@ -388,12 +391,11 @@ impl Worker {
     }
 
     fn run_migrations(&self) {
-        let _ = &self
+        let mut conn = self
             .db_pool
             .get()
-            .expect("[Parser] Could not get connection for migrations")
-            .run_pending_migrations(MIGRATIONS)
-            .expect("[Parser] migrations failed!");
+            .expect("[Parser] Failed to get connection");
+        run_pending_migrations(&mut conn);
     }
 
     /// Gets the start version for the processor. If not found, start from 0.

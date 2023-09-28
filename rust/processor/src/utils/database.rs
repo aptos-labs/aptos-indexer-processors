@@ -10,11 +10,14 @@ use diesel::{
     r2d2::{ConnectionManager, PoolError, PooledConnection},
     QueryResult, RunQueryDsl,
 };
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use std::{cmp::min, sync::Arc};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(QueryId)]
 /// Using this will append a where clause at the end of the string upsert function, e.g.
@@ -87,6 +90,11 @@ where
         tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
     }
     res
+}
+
+pub fn run_pending_migrations(conn: &mut PgConnection) {
+    conn.run_pending_migrations(MIGRATIONS)
+        .expect("[Parser] Migrations failed!");
 }
 
 /// Section below is required to modify the query.
