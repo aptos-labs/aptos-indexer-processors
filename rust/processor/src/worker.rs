@@ -65,7 +65,6 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub skip_migrations: bool,
 }
 
 impl Worker {
@@ -78,7 +77,6 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        skip_migrations: bool,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -104,7 +102,6 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            skip_migrations,
         })
     }
 
@@ -116,17 +113,15 @@ impl Worker {
     /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
         let processor_name = self.processor_config.name();
-        if !self.skip_migrations {
-            info!(
-                processor_name = processor_name,
-                "[Parser] Running migrations"
-            );
-            self.run_migrations();
-            info!(
-                processor_name = processor_name,
-                "[Parser] Finished migrations"
-            );
-        }
+        info!(
+            processor_name = processor_name,
+            "[Parser] Running migrations"
+        );
+        self.run_migrations();
+        info!(
+            processor_name = processor_name,
+            "[Parser] Finished migrations"
+        );
 
         let starting_version_from_db = self
             .get_start_version()

@@ -21,9 +21,6 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
-    /// If set, skip running migrations.
-    #[serde(default)]
-    pub skip_migrations: bool,
 }
 
 #[async_trait::async_trait]
@@ -38,7 +35,6 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            self.skip_migrations,
         )
         .await
         .context("Failed to build worker")?;
