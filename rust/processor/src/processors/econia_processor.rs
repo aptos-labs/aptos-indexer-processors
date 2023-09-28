@@ -1,14 +1,12 @@
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorTrait};
 use crate::{
-    models::default_models::{
-        events::Event,
-        transactions::{TransactionDetail, TransactionModel},
-    },
+    models::default_models::transactions::TransactionModel,
     utils::database::{execute_with_better_error, PgDbPool},
 };
+use crate::models::events_models::events::EventModel;
 
 use anyhow::anyhow;
-use aptos_indexer_protos::transaction::v1::Transaction;
+use aptos_indexer_protos::transaction::v1::{Transaction, transaction::TxnData};
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
@@ -27,21 +25,29 @@ use econia_db::schema::market_registration_events;
 use econia_db::schema::place_limit_order_events;
 use econia_db::schema::place_market_order_events;
 use econia_db::schema::place_swap_order_events;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use std::{collections::HashMap, fmt::Debug};
 
 pub const NAME: &str = "econia_processor";
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EconiaProcessorConfig {
+    pub econia_address: String,
+}
+
 pub struct EconiaTransactionProcessor {
     connection_pool: PgDbPool,
-    econia_address: String,
+    config: EconiaProcessorConfig,
 }
 
 impl EconiaTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool, econia_address: String) -> Self {
+    pub fn new(connection_pool: PgDbPool, config: EconiaProcessorConfig) -> Self {
         Self {
             connection_pool,
-            econia_address,
+            config,
         }
     }
 }
@@ -222,7 +228,7 @@ fn insert_place_swap_order_events(
 }
 
 fn event_data_to_cancel_order_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -248,7 +254,7 @@ fn event_data_to_cancel_order_event(
 }
 
 fn event_data_to_change_order_size_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -276,7 +282,7 @@ fn event_data_to_change_order_size_event(
 }
 
 fn event_data_to_fill_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -319,7 +325,7 @@ fn event_data_to_fill_event(
 }
 
 fn event_data_to_market_registration_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -384,7 +390,7 @@ fn event_data_to_market_registration_event(
 }
 
 fn event_data_to_place_market_order_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -416,7 +422,7 @@ fn event_data_to_place_market_order_event(
 }
 
 fn event_data_to_place_limit_order_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -454,7 +460,7 @@ fn event_data_to_place_limit_order_event(
 }
 
 fn event_data_to_place_swap_order_event(
-    event: &Event,
+    event: &EventModel,
     txn_version: BigDecimal,
     event_idx: BigDecimal,
     time: DateTime<Utc>,
@@ -503,38 +509,30 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        let (_, txn_details, _, _, _) = TransactionModel::from_transactions(&transactions);
+        let (_, blocks, _, _) = TransactionModel::from_transactions(&transactions);
 
         // Create a hashmap to store block_height to timestamp.
         let mut block_height_to_timestamp: HashMap<i64, DateTime<Utc>> = HashMap::new();
 
         // Iterate through the transactions and populate the map.
-        for txn_detail in txn_details {
-            match txn_detail {
-                TransactionDetail::User(user_transaction, _) => {
-                    block_height_to_timestamp.insert(
-                        user_transaction.block_height,
-                        DateTime::from_utc(user_transaction.timestamp, Utc),
-                    );
-                },
-                TransactionDetail::BlockMetadata(block_metadata_transaction) => {
-                    block_height_to_timestamp.insert(
-                        block_metadata_transaction.block_height,
-                        DateTime::from_utc(block_metadata_transaction.timestamp, Utc),
-                    );
-                },
-            }
+        for block_detail in blocks {
+            block_height_to_timestamp.insert(
+                block_detail.block_height,
+                DateTime::from_utc(block_detail.timestamp, Utc),
+            );
         }
 
-        let cancel_order_type = format!("{}::user::CancelOrderEvent", self.econia_address);
-        let change_order_size_type = format!("{}::user::ChangeOrderSizeEvent", self.econia_address);
-        let fill_type = format!("{}::user::FillEvent", self.econia_address);
+        let econia_address = &self.config.econia_address;
+
+        let cancel_order_type = format!("{}::user::CancelOrderEvent", econia_address);
+        let change_order_size_type = format!("{}::user::ChangeOrderSizeEvent", econia_address);
+        let fill_type = format!("{}::user::FillEvent", econia_address);
         let market_registration_type =
-            format!("{}::registry::MarketRegistrationEvent", self.econia_address);
-        let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", self.econia_address);
+            format!("{}::registry::MarketRegistrationEvent", econia_address);
+        let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", econia_address);
         let place_market_order_type =
-            format!("{}::user::PlaceMarketOrderEvent", self.econia_address);
-        let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", self.econia_address);
+            format!("{}::user::PlaceMarketOrderEvent", econia_address);
+        let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
 
         let mut cancel_order_events = vec![];
         let mut change_order_size_events = vec![];
@@ -544,8 +542,18 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let mut place_market_order_events = vec![];
         let mut place_swap_order_events = vec![];
 
-        for transaction in transactions {
-            let (txn, _, events, _, _) = TransactionModel::from_transaction(&transaction);
+        for txn in transactions {
+            let txn_version = txn.version as i64;
+            let block_height = txn.block_height as i64;
+            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
+            let default = vec![];
+            let raw_events = match txn_data {
+                TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
+                TxnData::Genesis(tx_inner) => &tx_inner.events,
+                TxnData::User(tx_inner) => &tx_inner.events,
+                _ => &default,
+            };
+            let events = EventModel::from_events(raw_events, txn_version, block_height);
             for (index, event) in events.iter().enumerate() {
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
