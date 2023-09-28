@@ -26,6 +26,7 @@ chrono = { workspace = true }
 clap = { workspace = true }
 diesel = { workspace = true }
 diesel_migrations = { workspace = true }
+enum_dispatch = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
@@ -43,7 +44,9 @@ serde_json = { workspace = true }
 server-framework = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
+strum = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 unescape = { workspace = true }
+url = { workspace = true }

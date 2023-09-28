@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-use super::transactions::{Transaction, TransactionQuery};
 use crate::{schema::events, utils::util::standardize_address};
 use aptos_indexer_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
-#[diesel(primary_key(account_address, creation_number, sequence_number))]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = events)]
 pub struct Event {
     pub sequence_number: i64,
@@ -20,24 +18,7 @@ pub struct Event {
     pub transaction_block_height: i64,
     pub type_: String,
     pub data: serde_json::Value,
-    pub event_index: Option<i64>,
-}
-
-/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
-#[derive(Associations, Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(belongs_to(TransactionQuery, foreign_key = transaction_version))]
-#[diesel(primary_key(account_address, creation_number, sequence_number))]
-#[diesel(table_name = events)]
-pub struct EventQuery {
-    pub sequence_number: i64,
-    pub creation_number: i64,
-    pub account_address: String,
-    pub transaction_version: i64,
-    pub transaction_block_height: i64,
-    pub type_: String,
-    pub data: serde_json::Value,
-    pub inserted_at: chrono::NaiveDateTime,
-    pub event_index: Option<i64>,
+    pub event_index: i64,
 }
 
 impl Event {
@@ -57,7 +38,7 @@ impl Event {
             transaction_block_height,
             type_: event.type_str.clone(),
             data: serde_json::from_str(event.data.as_str()).unwrap(),
-            event_index: Some(event_index),
+            event_index,
         }
     }
 

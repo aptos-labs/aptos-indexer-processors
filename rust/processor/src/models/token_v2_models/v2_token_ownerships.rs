@@ -293,7 +293,7 @@ impl TokenOwnershipV2 {
             {
                 Some(inner) => inner.clone(),
                 None => {
-                    match CurrentTokenOwnershipV2Query::get_nft_by_token_data_id(
+                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                         conn,
                         token_address,
                     ) {
@@ -590,14 +590,14 @@ impl TokenOwnershipV2 {
 }
 
 impl CurrentTokenOwnershipV2Query {
-    pub fn get_nft_by_token_data_id(
+    pub fn get_latest_owned_nft_by_token_data_id(
         conn: &mut PgPoolConnection,
         token_data_id: &str,
     ) -> anyhow::Result<NFTOwnershipV2> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match Self::get_nft_by_token_data_id_impl(conn, token_data_id) {
+            match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id) {
                 Ok(inner) => {
                     return Ok(NFTOwnershipV2 {
                         token_data_id: inner.token_data_id.clone(),
@@ -616,12 +616,13 @@ impl CurrentTokenOwnershipV2Query {
         ))
     }
 
-    fn get_nft_by_token_data_id_impl(
+    fn get_latest_owned_nft_by_token_data_id_impl(
         conn: &mut PgPoolConnection,
         token_data_id: &str,
     ) -> diesel::QueryResult<Self> {
         current_token_ownerships_v2::table
             .filter(current_token_ownerships_v2::token_data_id.eq(token_data_id))
+            .filter(current_token_ownerships_v2::amount.gt(BigDecimal::zero()))
             .first::<Self>(conn)
     }
 }

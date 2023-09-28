@@ -28,6 +28,26 @@ diesel::table! {
 }
 
 diesel::table! {
+    ans_lookup_v2 (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 10]
+        token_standard -> Varchar,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Nullable<Timestamp>,
+        #[max_length = 140]
+        token_name -> Varchar,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     ans_primary_name (transaction_version, write_set_change_index) {
         transaction_version -> Int8,
         write_set_change_index -> Int8,
@@ -37,6 +57,25 @@ diesel::table! {
         domain -> Nullable<Varchar>,
         #[max_length = 64]
         subdomain -> Nullable<Varchar>,
+        #[max_length = 140]
+        token_name -> Nullable<Varchar>,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    ans_primary_name_v2 (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 66]
+        registered_address -> Varchar,
+        #[max_length = 64]
+        domain -> Nullable<Varchar>,
+        #[max_length = 64]
+        subdomain -> Nullable<Varchar>,
+        #[max_length = 10]
+        token_standard -> Varchar,
         #[max_length = 140]
         token_name -> Nullable<Varchar>,
         is_deleted -> Bool,
@@ -85,6 +124,7 @@ diesel::table! {
         event_index -> Nullable<Int8>,
         #[max_length = 66]
         gas_fee_payer_address -> Nullable<Varchar>,
+        storage_refund_amount -> Numeric,
     }
 }
 
@@ -208,9 +248,46 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_ans_lookup_v2 (domain, subdomain, token_standard) {
+        #[max_length = 64]
+        domain -> Varchar,
+        #[max_length = 64]
+        subdomain -> Varchar,
+        #[max_length = 10]
+        token_standard -> Varchar,
+        #[max_length = 140]
+        token_name -> Nullable<Varchar>,
+        #[max_length = 66]
+        registered_address -> Nullable<Varchar>,
+        expiration_timestamp -> Timestamp,
+        last_transaction_version -> Int8,
+        is_deleted -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_ans_primary_name (registered_address) {
         #[max_length = 66]
         registered_address -> Varchar,
+        #[max_length = 64]
+        domain -> Nullable<Varchar>,
+        #[max_length = 64]
+        subdomain -> Nullable<Varchar>,
+        #[max_length = 140]
+        token_name -> Nullable<Varchar>,
+        is_deleted -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    current_ans_primary_name_v2 (registered_address, token_standard) {
+        #[max_length = 66]
+        registered_address -> Varchar,
+        #[max_length = 10]
+        token_standard -> Varchar,
         #[max_length = 64]
         domain -> Nullable<Varchar>,
         #[max_length = 64]
@@ -594,7 +671,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    events (account_address, creation_number, sequence_number) {
+    events (transaction_version, event_index) {
         sequence_number -> Int8,
         creation_number -> Int8,
         #[max_length = 66]
@@ -605,7 +682,7 @@ diesel::table! {
         type_ -> Text,
         data -> Jsonb,
         inserted_at -> Timestamp,
-        event_index -> Nullable<Int8>,
+        event_index -> Int8,
     }
 }
 
@@ -634,6 +711,7 @@ diesel::table! {
         token_standard -> Varchar,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        storage_refund_amount -> Numeric,
     }
 }
 
@@ -1088,10 +1166,18 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(block_metadata_transactions -> transactions (version));
+diesel::joinable!(move_modules -> transactions (transaction_version));
+diesel::joinable!(move_resources -> transactions (transaction_version));
+diesel::joinable!(table_items -> transactions (transaction_version));
+diesel::joinable!(write_set_changes -> transactions (transaction_version));
+
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
     ans_lookup,
+    ans_lookup_v2,
     ans_primary_name,
+    ans_primary_name_v2,
     block_metadata_transactions,
     coin_activities,
     coin_balances,
@@ -1100,7 +1186,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     collection_datas,
     collections_v2,
     current_ans_lookup,
+    current_ans_lookup_v2,
     current_ans_primary_name,
+    current_ans_primary_name_v2,
     current_coin_balances,
     current_collection_datas,
     current_collections_v2,
