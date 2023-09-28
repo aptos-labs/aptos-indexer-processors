@@ -6,6 +6,7 @@ use clap::Parser;
 use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fs::File, io::Read, panic::PanicInfo, path::PathBuf, process};
+use tokio::runtime::Handle;
 use tracing::error;
 use tracing_subscriber::EnvFilter;
 use warp::{http::Response, Filter};
@@ -19,7 +20,7 @@ pub struct ServerArgs {
 }
 
 impl ServerArgs {
-    pub async fn run<C>(&self) -> Result<()>
+    pub async fn run<C>(&self, handle: Handle) -> Result<()>
     where
         C: RunnableConfig,
     {
@@ -27,26 +28,23 @@ impl ServerArgs {
         setup_logging();
         setup_panic_handler();
         let config = load::<GenericConfig<C>>(&self.config_path)?;
-        run_server_with_config(config).await
+        run_server_with_config(config, handle).await
     }
 }
 
-pub async fn run_server_with_config<C>(config: GenericConfig<C>) -> Result<()>
+/// Run a server and the necessary probes. For spawning these tasks, the user must
+/// provide a handle to a runtime they already have.
+pub async fn run_server_with_config<C>(config: GenericConfig<C>, handle: Handle) -> Result<()>
 where
     C: RunnableConfig,
 {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .thread_name(config.get_server_name())
-        .enable_all()
-        .build()?;
-
     let health_port = config.health_check_port;
     // Start liveness and readiness probes.
-    let task_handler = runtime.spawn(async move {
+    let task_handler = handle.spawn(async move {
         register_probes_and_metrics_handler(health_port).await;
         Ok(())
     });
-    let main_task_handler = runtime.spawn(async move { config.run().await });
+    let main_task_handler = handle.spawn(async move { config.run().await });
     tokio::select! {
         _ = task_handler => {
             error!("Probes and metrics handler unexpectedly exited");

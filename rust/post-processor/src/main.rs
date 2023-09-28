@@ -59,5 +59,6 @@ impl RunnableConfig for PostProcessorConfig {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = ServerArgs::parse();
-    args.run::<PostProcessorConfig>().await
+    args.run::<PostProcessorConfig>(tokio::runtime::Handle::current())
+        .await
 }
