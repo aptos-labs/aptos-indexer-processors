@@ -114,13 +114,16 @@ fn opt_value_to_i16(value: Option<&Value>) -> anyhow::Result<i16> {
     }
 }
 
+// If we try to insert an event twice, as according to its transaction
+// version and event index, the second insertion will just be dropped
+// and lost to the wind. It will not return an error.
+
 fn insert_cancel_order_events(
     conn: &mut PgConnection,
     events: Vec<CancelOrderEvent>,
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // See comment above re: conflicts
         diesel::insert_into(cancel_order_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -135,7 +138,6 @@ fn insert_change_order_size_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // See comment above re: conflicts
         diesel::insert_into(change_order_size_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -150,7 +152,6 @@ fn insert_fill_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // See comment above re: conflicts
         diesel::insert_into(fill_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -165,9 +166,6 @@ fn insert_market_registration_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // If we try to insert an event twice, as according to its transaction
-        // version and event index, the second insertion will just be dropped
-        // and lost to the wind. It will not return an error.
         diesel::insert_into(market_registration_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -182,7 +180,6 @@ fn insert_place_limit_order_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // See comment above re: conflicts
         diesel::insert_into(place_limit_order_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -197,7 +194,6 @@ fn insert_place_market_order_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // See comment above re: conflicts
         diesel::insert_into(place_market_order_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -212,7 +208,6 @@ fn insert_place_swap_order_events(
 ) -> Result<(), diesel::result::Error> {
     execute_with_better_error(
         conn,
-        // See comment above re: conflicts
         diesel::insert_into(place_swap_order_events::table)
             .values(&events)
             .on_conflict_do_nothing(),
@@ -610,35 +605,14 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
-                insert_cancel_order_events(pg_conn, cancel_order_events)
-            })?;
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                insert_change_order_size_events(pg_conn, change_order_size_events)
-            })?;
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| insert_fill_events(pg_conn, fill_events))?;
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                insert_market_registration_events(pg_conn, market_registration_events)
-            })?;
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                insert_place_limit_order_events(pg_conn, place_limit_order_events)
-            })?;
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                insert_place_market_order_events(pg_conn, place_market_order_events)
-            })?;
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                insert_place_swap_order_events(pg_conn, place_swap_order_events)
+                insert_cancel_order_events(pg_conn, cancel_order_events)?;
+                insert_change_order_size_events(pg_conn, change_order_size_events)?;
+                insert_fill_events(pg_conn, fill_events)?;
+                insert_market_registration_events(pg_conn, market_registration_events)?;
+                insert_place_limit_order_events(pg_conn, place_limit_order_events)?;
+                insert_place_market_order_events(pg_conn, place_market_order_events)?;
+                insert_place_swap_order_events(pg_conn, place_swap_order_events)?;
+                Ok(())
             })?;
 
         Ok((start_version, end_version))
