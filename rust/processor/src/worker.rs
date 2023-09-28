@@ -433,13 +433,15 @@ impl Worker {
                 info!(
                     processor_name = processor_name,
                     chain_id = grpc_chain_id,
-                    "[Parser] Adding chain id to db, continue to index.."
+                    "[Parser] Adding chain id to db, continue to index..."
                 );
                 execute_with_better_error(
                     &mut conn,
-                    diesel::insert_into(ledger_infos::table).values(LedgerInfo {
-                        chain_id: grpc_chain_id,
-                    }),
+                    diesel::insert_into(ledger_infos::table)
+                        .values(LedgerInfo {
+                            chain_id: grpc_chain_id,
+                        })
+                        .on_conflict_do_nothing(),
                     None,
                 )
                 .context("[Parser] Error updating chain_id!")
