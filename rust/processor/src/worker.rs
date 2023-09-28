@@ -5,13 +5,13 @@ use crate::{
     config::IndexerGrpcHttp2Config,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
-        ans_processor::AnsProcessor, coin_processor::CoinProcessor,
-        default_processor::DefaultProcessor, events_processor::EventsProcessor,
-        fungible_asset_processor::FungibleAssetProcessor,
+        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
+        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
+        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait, account_transactions_processor::AccountTransactionsProcessor,
+        ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
