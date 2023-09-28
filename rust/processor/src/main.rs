@@ -9,5 +9,6 @@ use server_framework::ServerArgs;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     let args = ServerArgs::parse();
-    args.run::<IndexerGrpcProcessorConfig>().await
+    args.run::<IndexerGrpcProcessorConfig>(tokio::runtime::Handle::current())
+        .await
 }
