@@ -4,6 +4,10 @@
 // Note: For enum_dispatch to work nicely, it is easiest to have the trait and the enum
 // in the same file (ProcessorTrait and Processor).
 
+// Note: For enum_dispatch to work nicely, it is easiest to have the trait and the enum
+// in the same file (ProcessorTrait and Processor).
+
+pub mod account_transactions_processor;
 pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
@@ -16,6 +20,7 @@ pub mod token_v2_processor;
 pub mod user_transaction_processor;
 
 use self::{
+    account_transactions_processor::AccountTransactionsProcessor,
     ans_processor::{AnsProcessor, AnsProcessorConfig},
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
@@ -146,6 +151,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     strum(serialize_all = "snake_case")
 )]
 pub enum ProcessorConfig {
+    AccountTransactionsProcessor,
     AnsProcessor(AnsProcessorConfig),
     CoinProcessor,
     DefaultProcessor,
@@ -184,6 +190,7 @@ impl ProcessorConfig {
     )
 )]
 pub enum Processor {
+    AccountTransactionsProcessor,
     AnsProcessor,
     CoinProcessor,
     DefaultProcessor,

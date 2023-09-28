@@ -11,7 +11,7 @@ use crate::{
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        ProcessorConfig, ProcessorTrait, account_transactions_processor::AccountTransactionsProcessor,
     },
     schema::ledger_infos,
     utils::{
@@ -452,6 +452,9 @@ impl Worker {
 // couple processors together based on their args) makes sense.
 pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
     match config {
+        ProcessorConfig::AccountTransactionsProcessor => {
+            Processor::from(AccountTransactionsProcessor::new(db_pool))
+        },
         ProcessorConfig::AnsProcessor(config) => {
             Processor::from(AnsProcessor::new(db_pool, config.clone()))
         },
