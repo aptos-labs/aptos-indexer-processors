@@ -1,0 +1,153 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use crate::{
+    models::account_transaction_models::account_transactions::AccountTransaction,
+    schema,
+    utils::database::{
+        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+    },
+};
+use anyhow::bail;
+use aptos_indexer_protos::transaction::v1::Transaction;
+use async_trait::async_trait;
+use diesel::{result::Error, PgConnection};
+use field_count::FieldCount;
+use std::{collections::HashMap, fmt::Debug};
+use tracing::error;
+
+pub struct AccountTransactionsProcessor {
+    connection_pool: PgDbPool,
+}
+
+impl AccountTransactionsProcessor {
+    pub fn new(connection_pool: PgDbPool) -> Self {
+        Self { connection_pool }
+    }
+}
+
+impl Debug for AccountTransactionsProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool.state();
+        write!(
+            f,
+            "AccountTransactionsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
+            state.connections, state.idle_connections
+        )
+    }
+}
+
+fn insert_to_db_impl(
+    conn: &mut PgConnection,
+    account_transactions: &[AccountTransaction],
+) -> Result<(), diesel::result::Error> {
+    insert_account_transactions(conn, account_transactions)?;
+    Ok(())
+}
+
+fn insert_to_db(
+    conn: &mut PgPoolConnection,
+    name: &'static str,
+    start_version: u64,
+    end_version: u64,
+    account_transactions: Vec<AccountTransaction>,
+) -> Result<(), diesel::result::Error> {
+    tracing::trace!(
+        name = name,
+        start_version = start_version,
+        end_version = end_version,
+        "Inserting to db",
+    );
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| insert_to_db_impl(pg_conn, &account_transactions))
+    {
+        Ok(_) => Ok(()),
+        Err(_) => conn
+            .build_transaction()
+            .read_write()
+            .run::<_, Error, _>(|pg_conn| {
+                let account_transactions = clean_data_for_db(account_transactions, true);
+
+                insert_to_db_impl(pg_conn, &account_transactions)
+            }),
+    }
+}
+
+fn insert_account_transactions(
+    conn: &mut PgConnection,
+    item_to_insert: &[AccountTransaction],
+) -> Result<(), diesel::result::Error> {
+    use schema::account_transactions::dsl::*;
+
+    let chunks = get_chunks(item_to_insert.len(), AccountTransaction::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::account_transactions::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, account_address))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+#[async_trait]
+impl ProcessorTrait for AccountTransactionsProcessor {
+    fn name(&self) -> &'static str {
+        ProcessorName::AccountTransactionsProcessor.into()
+    }
+
+    async fn process_transactions(
+        &self,
+        transactions: Vec<Transaction>,
+        start_version: u64,
+        end_version: u64,
+        _: Option<u64>,
+    ) -> anyhow::Result<ProcessingResult> {
+        let mut conn = self.get_conn();
+        let mut account_transactions = HashMap::new();
+
+        for txn in &transactions {
+            account_transactions.extend(AccountTransaction::from_transaction(txn));
+        }
+        let mut account_transactions = account_transactions
+            .into_values()
+            .collect::<Vec<AccountTransaction>>();
+
+        // Sort by PK
+        account_transactions.sort_by(|a, b| {
+            (&a.transaction_version, &a.account_address)
+                .cmp(&(&b.transaction_version, &b.account_address))
+        });
+
+        let tx_result = insert_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            account_transactions,
+        );
+        match tx_result {
+            Ok(_) => Ok((start_version, end_version)),
+            Err(err) => {
+                error!(
+                    start_version = start_version,
+                    end_version = end_version,
+                    processor_name = self.name(),
+                    "[Parser] Error inserting transactions to db: {:?}",
+                    err
+                );
+                bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
+            },
+        }
+    }
+
+    fn connection_pool(&self) -> &PgDbPool {
+        &self.connection_pool
+    }
+}
