@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         coin_models::{
@@ -26,19 +26,18 @@ use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "coin_processor";
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
-pub struct CoinTransactionProcessor {
+pub struct CoinProcessor {
     connection_pool: PgDbPool,
 }
 
-impl CoinTransactionProcessor {
+impl CoinProcessor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for CoinTransactionProcessor {
+impl Debug for CoinProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -271,9 +270,9 @@ fn insert_account_transactions(
 }
 
 #[async_trait]
-impl ProcessorTrait for CoinTransactionProcessor {
+impl ProcessorTrait for CoinProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::CoinProcessor.into()
     }
 
     async fn process_transactions(

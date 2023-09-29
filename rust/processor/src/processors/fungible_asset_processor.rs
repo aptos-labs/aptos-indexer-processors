@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_trait::{ProcessingResult, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         fungible_asset_models::{
@@ -10,7 +10,7 @@ use crate::{
                 CurrentFungibleAssetBalance, CurrentFungibleAssetMapping, FungibleAssetBalance,
             },
             v2_fungible_asset_utils::{
-                FungibleAssetAggregatedData, FungibleAssetAggregatedDataMapping,
+                FeeStatement, FungibleAssetAggregatedData, FungibleAssetAggregatedDataMapping,
                 FungibleAssetMetadata, FungibleAssetStore,
             },
             v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
@@ -36,19 +36,18 @@ use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
-pub const NAME: &str = "fungible_asset_processor";
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
-pub struct FungibleAssetTransactionProcessor {
+pub struct FungibleAssetProcessor {
     connection_pool: PgDbPool,
 }
 
-impl FungibleAssetTransactionProcessor {
+impl FungibleAssetProcessor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for FungibleAssetTransactionProcessor {
+impl Debug for FungibleAssetProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -243,9 +242,9 @@ fn insert_current_fungible_asset_balances(
 }
 
 #[async_trait]
-impl ProcessorTrait for FungibleAssetTransactionProcessor {
+impl ProcessorTrait for FungibleAssetProcessor {
     fn name(&self) -> &'static str {
-        NAME
+        ProcessorName::FungibleAssetProcessor.into()
     }
 
     async fn process_transactions(
@@ -404,20 +403,26 @@ fn parse_v2_coin(
             }
         }
 
+        // The artificial gas event, only need for v1
+        if let Some(req) = user_request {
+            let fee_statement = events.iter().find_map(|event| {
+                let event_type = event.type_str.as_str();
+                FeeStatement::from_event(event_type, &event.data, txn_version)
+            });
+            let gas_event = FungibleAssetActivity::get_gas_event(
+                transaction_info,
+                req,
+                &entry_function_id_str,
+                txn_version,
+                txn_timestamp,
+                block_height,
+                fee_statement,
+            );
+            fungible_asset_activities.push(gas_event);
+        }
+
         // Loop to handle events and collect additional metadata from events for v2
         for (index, event) in events.iter().enumerate() {
-            // The artificial gas event, only need for v1
-            if let Some(req) = user_request {
-                let gas_event = FungibleAssetActivity::get_gas_event(
-                    transaction_info,
-                    req,
-                    &entry_function_id_str,
-                    txn_version,
-                    txn_timestamp,
-                    block_height,
-                );
-                fungible_asset_activities.push(gas_event);
-            }
             if let Some(v1_activity) = FungibleAssetActivity::get_v1_from_event(
                 event,
                 txn_version,

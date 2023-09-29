@@ -2,18 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    config::IndexerGrpcHttp2Config,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
-        ans_processor::AnsTransactionProcessor,
-        coin_processor::CoinTransactionProcessor,
-        default_processor::DefaultTransactionProcessor,
-        fungible_asset_processor::FungibleAssetTransactionProcessor,
-        nft_metadata_processor::NFTMetadataProcessor,
-        processor_trait::{ProcessingResult, ProcessorTrait},
-        stake_processor::StakeTransactionProcessor,
-        token_processor::TokenTransactionProcessor,
-        token_v2_processor::TokenV2TransactionProcessor,
-        Processor, econia_processor::EconiaTransactionProcessor,
+        ans_processor::AnsProcessor, coin_processor::CoinProcessor,
+        econia_processor::EconiaTransactionProcessor,
+        default_processor::DefaultProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
+        nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
+        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
+        ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
@@ -26,7 +25,7 @@ use crate::{
         util::time_diff_since_pb_timestamp_in_secs,
     },
 };
-use anyhow::Context;
+use anyhow::{Context, Result};
 use aptos_indexer_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
@@ -39,6 +38,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::error::TryRecvError;
 use tonic::Streaming;
 use tracing::{error, info};
+use url::Url;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./../../../../dbv2/migrations");
 /// GRPC request metadata key for the token ID.
@@ -60,41 +60,28 @@ const RECONNECTION_MAX_RETRIES: u64 = 5;
 
 pub struct Worker {
     pub db_pool: PgDbPool,
-    pub processor_name: String,
+    pub processor_config: ProcessorConfig,
     pub postgres_connection_string: String,
-    pub indexer_grpc_data_service_address: String,
-    pub indexer_grpc_http2_ping_interval: std::time::Duration,
-    pub indexer_grpc_http2_ping_timeout: std::time::Duration,
+    pub indexer_grpc_data_service_address: Url,
+    pub grpc_http2_config: IndexerGrpcHttp2Config,
     pub auth_token: String,
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub ans_v1_primary_names_table_handle: Option<String>,
-    pub ans_v1_name_records_table_handle: Option<String>,
-    pub nft_points_contract: Option<String>,
-    pub pubsub_topic_name: Option<String>,
-    pub google_application_credentials: Option<String>,
-    pub econia_address: Option<String>,
 }
 
 impl Worker {
     pub async fn new(
-        processor_name: String,
+        processor_config: ProcessorConfig,
         postgres_connection_string: String,
-        indexer_grpc_data_service_address: String,
-        indexer_grpc_http2_ping_interval: std::time::Duration,
-        indexer_grpc_http2_ping_timeout: std::time::Duration,
+        indexer_grpc_data_service_address: Url,
+        grpc_http2_config: IndexerGrpcHttp2Config,
         auth_token: String,
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        ans_v1_primary_names_table_handle: Option<String>,
-        ans_v1_name_records_table_handle: Option<String>,
-        nft_points_contract: Option<String>,
-        pubsub_topic_name: Option<String>,
-        google_application_credentials: Option<String>,
-        econia_address: Option<String>,
-    ) -> Self {
+    ) -> Result<Self> {
+        let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
         info!(
@@ -102,30 +89,23 @@ impl Worker {
             "[Parser] Creating connection pool"
         );
         let conn_pool =
-            new_db_pool(&postgres_connection_string).expect("Failed to create connection pool");
+            new_db_pool(&postgres_connection_string).context("Failed to create connection pool")?;
         info!(
             processor_name = processor_name,
             "[Parser] Finish creating the connection pool"
         );
         let number_concurrent_processing_tasks = number_concurrent_processing_tasks.unwrap_or(10);
-        Self {
+        Ok(Self {
             db_pool: conn_pool,
-            processor_name,
+            processor_config,
             postgres_connection_string,
             indexer_grpc_data_service_address,
-            indexer_grpc_http2_ping_interval,
-            indexer_grpc_http2_ping_timeout,
+            grpc_http2_config,
             starting_version,
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            ans_v1_primary_names_table_handle,
-            ans_v1_name_records_table_handle,
-            nft_points_contract,
-            pubsub_topic_name,
-            google_application_credentials,
-            econia_address,
-        }
+        })
     }
 
     /// This is the main logic of the processor. We will do a few large parts:
@@ -135,7 +115,7 @@ impl Worker {
     ///   * Note that the batches will be sequential so we won't have problems with gaps
     /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
-        let processor_name = self.processor_name.clone();
+        let processor_name = self.processor_config.name();
         info!(
             processor_name = processor_name,
             "[Parser] Running migrations"
@@ -164,7 +144,7 @@ impl Worker {
 
         info!(
             processor_name = processor_name,
-            stream_address = self.indexer_grpc_data_service_address.clone(),
+            stream_address = self.indexer_grpc_data_service_address.to_string(),
             final_start_version = starting_version,
             start_version_from_config = self.starting_version,
             start_version_from_db = starting_version_from_db,
@@ -173,61 +153,9 @@ impl Worker {
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
-        // Instantiates correct processor based on config
-        let processor_enum = Processor::from_string(&processor_name);
-        let processor: Arc<dyn ProcessorTrait> = match processor_enum {
-            Processor::CoinProcessor => {
-                Arc::new(CoinTransactionProcessor::new(self.db_pool.clone()))
-            },
-            Processor::DefaultProcessor => {
-                Arc::new(DefaultTransactionProcessor::new(self.db_pool.clone()))
-            },
-            Processor::FungibleAssetProcessor => {
-                Arc::new(FungibleAssetTransactionProcessor::new(self.db_pool.clone()))
-            },
-            Processor::StakeProcessor => {
-                Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
-            },
-            Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
-                self.db_pool.clone(),
-                self.nft_points_contract.clone(),
-            )),
-            Processor::TokenV2Processor => {
-                Arc::new(TokenV2TransactionProcessor::new(self.db_pool.clone()))
-            },
-            Processor::NFTMetadataProcessor => {
-                let pubsub_topic_name = self
-                    .pubsub_topic_name
-                    .clone()
-                    .expect("pubsub_topic_name is required for NFTMetadataProcessor");
-
-                // Crate reads from authentication from file specified in GOOGLE_APPLICATION_CREDENTIALS env var
-                if let Some(credentials) = self.google_application_credentials.clone() {
-                    std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
-                }
-
-                Arc::new(NFTMetadataProcessor::new(
-                    self.db_pool.clone(),
-                    pubsub_topic_name,
-                ))
-            },
-            Processor::AnsProcessor => Arc::new(AnsTransactionProcessor::new(
-                self.db_pool.clone(),
-                self.ans_v1_primary_names_table_handle.clone(),
-                self.ans_v1_name_records_table_handle.clone(),
-            )),
-            Processor::EconiaProcessor => {
-                Arc::new(
-                    EconiaTransactionProcessor::new(
-                        self.db_pool.clone(),
-                        self.econia_address
-                            .clone()
-                            .expect("Econia processor requires an exchange address")
-                    )
-                )
-            },
-        };
-        let processor_name = processor.name();
+        // Build the processor based on the config.
+        let processor = build_processor(&self.processor_config, self.db_pool.clone());
+        let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
         let mut ma = MovingAverage::new(10);
@@ -236,8 +164,10 @@ impl Worker {
 
         let ending_version = self.ending_version;
         let indexer_grpc_data_service_address = self.indexer_grpc_data_service_address.clone();
-        let indexer_grpc_http2_ping_interval = self.indexer_grpc_http2_ping_interval;
-        let indexer_grpc_http2_ping_timeout = self.indexer_grpc_http2_ping_timeout;
+        let indexer_grpc_http2_ping_interval =
+            self.grpc_http2_config.grpc_http2_ping_interval_in_secs();
+        let indexer_grpc_http2_ping_timeout =
+            self.grpc_http2_config.grpc_http2_ping_timeout_in_secs();
         // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
@@ -350,11 +280,11 @@ impl Worker {
                     let txn_time = transactions.as_slice().first().unwrap().timestamp.clone();
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS
-                            .with_label_values(&[auth_token.as_str(), processor_name])
+                            .with_label_values(&[auth_token.as_str(), &processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
                     PROCESSOR_INVOCATIONS_COUNT
-                        .with_label_values(&[processor_name])
+                        .with_label_values(&[&processor_name])
                         .inc();
 
                     let processed_result = processor_clone
@@ -362,7 +292,7 @@ impl Worker {
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
-                            .with_label_values(&[auth_token.as_str(), processor_name])
+                            .with_label_values(&[auth_token.as_str(), &processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
                     processed_result
@@ -387,19 +317,19 @@ impl Worker {
                 let processed: ProcessingResult = match res {
                     Ok(versions) => {
                         PROCESSOR_SUCCESSES_COUNT
-                            .with_label_values(&[processor_name])
+                            .with_label_values(&[&processor_name])
                             .inc();
                         versions
                     },
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.clone(),
+                            stream_address = self.indexer_grpc_data_service_address.to_string(),
                             error = ?e,
                             "[Parser] Error processing transactions"
                         );
                         PROCESSOR_ERRORS_COUNT
-                            .with_label_values(&[processor_name])
+                            .with_label_values(&[&processor_name])
                             .inc();
                         panic!();
                     },
@@ -420,7 +350,7 @@ impl Worker {
                     if prev_end.unwrap() + 1 != start {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.clone(),
+                            stream_address = self.indexer_grpc_data_service_address.to_string(),
                             processed_versions = processed_versions_sorted
                                 .iter()
                                 .map(|(s, e)| format!("{}-{}", s, e))
@@ -439,7 +369,7 @@ impl Worker {
             batch_start_version = batch_end + 1;
 
             LATEST_PROCESSED_VERSION
-                .with_label_values(&[processor_name])
+                .with_label_values(&[&processor_name])
                 .set(batch_end as i64);
             processor
                 .update_last_processed_version(batch_end)
@@ -468,19 +398,20 @@ impl Worker {
     }
 
     /// Gets the start version for the processor. If not found, start from 0.
-    pub fn get_start_version(&self) -> anyhow::Result<Option<u64>> {
+    pub fn get_start_version(&self) -> Result<Option<u64>> {
         let mut conn = self.db_pool.get()?;
 
-        match ProcessorStatusQuery::get_by_processor(&self.processor_name, &mut conn)? {
+        match ProcessorStatusQuery::get_by_processor(self.processor_config.name(), &mut conn)? {
             Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
             None => Ok(None),
         }
     }
 
     /// Verify the chain id from GRPC against the database.
-    pub async fn check_or_update_chain_id(&self, grpc_chain_id: i64) -> anyhow::Result<u64> {
+    pub async fn check_or_update_chain_id(&self, grpc_chain_id: i64) -> Result<u64> {
+        let processor_name = self.processor_config.name();
         info!(
-            processor_name = self.processor_name.as_str(),
+            processor_name = processor_name,
             "[Parser] Checking if chain id is correct"
         );
         let mut conn = self.db_pool.get()?;
@@ -491,7 +422,7 @@ impl Worker {
             Some(chain_id) => {
                 anyhow::ensure!(chain_id == grpc_chain_id, "[Parser] Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", grpc_chain_id, chain_id);
                 info!(
-                    processor_name = self.processor_name.as_str(),
+                    processor_name = processor_name,
                     chain_id = chain_id,
                     "[Parser] Chain id matches! Continue to index...",
                 );
@@ -499,7 +430,7 @@ impl Worker {
             },
             None => {
                 info!(
-                    processor_name = self.processor_name.as_str(),
+                    processor_name = processor_name,
                     chain_id = grpc_chain_id,
                     "[Parser] Adding chain id to db, continue to index.."
                 );
@@ -510,10 +441,43 @@ impl Worker {
                     }),
                     None,
                 )
-                .context(r#"[Parser] Error updating chain_id!"#)
+                .context("[Parser] Error updating chain_id!")
                 .map(|_| grpc_chain_id as u64)
             },
         }
+    }
+}
+
+/// Given a config and a db pool, build a concrete instance of a processor.
+// As time goes on there might be other things that we need to provide to certain
+// processors. As that happens we can revist whether this function (which tends to
+// couple processors together based on their args) makes sense.
+pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
+    match config {
+        ProcessorConfig::AnsProcessor(config) => {
+            Processor::from(AnsProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
+        ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
+        ProcessorConfig::EconiaTransactionProcessor(config) => Processor::from(EconiaTransactionProcessor::new(
+            db_pool,
+            config.clone(),
+        )),
+        ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
+        ProcessorConfig::FungibleAssetProcessor => {
+            Processor::from(FungibleAssetProcessor::new(db_pool))
+        },
+        ProcessorConfig::NftMetadataProcessor(config) => {
+            Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::StakeProcessor => Processor::from(StakeProcessor::new(db_pool)),
+        ProcessorConfig::TokenProcessor(config) => {
+            Processor::from(TokenProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
+        ProcessorConfig::UserTransactionProcessor => {
+            Processor::from(UserTransactionProcessor::new(db_pool))
+        },
     }
 }
 
@@ -541,7 +505,7 @@ pub fn grpc_request_builder(
 }
 
 pub async fn get_stream(
-    indexer_grpc_data_service_address: String,
+    indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
     starting_version: u64,
@@ -549,19 +513,34 @@ pub async fn get_stream(
     auth_token: String,
     processor_name: String,
 ) -> Streaming<TransactionsResponse> {
-    let config = tonic::transport::channel::ClientTlsConfig::new();
-    let channel = tonic::transport::Channel::from_shared(format!(
-        "https://{}",
-        indexer_grpc_data_service_address.clone()
-    ))
-    .expect("[Parser] Endpoint is not a valid URI")
-    .tls_config(config)
-    .expect("[Parser] Failed to create TLS config")
-    .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
-    .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
     info!(
         processor_name = processor_name,
-        stream_address = indexer_grpc_data_service_address,
+        stream_address = indexer_grpc_data_service_address.to_string(),
+        "[Parser] Setting up rpc channel"
+    );
+
+    let channel = tonic::transport::Channel::from_shared(
+        indexer_grpc_data_service_address.to_string(),
+    )
+    .expect(
+        "[Parser] Failed to build GRPC channel, perhaps because the data service URL is invalid",
+    )
+    .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
+    .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
+
+    // If the scheme is https, add a TLS config.
+    let channel = if indexer_grpc_data_service_address.scheme() == "https" {
+        let config = tonic::transport::channel::ClientTlsConfig::new();
+        channel
+            .tls_config(config)
+            .expect("[Parser] Failed to create TLS config")
+    } else {
+        channel
+    };
+
+    info!(
+        processor_name = processor_name,
+        stream_address = indexer_grpc_data_service_address.to_string(),
         "[Parser] Setting up rpc client"
     );
     let mut rpc_client = match RawDataClient::connect(channel).await {
@@ -573,7 +552,7 @@ pub async fn get_stream(
         Err(e) => {
             error!(
                 processor_name = processor_name,
-                stream_address = indexer_grpc_data_service_address,
+                stream_address = indexer_grpc_data_service_address.to_string(),
                 error = ?e,
                 "[Parser] Error connecting to grpc_stream"
             );
@@ -583,7 +562,7 @@ pub async fn get_stream(
     let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
     info!(
         processor_name = processor_name,
-        stream_address = indexer_grpc_data_service_address,
+        stream_address = indexer_grpc_data_service_address.to_string(),
         starting_version = starting_version,
         ending_version = ending_version,
         count = ?count,
@@ -604,7 +583,7 @@ pub async fn get_stream(
 /// all existing transactions are processed
 pub async fn create_fetcher_loop(
     tx: tokio::sync::mpsc::Sender<(u64, Vec<Transaction>)>,
-    indexer_grpc_data_service_address: String,
+    indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
     starting_version: u64,
@@ -630,7 +609,7 @@ pub async fn create_fetcher_loop(
     .await;
     info!(
         processor_name = processor_name,
-        stream_address = indexer_grpc_data_service_address.clone(),
+        stream_address = indexer_grpc_data_service_address.to_string(),
         starting_version = starting_version,
         ending_version = request_ending_version,
         concurrent_tasks = concurrent_tasks,
@@ -654,7 +633,7 @@ pub async fn create_fetcher_loop(
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
-                            stream_address = indexer_grpc_data_service_address.clone(),
+                            stream_address = indexer_grpc_data_service_address.to_string(),
                             error = ?e,
                             "[Parser] Error sending datastream response to channel."
                         );
@@ -675,7 +654,7 @@ pub async fn create_fetcher_loop(
             Some(Err(rpc_error)) => {
                 tracing::warn!(
                     processor_name = processor_name,
-                    stream_address = indexer_grpc_data_service_address.clone(),
+                    stream_address = indexer_grpc_data_service_address.to_string(),
                     error = ?rpc_error,
                     "[Parser] Error receiving datastream response."
                 );
@@ -684,7 +663,7 @@ pub async fn create_fetcher_loop(
             None => {
                 tracing::warn!(
                     processor_name = processor_name,
-                    stream_address = indexer_grpc_data_service_address.clone(),
+                    stream_address = indexer_grpc_data_service_address.to_string(),
                     "[Parser] Stream ended."
                 );
                 false
@@ -699,7 +678,7 @@ pub async fn create_fetcher_loop(
         if is_end {
             info!(
                 processor_name = processor_name,
-                stream_address = indexer_grpc_data_service_address.clone(),
+                stream_address = indexer_grpc_data_service_address.to_string(),
                 ending_version = request_ending_version,
                 next_version_to_fetch = next_version_to_fetch,
                 "[Parser] Reached ending version.",
@@ -718,6 +697,7 @@ pub async fn create_fetcher_loop(
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
             info!("[Parser] The stream is ended.");
+            break;
         } else {
             // The rest is to see if we need to reconnect
             if is_success {
@@ -730,7 +710,7 @@ pub async fn create_fetcher_loop(
                 {
                     error!(
                         processor_name = processor_name,
-                        stream_address = indexer_grpc_data_service_address.clone(),
+                        stream_address = indexer_grpc_data_service_address.to_string(),
                         seconds_since_last_retry = elapsed,
                         "[Parser] Recently reconnected. Will not retry.",
                     );
@@ -741,7 +721,7 @@ pub async fn create_fetcher_loop(
             last_reconnection_time = Some(std::time::Instant::now());
             tracing::warn!(
                 processor_name = processor_name,
-                stream_address = indexer_grpc_data_service_address.clone(),
+                stream_address = indexer_grpc_data_service_address.to_string(),
                 starting_version = next_version_to_fetch,
                 ending_version = request_ending_version,
                 reconnection_retries = reconnection_retries,

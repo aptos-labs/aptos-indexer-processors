@@ -6,7 +6,9 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, FungibleAssetEvent},
+    v2_fungible_asset_utils::{
+        FeeStatement, FungibleAssetAggregatedDataMapping, FungibleAssetEvent,
+    },
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
@@ -22,7 +24,7 @@ use crate::{
 };
 use anyhow::Context;
 use aptos_indexer_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,6 +59,7 @@ pub struct FungibleAssetActivity {
     pub block_height: i64,
     pub token_standard: String,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    pub storage_refund_amount: BigDecimal,
 }
 
 impl FungibleAssetActivity {
@@ -113,6 +116,7 @@ impl FungibleAssetActivity {
                     block_height,
                     token_standard: TokenStandard::V2.to_string(),
                     transaction_timestamp: txn_timestamp,
+                    storage_refund_amount: BigDecimal::zero(),
                 }));
             }
         }
@@ -167,6 +171,7 @@ impl FungibleAssetActivity {
                 block_height,
                 token_standard: TokenStandard::V1.to_string(),
                 transaction_timestamp,
+                storage_refund_amount: BigDecimal::zero(),
             }))
         } else {
             Ok(None)
@@ -182,6 +187,7 @@ impl FungibleAssetActivity {
         transaction_version: i64,
         transaction_timestamp: chrono::NaiveDateTime,
         block_height: i64,
+        fee_statement: Option<FeeStatement>,
     ) -> Self {
         let v1_activity = CoinActivity::get_gas_event(
             txn_info,
@@ -190,6 +196,7 @@ impl FungibleAssetActivity {
             transaction_version,
             transaction_timestamp,
             block_height,
+            fee_statement,
         );
         let storage_id = CoinInfoType::get_storage_id(
             v1_activity.coin_type.as_str(),
@@ -211,6 +218,7 @@ impl FungibleAssetActivity {
             block_height,
             token_standard: TokenStandard::V1.to_string(),
             transaction_timestamp,
+            storage_refund_amount: v1_activity.storage_refund_amount,
         }
     }
 }

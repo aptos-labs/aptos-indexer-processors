@@ -13,25 +13,29 @@ use super::{
 };
 use crate::{
     models::{
-        default_models::signatures::Signature,
-        fungible_asset_models::v2_fungible_asset_activities::{
-            CoinType, CurrentCoinBalancePK, EventToCoinType, BURN_GAS_EVENT_CREATION_NUM,
-            BURN_GAS_EVENT_INDEX, GAS_FEE_EVENT,
+        fungible_asset_models::{
+            v2_fungible_asset_activities::{
+                CoinType, CurrentCoinBalancePK, EventToCoinType, BURN_GAS_EVENT_CREATION_NUM,
+                BURN_GAS_EVENT_INDEX, GAS_FEE_EVENT,
+            },
+            v2_fungible_asset_utils::FeeStatement,
         },
+        user_transactions_models::signatures::Signature,
     },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
-    utils::util::{get_entry_function_from_user_request, standardize_address},
+    utils::util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
 };
 use aptos_indexer_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, Event as EventPB,
     Transaction as TransactionPB, TransactionInfo, UserTransactionRequest,
 };
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, Zero};
 use chrono::NaiveDateTime;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
     transaction_version,
@@ -56,6 +60,7 @@ pub struct CoinActivity {
     pub transaction_timestamp: chrono::NaiveDateTime,
     pub event_index: Option<i64>,
     pub gas_fee_payer_address: Option<String>,
+    pub storage_refund_amount: BigDecimal,
 }
 
 impl CoinActivity {
@@ -115,6 +120,11 @@ impl CoinActivity {
         // Handling gas first
         let mut entry_function_id_str = None;
         if let Some(user_request) = maybe_user_request {
+            let fee_statement = events.iter().find_map(|event| {
+                let event_type = event.type_str.as_str();
+                FeeStatement::from_event(event_type, &event.data, txn_version)
+            });
+
             entry_function_id_str = get_entry_function_from_user_request(user_request);
             coin_activities.push(Self::get_gas_event(
                 transaction_info,
@@ -123,6 +133,7 @@ impl CoinActivity {
                 txn_version,
                 txn_timestamp,
                 block_height,
+                fee_statement,
             ));
         }
 
@@ -249,6 +260,7 @@ impl CoinActivity {
             transaction_timestamp,
             event_index: Some(event_index),
             gas_fee_payer_address: None,
+            storage_refund_amount: BigDecimal::zero(),
         }
     }
 
@@ -259,6 +271,7 @@ impl CoinActivity {
         transaction_version: i64,
         transaction_timestamp: chrono::NaiveDateTime,
         block_height: i64,
+        fee_statement: Option<FeeStatement>,
     ) -> Self {
         let aptos_coin_burned =
             BigDecimal::from(txn_info.gas_used * user_transaction_request.gas_unit_price);
@@ -293,6 +306,9 @@ impl CoinActivity {
             transaction_timestamp,
             event_index: Some(BURN_GAS_EVENT_INDEX),
             gas_fee_payer_address,
+            storage_refund_amount: fee_statement
+                .map(|fs| u64_to_bigdecimal(fs.storage_fee_refund_octas))
+                .unwrap_or(BigDecimal::zero()),
         }
     }
 }

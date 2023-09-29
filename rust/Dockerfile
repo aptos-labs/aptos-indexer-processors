@@ -11,6 +11,8 @@ COPY --link . /app
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev lld
 RUN cargo build --locked --release -p processor
 RUN cp target/release/processor /usr/local/bin
+RUN cargo build --locked --release -p post-processor
+RUN cp target/release/post-processor /usr/local/bin
 
 # add build info
 ARG GIT_TAG
@@ -25,6 +27,7 @@ ENV GIT_SHA ${GIT_SHA}
 FROM debian:bullseye-slim
 
 COPY --from=builder /usr/local/bin/processor /usr/local/bin
+COPY --from=builder /usr/local/bin/post-processor /usr/local/bin
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
