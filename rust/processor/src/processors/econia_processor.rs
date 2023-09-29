@@ -1,7 +1,7 @@
 use super::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::default_models::transactions::TransactionModel,
-    utils::database::{execute_with_better_error, PgDbPool},
+    utils::{database::{execute_with_better_error, PgDbPool}, util::parse_timestamp},
 };
 use crate::models::events_models::events::EventModel;
 
@@ -509,17 +509,27 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        let (_, blocks, _, _) = TransactionModel::from_transactions(&transactions);
-
+        
         // Create a hashmap to store block_height to timestamp.
         let mut block_height_to_timestamp: HashMap<i64, DateTime<Utc>> = HashMap::new();
-
-        // Iterate through the transactions and populate the map.
-        for block_detail in blocks {
-            block_height_to_timestamp.insert(
-                block_detail.block_height,
-                DateTime::from_utc(block_detail.timestamp, Utc),
-            );
+        let mut user_transactions = vec![];
+        for txn in &transactions {
+            let txn_version = txn.version as i64;
+            let block_height = txn.block_height as i64;
+            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
+            if let TxnData::User(_) = txn_data {
+                block_height_to_timestamp.insert(
+                    block_height,
+                    DateTime::from_utc(
+                        parse_timestamp(
+                            txn.timestamp.as_ref().unwrap(),
+                            txn_version
+                        ),
+                        Utc
+                    ),
+                );
+                user_transactions.push(txn);
+            }
         }
 
         let econia_address = &self.config.econia_address;
@@ -542,7 +552,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let mut place_market_order_events = vec![];
         let mut place_swap_order_events = vec![];
 
-        for txn in transactions {
+        for txn in user_transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
