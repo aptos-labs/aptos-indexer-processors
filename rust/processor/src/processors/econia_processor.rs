@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
 use econia_db::{
     models::{
-        CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle, MarketAccounts,
+        CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle,
         MarketRegistrationEvent, PlaceLimitOrderEvent, PlaceMarketOrderEvent, PlaceSwapOrderEvent,
     },
     schema::{
@@ -643,12 +643,12 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         if resource.r#type.as_ref().expect("No resource type")
                             == &market_accounts_type
                         {
-                            let market_accounts: MarketAccounts =
+                            let resource_data: serde_json::Value =
                                 serde_json::from_str(&resource.data)
                                     .expect("Failed to parse MarketAccounts");
                             market_account_handles.push(MarketAccountHandle {
                                 user: resource.address.clone(),
-                                handle: market_accounts.map.handle,
+                                handle: resource_data["map"]["handle"].to_string(),
                             })
                         }
                     },
