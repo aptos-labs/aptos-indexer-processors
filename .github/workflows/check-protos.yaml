@@ -44,7 +44,7 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: 8.6.2
-      - run: pnpm install -g protoc-gen-ts
+      - run: pnpm install -g protoc-gen-ts@0.8.7
 
       # Setup the environment for the aptos-indexer-protos package in Python, in which
       # we generate Python code from the protos using the Python protoc toolchain

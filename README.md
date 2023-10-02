@@ -46,7 +46,7 @@ cargo install protoc-gen-prost-crate
 cargo install protoc-gen-tonic
 
 # For generating TS code
-pnpm install -g protoc-gen-ts
+pnpm install -g protoc-gen-ts@0.8.7
 
 # For generating Python code
 cd python/aptos-indexer-protos

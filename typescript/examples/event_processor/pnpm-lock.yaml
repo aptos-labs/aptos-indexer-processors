@@ -6,11 +6,11 @@ settings:
 
 dependencies:
   '@aptos-labs/aptos-indexer-protos':
-    specifier: '=0.2.2'
-    version: 0.2.2
+    specifier: '=0.2.3'
+    version: 0.2.3
   '@aptos-labs/aptos-processor-sdk':
-    specifier: file:/Users/dport/a/aptos-indexer-processors/typescript/sdk
-    version: file:../../sdk(pg@8.11.3)(ts-node@10.9.1)
+    specifier: '=0.1.1'
+    version: 0.1.1(pg@8.11.3)(ts-node@10.9.1)
   commander:
     specifier: ^11.0.0
     version: 11.0.0
@@ -54,13 +54,45 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /@aptos-labs/aptos-indexer-protos@0.2.2:
-    resolution: {integrity: sha512-Q6HHUQQv+iu3ycDsLUejgF2pYJJdZvSlmbl6/X/WZQ27ZSlfOk6G+b3cXDRMJWExnehofwJlMLgn/lzNbB+mzw==}
+  /@aptos-labs/aptos-indexer-protos@0.2.3:
+    resolution: {integrity: sha512-MR5+n3mr61LQUkU2MftaQPofEqMiCT8dO+W1H+C1Q23DKGMNf6CyPH6fba+WiDSypMsobpeSKY4uJZ7VUAADTA==}
     engines: {node: '>=14.0.0'}
     dependencies:
       '@grpc/grpc-js': 1.9.2
       long: 5.2.3
       protobufjs: 7.2.5
+    dev: false
+
+  /@aptos-labs/aptos-processor-sdk@0.1.1(pg@8.11.3)(ts-node@10.9.1):
+    resolution: {integrity: sha512-oEjCUoe7M9zTMFH2iNHnI/HvSB+lP5aYbdz2xgFYIKMboADeNoJ2WSyHtmrwVo2NmwACvW7of2D3/TCQy6A5uQ==}
+    engines: {node: '>=14.0.0'}
+    dependencies:
+      '@aptos-labs/aptos-indexer-protos': 0.2.3
+      '@grpc/grpc-js': 1.9.2
+      google-protobuf: 3.21.2
+      pg-connection-string: 2.6.2
+      timer-node: 5.0.7
+      typeorm: 0.3.17(pg@8.11.3)(ts-node@10.9.1)
+      typeorm-naming-strategies: 4.1.0(typeorm@0.3.17)
+    transitivePeerDependencies:
+      - '@google-cloud/spanner'
+      - '@sap/hana-client'
+      - better-sqlite3
+      - hdb-pool
+      - ioredis
+      - mongodb
+      - mssql
+      - mysql2
+      - oracledb
+      - pg
+      - pg-native
+      - pg-query-stream
+      - redis
+      - sql.js
+      - sqlite3
+      - supports-color
+      - ts-node
+      - typeorm-aurora-data-api-driver
     dev: false
 
   /@babel/runtime@7.22.11:
@@ -2272,38 +2304,3 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
     dev: true
-
-  file:../../sdk(pg@8.11.3)(ts-node@10.9.1):
-    resolution: {directory: ../../sdk, type: directory}
-    id: file:../../sdk
-    name: '@aptos-labs/aptos-processor-sdk'
-    version: 0.1.0
-    engines: {node: '>=14.0.0'}
-    dependencies:
-      '@aptos-labs/aptos-indexer-protos': 0.2.2
-      '@grpc/grpc-js': 1.9.2
-      google-protobuf: 3.21.2
-      pg-connection-string: 2.6.2
-      timer-node: 5.0.7
-      typeorm: 0.3.17(pg@8.11.3)(ts-node@10.9.1)
-      typeorm-naming-strategies: 4.1.0(typeorm@0.3.17)
-    transitivePeerDependencies:
-      - '@google-cloud/spanner'
-      - '@sap/hana-client'
-      - better-sqlite3
-      - hdb-pool
-      - ioredis
-      - mongodb
-      - mssql
-      - mysql2
-      - oracledb
-      - pg
-      - pg-native
-      - pg-query-stream
-      - redis
-      - sql.js
-      - sqlite3
-      - supports-color
-      - ts-node
-      - typeorm-aurora-data-api-driver
-    dev: false

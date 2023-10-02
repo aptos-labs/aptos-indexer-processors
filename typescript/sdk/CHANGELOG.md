@@ -4,5 +4,8 @@ All notable changes to the Aptos Processer SDK will be captured in this file. Th
 
 ## Unreleased
 
+## 0.1.2
+- Bumped @aptos-labs/aptos-indexer-protos to 0.2.3.
+
 ## 0.1.1
 - Initial release.

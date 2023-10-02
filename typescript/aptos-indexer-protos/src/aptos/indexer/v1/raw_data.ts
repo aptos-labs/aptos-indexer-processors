@@ -104,12 +104,12 @@ export const GetTransactionsRequest = {
       | Iterable<GetTransactionsRequest | GetTransactionsRequest[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [GetTransactionsRequest.encode(p).finish()];
         }
       } else {
-        yield* [GetTransactionsRequest.encode(pkt).finish()];
+        yield* [GetTransactionsRequest.encode(pkt as any).finish()];
       }
     }
   },
@@ -120,12 +120,12 @@ export const GetTransactionsRequest = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<GetTransactionsRequest> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [GetTransactionsRequest.decode(p)];
         }
       } else {
-        yield* [GetTransactionsRequest.decode(pkt)];
+        yield* [GetTransactionsRequest.decode(pkt as any)];
       }
     }
   },
@@ -219,12 +219,12 @@ export const TransactionsResponse = {
       | Iterable<TransactionsResponse | TransactionsResponse[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionsResponse.encode(p).finish()];
         }
       } else {
-        yield* [TransactionsResponse.encode(pkt).finish()];
+        yield* [TransactionsResponse.encode(pkt as any).finish()];
       }
     }
   },
@@ -235,19 +235,19 @@ export const TransactionsResponse = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<TransactionsResponse> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionsResponse.decode(p)];
         }
       } else {
-        yield* [TransactionsResponse.decode(pkt)];
+        yield* [TransactionsResponse.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): TransactionsResponse {
     return {
-      transactions: Array.isArray(object?.transactions)
+      transactions: globalThis.Array.isArray(object?.transactions)
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
       chainId: isSet(object.chainId) ? BigInt(object.chainId) : undefined,

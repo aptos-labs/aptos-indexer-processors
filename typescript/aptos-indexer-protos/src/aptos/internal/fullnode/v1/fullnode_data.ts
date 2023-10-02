@@ -138,12 +138,12 @@ export const TransactionsOutput = {
       | Iterable<TransactionsOutput | TransactionsOutput[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionsOutput.encode(p).finish()];
         }
       } else {
-        yield* [TransactionsOutput.encode(pkt).finish()];
+        yield* [TransactionsOutput.encode(pkt as any).finish()];
       }
     }
   },
@@ -154,19 +154,19 @@ export const TransactionsOutput = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<TransactionsOutput> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionsOutput.decode(p)];
         }
       } else {
-        yield* [TransactionsOutput.decode(pkt)];
+        yield* [TransactionsOutput.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): TransactionsOutput {
     return {
-      transactions: Array.isArray(object?.transactions)
+      transactions: globalThis.Array.isArray(object?.transactions)
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
     };
@@ -251,12 +251,12 @@ export const StreamStatus = {
     source: AsyncIterable<StreamStatus | StreamStatus[]> | Iterable<StreamStatus | StreamStatus[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [StreamStatus.encode(p).finish()];
         }
       } else {
-        yield* [StreamStatus.encode(pkt).finish()];
+        yield* [StreamStatus.encode(pkt as any).finish()];
       }
     }
   },
@@ -267,12 +267,12 @@ export const StreamStatus = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<StreamStatus> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [StreamStatus.decode(p)];
         }
       } else {
-        yield* [StreamStatus.decode(pkt)];
+        yield* [StreamStatus.decode(pkt as any)];
       }
     }
   },
@@ -364,12 +364,12 @@ export const GetTransactionsFromNodeRequest = {
       | Iterable<GetTransactionsFromNodeRequest | GetTransactionsFromNodeRequest[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [GetTransactionsFromNodeRequest.encode(p).finish()];
         }
       } else {
-        yield* [GetTransactionsFromNodeRequest.encode(pkt).finish()];
+        yield* [GetTransactionsFromNodeRequest.encode(pkt as any).finish()];
       }
     }
   },
@@ -380,12 +380,12 @@ export const GetTransactionsFromNodeRequest = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<GetTransactionsFromNodeRequest> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [GetTransactionsFromNodeRequest.decode(p)];
         }
       } else {
-        yield* [GetTransactionsFromNodeRequest.decode(pkt)];
+        yield* [GetTransactionsFromNodeRequest.decode(pkt as any)];
       }
     }
   },
@@ -482,12 +482,12 @@ export const TransactionsFromNodeResponse = {
       | Iterable<TransactionsFromNodeResponse | TransactionsFromNodeResponse[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionsFromNodeResponse.encode(p).finish()];
         }
       } else {
-        yield* [TransactionsFromNodeResponse.encode(pkt).finish()];
+        yield* [TransactionsFromNodeResponse.encode(pkt as any).finish()];
       }
     }
   },
@@ -498,12 +498,12 @@ export const TransactionsFromNodeResponse = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<TransactionsFromNodeResponse> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionsFromNodeResponse.decode(p)];
         }
       } else {
-        yield* [TransactionsFromNodeResponse.decode(pkt)];
+        yield* [TransactionsFromNodeResponse.decode(pkt as any)];
       }
     }
   },
