@@ -1,34 +1,34 @@
 use super::{ProcessingResult, ProcessorTrait};
 use crate::{
-    models::default_models::transactions::TransactionModel,
-    utils::{database::{execute_with_better_error, PgDbPool}, util::parse_timestamp},
+    models::events_models::events::EventModel,
+    utils::{
+        database::{execute_with_better_error, PgDbPool},
+        util::parse_timestamp,
+    },
 };
-use crate::models::events_models::events::EventModel;
-
 use anyhow::anyhow;
-use aptos_indexer_protos::transaction::v1::{Transaction, transaction::TxnData};
+use aptos_indexer_protos::transaction::v1::{
+    transaction::TxnData, write_set_change::Change, MoveStructTag, Transaction,
+};
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
-use econia_db::models::CancelOrderEvent;
-use econia_db::models::ChangeOrderSizeEvent;
-use econia_db::models::FillEvent;
-use econia_db::models::MarketRegistrationEvent;
-use econia_db::models::PlaceLimitOrderEvent;
-use econia_db::models::PlaceMarketOrderEvent;
-use econia_db::models::PlaceSwapOrderEvent;
-use econia_db::schema::cancel_order_events;
-use econia_db::schema::change_order_size_events;
-use econia_db::schema::fill_events;
-use econia_db::schema::market_registration_events;
-use econia_db::schema::place_limit_order_events;
-use econia_db::schema::place_market_order_events;
-use econia_db::schema::place_swap_order_events;
+use econia_db::{
+    models::{
+        CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle, MarketAccounts,
+        MarketRegistrationEvent, PlaceLimitOrderEvent, PlaceMarketOrderEvent, PlaceSwapOrderEvent,
+    },
+    schema::{
+        cancel_order_events, change_order_size_events, fill_events, market_account_handles,
+        market_registration_events, place_limit_order_events, place_market_order_events,
+        place_swap_order_events,
+    },
+};
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
 
 pub const NAME: &str = "econia_processor";
 
@@ -160,6 +160,20 @@ fn insert_fill_events(
         conn,
         diesel::insert_into(fill_events::table)
             .values(&events)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
+
+fn insert_market_account_handles(
+    conn: &mut PgConnection,
+    handles: Vec<MarketAccountHandle>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(market_account_handles::table)
+            .values(&handles)
             .on_conflict_do_nothing(),
         None,
     )?;
@@ -504,7 +518,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        
+
         // Create a hashmap to store block_height to timestamp.
         let mut block_height_to_timestamp: HashMap<i64, DateTime<Utc>> = HashMap::new();
         let mut user_transactions = vec![];
@@ -516,11 +530,8 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 block_height_to_timestamp.insert(
                     block_height,
                     DateTime::from_utc(
-                        parse_timestamp(
-                            txn.timestamp.as_ref().unwrap(),
-                            txn_version
-                        ),
-                        Utc
+                        parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version),
+                        Utc,
                     ),
                 );
                 user_transactions.push(txn);
@@ -532,16 +543,22 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let cancel_order_type = format!("{}::user::CancelOrderEvent", econia_address);
         let change_order_size_type = format!("{}::user::ChangeOrderSizeEvent", econia_address);
         let fill_type = format!("{}::user::FillEvent", econia_address);
+        let market_accounts_type = MoveStructTag {
+            address: econia_address.to_string(),
+            module: "user".to_string(),
+            name: "MarketAccounts".to_string(),
+            generic_type_params: vec![],
+        };
         let market_registration_type =
             format!("{}::registry::MarketRegistrationEvent", econia_address);
         let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", econia_address);
-        let place_market_order_type =
-            format!("{}::user::PlaceMarketOrderEvent", econia_address);
+        let place_market_order_type = format!("{}::user::PlaceMarketOrderEvent", econia_address);
         let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
 
         let mut cancel_order_events = vec![];
         let mut change_order_size_events = vec![];
         let mut fill_events = vec![];
+        let mut market_account_handles = vec![];
         let mut market_registration_events = vec![];
         let mut place_limit_order_events = vec![];
         let mut place_market_order_events = vec![];
@@ -618,14 +635,35 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                     )?);
                 }
             }
+            // Index transaction write set.
+            let info = &txn.info.as_ref().expect("No transaction info");
+            for change in &info.changes {
+                match change.change.as_ref().expect("No transaction changes") {
+                    Change::WriteResource(resource) => {
+                        if resource.r#type.as_ref().expect("No resource type")
+                            == &market_accounts_type
+                        {
+                            let market_accounts: MarketAccounts =
+                                serde_json::from_str(&resource.data)
+                                    .expect("Failed to parse MarketAccounts");
+                            market_account_handles.push(MarketAccountHandle {
+                                user: resource.address.clone(),
+                                handle: market_accounts.map.handle,
+                            })
+                        }
+                    },
+                    _ => continue,
+                }
+            }
         }
-
+        // Insert to the database all events and write sets.
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
                 insert_cancel_order_events(pg_conn, cancel_order_events)?;
                 insert_change_order_size_events(pg_conn, change_order_size_events)?;
                 insert_fill_events(pg_conn, fill_events)?;
+                insert_market_account_handles(pg_conn, market_account_handles)?;
                 insert_market_registration_events(pg_conn, market_registration_events)?;
                 insert_place_limit_order_events(pg_conn, place_limit_order_events)?;
                 insert_place_market_order_events(pg_conn, place_market_order_events)?;
