@@ -971,12 +971,12 @@ export const Block = {
     source: AsyncIterable<Block | Block[]> | Iterable<Block | Block[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Block.encode(p).finish()];
         }
       } else {
-        yield* [Block.encode(pkt).finish()];
+        yield* [Block.encode(pkt as any).finish()];
       }
     }
   },
@@ -987,12 +987,12 @@ export const Block = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<Block> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Block.decode(p)];
         }
       } else {
-        yield* [Block.decode(pkt)];
+        yield* [Block.decode(pkt as any)];
       }
     }
   },
@@ -1001,7 +1001,7 @@ export const Block = {
     return {
       timestamp: isSet(object.timestamp) ? Timestamp.fromJSON(object.timestamp) : undefined,
       height: isSet(object.height) ? BigInt(object.height) : BigInt("0"),
-      transactions: Array.isArray(object?.transactions)
+      transactions: globalThis.Array.isArray(object?.transactions)
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
       chainId: isSet(object.chainId) ? Number(object.chainId) : 0,
@@ -1182,12 +1182,12 @@ export const Transaction = {
     source: AsyncIterable<Transaction | Transaction[]> | Iterable<Transaction | Transaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Transaction.encode(p).finish()];
         }
       } else {
-        yield* [Transaction.encode(pkt).finish()];
+        yield* [Transaction.encode(pkt as any).finish()];
       }
     }
   },
@@ -1198,12 +1198,12 @@ export const Transaction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<Transaction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Transaction.decode(p)];
         }
       } else {
-        yield* [Transaction.decode(pkt)];
+        yield* [Transaction.decode(pkt as any)];
       }
     }
   },
@@ -1407,12 +1407,12 @@ export const BlockMetadataTransaction = {
       | Iterable<BlockMetadataTransaction | BlockMetadataTransaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [BlockMetadataTransaction.encode(p).finish()];
         }
       } else {
-        yield* [BlockMetadataTransaction.encode(pkt).finish()];
+        yield* [BlockMetadataTransaction.encode(pkt as any).finish()];
       }
     }
   },
@@ -1423,12 +1423,12 @@ export const BlockMetadataTransaction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<BlockMetadataTransaction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [BlockMetadataTransaction.decode(p)];
         }
       } else {
-        yield* [BlockMetadataTransaction.decode(pkt)];
+        yield* [BlockMetadataTransaction.decode(pkt as any)];
       }
     }
   },
@@ -1437,12 +1437,12 @@ export const BlockMetadataTransaction = {
     return {
       id: isSet(object.id) ? String(object.id) : "",
       round: isSet(object.round) ? BigInt(object.round) : BigInt("0"),
-      events: Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
       previousBlockVotesBitvec: isSet(object.previousBlockVotesBitvec)
         ? bytesFromBase64(object.previousBlockVotesBitvec)
         : new Uint8Array(0),
       proposer: isSet(object.proposer) ? String(object.proposer) : "",
-      failedProposerIndices: Array.isArray(object?.failedProposerIndices)
+      failedProposerIndices: globalThis.Array.isArray(object?.failedProposerIndices)
         ? object.failedProposerIndices.map((e: any) => Number(e))
         : [],
     };
@@ -1541,12 +1541,12 @@ export const GenesisTransaction = {
       | Iterable<GenesisTransaction | GenesisTransaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [GenesisTransaction.encode(p).finish()];
         }
       } else {
-        yield* [GenesisTransaction.encode(pkt).finish()];
+        yield* [GenesisTransaction.encode(pkt as any).finish()];
       }
     }
   },
@@ -1557,12 +1557,12 @@ export const GenesisTransaction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<GenesisTransaction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [GenesisTransaction.decode(p)];
         }
       } else {
-        yield* [GenesisTransaction.decode(pkt)];
+        yield* [GenesisTransaction.decode(pkt as any)];
       }
     }
   },
@@ -1570,7 +1570,7 @@ export const GenesisTransaction = {
   fromJSON(object: any): GenesisTransaction {
     return {
       payload: isSet(object.payload) ? WriteSet.fromJSON(object.payload) : undefined,
-      events: Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
     };
   },
 
@@ -1631,12 +1631,12 @@ export const StateCheckpointTransaction = {
       | Iterable<StateCheckpointTransaction | StateCheckpointTransaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [StateCheckpointTransaction.encode(p).finish()];
         }
       } else {
-        yield* [StateCheckpointTransaction.encode(pkt).finish()];
+        yield* [StateCheckpointTransaction.encode(pkt as any).finish()];
       }
     }
   },
@@ -1647,12 +1647,12 @@ export const StateCheckpointTransaction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<StateCheckpointTransaction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [StateCheckpointTransaction.decode(p)];
         }
       } else {
-        yield* [StateCheckpointTransaction.decode(pkt)];
+        yield* [StateCheckpointTransaction.decode(pkt as any)];
       }
     }
   },
@@ -1728,12 +1728,12 @@ export const UserTransaction = {
     source: AsyncIterable<UserTransaction | UserTransaction[]> | Iterable<UserTransaction | UserTransaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [UserTransaction.encode(p).finish()];
         }
       } else {
-        yield* [UserTransaction.encode(pkt).finish()];
+        yield* [UserTransaction.encode(pkt as any).finish()];
       }
     }
   },
@@ -1744,12 +1744,12 @@ export const UserTransaction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<UserTransaction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [UserTransaction.decode(p)];
         }
       } else {
-        yield* [UserTransaction.decode(pkt)];
+        yield* [UserTransaction.decode(pkt as any)];
       }
     }
   },
@@ -1757,7 +1757,7 @@ export const UserTransaction = {
   fromJSON(object: any): UserTransaction {
     return {
       request: isSet(object.request) ? UserTransactionRequest.fromJSON(object.request) : undefined,
-      events: Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
     };
   },
 
@@ -1866,12 +1866,12 @@ export const Event = {
     source: AsyncIterable<Event | Event[]> | Iterable<Event | Event[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Event.encode(p).finish()];
         }
       } else {
-        yield* [Event.encode(pkt).finish()];
+        yield* [Event.encode(pkt as any).finish()];
       }
     }
   },
@@ -1882,12 +1882,12 @@ export const Event = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<Event> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Event.decode(p)];
         }
       } else {
-        yield* [Event.decode(pkt)];
+        yield* [Event.decode(pkt as any)];
       }
     }
   },
@@ -2069,12 +2069,12 @@ export const TransactionInfo = {
     source: AsyncIterable<TransactionInfo | TransactionInfo[]> | Iterable<TransactionInfo | TransactionInfo[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionInfo.encode(p).finish()];
         }
       } else {
-        yield* [TransactionInfo.encode(pkt).finish()];
+        yield* [TransactionInfo.encode(pkt as any).finish()];
       }
     }
   },
@@ -2085,12 +2085,12 @@ export const TransactionInfo = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<TransactionInfo> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionInfo.decode(p)];
         }
       } else {
-        yield* [TransactionInfo.decode(pkt)];
+        yield* [TransactionInfo.decode(pkt as any)];
       }
     }
   },
@@ -2107,7 +2107,9 @@ export const TransactionInfo = {
       accumulatorRootHash: isSet(object.accumulatorRootHash)
         ? bytesFromBase64(object.accumulatorRootHash)
         : new Uint8Array(0),
-      changes: Array.isArray(object?.changes) ? object.changes.map((e: any) => WriteSetChange.fromJSON(e)) : [],
+      changes: globalThis.Array.isArray(object?.changes)
+        ? object.changes.map((e: any) => WriteSetChange.fromJSON(e))
+        : [],
     };
   },
 
@@ -2212,12 +2214,12 @@ export const EventKey = {
     source: AsyncIterable<EventKey | EventKey[]> | Iterable<EventKey | EventKey[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [EventKey.encode(p).finish()];
         }
       } else {
-        yield* [EventKey.encode(pkt).finish()];
+        yield* [EventKey.encode(pkt as any).finish()];
       }
     }
   },
@@ -2228,12 +2230,12 @@ export const EventKey = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<EventKey> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [EventKey.decode(p)];
         }
       } else {
-        yield* [EventKey.decode(pkt)];
+        yield* [EventKey.decode(pkt as any)];
       }
     }
   },
@@ -2378,12 +2380,12 @@ export const UserTransactionRequest = {
       | Iterable<UserTransactionRequest | UserTransactionRequest[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [UserTransactionRequest.encode(p).finish()];
         }
       } else {
-        yield* [UserTransactionRequest.encode(pkt).finish()];
+        yield* [UserTransactionRequest.encode(pkt as any).finish()];
       }
     }
   },
@@ -2394,12 +2396,12 @@ export const UserTransactionRequest = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<UserTransactionRequest> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [UserTransactionRequest.decode(p)];
         }
       } else {
-        yield* [UserTransactionRequest.decode(pkt)];
+        yield* [UserTransactionRequest.decode(pkt as any)];
       }
     }
   },
@@ -2528,12 +2530,12 @@ export const WriteSet = {
     source: AsyncIterable<WriteSet | WriteSet[]> | Iterable<WriteSet | WriteSet[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteSet.encode(p).finish()];
         }
       } else {
-        yield* [WriteSet.encode(pkt).finish()];
+        yield* [WriteSet.encode(pkt as any).finish()];
       }
     }
   },
@@ -2544,12 +2546,12 @@ export const WriteSet = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteSet> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteSet.decode(p)];
         }
       } else {
-        yield* [WriteSet.decode(pkt)];
+        yield* [WriteSet.decode(pkt as any)];
       }
     }
   },
@@ -2643,12 +2645,12 @@ export const ScriptWriteSet = {
     source: AsyncIterable<ScriptWriteSet | ScriptWriteSet[]> | Iterable<ScriptWriteSet | ScriptWriteSet[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [ScriptWriteSet.encode(p).finish()];
         }
       } else {
-        yield* [ScriptWriteSet.encode(pkt).finish()];
+        yield* [ScriptWriteSet.encode(pkt as any).finish()];
       }
     }
   },
@@ -2659,12 +2661,12 @@ export const ScriptWriteSet = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<ScriptWriteSet> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [ScriptWriteSet.decode(p)];
         }
       } else {
-        yield* [ScriptWriteSet.decode(pkt)];
+        yield* [ScriptWriteSet.decode(pkt as any)];
       }
     }
   },
@@ -2755,12 +2757,12 @@ export const DirectWriteSet = {
     source: AsyncIterable<DirectWriteSet | DirectWriteSet[]> | Iterable<DirectWriteSet | DirectWriteSet[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DirectWriteSet.encode(p).finish()];
         }
       } else {
-        yield* [DirectWriteSet.encode(pkt).finish()];
+        yield* [DirectWriteSet.encode(pkt as any).finish()];
       }
     }
   },
@@ -2771,22 +2773,22 @@ export const DirectWriteSet = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<DirectWriteSet> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DirectWriteSet.decode(p)];
         }
       } else {
-        yield* [DirectWriteSet.decode(pkt)];
+        yield* [DirectWriteSet.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): DirectWriteSet {
     return {
-      writeSetChange: Array.isArray(object?.writeSetChange)
+      writeSetChange: globalThis.Array.isArray(object?.writeSetChange)
         ? object.writeSetChange.map((e: any) => WriteSetChange.fromJSON(e))
         : [],
-      events: Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
+      events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
     };
   },
 
@@ -2921,12 +2923,12 @@ export const WriteSetChange = {
     source: AsyncIterable<WriteSetChange | WriteSetChange[]> | Iterable<WriteSetChange | WriteSetChange[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteSetChange.encode(p).finish()];
         }
       } else {
-        yield* [WriteSetChange.encode(pkt).finish()];
+        yield* [WriteSetChange.encode(pkt as any).finish()];
       }
     }
   },
@@ -2937,12 +2939,12 @@ export const WriteSetChange = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteSetChange> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteSetChange.decode(p)];
         }
       } else {
-        yield* [WriteSetChange.decode(pkt)];
+        yield* [WriteSetChange.decode(pkt as any)];
       }
     }
   },
@@ -3074,12 +3076,12 @@ export const DeleteModule = {
     source: AsyncIterable<DeleteModule | DeleteModule[]> | Iterable<DeleteModule | DeleteModule[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteModule.encode(p).finish()];
         }
       } else {
-        yield* [DeleteModule.encode(pkt).finish()];
+        yield* [DeleteModule.encode(pkt as any).finish()];
       }
     }
   },
@@ -3090,12 +3092,12 @@ export const DeleteModule = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<DeleteModule> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteModule.decode(p)];
         }
       } else {
-        yield* [DeleteModule.decode(pkt)];
+        yield* [DeleteModule.decode(pkt as any)];
       }
     }
   },
@@ -3207,12 +3209,12 @@ export const DeleteResource = {
     source: AsyncIterable<DeleteResource | DeleteResource[]> | Iterable<DeleteResource | DeleteResource[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteResource.encode(p).finish()];
         }
       } else {
-        yield* [DeleteResource.encode(pkt).finish()];
+        yield* [DeleteResource.encode(pkt as any).finish()];
       }
     }
   },
@@ -3223,12 +3225,12 @@ export const DeleteResource = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<DeleteResource> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteResource.decode(p)];
         }
       } else {
-        yield* [DeleteResource.decode(pkt)];
+        yield* [DeleteResource.decode(pkt as any)];
       }
     }
   },
@@ -3345,12 +3347,12 @@ export const DeleteTableItem = {
     source: AsyncIterable<DeleteTableItem | DeleteTableItem[]> | Iterable<DeleteTableItem | DeleteTableItem[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteTableItem.encode(p).finish()];
         }
       } else {
-        yield* [DeleteTableItem.encode(pkt).finish()];
+        yield* [DeleteTableItem.encode(pkt as any).finish()];
       }
     }
   },
@@ -3361,12 +3363,12 @@ export const DeleteTableItem = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<DeleteTableItem> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteTableItem.decode(p)];
         }
       } else {
-        yield* [DeleteTableItem.decode(pkt)];
+        yield* [DeleteTableItem.decode(pkt as any)];
       }
     }
   },
@@ -3463,12 +3465,12 @@ export const DeleteTableData = {
     source: AsyncIterable<DeleteTableData | DeleteTableData[]> | Iterable<DeleteTableData | DeleteTableData[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteTableData.encode(p).finish()];
         }
       } else {
-        yield* [DeleteTableData.encode(pkt).finish()];
+        yield* [DeleteTableData.encode(pkt as any).finish()];
       }
     }
   },
@@ -3479,12 +3481,12 @@ export const DeleteTableData = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<DeleteTableData> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [DeleteTableData.decode(p)];
         }
       } else {
-        yield* [DeleteTableData.decode(pkt)];
+        yield* [DeleteTableData.decode(pkt as any)];
       }
     }
   },
@@ -3579,12 +3581,12 @@ export const WriteModule = {
     source: AsyncIterable<WriteModule | WriteModule[]> | Iterable<WriteModule | WriteModule[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteModule.encode(p).finish()];
         }
       } else {
-        yield* [WriteModule.encode(pkt).finish()];
+        yield* [WriteModule.encode(pkt as any).finish()];
       }
     }
   },
@@ -3595,12 +3597,12 @@ export const WriteModule = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteModule> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteModule.decode(p)];
         }
       } else {
-        yield* [WriteModule.decode(pkt)];
+        yield* [WriteModule.decode(pkt as any)];
       }
     }
   },
@@ -3722,12 +3724,12 @@ export const WriteResource = {
     source: AsyncIterable<WriteResource | WriteResource[]> | Iterable<WriteResource | WriteResource[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteResource.encode(p).finish()];
         }
       } else {
-        yield* [WriteResource.encode(pkt).finish()];
+        yield* [WriteResource.encode(pkt as any).finish()];
       }
     }
   },
@@ -3738,12 +3740,12 @@ export const WriteResource = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteResource> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteResource.decode(p)];
         }
       } else {
-        yield* [WriteResource.decode(pkt)];
+        yield* [WriteResource.decode(pkt as any)];
       }
     }
   },
@@ -3865,12 +3867,12 @@ export const WriteTableData = {
     source: AsyncIterable<WriteTableData | WriteTableData[]> | Iterable<WriteTableData | WriteTableData[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteTableData.encode(p).finish()];
         }
       } else {
-        yield* [WriteTableData.encode(pkt).finish()];
+        yield* [WriteTableData.encode(pkt as any).finish()];
       }
     }
   },
@@ -3881,12 +3883,12 @@ export const WriteTableData = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteTableData> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteTableData.decode(p)];
         }
       } else {
-        yield* [WriteTableData.decode(pkt)];
+        yield* [WriteTableData.decode(pkt as any)];
       }
     }
   },
@@ -4001,12 +4003,12 @@ export const WriteTableItem = {
     source: AsyncIterable<WriteTableItem | WriteTableItem[]> | Iterable<WriteTableItem | WriteTableItem[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteTableItem.encode(p).finish()];
         }
       } else {
-        yield* [WriteTableItem.encode(pkt).finish()];
+        yield* [WriteTableItem.encode(pkt as any).finish()];
       }
     }
   },
@@ -4017,12 +4019,12 @@ export const WriteTableItem = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteTableItem> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteTableItem.decode(p)];
         }
       } else {
-        yield* [WriteTableItem.decode(pkt)];
+        yield* [WriteTableItem.decode(pkt as any)];
       }
     }
   },
@@ -4168,12 +4170,12 @@ export const TransactionPayload = {
       | Iterable<TransactionPayload | TransactionPayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionPayload.encode(p).finish()];
         }
       } else {
-        yield* [TransactionPayload.encode(pkt).finish()];
+        yield* [TransactionPayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -4184,12 +4186,12 @@ export const TransactionPayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<TransactionPayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [TransactionPayload.decode(p)];
         }
       } else {
-        yield* [TransactionPayload.decode(pkt)];
+        yield* [TransactionPayload.decode(pkt as any)];
       }
     }
   },
@@ -4334,12 +4336,12 @@ export const EntryFunctionPayload = {
       | Iterable<EntryFunctionPayload | EntryFunctionPayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [EntryFunctionPayload.encode(p).finish()];
         }
       } else {
-        yield* [EntryFunctionPayload.encode(pkt).finish()];
+        yield* [EntryFunctionPayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -4350,12 +4352,12 @@ export const EntryFunctionPayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<EntryFunctionPayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [EntryFunctionPayload.decode(p)];
         }
       } else {
-        yield* [EntryFunctionPayload.decode(pkt)];
+        yield* [EntryFunctionPayload.decode(pkt as any)];
       }
     }
   },
@@ -4363,10 +4365,10 @@ export const EntryFunctionPayload = {
   fromJSON(object: any): EntryFunctionPayload {
     return {
       function: isSet(object.function) ? EntryFunctionId.fromJSON(object.function) : undefined,
-      typeArguments: Array.isArray(object?.typeArguments)
+      typeArguments: globalThis.Array.isArray(object?.typeArguments)
         ? object.typeArguments.map((e: any) => MoveType.fromJSON(e))
         : [],
-      arguments: Array.isArray(object?.arguments) ? object.arguments.map((e: any) => String(e)) : [],
+      arguments: globalThis.Array.isArray(object?.arguments) ? object.arguments.map((e: any) => String(e)) : [],
       entryFunctionIdStr: isSet(object.entryFunctionIdStr) ? String(object.entryFunctionIdStr) : "",
     };
   },
@@ -4456,12 +4458,12 @@ export const MoveScriptBytecode = {
       | Iterable<MoveScriptBytecode | MoveScriptBytecode[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveScriptBytecode.encode(p).finish()];
         }
       } else {
-        yield* [MoveScriptBytecode.encode(pkt).finish()];
+        yield* [MoveScriptBytecode.encode(pkt as any).finish()];
       }
     }
   },
@@ -4472,12 +4474,12 @@ export const MoveScriptBytecode = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveScriptBytecode> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveScriptBytecode.decode(p)];
         }
       } else {
-        yield* [MoveScriptBytecode.decode(pkt)];
+        yield* [MoveScriptBytecode.decode(pkt as any)];
       }
     }
   },
@@ -4576,12 +4578,12 @@ export const ScriptPayload = {
     source: AsyncIterable<ScriptPayload | ScriptPayload[]> | Iterable<ScriptPayload | ScriptPayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [ScriptPayload.encode(p).finish()];
         }
       } else {
-        yield* [ScriptPayload.encode(pkt).finish()];
+        yield* [ScriptPayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -4592,12 +4594,12 @@ export const ScriptPayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<ScriptPayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [ScriptPayload.decode(p)];
         }
       } else {
-        yield* [ScriptPayload.decode(pkt)];
+        yield* [ScriptPayload.decode(pkt as any)];
       }
     }
   },
@@ -4605,10 +4607,10 @@ export const ScriptPayload = {
   fromJSON(object: any): ScriptPayload {
     return {
       code: isSet(object.code) ? MoveScriptBytecode.fromJSON(object.code) : undefined,
-      typeArguments: Array.isArray(object?.typeArguments)
+      typeArguments: globalThis.Array.isArray(object?.typeArguments)
         ? object.typeArguments.map((e: any) => MoveType.fromJSON(e))
         : [],
-      arguments: Array.isArray(object?.arguments) ? object.arguments.map((e: any) => String(e)) : [],
+      arguments: globalThis.Array.isArray(object?.arguments) ? object.arguments.map((e: any) => String(e)) : [],
     };
   },
 
@@ -4691,12 +4693,12 @@ export const MultisigPayload = {
     source: AsyncIterable<MultisigPayload | MultisigPayload[]> | Iterable<MultisigPayload | MultisigPayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultisigPayload.encode(p).finish()];
         }
       } else {
-        yield* [MultisigPayload.encode(pkt).finish()];
+        yield* [MultisigPayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -4707,12 +4709,12 @@ export const MultisigPayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MultisigPayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultisigPayload.decode(p)];
         }
       } else {
-        yield* [MultisigPayload.decode(pkt)];
+        yield* [MultisigPayload.decode(pkt as any)];
       }
     }
   },
@@ -4803,12 +4805,12 @@ export const MultisigTransactionPayload = {
       | Iterable<MultisigTransactionPayload | MultisigTransactionPayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultisigTransactionPayload.encode(p).finish()];
         }
       } else {
-        yield* [MultisigTransactionPayload.encode(pkt).finish()];
+        yield* [MultisigTransactionPayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -4819,12 +4821,12 @@ export const MultisigTransactionPayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MultisigTransactionPayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultisigTransactionPayload.decode(p)];
         }
       } else {
-        yield* [MultisigTransactionPayload.decode(pkt)];
+        yield* [MultisigTransactionPayload.decode(pkt as any)];
       }
     }
   },
@@ -4907,12 +4909,12 @@ export const ModuleBundlePayload = {
       | Iterable<ModuleBundlePayload | ModuleBundlePayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [ModuleBundlePayload.encode(p).finish()];
         }
       } else {
-        yield* [ModuleBundlePayload.encode(pkt).finish()];
+        yield* [ModuleBundlePayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -4923,19 +4925,21 @@ export const ModuleBundlePayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<ModuleBundlePayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [ModuleBundlePayload.decode(p)];
         }
       } else {
-        yield* [ModuleBundlePayload.decode(pkt)];
+        yield* [ModuleBundlePayload.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): ModuleBundlePayload {
     return {
-      modules: Array.isArray(object?.modules) ? object.modules.map((e: any) => MoveModuleBytecode.fromJSON(e)) : [],
+      modules: globalThis.Array.isArray(object?.modules)
+        ? object.modules.map((e: any) => MoveModuleBytecode.fromJSON(e))
+        : [],
     };
   },
 
@@ -5010,12 +5014,12 @@ export const MoveModuleBytecode = {
       | Iterable<MoveModuleBytecode | MoveModuleBytecode[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveModuleBytecode.encode(p).finish()];
         }
       } else {
-        yield* [MoveModuleBytecode.encode(pkt).finish()];
+        yield* [MoveModuleBytecode.encode(pkt as any).finish()];
       }
     }
   },
@@ -5026,12 +5030,12 @@ export const MoveModuleBytecode = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveModuleBytecode> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveModuleBytecode.decode(p)];
         }
       } else {
-        yield* [MoveModuleBytecode.decode(pkt)];
+        yield* [MoveModuleBytecode.decode(pkt as any)];
       }
     }
   },
@@ -5152,12 +5156,12 @@ export const MoveModule = {
     source: AsyncIterable<MoveModule | MoveModule[]> | Iterable<MoveModule | MoveModule[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveModule.encode(p).finish()];
         }
       } else {
-        yield* [MoveModule.encode(pkt).finish()];
+        yield* [MoveModule.encode(pkt as any).finish()];
       }
     }
   },
@@ -5168,12 +5172,12 @@ export const MoveModule = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveModule> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveModule.decode(p)];
         }
       } else {
-        yield* [MoveModule.decode(pkt)];
+        yield* [MoveModule.decode(pkt as any)];
       }
     }
   },
@@ -5182,11 +5186,13 @@ export const MoveModule = {
     return {
       address: isSet(object.address) ? String(object.address) : "",
       name: isSet(object.name) ? String(object.name) : "",
-      friends: Array.isArray(object?.friends) ? object.friends.map((e: any) => MoveModuleId.fromJSON(e)) : [],
-      exposedFunctions: Array.isArray(object?.exposedFunctions)
+      friends: globalThis.Array.isArray(object?.friends)
+        ? object.friends.map((e: any) => MoveModuleId.fromJSON(e))
+        : [],
+      exposedFunctions: globalThis.Array.isArray(object?.exposedFunctions)
         ? object.exposedFunctions.map((e: any) => MoveFunction.fromJSON(e))
         : [],
-      structs: Array.isArray(object?.structs) ? object.structs.map((e: any) => MoveStruct.fromJSON(e)) : [],
+      structs: globalThis.Array.isArray(object?.structs) ? object.structs.map((e: any) => MoveStruct.fromJSON(e)) : [],
     };
   },
 
@@ -5321,12 +5327,12 @@ export const MoveFunction = {
     source: AsyncIterable<MoveFunction | MoveFunction[]> | Iterable<MoveFunction | MoveFunction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveFunction.encode(p).finish()];
         }
       } else {
-        yield* [MoveFunction.encode(pkt).finish()];
+        yield* [MoveFunction.encode(pkt as any).finish()];
       }
     }
   },
@@ -5337,12 +5343,12 @@ export const MoveFunction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveFunction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveFunction.decode(p)];
         }
       } else {
-        yield* [MoveFunction.decode(pkt)];
+        yield* [MoveFunction.decode(pkt as any)];
       }
     }
   },
@@ -5352,11 +5358,11 @@ export const MoveFunction = {
       name: isSet(object.name) ? String(object.name) : "",
       visibility: isSet(object.visibility) ? moveFunction_VisibilityFromJSON(object.visibility) : 0,
       isEntry: isSet(object.isEntry) ? Boolean(object.isEntry) : false,
-      genericTypeParams: Array.isArray(object?.genericTypeParams)
+      genericTypeParams: globalThis.Array.isArray(object?.genericTypeParams)
         ? object.genericTypeParams.map((e: any) => MoveFunctionGenericTypeParam.fromJSON(e))
         : [],
-      params: Array.isArray(object?.params) ? object.params.map((e: any) => MoveType.fromJSON(e)) : [],
-      return: Array.isArray(object?.return) ? object.return.map((e: any) => MoveType.fromJSON(e)) : [],
+      params: globalThis.Array.isArray(object?.params) ? object.params.map((e: any) => MoveType.fromJSON(e)) : [],
+      return: globalThis.Array.isArray(object?.return) ? object.return.map((e: any) => MoveType.fromJSON(e)) : [],
     };
   },
 
@@ -5497,12 +5503,12 @@ export const MoveStruct = {
     source: AsyncIterable<MoveStruct | MoveStruct[]> | Iterable<MoveStruct | MoveStruct[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStruct.encode(p).finish()];
         }
       } else {
-        yield* [MoveStruct.encode(pkt).finish()];
+        yield* [MoveStruct.encode(pkt as any).finish()];
       }
     }
   },
@@ -5513,12 +5519,12 @@ export const MoveStruct = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveStruct> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStruct.decode(p)];
         }
       } else {
-        yield* [MoveStruct.decode(pkt)];
+        yield* [MoveStruct.decode(pkt as any)];
       }
     }
   },
@@ -5527,11 +5533,15 @@ export const MoveStruct = {
     return {
       name: isSet(object.name) ? String(object.name) : "",
       isNative: isSet(object.isNative) ? Boolean(object.isNative) : false,
-      abilities: Array.isArray(object?.abilities) ? object.abilities.map((e: any) => moveAbilityFromJSON(e)) : [],
-      genericTypeParams: Array.isArray(object?.genericTypeParams)
+      abilities: globalThis.Array.isArray(object?.abilities)
+        ? object.abilities.map((e: any) => moveAbilityFromJSON(e))
+        : [],
+      genericTypeParams: globalThis.Array.isArray(object?.genericTypeParams)
         ? object.genericTypeParams.map((e: any) => MoveStructGenericTypeParam.fromJSON(e))
         : [],
-      fields: Array.isArray(object?.fields) ? object.fields.map((e: any) => MoveStructField.fromJSON(e)) : [],
+      fields: globalThis.Array.isArray(object?.fields)
+        ? object.fields.map((e: any) => MoveStructField.fromJSON(e))
+        : [],
     };
   },
 
@@ -5636,12 +5646,12 @@ export const MoveStructGenericTypeParam = {
       | Iterable<MoveStructGenericTypeParam | MoveStructGenericTypeParam[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStructGenericTypeParam.encode(p).finish()];
         }
       } else {
-        yield* [MoveStructGenericTypeParam.encode(pkt).finish()];
+        yield* [MoveStructGenericTypeParam.encode(pkt as any).finish()];
       }
     }
   },
@@ -5652,19 +5662,21 @@ export const MoveStructGenericTypeParam = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveStructGenericTypeParam> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStructGenericTypeParam.decode(p)];
         }
       } else {
-        yield* [MoveStructGenericTypeParam.decode(pkt)];
+        yield* [MoveStructGenericTypeParam.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): MoveStructGenericTypeParam {
     return {
-      constraints: Array.isArray(object?.constraints) ? object.constraints.map((e: any) => moveAbilityFromJSON(e)) : [],
+      constraints: globalThis.Array.isArray(object?.constraints)
+        ? object.constraints.map((e: any) => moveAbilityFromJSON(e))
+        : [],
       isPhantom: isSet(object.isPhantom) ? Boolean(object.isPhantom) : false,
     };
   },
@@ -5742,12 +5754,12 @@ export const MoveStructField = {
     source: AsyncIterable<MoveStructField | MoveStructField[]> | Iterable<MoveStructField | MoveStructField[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStructField.encode(p).finish()];
         }
       } else {
-        yield* [MoveStructField.encode(pkt).finish()];
+        yield* [MoveStructField.encode(pkt as any).finish()];
       }
     }
   },
@@ -5758,12 +5770,12 @@ export const MoveStructField = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveStructField> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStructField.decode(p)];
         }
       } else {
-        yield* [MoveStructField.decode(pkt)];
+        yield* [MoveStructField.decode(pkt as any)];
       }
     }
   },
@@ -5854,12 +5866,12 @@ export const MoveFunctionGenericTypeParam = {
       | Iterable<MoveFunctionGenericTypeParam | MoveFunctionGenericTypeParam[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveFunctionGenericTypeParam.encode(p).finish()];
         }
       } else {
-        yield* [MoveFunctionGenericTypeParam.encode(pkt).finish()];
+        yield* [MoveFunctionGenericTypeParam.encode(pkt as any).finish()];
       }
     }
   },
@@ -5870,19 +5882,21 @@ export const MoveFunctionGenericTypeParam = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveFunctionGenericTypeParam> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveFunctionGenericTypeParam.decode(p)];
         }
       } else {
-        yield* [MoveFunctionGenericTypeParam.decode(pkt)];
+        yield* [MoveFunctionGenericTypeParam.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): MoveFunctionGenericTypeParam {
     return {
-      constraints: Array.isArray(object?.constraints) ? object.constraints.map((e: any) => moveAbilityFromJSON(e)) : [],
+      constraints: globalThis.Array.isArray(object?.constraints)
+        ? object.constraints.map((e: any) => moveAbilityFromJSON(e))
+        : [],
     };
   },
 
@@ -6002,12 +6016,12 @@ export const MoveType = {
     source: AsyncIterable<MoveType | MoveType[]> | Iterable<MoveType | MoveType[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveType.encode(p).finish()];
         }
       } else {
-        yield* [MoveType.encode(pkt).finish()];
+        yield* [MoveType.encode(pkt as any).finish()];
       }
     }
   },
@@ -6018,12 +6032,12 @@ export const MoveType = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveType> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveType.decode(p)];
         }
       } else {
-        yield* [MoveType.decode(pkt)];
+        yield* [MoveType.decode(pkt as any)];
       }
     }
   },
@@ -6136,12 +6150,12 @@ export const MoveType_ReferenceType = {
       | Iterable<MoveType_ReferenceType | MoveType_ReferenceType[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveType_ReferenceType.encode(p).finish()];
         }
       } else {
-        yield* [MoveType_ReferenceType.encode(pkt).finish()];
+        yield* [MoveType_ReferenceType.encode(pkt as any).finish()];
       }
     }
   },
@@ -6152,12 +6166,12 @@ export const MoveType_ReferenceType = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveType_ReferenceType> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveType_ReferenceType.decode(p)];
         }
       } else {
-        yield* [MoveType_ReferenceType.decode(pkt)];
+        yield* [MoveType_ReferenceType.decode(pkt as any)];
       }
     }
   },
@@ -6232,12 +6246,12 @@ export const WriteSetPayload = {
     source: AsyncIterable<WriteSetPayload | WriteSetPayload[]> | Iterable<WriteSetPayload | WriteSetPayload[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteSetPayload.encode(p).finish()];
         }
       } else {
-        yield* [WriteSetPayload.encode(pkt).finish()];
+        yield* [WriteSetPayload.encode(pkt as any).finish()];
       }
     }
   },
@@ -6248,12 +6262,12 @@ export const WriteSetPayload = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<WriteSetPayload> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [WriteSetPayload.decode(p)];
         }
       } else {
-        yield* [WriteSetPayload.decode(pkt)];
+        yield* [WriteSetPayload.decode(pkt as any)];
       }
     }
   },
@@ -6333,12 +6347,12 @@ export const EntryFunctionId = {
     source: AsyncIterable<EntryFunctionId | EntryFunctionId[]> | Iterable<EntryFunctionId | EntryFunctionId[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [EntryFunctionId.encode(p).finish()];
         }
       } else {
-        yield* [EntryFunctionId.encode(pkt).finish()];
+        yield* [EntryFunctionId.encode(pkt as any).finish()];
       }
     }
   },
@@ -6349,12 +6363,12 @@ export const EntryFunctionId = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<EntryFunctionId> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [EntryFunctionId.decode(p)];
         }
       } else {
-        yield* [EntryFunctionId.decode(pkt)];
+        yield* [EntryFunctionId.decode(pkt as any)];
       }
     }
   },
@@ -6441,12 +6455,12 @@ export const MoveModuleId = {
     source: AsyncIterable<MoveModuleId | MoveModuleId[]> | Iterable<MoveModuleId | MoveModuleId[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveModuleId.encode(p).finish()];
         }
       } else {
-        yield* [MoveModuleId.encode(pkt).finish()];
+        yield* [MoveModuleId.encode(pkt as any).finish()];
       }
     }
   },
@@ -6457,12 +6471,12 @@ export const MoveModuleId = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveModuleId> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveModuleId.decode(p)];
         }
       } else {
-        yield* [MoveModuleId.decode(pkt)];
+        yield* [MoveModuleId.decode(pkt as any)];
       }
     }
   },
@@ -6569,12 +6583,12 @@ export const MoveStructTag = {
     source: AsyncIterable<MoveStructTag | MoveStructTag[]> | Iterable<MoveStructTag | MoveStructTag[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStructTag.encode(p).finish()];
         }
       } else {
-        yield* [MoveStructTag.encode(pkt).finish()];
+        yield* [MoveStructTag.encode(pkt as any).finish()];
       }
     }
   },
@@ -6585,12 +6599,12 @@ export const MoveStructTag = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MoveStructTag> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MoveStructTag.decode(p)];
         }
       } else {
-        yield* [MoveStructTag.decode(pkt)];
+        yield* [MoveStructTag.decode(pkt as any)];
       }
     }
   },
@@ -6600,7 +6614,7 @@ export const MoveStructTag = {
       address: isSet(object.address) ? String(object.address) : "",
       module: isSet(object.module) ? String(object.module) : "",
       name: isSet(object.name) ? String(object.name) : "",
-      genericTypeParams: Array.isArray(object?.genericTypeParams)
+      genericTypeParams: globalThis.Array.isArray(object?.genericTypeParams)
         ? object.genericTypeParams.map((e: any) => MoveType.fromJSON(e))
         : [],
     };
@@ -6717,12 +6731,12 @@ export const Signature = {
     source: AsyncIterable<Signature | Signature[]> | Iterable<Signature | Signature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Signature.encode(p).finish()];
         }
       } else {
-        yield* [Signature.encode(pkt).finish()];
+        yield* [Signature.encode(pkt as any).finish()];
       }
     }
   },
@@ -6733,12 +6747,12 @@ export const Signature = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<Signature> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Signature.decode(p)];
         }
       } else {
-        yield* [Signature.decode(pkt)];
+        yield* [Signature.decode(pkt as any)];
       }
     }
   },
@@ -6846,12 +6860,12 @@ export const Ed25519Signature = {
     source: AsyncIterable<Ed25519Signature | Ed25519Signature[]> | Iterable<Ed25519Signature | Ed25519Signature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Ed25519Signature.encode(p).finish()];
         }
       } else {
-        yield* [Ed25519Signature.encode(pkt).finish()];
+        yield* [Ed25519Signature.encode(pkt as any).finish()];
       }
     }
   },
@@ -6862,12 +6876,12 @@ export const Ed25519Signature = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<Ed25519Signature> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Ed25519Signature.decode(p)];
         }
       } else {
-        yield* [Ed25519Signature.decode(pkt)];
+        yield* [Ed25519Signature.decode(pkt as any)];
       }
     }
   },
@@ -6992,12 +7006,12 @@ export const MultiEd25519Signature = {
       | Iterable<MultiEd25519Signature | MultiEd25519Signature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultiEd25519Signature.encode(p).finish()];
         }
       } else {
-        yield* [MultiEd25519Signature.encode(pkt).finish()];
+        yield* [MultiEd25519Signature.encode(pkt as any).finish()];
       }
     }
   },
@@ -7008,22 +7022,26 @@ export const MultiEd25519Signature = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MultiEd25519Signature> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultiEd25519Signature.decode(p)];
         }
       } else {
-        yield* [MultiEd25519Signature.decode(pkt)];
+        yield* [MultiEd25519Signature.decode(pkt as any)];
       }
     }
   },
 
   fromJSON(object: any): MultiEd25519Signature {
     return {
-      publicKeys: Array.isArray(object?.publicKeys) ? object.publicKeys.map((e: any) => bytesFromBase64(e)) : [],
-      signatures: Array.isArray(object?.signatures) ? object.signatures.map((e: any) => bytesFromBase64(e)) : [],
+      publicKeys: globalThis.Array.isArray(object?.publicKeys)
+        ? object.publicKeys.map((e: any) => bytesFromBase64(e))
+        : [],
+      signatures: globalThis.Array.isArray(object?.signatures)
+        ? object.signatures.map((e: any) => bytesFromBase64(e))
+        : [],
       threshold: isSet(object.threshold) ? Number(object.threshold) : 0,
-      publicKeyIndices: Array.isArray(object?.publicKeyIndices)
+      publicKeyIndices: globalThis.Array.isArray(object?.publicKeyIndices)
         ? object.publicKeyIndices.map((e: any) => Number(e))
         : [],
     };
@@ -7126,12 +7144,12 @@ export const MultiAgentSignature = {
       | Iterable<MultiAgentSignature | MultiAgentSignature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultiAgentSignature.encode(p).finish()];
         }
       } else {
-        yield* [MultiAgentSignature.encode(pkt).finish()];
+        yield* [MultiAgentSignature.encode(pkt as any).finish()];
       }
     }
   },
@@ -7142,12 +7160,12 @@ export const MultiAgentSignature = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<MultiAgentSignature> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [MultiAgentSignature.decode(p)];
         }
       } else {
-        yield* [MultiAgentSignature.decode(pkt)];
+        yield* [MultiAgentSignature.decode(pkt as any)];
       }
     }
   },
@@ -7155,10 +7173,10 @@ export const MultiAgentSignature = {
   fromJSON(object: any): MultiAgentSignature {
     return {
       sender: isSet(object.sender) ? AccountSignature.fromJSON(object.sender) : undefined,
-      secondarySignerAddresses: Array.isArray(object?.secondarySignerAddresses)
+      secondarySignerAddresses: globalThis.Array.isArray(object?.secondarySignerAddresses)
         ? object.secondarySignerAddresses.map((e: any) => String(e))
         : [],
-      secondarySigners: Array.isArray(object?.secondarySigners)
+      secondarySigners: globalThis.Array.isArray(object?.secondarySigners)
         ? object.secondarySigners.map((e: any) => AccountSignature.fromJSON(e))
         : [],
     };
@@ -7283,12 +7301,12 @@ export const FeePayerSignature = {
     source: AsyncIterable<FeePayerSignature | FeePayerSignature[]> | Iterable<FeePayerSignature | FeePayerSignature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [FeePayerSignature.encode(p).finish()];
         }
       } else {
-        yield* [FeePayerSignature.encode(pkt).finish()];
+        yield* [FeePayerSignature.encode(pkt as any).finish()];
       }
     }
   },
@@ -7299,12 +7317,12 @@ export const FeePayerSignature = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<FeePayerSignature> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [FeePayerSignature.decode(p)];
         }
       } else {
-        yield* [FeePayerSignature.decode(pkt)];
+        yield* [FeePayerSignature.decode(pkt as any)];
       }
     }
   },
@@ -7312,10 +7330,10 @@ export const FeePayerSignature = {
   fromJSON(object: any): FeePayerSignature {
     return {
       sender: isSet(object.sender) ? AccountSignature.fromJSON(object.sender) : undefined,
-      secondarySignerAddresses: Array.isArray(object?.secondarySignerAddresses)
+      secondarySignerAddresses: globalThis.Array.isArray(object?.secondarySignerAddresses)
         ? object.secondarySignerAddresses.map((e: any) => String(e))
         : [],
-      secondarySigners: Array.isArray(object?.secondarySigners)
+      secondarySigners: globalThis.Array.isArray(object?.secondarySigners)
         ? object.secondarySigners.map((e: any) => AccountSignature.fromJSON(e))
         : [],
       feePayerAddress: isSet(object.feePayerAddress) ? String(object.feePayerAddress) : "",
@@ -7422,12 +7440,12 @@ export const AccountSignature = {
     source: AsyncIterable<AccountSignature | AccountSignature[]> | Iterable<AccountSignature | AccountSignature[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [AccountSignature.encode(p).finish()];
         }
       } else {
-        yield* [AccountSignature.encode(pkt).finish()];
+        yield* [AccountSignature.encode(pkt as any).finish()];
       }
     }
   },
@@ -7438,12 +7456,12 @@ export const AccountSignature = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<AccountSignature> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [AccountSignature.decode(p)];
         }
       } else {
-        yield* [AccountSignature.decode(pkt)];
+        yield* [AccountSignature.decode(pkt as any)];
       }
     }
   },
@@ -7486,30 +7504,11 @@ export const AccountSignature = {
   },
 };
 
-declare const self: any | undefined;
-declare const window: any | undefined;
-declare const global: any | undefined;
-const tsProtoGlobalThis: any = (() => {
-  if (typeof globalThis !== "undefined") {
-    return globalThis;
-  }
-  if (typeof self !== "undefined") {
-    return self;
-  }
-  if (typeof window !== "undefined") {
-    return window;
-  }
-  if (typeof global !== "undefined") {
-    return global;
-  }
-  throw "Unable to locate global object";
-})();
-
 function bytesFromBase64(b64: string): Uint8Array {
-  if (tsProtoGlobalThis.Buffer) {
-    return Uint8Array.from(tsProtoGlobalThis.Buffer.from(b64, "base64"));
+  if (globalThis.Buffer) {
+    return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
   } else {
-    const bin = tsProtoGlobalThis.atob(b64);
+    const bin = globalThis.atob(b64);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; ++i) {
       arr[i] = bin.charCodeAt(i);
@@ -7519,14 +7518,14 @@ function bytesFromBase64(b64: string): Uint8Array {
 }
 
 function base64FromBytes(arr: Uint8Array): string {
-  if (tsProtoGlobalThis.Buffer) {
-    return tsProtoGlobalThis.Buffer.from(arr).toString("base64");
+  if (globalThis.Buffer) {
+    return globalThis.Buffer.from(arr).toString("base64");
   } else {
     const bin: string[] = [];
     arr.forEach((byte) => {
-      bin.push(String.fromCharCode(byte));
+      bin.push(globalThis.String.fromCharCode(byte));
     });
-    return tsProtoGlobalThis.btoa(bin.join(""));
+    return globalThis.btoa(bin.join(""));
   }
 }
 

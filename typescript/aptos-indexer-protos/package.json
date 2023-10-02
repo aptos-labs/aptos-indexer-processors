@@ -1,7 +1,7 @@
 {
   "name": "@aptos-labs/aptos-indexer-protos",
   "description": "Code generated from protobuf definitions for the Aptos Indexer tech stack",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "packageManager": "pnpm@8.6.2",
   "license": "Apache-2.0",
   "engines": {

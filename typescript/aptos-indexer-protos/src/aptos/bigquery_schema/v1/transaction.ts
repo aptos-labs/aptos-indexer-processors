@@ -242,12 +242,12 @@ export const Transaction = {
     source: AsyncIterable<Transaction | Transaction[]> | Iterable<Transaction | Transaction[]>,
   ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Transaction.encode(p).finish()];
         }
       } else {
-        yield* [Transaction.encode(pkt).finish()];
+        yield* [Transaction.encode(pkt as any).finish()];
       }
     }
   },
@@ -258,12 +258,12 @@ export const Transaction = {
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
   ): AsyncIterable<Transaction> {
     for await (const pkt of source) {
-      if (Array.isArray(pkt)) {
-        for (const p of pkt) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
           yield* [Transaction.decode(p)];
         }
       } else {
-        yield* [Transaction.decode(pkt)];
+        yield* [Transaction.decode(pkt as any)];
       }
     }
   },

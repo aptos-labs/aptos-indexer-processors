@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@aptos-labs/aptos-indexer-protos':
-    specifier: '=0.2.2'
-    version: 0.2.2
+    specifier: '=0.2.3'
+    version: 0.2.3
   '@grpc/grpc-js':
     specifier: '=1.9.2'
     version: 1.9.2
@@ -63,8 +63,8 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /@aptos-labs/aptos-indexer-protos@0.2.2:
-    resolution: {integrity: sha512-Q6HHUQQv+iu3ycDsLUejgF2pYJJdZvSlmbl6/X/WZQ27ZSlfOk6G+b3cXDRMJWExnehofwJlMLgn/lzNbB+mzw==}
+  /@aptos-labs/aptos-indexer-protos@0.2.3:
+    resolution: {integrity: sha512-MR5+n3mr61LQUkU2MftaQPofEqMiCT8dO+W1H+C1Q23DKGMNf6CyPH6fba+WiDSypMsobpeSKY4uJZ7VUAADTA==}
     engines: {node: '>=14.0.0'}
     dependencies:
       '@grpc/grpc-js': 1.9.2
