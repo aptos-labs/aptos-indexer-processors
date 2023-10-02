@@ -648,7 +648,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                                     .expect("Failed to parse MarketAccounts");
                             market_account_handles.push(MarketAccountHandle {
                                 user: resource.address.clone(),
-                                handle: market_accounts.map.handle.to_hex_literal(),
+                                handle: market_accounts.map.handle,
                             })
                         }
                     },
