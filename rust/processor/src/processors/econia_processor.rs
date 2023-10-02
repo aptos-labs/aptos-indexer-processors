@@ -583,6 +583,9 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let mut place_swap_order_events = vec![];
 
         for txn in user_transactions {
+            let time = *block_height_to_timestamp
+                .get(&txn.block_height.try_into().unwrap())
+                .expect("No block time");
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
@@ -597,11 +600,6 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             for (index, event) in events.iter().enumerate() {
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
-                let time = *block_height_to_timestamp
-                    .get(&event.transaction_block_height)
-                    // cannot panic because the loop beforehand populates the block height times
-                    .unwrap();
-
                 if event.type_ == cancel_order_type {
                     cancel_order_events.push(event_data_to_cancel_order_event(
                         event,
@@ -655,9 +653,6 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             }
             // Index transaction write set.
             let info = &txn.info.as_ref().expect("No transaction info");
-            let time = *block_height_to_timestamp
-                .get(&txn.block_height.try_into().unwrap())
-                .expect("No block time");
             for change in &info.changes {
                 match change.change.as_ref().expect("No transaction changes") {
                     Change::WriteResource(resource) => {
@@ -679,8 +674,10 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         {
                             continue;
                         }
-                        let market_account_id: u128 = serde_json::from_str(&table_data.key)
+                        let table_key: serde_json::Value = serde_json::from_str(&table_data.key)
                             .expect("Failed to parse market account ID");
+                        let market_account_id =
+                            u128::from_str(table_key.as_str().unwrap()).unwrap();
                         let data: serde_json::Value = serde_json::from_str(&table_data.value)
                             .expect("Failed to parse MarketAccount");
                         balance_updates.push(BalanceUpdate {
