@@ -14,14 +14,19 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-        PgPoolConnection,
+        build_query, clean_data_for_db, get_chunks, MyDbConnection, PgDbPool, PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::{QueryFragment, QueryId},
+    result::Error,
+    ExpressionMethods,
+};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -61,16 +66,41 @@ async fn insert_to_db_impl(
     ),
     (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
-    insert_transactions(conn, txns).await?;
-    insert_block_metadata_transactions(conn, block_metadata_transactions).await?;
-    insert_write_set_changes(conn, wscs).await?;
-    insert_move_modules(conn, move_modules).await?;
-    insert_move_resources(conn, move_resources).await?;
-    insert_table_items(conn, table_items).await?;
-    insert_current_table_items(conn, current_table_items).await?;
-    insert_table_metadata(conn, table_metadata).await?;
-    insert_objects(conn, objects).await?;
-    insert_current_objects(conn, current_objects).await?;
+    let mut futures = Vec::new();
+    for query in insert_transactions(txns) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_block_metadata_transactions(block_metadata_transactions) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_write_set_changes(wscs) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_move_modules(move_modules) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_move_resources(move_resources) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_table_items(table_items) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_current_table_items(current_table_items) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_table_metadata(table_metadata) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_objects(objects) {
+        futures.push(query.execute(conn));
+    }
+    for query in insert_current_objects(current_objects) {
+        futures.push(query.execute(conn));
+    }
+
+    // Execute the futures concurrently. The engine will pipeline the queries.
+    futures::future::try_join_all(futures).await?;
+
     Ok(())
 }
 
@@ -157,138 +187,125 @@ async fn insert_to_db(
     }
 }
 
-async fn insert_transactions(
-    conn: &mut MyDbConnection,
+fn insert_transactions(
     items_to_insert: &[TransactionModel],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::transactions::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), TransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_block_metadata_transactions(
-    conn: &mut MyDbConnection,
+fn insert_block_metadata_transactions(
     items_to_insert: &[BlockMetadataTransactionModel],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::block_metadata_transactions::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(
         items_to_insert.len(),
         BlockMetadataTransactionModel::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::block_metadata_transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_write_set_changes(
-    conn: &mut MyDbConnection,
+fn insert_write_set_changes(
     items_to_insert: &[WriteSetChangeModel],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::write_set_changes::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), WriteSetChangeModel::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::write_set_changes::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, index))
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_move_modules(
-    conn: &mut MyDbConnection,
+fn insert_move_modules(
     items_to_insert: &[MoveModule],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::move_modules::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), MoveModule::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::move_modules::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_move_resources(
-    conn: &mut MyDbConnection,
+fn insert_move_resources(
     items_to_insert: &[MoveResource],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::move_resources::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), MoveResource::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::move_resources::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_table_items(
-    conn: &mut MyDbConnection,
+fn insert_table_items(
     items_to_insert: &[TableItem],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::table_items::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), TableItem::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::table_items::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_current_table_items(
-    conn: &mut MyDbConnection,
+fn insert_current_table_items(
     items_to_insert: &[CurrentTableItem],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::current_table_items::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), CurrentTableItem::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::current_table_items::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((table_handle, key_hash))
@@ -302,60 +319,53 @@ async fn insert_current_table_items(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_table_metadata(
-    conn: &mut MyDbConnection,
+fn insert_table_metadata(
     items_to_insert: &[TableMetadata],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::table_metadatas::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), TableMetadata::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::table_metadatas::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(handle)
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_objects(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[Object],
-) -> Result<(), diesel::result::Error> {
+fn insert_objects(items_to_insert: &[Object]) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::objects::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), Object::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::objects::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )
-        .await?;
+        ));
     }
-    Ok(())
+    queries
 }
 
-async fn insert_current_objects(
-    conn: &mut MyDbConnection,
+fn insert_current_objects(
     items_to_insert: &[CurrentObject],
-) -> Result<(), diesel::result::Error> {
+) -> Vec<impl QueryFragment<Pg> + Send + QueryId + '_> {
     use schema::current_objects::dsl::*;
+    let mut queries = Vec::new();
     let chunks = get_chunks(items_to_insert.len(), CurrentObject::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+        queries.push(build_query(
             diesel::insert_into(schema::current_objects::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(object_address)
@@ -370,9 +380,9 @@ async fn insert_current_objects(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
+            ));
     }
-    Ok(())
+    queries
 }
 
 #[async_trait]

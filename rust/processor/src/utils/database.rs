@@ -6,7 +6,7 @@
 use crate::utils::util::remove_null_bytes;
 use diesel::{
     pg::Pg,
-    query_builder::{AstPass, Query, QueryFragment},
+    query_builder::{AstPass, Query, QueryFragment, QueryId},
     QueryResult,
 };
 use diesel_async::{
@@ -106,6 +106,28 @@ where
         tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
     }
     res
+}
+
+pub fn build_query<U>(
+    query: U,
+    mut additional_where_clause: Option<&'static str>,
+) -> UpsertFilterLatestTransactionQuery<U>
+where
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+{
+    let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    // This is needed because if we don't insert any row, then diesel makes a call like this
+    // SELECT 1 FROM TABLE WHERE 1=0
+    if original_query.to_lowercase().contains("where") {
+        additional_where_clause = None;
+    }
+    let final_query = UpsertFilterLatestTransactionQuery {
+        query,
+        where_clause: additional_where_clause,
+    };
+    let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    tracing::debug!("Executing query: {:?}", debug_string);
+    final_query
 }
 
 pub async fn run_pending_migrations(conn: &mut MyDbConnection) {
