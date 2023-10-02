@@ -16,13 +16,13 @@ use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
 use econia_db::{
     models::{
-        CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle,
+        BalanceUpdate, CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle,
         MarketRegistrationEvent, PlaceLimitOrderEvent, PlaceMarketOrderEvent, PlaceSwapOrderEvent,
     },
     schema::{
-        cancel_order_events, change_order_size_events, fill_events, market_account_handles,
-        market_registration_events, place_limit_order_events, place_market_order_events,
-        place_swap_order_events,
+        balance_updates_by_handle, cancel_order_events, change_order_size_events, fill_events,
+        market_account_handles, market_registration_events, place_limit_order_events,
+        place_market_order_events, place_swap_order_events,
     },
 };
 
@@ -62,6 +62,9 @@ impl Debug for EconiaTransactionProcessor {
         )
     }
 }
+
+const HI_64: u128 = 0xffffffffffffffff;
+const SHIFT_MARKET_ID: u8 = 64;
 
 fn hex_to_string(hex: &str) -> anyhow::Result<String> {
     if !hex.starts_with("0x") {
@@ -123,6 +126,20 @@ fn opt_value_to_i16(value: Option<&Value>) -> anyhow::Result<i16> {
 // If we try to insert an event twice, as according to its transaction
 // version and event index, the second insertion will just be dropped
 // and lost to the wind. It will not return an error.
+
+fn insert_balance_updates(
+    conn: &mut PgConnection,
+    handles: Vec<BalanceUpdate>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(balance_updates_by_handle::table)
+            .values(&handles)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
 
 fn insert_cancel_order_events(
     conn: &mut PgConnection,
@@ -555,6 +572,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let place_market_order_type = format!("{}::user::PlaceMarketOrderEvent", econia_address);
         let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
 
+        let mut balance_updates = vec![];
         let mut cancel_order_events = vec![];
         let mut change_order_size_events = vec![];
         let mut fill_events = vec![];
@@ -637,23 +655,47 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             }
             // Index transaction write set.
             let info = &txn.info.as_ref().expect("No transaction info");
+            let time = *block_height_to_timestamp
+                .get(&txn.block_height.try_into().unwrap())
+                .expect("No block time");
             for change in &info.changes {
                 match change.change.as_ref().expect("No transaction changes") {
                     Change::WriteResource(resource) => {
                         if resource.r#type.as_ref().expect("No resource type")
                             == &market_accounts_type
                         {
-                            let resource_data: serde_json::Value =
-                                serde_json::from_str(&resource.data)
-                                    .expect("Failed to parse MarketAccounts");
+                            let data: serde_json::Value = serde_json::from_str(&resource.data)
+                                .expect("Failed to parse MarketAccounts");
                             market_account_handles.push(MarketAccountHandle {
                                 user: resource.address.clone(),
-                                handle: resource_data["map"]["handle"]
-                                    .as_str()
-                                    .unwrap()
-                                    .to_string(),
+                                handle: data["map"]["handle"].as_str().unwrap().to_string(),
                             })
                         }
+                    },
+                    Change::WriteTableItem(write) => {
+                        let table_data = write.data.as_ref().expect("No WriteTableItem data");
+                        if table_data.value_type
+                            != format!("{}::user::MarketAccount", econia_address)
+                        {
+                            continue;
+                        }
+                        let market_account_id: u128 = serde_json::from_str(&table_data.key)
+                            .expect("Failed to parse market account ID");
+                        let data: serde_json::Value = serde_json::from_str(&table_data.value)
+                            .expect("Failed to parse MarketAccount");
+                        balance_updates.push(BalanceUpdate {
+                            txn_version: txn_version.into(),
+                            handle: write.handle.to_string(),
+                            market_id: ((market_account_id >> SHIFT_MARKET_ID) as u64).into(),
+                            custodian_id: ((market_account_id & HI_64) as u64).into(),
+                            time,
+                            base_total: data["base_total"].as_u64().unwrap().into(),
+                            base_available: data["base_available"].as_u64().unwrap().into(),
+                            base_ceiling: data["base_ceiling"].as_u64().unwrap().into(),
+                            quote_total: data["quote_total"].as_u64().unwrap().into(),
+                            quote_available: data["quote_available"].as_u64().unwrap().into(),
+                            quote_ceiling: data["quote_ceiling"].as_u64().unwrap().into(),
+                        })
                     },
                     _ => continue,
                 }
@@ -663,6 +705,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
+                insert_balance_updates(pg_conn, balance_updates)?;
                 insert_cancel_order_events(pg_conn, cancel_order_events)?;
                 insert_change_order_size_events(pg_conn, change_order_size_events)?;
                 insert_fill_events(pg_conn, fill_events)?;
