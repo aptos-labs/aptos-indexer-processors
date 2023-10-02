@@ -686,12 +686,26 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                             market_id: ((market_account_id >> SHIFT_MARKET_ID) as u64).into(),
                             custodian_id: ((market_account_id & HI_64) as u64).into(),
                             time,
-                            base_total: data["base_total"].as_u64().unwrap().into(),
-                            base_available: data["base_available"].as_u64().unwrap().into(),
-                            base_ceiling: data["base_ceiling"].as_u64().unwrap().into(),
-                            quote_total: data["quote_total"].as_u64().unwrap().into(),
-                            quote_available: data["quote_available"].as_u64().unwrap().into(),
-                            quote_ceiling: data["quote_ceiling"].as_u64().unwrap().into(),
+                            base_total: u64::from_str(data["base_total"].as_str().unwrap())
+                                .unwrap()
+                                .into(),
+                            base_available: u64::from_str(data["base_available"].as_str().unwrap())
+                                .unwrap()
+                                .into(),
+                            base_ceiling: u64::from_str(data["base_ceiling"].as_str().unwrap())
+                                .unwrap()
+                                .into(),
+                            quote_total: u64::from_str(data["quote_total"].as_str().unwrap())
+                                .unwrap()
+                                .into(),
+                            quote_available: u64::from_str(
+                                data["quote_available"].as_str().unwrap(),
+                            )
+                            .unwrap()
+                            .into(),
+                            quote_ceiling: u64::from_str(data["quote_ceiling"].as_str().unwrap())
+                                .unwrap()
+                                .into(),
                         })
                     },
                     _ => continue,
