@@ -85,8 +85,9 @@ impl Worker {
             processor_name = processor_name,
             "[Parser] Creating connection pool"
         );
-        let conn_pool =
-            new_db_pool(&postgres_connection_string).context("Failed to create connection pool")?;
+        let conn_pool = new_db_pool(&postgres_connection_string)
+            .await
+            .context("Failed to create connection pool")?;
         info!(
             processor_name = processor_name,
             "[Parser] Finish creating the connection pool"
@@ -117,7 +118,7 @@ impl Worker {
             processor_name = processor_name,
             "[Parser] Running migrations"
         );
-        self.run_migrations();
+        self.run_migrations().await;
         info!(
             processor_name = processor_name,
             "[Parser] Finished migrations"
@@ -125,6 +126,7 @@ impl Worker {
 
         let starting_version_from_db = self
             .get_start_version()
+            .await
             .expect("[Parser] Database error when getting starting version")
             .unwrap_or_else(|| {
                 info!(
@@ -385,19 +387,22 @@ impl Worker {
         }
     }
 
-    fn run_migrations(&self) {
+    async fn run_migrations(&self) {
         let mut conn = self
             .db_pool
             .get()
+            .await
             .expect("[Parser] Failed to get connection");
-        run_pending_migrations(&mut conn);
+        run_pending_migrations(&mut conn).await;
     }
 
     /// Gets the start version for the processor. If not found, start from 0.
-    pub fn get_start_version(&self) -> Result<Option<u64>> {
-        let mut conn = self.db_pool.get()?;
+    pub async fn get_start_version(&self) -> Result<Option<u64>> {
+        let mut conn = self.db_pool.get().await?;
 
-        match ProcessorStatusQuery::get_by_processor(self.processor_config.name(), &mut conn)? {
+        match ProcessorStatusQuery::get_by_processor(self.processor_config.name(), &mut conn)
+            .await?
+        {
             Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
             None => Ok(None),
         }
@@ -410,9 +415,9 @@ impl Worker {
             processor_name = processor_name,
             "[Parser] Checking if chain id is correct"
         );
-        let mut conn = self.db_pool.get()?;
+        let mut conn = self.db_pool.get().await?;
 
-        let maybe_existing_chain_id = LedgerInfo::get(&mut conn)?.map(|li| li.chain_id);
+        let maybe_existing_chain_id = LedgerInfo::get(&mut conn).await?.map(|li| li.chain_id);
 
         match maybe_existing_chain_id {
             Some(chain_id) => {
@@ -439,6 +444,7 @@ impl Worker {
                         .on_conflict_do_nothing(),
                     None,
                 )
+                .await
                 .context("[Parser] Error updating chain_id!")
                 .map(|_| grpc_chain_id as u64)
             },

@@ -8,13 +8,14 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
@@ -40,18 +41,18 @@ impl Debug for UserTransactionProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     user_transactions: &[UserTransactionModel],
     signatures: &[Signature],
 ) -> Result<(), diesel::result::Error> {
-    insert_user_transactions(conn, user_transactions)?;
-    insert_signatures(conn, signatures)?;
+    insert_user_transactions(conn, user_transactions).await?;
+    insert_signatures(conn, signatures).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -67,7 +68,10 @@ fn insert_to_db(
     match conn
         .build_transaction()
         .read_write()
-        .run::<_, Error, _>(|pg_conn| insert_to_db_impl(pg_conn, &user_transactions, &signatures))
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_to_db_impl(pg_conn, &user_transactions, &signatures))
+        })
+        .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
@@ -77,14 +81,17 @@ fn insert_to_db(
             conn.build_transaction()
                 .read_write()
                 .run::<_, Error, _>(|pg_conn| {
-                    insert_to_db_impl(pg_conn, &user_transactions, &signatures)
+                    Box::pin(async move {
+                        insert_to_db_impl(pg_conn, &user_transactions, &signatures).await
+                    })
                 })
+                .await
         },
     }
 }
 
-fn insert_user_transactions(
-    conn: &mut PgConnection,
+async fn insert_user_transactions(
+    conn: &mut MyDbConnection,
     items_to_insert: &[UserTransactionModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::user_transactions::dsl::*;
@@ -101,13 +108,14 @@ fn insert_user_transactions(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_signatures(
-    conn: &mut PgConnection,
+async fn insert_signatures(
+    conn: &mut MyDbConnection,
     items_to_insert: &[Signature],
 ) -> Result<(), diesel::result::Error> {
     use schema::signatures::dsl::*;
@@ -125,7 +133,8 @@ fn insert_signatures(
                 ))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -143,7 +152,7 @@ impl ProcessorTrait for UserTransactionProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
         let mut signatures = vec![];
         let mut user_transactions = vec![];
         for txn in transactions {
@@ -169,7 +178,8 @@ impl ProcessorTrait for UserTransactionProcessor {
             end_version,
             user_transactions,
             signatures,
-        );
+        )
+        .await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(e) => {

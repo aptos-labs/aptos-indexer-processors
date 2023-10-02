@@ -65,13 +65,13 @@ pub struct CurrentFungibleAssetBalance {
 
 impl FungibleAssetBalance {
     /// Basically just need to index FA Store, but we'll need to look up FA metadata
-    pub fn get_v2_from_write_resource(
+    pub async fn get_v2_from_write_resource(
         write_resource: &WriteResource,
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
         {
@@ -86,7 +86,9 @@ impl FungibleAssetBalance {
                     conn,
                     &asset_type,
                     fungible_asset_metadata,
-                ) {
+                )
+                .await
+                {
                     return Ok(None);
                 }
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);

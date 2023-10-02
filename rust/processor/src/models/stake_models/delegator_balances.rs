@@ -18,6 +18,7 @@ use aptos_indexer_protos::transaction::v1::{
 };
 use bigdecimal::{BigDecimal, Zero};
 use diesel::{prelude::*, ExpressionMethods};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -58,7 +59,7 @@ pub struct CurrentDelegatorBalanceQuery {
 
 impl CurrentDelegatorBalance {
     /// Getting active share balances. Only 1 active pool per staking pool tracked in a single table
-    pub fn get_active_share_from_write_table_item(
+    pub async fn get_active_share_from_write_table_item(
         write_table_item: &WriteTableItem,
         txn_version: i64,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
@@ -102,12 +103,12 @@ impl CurrentDelegatorBalance {
 
     /// Getting inactive share balances. There could be multiple inactive pool per staking pool so we have
     /// 2 layers of mapping (table w/ all inactive pools -> staking pool, table w/ delegator inactive shares -> each inactive pool)
-    pub fn get_inactive_share_from_write_table_item(
+    pub async fn get_inactive_share_from_write_table_item(
         write_table_item: &WriteTableItem,
         txn_version: i64,
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -124,7 +125,9 @@ impl CurrentDelegatorBalance {
                     match Self::get_staking_pool_from_inactive_share_handle(
                         conn,
                         &inactive_pool_handle,
-                    ) {
+                    )
+                    .await
+                    {
                         Ok(pool) => pool,
                         Err(_) => {
                             tracing::error!(
@@ -194,12 +197,12 @@ impl CurrentDelegatorBalance {
     }
 
     // Setting amount to 0 if table item is deleted
-    pub fn get_inactive_share_from_delete_table_item(
+    pub async fn get_inactive_share_from_delete_table_item(
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -214,6 +217,7 @@ impl CurrentDelegatorBalance {
                 Some(pool_address) => pool_address,
                 None => {
                     Self::get_staking_pool_from_inactive_share_handle(conn, &inactive_pool_handle)
+                    .await
                         .context(format!("Failed to get staking pool address from inactive share handle {}, txn version {}",
                         inactive_pool_handle, txn_version
                     ))?
@@ -291,14 +295,16 @@ impl CurrentDelegatorBalance {
         }
     }
 
-    pub fn get_staking_pool_from_inactive_share_handle(
-        conn: &mut PgPoolConnection,
+    pub async fn get_staking_pool_from_inactive_share_handle(
+        conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
     ) -> anyhow::Result<String> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match CurrentDelegatorBalanceQuery::get_by_inactive_share_handle(conn, table_handle) {
+            match CurrentDelegatorBalanceQuery::get_by_inactive_share_handle(conn, table_handle)
+                .await
+            {
                 Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
@@ -310,10 +316,10 @@ impl CurrentDelegatorBalance {
         ))
     }
 
-    pub fn from_transaction(
+    pub async fn from_transaction(
         transaction: &Transaction,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<CurrentDelegatorBalanceMap> {
         let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = HashMap::new();
         let mut inactive_share_to_pool: ShareToPoolMapping = HashMap::new();
@@ -359,6 +365,7 @@ impl CurrentDelegatorBalance {
                             &inactive_share_to_pool,
                             conn,
                         )
+                        .await
                         .unwrap()
                     }
                 },
@@ -368,6 +375,7 @@ impl CurrentDelegatorBalance {
                         txn_version,
                         active_pool_to_staking_pool,
                     )
+                    .await
                     .unwrap()
                     {
                         Some(balance)
@@ -379,6 +387,7 @@ impl CurrentDelegatorBalance {
                             &inactive_share_to_pool,
                             conn,
                         )
+                        .await
                         .unwrap()
                     }
                 },
@@ -400,12 +409,13 @@ impl CurrentDelegatorBalance {
 }
 
 impl CurrentDelegatorBalanceQuery {
-    pub fn get_by_inactive_share_handle(
-        conn: &mut PgPoolConnection,
+    pub async fn get_by_inactive_share_handle(
+        conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
     ) -> diesel::QueryResult<Self> {
         current_delegator_balances::table
             .filter(current_delegator_balances::parent_table_handle.eq(table_handle))
             .first::<Self>(conn)
+            .await
     }
 }

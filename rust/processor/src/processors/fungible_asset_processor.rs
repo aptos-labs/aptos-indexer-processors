@@ -20,7 +20,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+            PgPoolConnection,
         },
         util::{get_entry_function_from_user_request, standardize_address},
     },
@@ -31,7 +32,7 @@ use aptos_indexer_protos::transaction::v1::{
 };
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -58,22 +59,22 @@ impl Debug for FungibleAssetProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     fungible_asset_activities: &[FungibleAssetActivity],
     fungible_asset_metadata: &[FungibleAssetMetadataModel],
     fungible_asset_balances: &[FungibleAssetBalance],
     current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
 ) -> Result<(), diesel::result::Error> {
-    insert_fungible_asset_activities(conn, fungible_asset_activities)?;
-    insert_fungible_asset_metadata(conn, fungible_asset_metadata)?;
-    insert_fungible_asset_balances(conn, fungible_asset_balances)?;
-    insert_current_fungible_asset_balances(conn, current_fungible_asset_balances)?;
+    insert_fungible_asset_activities(conn, fungible_asset_activities).await?;
+    insert_fungible_asset_metadata(conn, fungible_asset_metadata).await?;
+    insert_fungible_asset_balances(conn, fungible_asset_balances).await?;
+    insert_current_fungible_asset_balances(conn, current_fungible_asset_balances).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -92,38 +93,48 @@ fn insert_to_db(
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            insert_to_db_impl(
+            Box::pin(insert_to_db_impl(
                 pg_conn,
                 &fungible_asset_activities,
                 &fungible_asset_metadata,
                 &fungible_asset_balances,
                 &current_fungible_asset_balances,
-            )
-        }) {
+            ))
+        })
+        .await
+    {
         Ok(_) => Ok(()),
-        Err(_) => conn
-            .build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                let fungible_asset_activities = clean_data_for_db(fungible_asset_activities, true);
-                let fungible_asset_metadata = clean_data_for_db(fungible_asset_metadata, true);
-                let fungible_asset_balances = clean_data_for_db(fungible_asset_balances, true);
-                let current_fungible_asset_balances =
-                    clean_data_for_db(current_fungible_asset_balances, true);
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let fungible_asset_activities =
+                            clean_data_for_db(fungible_asset_activities, true);
+                        let fungible_asset_metadata =
+                            clean_data_for_db(fungible_asset_metadata, true);
+                        let fungible_asset_balances =
+                            clean_data_for_db(fungible_asset_balances, true);
+                        let current_fungible_asset_balances =
+                            clean_data_for_db(current_fungible_asset_balances, true);
 
-                insert_to_db_impl(
-                    pg_conn,
-                    &fungible_asset_activities,
-                    &fungible_asset_metadata,
-                    &fungible_asset_balances,
-                    &current_fungible_asset_balances,
-                )
-            }),
+                        insert_to_db_impl(
+                            pg_conn,
+                            &fungible_asset_activities,
+                            &fungible_asset_metadata,
+                            &fungible_asset_balances,
+                            &current_fungible_asset_balances,
+                        )
+                        .await
+                    })
+                })
+                .await
+        },
     }
 }
 
-fn insert_fungible_asset_activities(
-    conn: &mut PgConnection,
+async fn insert_fungible_asset_activities(
+    conn: &mut MyDbConnection,
     item_to_insert: &[FungibleAssetActivity],
 ) -> Result<(), diesel::result::Error> {
     use schema::fungible_asset_activities::dsl::*;
@@ -137,13 +148,14 @@ fn insert_fungible_asset_activities(
                 .on_conflict((transaction_version, event_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_fungible_asset_metadata(
-    conn: &mut PgConnection,
+async fn insert_fungible_asset_metadata(
+    conn: &mut MyDbConnection,
     item_to_insert: &[FungibleAssetMetadataModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::fungible_asset_metadata::dsl::*;
@@ -176,13 +188,13 @@ fn insert_fungible_asset_metadata(
                     )
                 ),
             Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_fungible_asset_balances(
-    conn: &mut PgConnection,
+async fn insert_fungible_asset_balances(
+    conn: &mut MyDbConnection,
     item_to_insert: &[FungibleAssetBalance],
 ) -> Result<(), diesel::result::Error> {
     use schema::fungible_asset_balances::dsl::*;
@@ -200,13 +212,14 @@ fn insert_fungible_asset_balances(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_fungible_asset_balances(
-    conn: &mut PgConnection,
+async fn insert_current_fungible_asset_balances(
+    conn: &mut MyDbConnection,
     item_to_insert: &[CurrentFungibleAssetBalance],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_fungible_asset_balances::dsl::*;
@@ -236,7 +249,7 @@ fn insert_current_fungible_asset_balances(
                     )
                 ),
             Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
@@ -254,13 +267,13 @@ impl ProcessorTrait for FungibleAssetProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
         let (
             fungible_asset_activities,
             fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
-        ) = parse_v2_coin(&transactions, &mut conn);
+        ) = parse_v2_coin(&transactions, &mut conn).await;
 
         let tx_result = insert_to_db(
             &mut conn,
@@ -271,7 +284,8 @@ impl ProcessorTrait for FungibleAssetProcessor {
             fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
-        );
+        )
+        .await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(err) => {
@@ -293,9 +307,9 @@ impl ProcessorTrait for FungibleAssetProcessor {
 }
 
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
-fn parse_v2_coin(
+async fn parse_v2_coin(
     transactions: &[Transaction],
-    conn: &mut PgPoolConnection,
+    conn: &mut PgPoolConnection<'_>,
 ) -> (
     Vec<FungibleAssetActivity>,
     Vec<FungibleAssetMetadataModel>,
@@ -452,6 +466,7 @@ fn parse_v2_coin(
                 &fungible_asset_object_helper,
                 conn,
             )
+            .await
             .unwrap_or_else(|e| {
                 tracing::error!(
                     transaction_version = txn_version,
@@ -507,6 +522,7 @@ fn parse_v2_coin(
                         &fungible_asset_object_helper,
                         conn,
                     )
+                    .await
                     .unwrap_or_else(|e| {
                         tracing::error!(
                         transaction_version = txn_version,

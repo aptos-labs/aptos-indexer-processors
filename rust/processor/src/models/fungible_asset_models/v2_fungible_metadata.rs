@@ -18,6 +18,7 @@ use crate::{
 use anyhow::Context;
 use aptos_indexer_protos::transaction::v1::WriteResource;
 use diesel::{prelude::*, sql_query, sql_types::Text};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -134,8 +135,8 @@ impl FungibleAssetMetadataModel {
     /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
     /// 1. If metadata is present without token object, then it's not a token
     /// 2. If metadata is not present, we will do a lookup in the db. If it's not there, it's a token
-    pub fn is_address_fungible_asset(
-        conn: &mut PgPoolConnection,
+    pub async fn is_address_fungible_asset(
+        conn: &mut PgPoolConnection<'_>,
         address: &str,
         fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
     ) -> bool {
@@ -143,7 +144,7 @@ impl FungibleAssetMetadataModel {
             metadata.token.is_none()
         } else {
             // Look up in the db
-            Self::query_is_address_fungible_asset(conn, address)
+            Self::query_is_address_fungible_asset(conn, address).await
         }
     }
 
@@ -151,11 +152,14 @@ impl FungibleAssetMetadataModel {
     /// and if we can't find after 3 times, we'll assume that it's not a fungible asset.
     /// TODO: An improvement is to combine this with is_address_token. To do this well we need
     /// a k-v store
-    fn query_is_address_fungible_asset(conn: &mut PgPoolConnection, address: &str) -> bool {
+    async fn query_is_address_fungible_asset(
+        conn: &mut PgPoolConnection<'_>,
+        address: &str,
+    ) -> bool {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match Self::get_by_asset_type(conn, address) {
+            match Self::get_by_asset_type(conn, address).await {
                 Ok(_) => return true,
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
@@ -166,11 +170,15 @@ impl FungibleAssetMetadataModel {
     }
 
     /// TODO: Change this to a KV store
-    fn get_by_asset_type(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<String> {
+    async fn get_by_asset_type(
+        conn: &mut PgPoolConnection<'_>,
+        address: &str,
+    ) -> anyhow::Result<String> {
         let mut res: Vec<Option<AssetTypeFromTable>> =
             sql_query("SELECT asset_type FROM fungible_asset_metadata WHERE asset_type = $1")
                 .bind::<Text, _>(address)
-                .get_results(conn)?;
+                .get_results(conn)
+                .await?;
         Ok(res
             .pop()
             .context("fungible asset metadata result empty")?

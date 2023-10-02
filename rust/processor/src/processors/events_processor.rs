@@ -6,13 +6,14 @@ use crate::{
     models::events_models::events::EventModel,
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::{result::Error, PgConnection};
+use diesel::result::Error;
 use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
@@ -38,16 +39,16 @@ impl Debug for EventsProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     events: &[EventModel],
 ) -> Result<(), diesel::result::Error> {
-    insert_events(conn, events)?;
+    insert_events(conn, events).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -62,21 +63,26 @@ fn insert_to_db(
     match conn
         .build_transaction()
         .read_write()
-        .run::<_, Error, _>(|pg_conn| insert_to_db_impl(pg_conn, &events))
+        .run::<_, Error, _>(|pg_conn| Box::pin(insert_to_db_impl(pg_conn, &events)))
+        .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
-            let events = clean_data_for_db(events, true);
-
             conn.build_transaction()
                 .read_write()
-                .run::<_, Error, _>(|pg_conn| insert_to_db_impl(pg_conn, &events))
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async move {
+                        let events = clean_data_for_db(events, true);
+                        insert_to_db_impl(pg_conn, &events).await
+                    })
+                })
+                .await
         },
     }
 }
 
-fn insert_events(
-    conn: &mut PgConnection,
+async fn insert_events(
+    conn: &mut MyDbConnection,
     items_to_insert: &[EventModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::events::dsl::*;
@@ -89,7 +95,8 @@ fn insert_events(
                 .on_conflict((transaction_version, event_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -107,7 +114,7 @@ impl ProcessorTrait for EventsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
         let mut events = vec![];
         for txn in &transactions {
             let txn_version = txn.version as i64;
@@ -125,7 +132,8 @@ impl ProcessorTrait for EventsProcessor {
             events.extend(txn_events);
         }
 
-        let tx_result = insert_to_db(&mut conn, self.name(), start_version, end_version, events);
+        let tx_result =
+            insert_to_db(&mut conn, self.name(), start_version, end_version, events).await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(e) => {

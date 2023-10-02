@@ -33,6 +33,7 @@ use aptos_indexer_protos::transaction::v1::{
 };
 use bigdecimal::{BigDecimal, One, Zero};
 use diesel::{prelude::*, ExpressionMethods};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -277,14 +278,14 @@ impl TokenOwnershipV2 {
     }
 
     /// This handles the case where token is burned and objectCore is deleted
-    pub fn get_burned_nft_v2_from_delete_resource(
+    pub async fn get_burned_nft_v2_from_delete_resource(
         write_resource: &DeleteResource,
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &HashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         if let Some(token_address) =
             tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
@@ -296,7 +297,9 @@ impl TokenOwnershipV2 {
                     match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                         conn,
                         token_address,
-                    ) {
+                    )
+                    .await
+                    {
                         Ok(nft) => nft,
                         Err(_) => {
                             tracing::error!(
@@ -353,13 +356,13 @@ impl TokenOwnershipV2 {
     }
 
     // Getting this from 0x1::fungible_asset::FungibleStore
-    pub fn get_ft_v2_from_write_resource(
+    pub async fn get_ft_v2_from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
@@ -384,6 +387,7 @@ impl TokenOwnershipV2 {
                 let token_data_id = inner.metadata.get_reference_address();
                 // Exit early if it's not a token
                 if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
+                    .await
                 {
                     return Ok(None);
                 }
@@ -590,14 +594,14 @@ impl TokenOwnershipV2 {
 }
 
 impl CurrentTokenOwnershipV2Query {
-    pub fn get_latest_owned_nft_by_token_data_id(
-        conn: &mut PgPoolConnection,
+    pub async fn get_latest_owned_nft_by_token_data_id(
+        conn: &mut PgPoolConnection<'_>,
         token_data_id: &str,
     ) -> anyhow::Result<NFTOwnershipV2> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id) {
+            match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id).await {
                 Ok(inner) => {
                     return Ok(NFTOwnershipV2 {
                         token_data_id: inner.token_data_id.clone(),
@@ -616,13 +620,14 @@ impl CurrentTokenOwnershipV2Query {
         ))
     }
 
-    fn get_latest_owned_nft_by_token_data_id_impl(
-        conn: &mut PgPoolConnection,
+    async fn get_latest_owned_nft_by_token_data_id_impl(
+        conn: &mut PgPoolConnection<'_>,
         token_data_id: &str,
     ) -> diesel::QueryResult<Self> {
         current_token_ownerships_v2::table
             .filter(current_token_ownerships_v2::token_data_id.eq(token_data_id))
             .filter(current_token_ownerships_v2::amount.gt(BigDecimal::zero()))
             .first::<Self>(conn)
+            .await
     }
 }
