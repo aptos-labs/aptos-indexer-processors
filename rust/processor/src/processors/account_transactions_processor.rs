@@ -6,13 +6,14 @@ use crate::{
     models::account_transaction_models::account_transactions::AccountTransaction,
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{result::Error, PgConnection};
+use diesel::result::Error;
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -38,16 +39,16 @@ impl Debug for AccountTransactionsProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     account_transactions: &[AccountTransaction],
 ) -> Result<(), diesel::result::Error> {
-    insert_account_transactions(conn, account_transactions)?;
+    insert_account_transactions(conn, account_transactions).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -62,22 +63,26 @@ fn insert_to_db(
     match conn
         .build_transaction()
         .read_write()
-        .run::<_, Error, _>(|pg_conn| insert_to_db_impl(pg_conn, &account_transactions))
+        .run::<_, Error, _>(|pg_conn| Box::pin(insert_to_db_impl(pg_conn, &account_transactions)))
+        .await
     {
         Ok(_) => Ok(()),
-        Err(_) => conn
-            .build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                let account_transactions = clean_data_for_db(account_transactions, true);
-
-                insert_to_db_impl(pg_conn, &account_transactions)
-            }),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        insert_to_db_impl(pg_conn, &clean_data_for_db(account_transactions, true))
+                            .await
+                    })
+                })
+                .await
+        },
     }
 }
 
-fn insert_account_transactions(
-    conn: &mut PgConnection,
+async fn insert_account_transactions(
+    conn: &mut MyDbConnection,
     item_to_insert: &[AccountTransaction],
 ) -> Result<(), diesel::result::Error> {
     use schema::account_transactions::dsl::*;
@@ -91,7 +96,8 @@ fn insert_account_transactions(
                 .on_conflict((transaction_version, account_address))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -109,7 +115,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
         let mut account_transactions = HashMap::new();
 
         for txn in &transactions {
@@ -131,7 +137,8 @@ impl ProcessorTrait for AccountTransactionsProcessor {
             start_version,
             end_version,
             account_transactions,
-        );
+        )
+        .await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(err) => {

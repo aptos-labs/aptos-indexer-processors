@@ -23,6 +23,8 @@ bigdecimal = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 diesel = { workspace = true }
+diesel-async = { workspace = true }
+diesel_async_migrations = { workspace = true }
 diesel_migrations = { workspace = true }
 enum_dispatch = { workspace = true }
 field_count = { workspace = true }

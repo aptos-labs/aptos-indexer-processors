@@ -5,19 +5,28 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::utils::util::remove_null_bytes;
 use diesel::{
-    pg::{Pg, PgConnection},
+    pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
-    r2d2::{ConnectionManager, PoolError, PooledConnection},
-    QueryResult, RunQueryDsl,
+    QueryResult,
 };
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_async::{
+    pg::AsyncPgConnection,
+    pooled_connection::{
+        bb8::{Pool, PooledConnection},
+        AsyncDieselConnectionManager, PoolError,
+    },
+    RunQueryDsl,
+};
+use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
+use once_cell::sync::Lazy;
 use std::{cmp::min, sync::Arc};
 
-pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
+pub type MyDbConnection = AsyncPgConnection;
+pub type PgPool = Pool<MyDbConnection>;
 pub type PgDbPool = Arc<PgPool>;
-pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
+pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+pub static MIGRATIONS: Lazy<EmbeddedMigrations> = Lazy::new(|| embed_migrations!());
 
 #[derive(QueryId)]
 /// Using this will append a where clause at the end of the string upsert function, e.g.
@@ -60,18 +69,25 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
     }
 }
 
-pub fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
-    let manager = ConnectionManager::<PgConnection>::new(database_url);
-    PgPool::builder().build(manager).map(Arc::new)
+pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
+    let config = AsyncDieselConnectionManager::<MyDbConnection>::new(database_url);
+    Ok(Arc::new(Pool::builder().build(config).await?))
 }
 
-pub fn execute_with_better_error<U>(
-    conn: &mut PgConnection,
+/*
+pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<AsyncPgConnection>, PoolError> {
+    let connection = pool.get().await.unwrap();
+    Ok(AsyncConnectionWrapper::from(connection))
+}
+*/
+
+pub async fn execute_with_better_error<U>(
+    conn: &mut MyDbConnection,
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
 where
-    U: QueryFragment<Pg> + diesel::query_builder::QueryId,
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
@@ -85,15 +101,17 @@ where
     };
     let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
     tracing::debug!("Executing query: {:?}", debug_string);
-    let res = final_query.execute(conn);
+    let res = final_query.execute(conn).await;
     if let Err(ref e) = res {
         tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
     }
     res
 }
 
-pub fn run_pending_migrations(conn: &mut PgConnection) {
-    conn.run_pending_migrations(MIGRATIONS)
+pub async fn run_pending_migrations(conn: &mut MyDbConnection) {
+    MIGRATIONS
+        .run_pending_migrations(conn)
+        .await
         .expect("[Parser] Migrations failed!");
 }
 
@@ -102,7 +120,7 @@ impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
     type SqlType = T::SqlType;
 }
 
-impl<T> RunQueryDsl<PgConnection> for UpsertFilterLatestTransactionQuery<T> {}
+//impl<T> RunQueryDsl<MyDbConnection> for UpsertFilterLatestTransactionQuery<T> {}
 
 impl<T> QueryFragment<Pg> for UpsertFilterLatestTransactionQuery<T>
 where

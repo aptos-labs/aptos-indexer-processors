@@ -16,6 +16,7 @@ use crate::{
 use aptos_indexer_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -81,12 +82,12 @@ pub struct CurrentCollectionDataQuery {
 }
 
 impl CollectionData {
-    pub fn from_write_table_item(
+    pub async fn from_write_table_item(
         table_item: &WriteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionData)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -105,7 +106,7 @@ impl CollectionData {
                 .map(|table_metadata| table_metadata.get_owner_address());
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
-                None => match Self::get_collection_creator(conn, &table_handle) {
+                None => match Self::get_collection_creator(conn, &table_handle).await {
                     Ok(creator) => creator,
                     Err(_) => {
                         tracing::error!(
@@ -164,14 +165,14 @@ impl CollectionData {
     /// If collection data is not in resources of the same transaction, then try looking for it in the database. Since collection owner
     /// cannot change, we can just look in the current_collection_datas table.
     /// Retrying a few times since this collection could've been written in a separate thread.
-    pub fn get_collection_creator(
-        conn: &mut PgPoolConnection,
+    pub async fn get_collection_creator(
+        conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
     ) -> anyhow::Result<String> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match CurrentCollectionDataQuery::get_by_table_handle(conn, table_handle) {
+            match CurrentCollectionDataQuery::get_by_table_handle(conn, table_handle).await {
                 Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
@@ -183,12 +184,13 @@ impl CollectionData {
 }
 
 impl CurrentCollectionDataQuery {
-    pub fn get_by_table_handle(
-        conn: &mut PgPoolConnection,
+    pub async fn get_by_table_handle(
+        conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
     ) -> diesel::QueryResult<Self> {
         current_collection_datas::table
             .filter(current_collection_datas::table_handle.eq(table_handle))
             .first::<Self>(conn)
+            .await
     }
 }

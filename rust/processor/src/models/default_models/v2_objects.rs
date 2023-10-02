@@ -17,6 +17,7 @@ use crate::{
 use aptos_indexer_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -108,12 +109,12 @@ impl Object {
     /// This handles the case where the entire object is deleted
     /// TODO: We need to detect if an object is only partially deleted
     /// using KV store
-    pub fn from_delete_resource(
+    pub async fn from_delete_resource(
         delete_resource: &DeleteResource,
         txn_version: i64,
         write_set_change_index: i64,
         object_mapping: &HashMap<CurrentObjectPK, CurrentObject>,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
         if delete_resource.type_str == "0x1::object::ObjectGroup" {
             let resource = MoveResource::from_delete_resource(
@@ -125,7 +126,7 @@ impl Object {
             let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
                 object.clone()
             } else {
-                match Self::get_object_owner(conn, &resource.address) {
+                match Self::get_object_owner(conn, &resource.address).await {
                     Ok(owner) => owner,
                     Err(_) => {
                         tracing::error!(
@@ -164,14 +165,14 @@ impl Object {
     }
 
     /// This is actually not great because object owner can change. The best we can do now though
-    fn get_object_owner(
-        conn: &mut PgPoolConnection,
+    async fn get_object_owner(
+        conn: &mut PgPoolConnection<'_>,
         object_address: &str,
     ) -> anyhow::Result<CurrentObject> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match CurrentObjectQuery::get_by_address(object_address, conn) {
+            match CurrentObjectQuery::get_by_address(object_address, conn).await {
                 Ok(res) => {
                     return Ok(CurrentObject {
                         object_address: res.object_address,
@@ -194,12 +195,13 @@ impl Object {
 
 impl CurrentObjectQuery {
     /// TODO: Change this to a KV store
-    pub fn get_by_address(
+    pub async fn get_by_address(
         object_address: &str,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> diesel::QueryResult<Self> {
         current_objects::table
             .filter(current_objects::object_address.eq(object_address))
             .first::<Self>(conn)
+            .await
     }
 }

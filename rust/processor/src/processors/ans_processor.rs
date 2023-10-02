@@ -13,7 +13,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+            PgPoolConnection,
         },
         util::standardize_address,
     },
@@ -23,7 +24,7 @@ use aptos_indexer_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
@@ -68,8 +69,8 @@ impl Debug for AnsProcessor {
     }
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -92,7 +93,7 @@ fn insert_to_db(
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            insert_to_db_impl(
+            Box::pin(insert_to_db_impl(
                 pg_conn,
                 &current_ans_lookups,
                 &ans_lookups,
@@ -102,40 +103,49 @@ fn insert_to_db(
                 &ans_lookups_v2,
                 &current_ans_primary_names_v2,
                 &ans_primary_names_v2,
-            )
-        }) {
+            ))
+        })
+        .await
+    {
         Ok(_) => Ok(()),
-        Err(_) => conn
-            .build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
-                let ans_lookups = clean_data_for_db(ans_lookups, true);
-                let current_ans_primary_names = clean_data_for_db(current_ans_primary_names, true);
-                let ans_primary_names = clean_data_for_db(ans_primary_names, true);
-                let current_ans_lookups_v2 = clean_data_for_db(current_ans_lookups_v2, true);
-                let ans_lookups_v2 = clean_data_for_db(ans_lookups_v2, true);
-                let current_ans_primary_names_v2 =
-                    clean_data_for_db(current_ans_primary_names_v2, true);
-                let ans_primary_names_v2 = clean_data_for_db(ans_primary_names_v2, true);
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
+                        let ans_lookups = clean_data_for_db(ans_lookups, true);
+                        let current_ans_primary_names =
+                            clean_data_for_db(current_ans_primary_names, true);
+                        let ans_primary_names = clean_data_for_db(ans_primary_names, true);
+                        let current_ans_lookups_v2 =
+                            clean_data_for_db(current_ans_lookups_v2, true);
+                        let ans_lookups_v2 = clean_data_for_db(ans_lookups_v2, true);
+                        let current_ans_primary_names_v2 =
+                            clean_data_for_db(current_ans_primary_names_v2, true);
+                        let ans_primary_names_v2 = clean_data_for_db(ans_primary_names_v2, true);
 
-                insert_to_db_impl(
-                    pg_conn,
-                    &current_ans_lookups,
-                    &ans_lookups,
-                    &current_ans_primary_names,
-                    &ans_primary_names,
-                    &current_ans_lookups_v2,
-                    &ans_lookups_v2,
-                    &current_ans_primary_names_v2,
-                    &ans_primary_names_v2,
-                )
-            }),
+                        insert_to_db_impl(
+                            pg_conn,
+                            &current_ans_lookups,
+                            &ans_lookups,
+                            &current_ans_primary_names,
+                            &ans_primary_names,
+                            &current_ans_lookups_v2,
+                            &ans_lookups_v2,
+                            &current_ans_primary_names_v2,
+                            &ans_primary_names_v2,
+                        )
+                        .await
+                    })
+                })
+                .await
+        },
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     current_ans_lookups: &[CurrentAnsLookup],
     ans_lookups: &[AnsLookup],
     current_ans_primary_names: &[CurrentAnsPrimaryName],
@@ -145,20 +155,34 @@ fn insert_to_db_impl(
     current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
     ans_primary_names_v2: &[AnsPrimaryNameV2],
 ) -> Result<(), diesel::result::Error> {
-    insert_current_ans_lookups(conn, current_ans_lookups)?;
-    insert_ans_lookups(conn, ans_lookups)?;
-    insert_current_ans_primary_names(conn, current_ans_primary_names)?;
-    insert_ans_primary_names(conn, ans_primary_names)?;
-    insert_current_ans_lookups_v2(conn, current_ans_lookups_v2)?;
-    insert_ans_lookups_v2(conn, ans_lookups_v2)?;
-    insert_current_ans_primary_names_v2(conn, current_ans_primary_names_v2)?;
-    insert_ans_primary_names_v2(conn, ans_primary_names_v2)?;
+    /*
+    // Execute the futures concurrently. The engine will pipeline the queries.
+    futures::try_join!(
+        insert_current_ans_lookups(conn, current_ans_lookups),
+        insert_ans_lookups(conn, ans_lookups),
+        insert_current_ans_primary_names(conn, current_ans_primary_names),
+        insert_ans_primary_names(conn, ans_primary_names),
+        insert_current_ans_lookups_v2(conn, current_ans_lookups_v2),
+        insert_ans_lookups_v2(conn, ans_lookups_v2),
+        insert_current_ans_primary_names_v2(conn, current_ans_primary_names_v2),
+        insert_ans_primary_names_v2(conn, ans_primary_names_v2),
+    )?;
+    */
+
+    insert_current_ans_lookups(conn, current_ans_lookups).await?;
+    insert_ans_lookups(conn, ans_lookups).await?;
+    insert_current_ans_primary_names(conn, current_ans_primary_names).await?;
+    insert_ans_primary_names(conn, ans_primary_names).await?;
+    insert_current_ans_lookups_v2(conn, current_ans_lookups_v2).await?;
+    insert_ans_lookups_v2(conn, ans_lookups_v2).await?;
+    insert_current_ans_primary_names_v2(conn, current_ans_primary_names_v2).await?;
+    insert_ans_primary_names_v2(conn, ans_primary_names_v2).await?;
 
     Ok(())
 }
 
-fn insert_current_ans_lookups(
-    conn: &mut PgConnection,
+async fn insert_current_ans_lookups(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentAnsLookup],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_ans_lookup::dsl::*;
@@ -181,13 +205,13 @@ fn insert_current_ans_lookups(
                         inserted_at.eq(excluded(inserted_at)),
                     )),
                     Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
-                )?;
+                ).await?;
     }
     Ok(())
 }
 
-fn insert_ans_lookups(
-    conn: &mut PgConnection,
+async fn insert_ans_lookups(
+    conn: &mut MyDbConnection,
     items_to_insert: &[AnsLookup],
 ) -> Result<(), diesel::result::Error> {
     use schema::ans_lookup::dsl::*;
@@ -202,13 +226,14 @@ fn insert_ans_lookups(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_ans_primary_names(
-    conn: &mut PgConnection,
+async fn insert_current_ans_primary_names(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentAnsPrimaryName],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_ans_primary_name::dsl::*;
@@ -231,13 +256,13 @@ fn insert_current_ans_primary_names(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_ans_primary_names(
-    conn: &mut PgConnection,
+async fn insert_ans_primary_names(
+    conn: &mut MyDbConnection,
     items_to_insert: &[AnsPrimaryName],
 ) -> Result<(), diesel::result::Error> {
     use schema::ans_primary_name::dsl::*;
@@ -252,13 +277,14 @@ fn insert_ans_primary_names(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_ans_lookups_v2(
-    conn: &mut PgConnection,
+async fn insert_current_ans_lookups_v2(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentAnsLookupV2],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_ans_lookup_v2::dsl::*;
@@ -281,13 +307,13 @@ fn insert_current_ans_lookups_v2(
                         inserted_at.eq(excluded(inserted_at)),
                     )),
                     Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
-                )?;
+                ).await?;
     }
     Ok(())
 }
 
-fn insert_ans_lookups_v2(
-    conn: &mut PgConnection,
+async fn insert_ans_lookups_v2(
+    conn: &mut MyDbConnection,
     items_to_insert: &[AnsLookupV2],
 ) -> Result<(), diesel::result::Error> {
     use schema::ans_lookup_v2::dsl::*;
@@ -302,13 +328,14 @@ fn insert_ans_lookups_v2(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_ans_primary_names_v2(
-    conn: &mut PgConnection,
+async fn insert_current_ans_primary_names_v2(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentAnsPrimaryNameV2],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_ans_primary_name_v2::dsl::*;
@@ -334,13 +361,13 @@ fn insert_current_ans_primary_names_v2(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_ans_primary_name_v2.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_ans_primary_names_v2(
-    conn: &mut PgConnection,
+async fn insert_ans_primary_names_v2(
+    conn: &mut MyDbConnection,
     items_to_insert: &[AnsPrimaryNameV2],
 ) -> Result<(), diesel::result::Error> {
     use schema::ans_primary_name_v2::dsl::*;
@@ -355,7 +382,8 @@ fn insert_ans_primary_names_v2(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -373,7 +401,7 @@ impl ProcessorTrait for AnsProcessor {
         end_version: u64,
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
 
         let (
             all_current_ans_lookups,
@@ -405,7 +433,8 @@ impl ProcessorTrait for AnsProcessor {
             all_ans_lookups_v2,
             all_current_ans_primary_names_v2,
             all_ans_primary_names_v2,
-        );
+        )
+        .await;
 
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),

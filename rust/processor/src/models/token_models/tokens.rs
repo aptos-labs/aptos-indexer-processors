@@ -68,10 +68,10 @@ impl Token {
     ///
     /// We also will compute current versions of the token tables which are at a higher granularity than the transactional tables (only
     /// state at the last transaction will be tracked, hence using hashmap to dedupe)
-    pub fn from_transaction(
+    pub async fn from_transaction(
         transaction: &Transaction,
         table_handle_to_owner: &TableHandleToOwner,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> (
         Vec<Self>,
         Vec<TokenOwnership>,
@@ -138,6 +138,7 @@ impl Token {
                                 table_handle_to_owner,
                                 conn,
                             )
+                            .await
                             .unwrap(),
                         ),
                         WriteSetChangeEnum::DeleteTableItem(delete_table_item) => (

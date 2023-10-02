@@ -63,7 +63,7 @@ pub struct FungibleAssetActivity {
 }
 
 impl FungibleAssetActivity {
-    pub fn get_v2_from_event(
+    pub async fn get_v2_from_event(
         event: &Event,
         txn_version: i64,
         block_height: i64,
@@ -71,7 +71,7 @@ impl FungibleAssetActivity {
         event_index: i64,
         entry_function_id_str: &Option<String>,
         fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(fa_event) =
@@ -90,7 +90,9 @@ impl FungibleAssetActivity {
                     conn,
                     &asset_type,
                     fungible_asset_metadata,
-                ) {
+                )
+                .await
+                {
                     return Ok(None);
                 }
 

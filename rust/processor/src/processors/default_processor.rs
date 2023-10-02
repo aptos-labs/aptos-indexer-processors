@@ -14,13 +14,14 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -46,8 +47,8 @@ impl Debug for DefaultProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     txns: &[TransactionModel],
     block_metadata_transactions: &[BlockMetadataTransactionModel],
     wscs: &[WriteSetChangeModel],
@@ -60,21 +61,21 @@ fn insert_to_db_impl(
     ),
     (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
-    insert_transactions(conn, txns)?;
-    insert_block_metadata_transactions(conn, block_metadata_transactions)?;
-    insert_write_set_changes(conn, wscs)?;
-    insert_move_modules(conn, move_modules)?;
-    insert_move_resources(conn, move_resources)?;
-    insert_table_items(conn, table_items)?;
-    insert_current_table_items(conn, current_table_items)?;
-    insert_table_metadata(conn, table_metadata)?;
-    insert_objects(conn, objects)?;
-    insert_current_objects(conn, current_objects)?;
+    insert_transactions(conn, txns).await?;
+    insert_block_metadata_transactions(conn, block_metadata_transactions).await?;
+    insert_write_set_changes(conn, wscs).await?;
+    insert_move_modules(conn, move_modules).await?;
+    insert_move_resources(conn, move_resources).await?;
+    insert_table_items(conn, table_items).await?;
+    insert_current_table_items(conn, current_table_items).await?;
+    insert_table_metadata(conn, table_metadata).await?;
+    insert_objects(conn, objects).await?;
+    insert_current_objects(conn, current_objects).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -100,7 +101,7 @@ fn insert_to_db(
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            insert_to_db_impl(
+            Box::pin(insert_to_db_impl(
                 pg_conn,
                 &txns,
                 &block_metadata_transactions,
@@ -113,45 +114,51 @@ fn insert_to_db(
                     &table_metadata,
                 ),
                 (&objects, &current_objects),
-            )
-        }) {
+            ))
+        })
+        .await
+    {
         Ok(_) => Ok(()),
         Err(_) => {
-            let txns = clean_data_for_db(txns, true);
-            let block_metadata_transactions = clean_data_for_db(block_metadata_transactions, true);
-            let wscs = clean_data_for_db(wscs, true);
-            let move_modules = clean_data_for_db(move_modules, true);
-            let move_resources = clean_data_for_db(move_resources, true);
-            let table_items = clean_data_for_db(table_items, true);
-            let current_table_items = clean_data_for_db(current_table_items, true);
-            let table_metadata = clean_data_for_db(table_metadata, true);
-            let objects = clean_data_for_db(objects, true);
-            let current_objects = clean_data_for_db(current_objects, true);
-
             conn.build_transaction()
                 .read_write()
                 .run::<_, Error, _>(|pg_conn| {
-                    insert_to_db_impl(
-                        pg_conn,
-                        &txns,
-                        &block_metadata_transactions,
-                        &wscs,
-                        (
-                            &move_modules,
-                            &move_resources,
-                            &table_items,
-                            &current_table_items,
-                            &table_metadata,
-                        ),
-                        (&objects, &current_objects),
-                    )
+                    Box::pin(async move {
+                        let txns = clean_data_for_db(txns, true);
+                        let block_metadata_transactions =
+                            clean_data_for_db(block_metadata_transactions, true);
+                        let wscs = clean_data_for_db(wscs, true);
+                        let move_modules = clean_data_for_db(move_modules, true);
+                        let move_resources = clean_data_for_db(move_resources, true);
+                        let table_items = clean_data_for_db(table_items, true);
+                        let current_table_items = clean_data_for_db(current_table_items, true);
+                        let table_metadata = clean_data_for_db(table_metadata, true);
+                        let objects = clean_data_for_db(objects, true);
+                        let current_objects = clean_data_for_db(current_objects, true);
+                        insert_to_db_impl(
+                            pg_conn,
+                            &txns,
+                            &block_metadata_transactions,
+                            &wscs,
+                            (
+                                &move_modules,
+                                &move_resources,
+                                &table_items,
+                                &current_table_items,
+                                &table_metadata,
+                            ),
+                            (&objects, &current_objects),
+                        )
+                        .await
+                    })
                 })
+                .await
         },
     }
 }
 
-fn insert_transactions(
-    conn: &mut PgConnection,
+async fn insert_transactions(
+    conn: &mut MyDbConnection,
     items_to_insert: &[TransactionModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::transactions::dsl::*;
@@ -164,13 +171,14 @@ fn insert_transactions(
                 .on_conflict(version)
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_block_metadata_transactions(
-    conn: &mut PgConnection,
+async fn insert_block_metadata_transactions(
+    conn: &mut MyDbConnection,
     items_to_insert: &[BlockMetadataTransactionModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::block_metadata_transactions::dsl::*;
@@ -186,13 +194,14 @@ fn insert_block_metadata_transactions(
                 .on_conflict(version)
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_write_set_changes(
-    conn: &mut PgConnection,
+async fn insert_write_set_changes(
+    conn: &mut MyDbConnection,
     items_to_insert: &[WriteSetChangeModel],
 ) -> Result<(), diesel::result::Error> {
     use schema::write_set_changes::dsl::*;
@@ -205,13 +214,14 @@ fn insert_write_set_changes(
                 .on_conflict((transaction_version, index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_move_modules(
-    conn: &mut PgConnection,
+async fn insert_move_modules(
+    conn: &mut MyDbConnection,
     items_to_insert: &[MoveModule],
 ) -> Result<(), diesel::result::Error> {
     use schema::move_modules::dsl::*;
@@ -224,13 +234,14 @@ fn insert_move_modules(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_move_resources(
-    conn: &mut PgConnection,
+async fn insert_move_resources(
+    conn: &mut MyDbConnection,
     items_to_insert: &[MoveResource],
 ) -> Result<(), diesel::result::Error> {
     use schema::move_resources::dsl::*;
@@ -243,13 +254,14 @@ fn insert_move_resources(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_table_items(
-    conn: &mut PgConnection,
+async fn insert_table_items(
+    conn: &mut MyDbConnection,
     items_to_insert: &[TableItem],
 ) -> Result<(), diesel::result::Error> {
     use schema::table_items::dsl::*;
@@ -262,13 +274,14 @@ fn insert_table_items(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_table_items(
-    conn: &mut PgConnection,
+async fn insert_current_table_items(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTableItem],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_table_items::dsl::*;
@@ -289,13 +302,13 @@ fn insert_current_table_items(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_table_metadata(
-    conn: &mut PgConnection,
+async fn insert_table_metadata(
+    conn: &mut MyDbConnection,
     items_to_insert: &[TableMetadata],
 ) -> Result<(), diesel::result::Error> {
     use schema::table_metadatas::dsl::*;
@@ -308,13 +321,14 @@ fn insert_table_metadata(
                 .on_conflict(handle)
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_objects(
-    conn: &mut PgConnection,
+async fn insert_objects(
+    conn: &mut MyDbConnection,
     items_to_insert: &[Object],
 ) -> Result<(), diesel::result::Error> {
     use schema::objects::dsl::*;
@@ -327,13 +341,14 @@ fn insert_objects(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_objects(
-    conn: &mut PgConnection,
+async fn insert_current_objects(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentObject],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_objects::dsl::*;
@@ -355,7 +370,7 @@ fn insert_current_objects(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
@@ -373,7 +388,7 @@ impl ProcessorTrait for DefaultProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
         let (txns, block_metadata_txns, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
@@ -445,6 +460,7 @@ impl ProcessorTrait for DefaultProcessor {
                             &all_current_objects,
                             &mut conn,
                         )
+                        .await
                         .unwrap()
                         {
                             all_objects.push(object.clone());
@@ -486,7 +502,8 @@ impl ProcessorTrait for DefaultProcessor {
                 table_metadata,
             ),
             (all_objects, all_current_objects),
-        );
+        )
+        .await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(e) => {

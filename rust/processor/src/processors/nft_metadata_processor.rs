@@ -92,7 +92,7 @@ impl ProcessorTrait for NftMetadataProcessor {
         end_version: u64,
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -108,7 +108,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
         // Publish CurrentTokenDataV2 and CurrentCollectionV2 from transactions
         let (token_datas, collections) =
-            parse_v2_token(&transactions, &table_handle_to_owner, &mut conn);
+            parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
         let mut pubsub_messages: Vec<PubsubMessage> =
             Vec::with_capacity(token_datas.len() + collections.len());
 
@@ -176,10 +176,10 @@ impl ProcessorTrait for NftMetadataProcessor {
 }
 
 /// Copied from token_processor;
-fn parse_v2_token(
+async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut PgPoolConnection,
+    conn: &mut PgPoolConnection<'_>,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
     let mut current_token_datas_v2: HashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         HashMap::new();
@@ -241,6 +241,7 @@ fn parse_v2_token(
                             table_handle_to_owner,
                             conn,
                         )
+                        .await
                         .unwrap()
                     {
                         current_collections_v2

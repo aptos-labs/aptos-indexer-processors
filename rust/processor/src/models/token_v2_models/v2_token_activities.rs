@@ -68,14 +68,14 @@ impl TokenActivityV2 {
     /// or by looking up the postgres table.
     /// TODO: Create artificial events for mint and burn. There are no mint and burn events so we'll have to
     /// add all the deposits/withdrawals and if it's positive/negative it's a mint/burn.
-    pub fn get_ft_v2_from_parsed_event(
+    pub async fn get_ft_v2_from_parsed_event(
         event: &Event,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(fa_event) =
@@ -92,6 +92,7 @@ impl TokenActivityV2 {
                 let token_data_id = fungible_asset.metadata.get_reference_address();
                 // Exit early if it's not a token
                 if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
+                    .await
                 {
                     return Ok(None);
                 }

@@ -3,7 +3,8 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{schema::processor_status, utils::database::PgPoolConnection};
-use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
+use diesel_async::RunQueryDsl;
 
 #[derive(AsChangeset, Debug, Insertable)]
 #[diesel(table_name = processor_status)]
@@ -23,13 +24,14 @@ pub struct ProcessorStatusQuery {
 }
 
 impl ProcessorStatusQuery {
-    pub fn get_by_processor(
+    pub async fn get_by_processor(
         processor_name: &str,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> diesel::QueryResult<Option<Self>> {
         processor_status::table
             .filter(processor_status::processor.eq(processor_name))
             .first::<Self>(conn)
+            .await
             .optional()
     }
 }

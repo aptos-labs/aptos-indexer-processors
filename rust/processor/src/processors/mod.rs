@@ -74,10 +74,10 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 
     /// Gets the connection.
     /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
-    fn get_conn(&self) -> PgPoolConnection {
+    async fn get_conn(&self) -> PgPoolConnection {
         let pool = self.connection_pool();
         loop {
-            match pool.get() {
+            match pool.get().await {
                 Ok(conn) => {
                     GOT_CONNECTION_COUNT.inc();
                     return conn;
@@ -85,8 +85,10 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                 Err(err) => {
                     UNABLE_TO_GET_CONNECTION_COUNT.inc();
                     tracing::error!(
-                        "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                        pool.connection_timeout(),
+                        // todo bb8 doesn't let you read the connection timeout.
+                        //"Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
+                        //pool.connection_timeout(),
+                        "Could not get DB connection from pool, will retry. Err: {:?}",
                         err
                     );
                 },
@@ -97,7 +99,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     /// Store last processed version from database. We can assume that all previously processed
     /// versions are successful because any gap would cause the processor to panic
     async fn update_last_processed_version(&self, version: u64) -> anyhow::Result<()> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
         let status = ProcessorStatus {
             processor: self.name().to_string(),
             last_success_version: version as i64,
@@ -114,7 +116,8 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                     processor_status::last_updated.eq(excluded(processor_status::last_updated)),
                 )),
             Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
-        )?;
+        )
+        .await?;
         Ok(())
     }
 }
