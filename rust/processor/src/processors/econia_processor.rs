@@ -1,7 +1,5 @@
 use super::{ProcessingResult, ProcessorTrait};
-use crate::models::events_models::events::EventModel;
 use crate::{
-    models::default_models::transactions::TransactionModel,
     models::events_models::events::EventModel,
     utils::{
         database::{execute_with_better_error, PgDbPool},
@@ -668,9 +666,10 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         {
                             let data: serde_json::Value = serde_json::from_str(&resource.data)
                                 .expect("Failed to parse MarketAccounts");
+                            let map_field = data.get("map").expect("No map field");
                             market_account_handles.push(MarketAccountHandle {
                                 user: resource.address.clone(),
-                                handle: opt_value_to_string(data["map"]["handle"])?,
+                                handle: opt_value_to_string(map_field.get("handle"))?,
                                 creation_time: time,
                             })
                         }
@@ -682,9 +681,8 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         {
                             continue;
                         }
-                        let market_account_id =
-                            u128::from_str(opt_value_to_string(&table_data.key)?)
-                                .expect("Failed to parse market account ID");
+                        let market_account_id = u128::from_str(&table_data.key)
+                            .expect("Failed to parse market account ID");
                         let data: serde_json::Value = serde_json::from_str(&table_data.value)
                             .expect("Failed to parse MarketAccount");
                         balance_updates.push(BalanceUpdate {
@@ -693,12 +691,12 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                             market_id: ((market_account_id >> SHIFT_MARKET_ID) as u64).into(),
                             custodian_id: ((market_account_id & HI_64) as u64).into(),
                             time,
-                            base_total: opt_value_to_big_decimal(data["base_total"])?,
-                            base_available: opt_value_to_big_decimal(data["base_available"])?,
-                            base_ceiling: opt_value_to_big_decimal(data["base_ceiling"])?,
-                            quote_total: opt_value_to_big_decimal(data["quote_total"])?,
-                            quote_available: opt_value_to_big_decimal(data["quote_available"])?,
-                            quote_ceiling: opt_value_to_big_decimal(data["quote_ceiling"])?,
+                            base_total: opt_value_to_big_decimal(data.get("base_total"))?,
+                            base_available: opt_value_to_big_decimal(data.get("base_available"))?,
+                            base_ceiling: opt_value_to_big_decimal(data.get("base_ceiling"))?,
+                            quote_total: opt_value_to_big_decimal(data.get("quote_total"))?,
+                            quote_available: opt_value_to_big_decimal(data.get("quote_available"))?,
+                            quote_ceiling: opt_value_to_big_decimal(data.get("quote_ceiling"))?,
                         })
                     },
                     _ => continue,
