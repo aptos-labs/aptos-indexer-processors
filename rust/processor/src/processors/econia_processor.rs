@@ -1,12 +1,15 @@
 use super::{ProcessingResult, ProcessorTrait};
+use crate::models::events_models::events::EventModel;
 use crate::{
     models::default_models::transactions::TransactionModel,
-    utils::{database::{execute_with_better_error, PgDbPool}, util::parse_timestamp},
+    utils::{
+        database::{execute_with_better_error, PgDbPool},
+        util::parse_timestamp,
+    },
 };
-use crate::models::events_models::events::EventModel;
 
 use anyhow::anyhow;
-use aptos_indexer_protos::transaction::v1::{Transaction, transaction::TxnData};
+use aptos_indexer_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
@@ -330,7 +333,7 @@ fn event_data_to_market_registration_event(
     let tick_size = opt_value_to_big_decimal(event.data.get("tick_size"))?;
     let min_size = opt_value_to_big_decimal(event.data.get("min_size"))?;
     let underwriter_id = opt_value_to_big_decimal(event.data.get("underwriter_id"))?;
-    let (base_name_generic, base_account_address, base_module_name, base_struct_name) =
+    let (base_name_generic, base_account_address, base_module_name_hex, base_struct_name_hex) =
         if opt_value_to_string(event.data.get("base_name_generic"))?.is_empty() {
             if let Some(base_type) = event.data.get("base_type") {
                 (
@@ -350,6 +353,11 @@ fn event_data_to_market_registration_event(
                 None,
             )
         };
+    let base_module_name =
+        base_module_name_hex.map(|s| hex_to_string(s.as_str()).expect("Expected hex string"));
+    let base_struct_name =
+        base_struct_name_hex.map(|s| hex_to_string(s.as_str()).expect("Expected hex string"));
+
     let (quote_account_address, quote_module_name_hex, quote_struct_name_hex) =
         if let Some(quote_type) = event.data.get("quote_type") {
             (
@@ -504,7 +512,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn();
-        
+
         // Create a hashmap to store block_height to timestamp.
         let mut block_height_to_timestamp: HashMap<i64, DateTime<Utc>> = HashMap::new();
         let mut user_transactions = vec![];
@@ -516,11 +524,8 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 block_height_to_timestamp.insert(
                     block_height,
                     DateTime::from_utc(
-                        parse_timestamp(
-                            txn.timestamp.as_ref().unwrap(),
-                            txn_version
-                        ),
-                        Utc
+                        parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version),
+                        Utc,
                     ),
                 );
                 user_transactions.push(txn);
@@ -535,8 +540,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let market_registration_type =
             format!("{}::registry::MarketRegistrationEvent", econia_address);
         let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", econia_address);
-        let place_market_order_type =
-            format!("{}::user::PlaceMarketOrderEvent", econia_address);
+        let place_market_order_type = format!("{}::user::PlaceMarketOrderEvent", econia_address);
         let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
 
         let mut cancel_order_events = vec![];
