@@ -681,8 +681,14 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         {
                             continue;
                         }
-                        let market_account_id = u128::from_str(&table_data.key)
-                            .expect("Failed to parse market account ID");
+                        let table_key: serde_json::Value = serde_json::from_str(&table_data.key)
+                            .expect("Failed to parse market account ID to JSON");
+                        let market_account_id = u128::from_str(
+                            &table_key
+                                .as_str()
+                                .expect("Failed to parse market account ID to string"),
+                        )
+                        .expect("Failed to parse market account ID to u128");
                         let data: serde_json::Value = serde_json::from_str(&table_data.value)
                             .expect("Failed to parse MarketAccount");
                         balance_updates.push(BalanceUpdate {
