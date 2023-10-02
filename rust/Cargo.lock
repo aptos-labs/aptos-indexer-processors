@@ -497,7 +497,6 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "diesel",
- "hex",
  "serde",
  "serde_json",
 ]
