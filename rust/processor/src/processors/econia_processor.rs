@@ -670,7 +670,8 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                                 .expect("Failed to parse MarketAccounts");
                             market_account_handles.push(MarketAccountHandle {
                                 user: resource.address.clone(),
-                                handle: data["map"]["handle"].as_str().unwrap().to_string(),
+                                handle: opt_value_to_string(data["map"]["handle"])?,
+                                creation_time: time,
                             })
                         }
                     },
@@ -681,10 +682,9 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                         {
                             continue;
                         }
-                        let table_key: serde_json::Value = serde_json::from_str(&table_data.key)
-                            .expect("Failed to parse market account ID");
                         let market_account_id =
-                            u128::from_str(table_key.as_str().unwrap()).unwrap();
+                            u128::from_str(opt_value_to_string(&table_data.key)?)
+                                .expect("Failed to parse market account ID");
                         let data: serde_json::Value = serde_json::from_str(&table_data.value)
                             .expect("Failed to parse MarketAccount");
                         balance_updates.push(BalanceUpdate {
@@ -693,26 +693,12 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                             market_id: ((market_account_id >> SHIFT_MARKET_ID) as u64).into(),
                             custodian_id: ((market_account_id & HI_64) as u64).into(),
                             time,
-                            base_total: u64::from_str(data["base_total"].as_str().unwrap())
-                                .unwrap()
-                                .into(),
-                            base_available: u64::from_str(data["base_available"].as_str().unwrap())
-                                .unwrap()
-                                .into(),
-                            base_ceiling: u64::from_str(data["base_ceiling"].as_str().unwrap())
-                                .unwrap()
-                                .into(),
-                            quote_total: u64::from_str(data["quote_total"].as_str().unwrap())
-                                .unwrap()
-                                .into(),
-                            quote_available: u64::from_str(
-                                data["quote_available"].as_str().unwrap(),
-                            )
-                            .unwrap()
-                            .into(),
-                            quote_ceiling: u64::from_str(data["quote_ceiling"].as_str().unwrap())
-                                .unwrap()
-                                .into(),
+                            base_total: opt_value_to_big_decimal(data["base_total"])?,
+                            base_available: opt_value_to_big_decimal(data["base_available"])?,
+                            base_ceiling: opt_value_to_big_decimal(data["base_ceiling"])?,
+                            quote_total: opt_value_to_big_decimal(data["quote_total"])?,
+                            quote_available: opt_value_to_big_decimal(data["quote_available"])?,
+                            quote_ceiling: opt_value_to_big_decimal(data["quote_ceiling"])?,
                         })
                     },
                     _ => continue,
