@@ -1,5 +1,7 @@
 use super::{ProcessingResult, ProcessorTrait};
+use crate::models::events_models::events::EventModel;
 use crate::{
+    models::default_models::transactions::TransactionModel,
     models::events_models::events::EventModel,
     utils::{
         database::{execute_with_better_error, PgDbPool},
@@ -361,7 +363,7 @@ fn event_data_to_market_registration_event(
     let tick_size = opt_value_to_big_decimal(event.data.get("tick_size"))?;
     let min_size = opt_value_to_big_decimal(event.data.get("min_size"))?;
     let underwriter_id = opt_value_to_big_decimal(event.data.get("underwriter_id"))?;
-    let (base_name_generic, base_account_address, base_module_name, base_struct_name) =
+    let (base_name_generic, base_account_address, base_module_name_hex, base_struct_name_hex) =
         if opt_value_to_string(event.data.get("base_name_generic"))?.is_empty() {
             if let Some(base_type) = event.data.get("base_type") {
                 (
@@ -381,6 +383,11 @@ fn event_data_to_market_registration_event(
                 None,
             )
         };
+    let base_module_name =
+        base_module_name_hex.map(|s| hex_to_string(s.as_str()).expect("Expected hex string"));
+    let base_struct_name =
+        base_struct_name_hex.map(|s| hex_to_string(s.as_str()).expect("Expected hex string"));
+
     let (quote_account_address, quote_module_name_hex, quote_struct_name_hex) =
         if let Some(quote_type) = event.data.get("quote_type") {
             (
