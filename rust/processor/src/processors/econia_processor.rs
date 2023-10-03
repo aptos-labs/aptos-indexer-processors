@@ -1,37 +1,34 @@
 use super::{ProcessingResult, ProcessorTrait};
-use crate::models::events_models::events::EventModel;
 use crate::{
-    models::default_models::transactions::TransactionModel,
+    models::events_models::events::EventModel,
     utils::{
         database::{execute_with_better_error, PgDbPool},
         util::parse_timestamp,
     },
 };
-
 use anyhow::anyhow;
-use aptos_indexer_protos::transaction::v1::{transaction::TxnData, Transaction};
+use aptos_indexer_protos::transaction::v1::{
+    transaction::TxnData, write_set_change::Change, MoveStructTag, Transaction,
+};
 use async_trait::async_trait;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::{result::Error, PgConnection};
-use econia_db::models::CancelOrderEvent;
-use econia_db::models::ChangeOrderSizeEvent;
-use econia_db::models::FillEvent;
-use econia_db::models::MarketRegistrationEvent;
-use econia_db::models::PlaceLimitOrderEvent;
-use econia_db::models::PlaceMarketOrderEvent;
-use econia_db::models::PlaceSwapOrderEvent;
-use econia_db::schema::cancel_order_events;
-use econia_db::schema::change_order_size_events;
-use econia_db::schema::fill_events;
-use econia_db::schema::market_registration_events;
-use econia_db::schema::place_limit_order_events;
-use econia_db::schema::place_market_order_events;
-use econia_db::schema::place_swap_order_events;
+use econia_db::{
+    models::{
+        BalanceUpdate, CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle,
+        MarketRegistrationEvent, PlaceLimitOrderEvent, PlaceMarketOrderEvent, PlaceSwapOrderEvent,
+    },
+    schema::{
+        balance_updates_by_handle, cancel_order_events, change_order_size_events, fill_events,
+        market_account_handles, market_registration_events, place_limit_order_events,
+        place_market_order_events, place_swap_order_events,
+    },
+};
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
 
 pub const NAME: &str = "econia_processor";
 
@@ -65,6 +62,9 @@ impl Debug for EconiaTransactionProcessor {
         )
     }
 }
+
+const HI_64: u128 = 0xffffffffffffffff;
+const SHIFT_MARKET_ID: u8 = 64;
 
 fn hex_to_string(hex: &str) -> anyhow::Result<String> {
     if !hex.starts_with("0x") {
@@ -127,6 +127,20 @@ fn opt_value_to_i16(value: Option<&Value>) -> anyhow::Result<i16> {
 // version and event index, the second insertion will just be dropped
 // and lost to the wind. It will not return an error.
 
+fn insert_balance_updates(
+    conn: &mut PgConnection,
+    handles: Vec<BalanceUpdate>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(balance_updates_by_handle::table)
+            .values(&handles)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
+
 fn insert_cancel_order_events(
     conn: &mut PgConnection,
     events: Vec<CancelOrderEvent>,
@@ -163,6 +177,20 @@ fn insert_fill_events(
         conn,
         diesel::insert_into(fill_events::table)
             .values(&events)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
+
+fn insert_market_account_handles(
+    conn: &mut PgConnection,
+    handles: Vec<MarketAccountHandle>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(market_account_handles::table)
+            .values(&handles)
             .on_conflict_do_nothing(),
         None,
     )?;
@@ -537,21 +565,32 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let cancel_order_type = format!("{}::user::CancelOrderEvent", econia_address);
         let change_order_size_type = format!("{}::user::ChangeOrderSizeEvent", econia_address);
         let fill_type = format!("{}::user::FillEvent", econia_address);
+        let market_accounts_type = MoveStructTag {
+            address: econia_address.to_string(),
+            module: "user".to_string(),
+            name: "MarketAccounts".to_string(),
+            generic_type_params: vec![],
+        };
         let market_registration_type =
             format!("{}::registry::MarketRegistrationEvent", econia_address);
         let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", econia_address);
         let place_market_order_type = format!("{}::user::PlaceMarketOrderEvent", econia_address);
         let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
 
+        let mut balance_updates = vec![];
         let mut cancel_order_events = vec![];
         let mut change_order_size_events = vec![];
         let mut fill_events = vec![];
+        let mut market_account_handles = vec![];
         let mut market_registration_events = vec![];
         let mut place_limit_order_events = vec![];
         let mut place_market_order_events = vec![];
         let mut place_swap_order_events = vec![];
 
         for txn in user_transactions {
+            let time = *block_height_to_timestamp
+                .get(&txn.block_height.try_into().unwrap())
+                .expect("No block time");
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
@@ -566,11 +605,6 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             for (index, event) in events.iter().enumerate() {
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
-                let time = *block_height_to_timestamp
-                    .get(&event.transaction_block_height)
-                    // cannot panic because the loop beforehand populates the block height times
-                    .unwrap();
-
                 if event.type_ == cancel_order_type {
                     cancel_order_events.push(event_data_to_cancel_order_event(
                         event,
@@ -622,14 +656,68 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                     )?);
                 }
             }
+            // Index transaction write set.
+            let info = &txn.info.as_ref().expect("No transaction info");
+            for change in &info.changes {
+                match change.change.as_ref().expect("No transaction changes") {
+                    Change::WriteResource(resource) => {
+                        if resource.r#type.as_ref().expect("No resource type")
+                            == &market_accounts_type
+                        {
+                            let data: serde_json::Value = serde_json::from_str(&resource.data)
+                                .expect("Failed to parse MarketAccounts");
+                            let map_field = data.get("map").expect("No map field");
+                            market_account_handles.push(MarketAccountHandle {
+                                user: resource.address.clone(),
+                                handle: opt_value_to_string(map_field.get("handle"))?,
+                                creation_time: time,
+                            })
+                        }
+                    },
+                    Change::WriteTableItem(write) => {
+                        let table_data = write.data.as_ref().expect("No WriteTableItem data");
+                        if table_data.value_type
+                            != format!("{}::user::MarketAccount", econia_address)
+                        {
+                            continue;
+                        }
+                        let table_key: serde_json::Value = serde_json::from_str(&table_data.key)
+                            .expect("Failed to parse market account ID to JSON");
+                        let market_account_id = u128::from_str(
+                            &table_key
+                                .as_str()
+                                .expect("Failed to parse market account ID to string"),
+                        )
+                        .expect("Failed to parse market account ID to u128");
+                        let data: serde_json::Value = serde_json::from_str(&table_data.value)
+                            .expect("Failed to parse MarketAccount");
+                        balance_updates.push(BalanceUpdate {
+                            txn_version: txn_version.into(),
+                            handle: write.handle.to_string(),
+                            market_id: ((market_account_id >> SHIFT_MARKET_ID) as u64).into(),
+                            custodian_id: ((market_account_id & HI_64) as u64).into(),
+                            time,
+                            base_total: opt_value_to_big_decimal(data.get("base_total"))?,
+                            base_available: opt_value_to_big_decimal(data.get("base_available"))?,
+                            base_ceiling: opt_value_to_big_decimal(data.get("base_ceiling"))?,
+                            quote_total: opt_value_to_big_decimal(data.get("quote_total"))?,
+                            quote_available: opt_value_to_big_decimal(data.get("quote_available"))?,
+                            quote_ceiling: opt_value_to_big_decimal(data.get("quote_ceiling"))?,
+                        })
+                    },
+                    _ => continue,
+                }
+            }
         }
-
+        // Insert to the database all events and write sets.
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
+                insert_balance_updates(pg_conn, balance_updates)?;
                 insert_cancel_order_events(pg_conn, cancel_order_events)?;
                 insert_change_order_size_events(pg_conn, change_order_size_events)?;
                 insert_fill_events(pg_conn, fill_events)?;
+                insert_market_account_handles(pg_conn, market_account_handles)?;
                 insert_market_registration_events(pg_conn, market_registration_events)?;
                 insert_place_limit_order_events(pg_conn, place_limit_order_events)?;
                 insert_place_market_order_events(pg_conn, place_market_order_events)?;
