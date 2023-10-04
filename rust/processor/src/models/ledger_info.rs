@@ -3,7 +3,8 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{schema::ledger_infos, utils::database::PgPoolConnection};
-use diesel::{OptionalExtension, QueryDsl, RunQueryDsl};
+use diesel::{OptionalExtension, QueryDsl};
+use diesel_async::RunQueryDsl;
 
 #[derive(Debug, Identifiable, Insertable, Queryable)]
 #[diesel(table_name = ledger_infos)]
@@ -13,10 +14,11 @@ pub struct LedgerInfo {
 }
 
 impl LedgerInfo {
-    pub fn get(conn: &mut PgPoolConnection) -> diesel::QueryResult<Option<Self>> {
+    pub async fn get(conn: &mut PgPoolConnection<'_>) -> diesel::QueryResult<Option<Self>> {
         ledger_infos::table
             .select(ledger_infos::all_columns)
             .first::<Self>(conn)
+            .await
             .optional()
     }
 }

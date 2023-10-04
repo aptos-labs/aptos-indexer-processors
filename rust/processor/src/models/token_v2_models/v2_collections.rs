@@ -22,6 +22,7 @@ use anyhow::Context;
 use aptos_indexer_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use diesel::{prelude::*, sql_query, sql_types::Text};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -178,13 +179,13 @@ impl CollectionV2 {
         }
     }
 
-    pub fn get_v1_from_write_table_item(
+    pub async fn get_v1_from_write_table_item(
         table_item: &WriteTableItem,
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
-        conn: &mut PgPoolConnection,
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -204,14 +205,17 @@ impl CollectionV2 {
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
                 None => {
-                    match Self::get_collection_creator_for_v1(conn, &table_handle).context(format!(
-                        "Failed to get collection creator for table handle {}, txn version {}",
-                        table_handle, txn_version
-                    )) {
+                    match Self::get_collection_creator_for_v1(conn, &table_handle)
+                        .await
+                        .context(format!(
+                            "Failed to get collection creator for table handle {}, txn version {}",
+                            table_handle, txn_version
+                        )) {
                         Ok(ca) => ca,
                         Err(_) => {
                             // Try our best by getting from the older collection data
-                            match CollectionData::get_collection_creator(conn, &table_handle) {
+                            match CollectionData::get_collection_creator(conn, &table_handle).await
+                            {
                                 Ok(creator) => creator,
                                 Err(_) => {
                                     tracing::error!(
@@ -276,14 +280,14 @@ impl CollectionV2 {
     /// If collection data is not in resources of the same transaction, then try looking for it in the database. Since collection owner
     /// cannot change, we can just look in the current_collection_datas table.
     /// Retrying a few times since this collection could've been written in a separate thread.
-    fn get_collection_creator_for_v1(
-        conn: &mut PgPoolConnection,
+    async fn get_collection_creator_for_v1(
+        conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
     ) -> anyhow::Result<String> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match Self::get_by_table_handle(conn, table_handle) {
+            match Self::get_by_table_handle(conn, table_handle).await {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
@@ -294,15 +298,16 @@ impl CollectionV2 {
     }
 
     /// TODO: Change this to a KV store
-    fn get_by_table_handle(
-        conn: &mut PgPoolConnection,
+    async fn get_by_table_handle(
+        conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
     ) -> anyhow::Result<String> {
         let mut res: Vec<Option<CreatorFromCollectionTableV1>> = sql_query(
             "SELECT creator_address FROM current_collections_v2 WHERE table_handle_v1 = $1",
         )
         .bind::<Text, _>(table_handle)
-        .get_results(conn)?;
+        .get_results(conn)
+        .await?;
         Ok(res
             .pop()
             .context("collection result empty")?

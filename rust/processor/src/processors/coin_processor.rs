@@ -14,13 +14,14 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -47,24 +48,24 @@ impl Debug for CoinProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     coin_activities: &[CoinActivity],
     coin_infos: &[CoinInfo],
     coin_balances: &[CoinBalance],
     current_coin_balances: &[CurrentCoinBalance],
     coin_supply: &[CoinSupply],
 ) -> Result<(), diesel::result::Error> {
-    insert_coin_activities(conn, coin_activities)?;
-    insert_coin_infos(conn, coin_infos)?;
-    insert_coin_balances(conn, coin_balances)?;
-    insert_current_coin_balances(conn, current_coin_balances)?;
-    insert_coin_supply(conn, coin_supply)?;
+    insert_coin_activities(conn, coin_activities).await?;
+    insert_coin_infos(conn, coin_infos).await?;
+    insert_coin_balances(conn, coin_balances).await?;
+    insert_current_coin_balances(conn, current_coin_balances).await?;
+    insert_coin_supply(conn, coin_supply).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -84,40 +85,47 @@ fn insert_to_db(
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            insert_to_db_impl(
+            Box::pin(insert_to_db_impl(
                 pg_conn,
                 &coin_activities,
                 &coin_infos,
                 &coin_balances,
                 &current_coin_balances,
                 &coin_supply,
-            )
-        }) {
+            ))
+        })
+        .await
+    {
         Ok(_) => Ok(()),
-        Err(_) => conn
-            .build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                let coin_activities = clean_data_for_db(coin_activities, true);
-                let coin_infos = clean_data_for_db(coin_infos, true);
-                let coin_balances = clean_data_for_db(coin_balances, true);
-                let current_coin_balances = clean_data_for_db(current_coin_balances, true);
-                let coin_supply = clean_data_for_db(coin_supply, true);
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let coin_activities = clean_data_for_db(coin_activities, true);
+                        let coin_infos = clean_data_for_db(coin_infos, true);
+                        let coin_balances = clean_data_for_db(coin_balances, true);
+                        let current_coin_balances = clean_data_for_db(current_coin_balances, true);
+                        let coin_supply = clean_data_for_db(coin_supply, true);
 
-                insert_to_db_impl(
-                    pg_conn,
-                    &coin_activities,
-                    &coin_infos,
-                    &coin_balances,
-                    &current_coin_balances,
-                    &coin_supply,
-                )
-            }),
+                        insert_to_db_impl(
+                            pg_conn,
+                            &coin_activities,
+                            &coin_infos,
+                            &coin_balances,
+                            &current_coin_balances,
+                            &coin_supply,
+                        )
+                        .await
+                    })
+                })
+                .await
+        },
     }
 }
 
-fn insert_coin_activities(
-    conn: &mut PgConnection,
+async fn insert_coin_activities(
+    conn: &mut MyDbConnection,
     item_to_insert: &[CoinActivity],
 ) -> Result<(), diesel::result::Error> {
     use schema::coin_activities::dsl::*;
@@ -140,13 +148,14 @@ fn insert_coin_activities(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_coin_infos(
-    conn: &mut PgConnection,
+async fn insert_coin_infos(
+    conn: &mut MyDbConnection,
     item_to_insert: &[CoinInfo],
 ) -> Result<(), diesel::result::Error> {
     use schema::coin_infos::dsl::*;
@@ -171,13 +180,13 @@ fn insert_coin_infos(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_coin_balances(
-    conn: &mut PgConnection,
+async fn insert_coin_balances(
+    conn: &mut MyDbConnection,
     item_to_insert: &[CoinBalance],
 ) -> Result<(), diesel::result::Error> {
     use schema::coin_balances::dsl::*;
@@ -191,13 +200,14 @@ fn insert_coin_balances(
                 .on_conflict((transaction_version, owner_address, coin_type_hash))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_coin_balances(
-    conn: &mut PgConnection,
+async fn insert_current_coin_balances(
+    conn: &mut MyDbConnection,
     item_to_insert: &[CurrentCoinBalance],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_coin_balances::dsl::*;
@@ -217,13 +227,13 @@ fn insert_current_coin_balances(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
-            )?;
+            ).await?;
     }
     Ok(())
 }
 
-fn insert_coin_supply(
-    conn: &mut PgConnection,
+async fn insert_coin_supply(
+    conn: &mut MyDbConnection,
     item_to_insert: &[CoinSupply],
 ) -> Result<(), diesel::result::Error> {
     use schema::coin_supply::dsl::*;
@@ -237,7 +247,8 @@ fn insert_coin_supply(
                 .on_conflict((transaction_version, coin_type_hash))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -255,7 +266,7 @@ impl ProcessorTrait for CoinProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
@@ -302,7 +313,8 @@ impl ProcessorTrait for CoinProcessor {
             all_coin_balances,
             all_current_coin_balances,
             all_coin_supply,
-        );
+        )
+        .await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(err) => {

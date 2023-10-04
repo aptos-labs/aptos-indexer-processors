@@ -18,6 +18,7 @@ use anyhow::Context;
 use aptos_indexer_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use diesel::{prelude::*, sql_query, sql_types::Text};
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -235,8 +236,8 @@ impl TokenDataV2 {
     /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
     /// 1. If metadata is present with a token object, then is a token
     /// 2. If metadata is not present, we will do a lookup in the db.
-    pub fn is_address_fungible_token(
-        conn: &mut PgPoolConnection,
+    pub async fn is_address_fungible_token(
+        conn: &mut PgPoolConnection<'_>,
         address: &str,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
     ) -> bool {
@@ -244,7 +245,7 @@ impl TokenDataV2 {
             metadata.token.is_some()
         } else {
             // Look up in the db
-            Self::query_is_address_token(conn, address)
+            Self::query_is_address_token(conn, address).await
         }
     }
 
@@ -252,11 +253,11 @@ impl TokenDataV2 {
     /// and if we can't find after 3 times, we'll assume that it's not a token.
     /// TODO: An improvement is to combine this with is_address_coin. To do this well we need
     /// a k-v store
-    fn query_is_address_token(conn: &mut PgPoolConnection, address: &str) -> bool {
+    async fn query_is_address_token(conn: &mut PgPoolConnection<'_>, address: &str) -> bool {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            match Self::get_by_token_data_id(conn, address) {
+            match Self::get_by_token_data_id(conn, address).await {
                 Ok(_) => return true,
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
@@ -267,11 +268,15 @@ impl TokenDataV2 {
     }
 
     /// TODO: Change this to a KV store
-    fn get_by_token_data_id(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<String> {
+    async fn get_by_token_data_id(
+        conn: &mut PgPoolConnection<'_>,
+        address: &str,
+    ) -> anyhow::Result<String> {
         let mut res: Vec<Option<TokenDataIdFromTable>> =
             sql_query("SELECT token_data_id FROM current_token_datas_v2 WHERE token_data_id = $1")
                 .bind::<Text, _>(address)
-                .get_results(conn)?;
+                .get_results(conn)
+                .await?;
         Ok(res
             .pop()
             .context("token data result empty")?

@@ -17,13 +17,14 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection,
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
 use aptos_indexer_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
@@ -60,8 +61,8 @@ impl Debug for TokenProcessor {
     }
 }
 
-fn insert_to_db_impl(
-    conn: &mut PgConnection,
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
     basic_token_transaction_lists: (&[Token], &[TokenOwnership], &[TokenData], &[CollectionData]),
     basic_token_current_lists: (
         &[CurrentTokenOwnership],
@@ -75,21 +76,21 @@ fn insert_to_db_impl(
     let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
     let (current_token_ownerships, current_token_datas, current_collection_datas) =
         basic_token_current_lists;
-    insert_tokens(conn, tokens)?;
-    insert_token_datas(conn, token_datas)?;
-    insert_token_ownerships(conn, token_ownerships)?;
-    insert_collection_datas(conn, collection_datas)?;
-    insert_current_token_ownerships(conn, current_token_ownerships)?;
-    insert_current_token_datas(conn, current_token_datas)?;
-    insert_current_collection_datas(conn, current_collection_datas)?;
-    insert_token_activities(conn, token_activities)?;
-    insert_current_token_claims(conn, current_token_claims)?;
-    insert_nft_points(conn, nft_points)?;
+    insert_tokens(conn, tokens).await?;
+    insert_token_datas(conn, token_datas).await?;
+    insert_token_ownerships(conn, token_ownerships).await?;
+    insert_collection_datas(conn, collection_datas).await?;
+    insert_current_token_ownerships(conn, current_token_ownerships).await?;
+    insert_current_token_datas(conn, current_token_datas).await?;
+    insert_current_collection_datas(conn, current_collection_datas).await?;
+    insert_token_activities(conn, token_activities).await?;
+    insert_current_token_claims(conn, current_token_claims).await?;
+    insert_nft_points(conn, nft_points).await?;
     Ok(())
 }
 
-fn insert_to_db(
-    conn: &mut PgPoolConnection,
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -121,7 +122,7 @@ fn insert_to_db(
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            insert_to_db_impl(
+            Box::pin(insert_to_db_impl(
                 pg_conn,
                 (&tokens, &token_ownerships, &token_datas, &collection_datas),
                 (
@@ -132,42 +133,51 @@ fn insert_to_db(
                 &token_activities,
                 &current_token_claims,
                 &nft_points,
-            )
-        }) {
+            ))
+        })
+        .await
+    {
         Ok(_) => Ok(()),
-        Err(_) => conn
-            .build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| {
-                let tokens = clean_data_for_db(tokens, true);
-                let token_datas = clean_data_for_db(token_datas, true);
-                let token_ownerships = clean_data_for_db(token_ownerships, true);
-                let collection_datas = clean_data_for_db(collection_datas, true);
-                let current_token_ownerships = clean_data_for_db(current_token_ownerships, true);
-                let current_token_datas = clean_data_for_db(current_token_datas, true);
-                let current_collection_datas = clean_data_for_db(current_collection_datas, true);
-                let token_activities = clean_data_for_db(token_activities, true);
-                let current_token_claims = clean_data_for_db(current_token_claims, true);
-                let nft_points = clean_data_for_db(nft_points, true);
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let tokens = clean_data_for_db(tokens, true);
+                        let token_datas = clean_data_for_db(token_datas, true);
+                        let token_ownerships = clean_data_for_db(token_ownerships, true);
+                        let collection_datas = clean_data_for_db(collection_datas, true);
+                        let current_token_ownerships =
+                            clean_data_for_db(current_token_ownerships, true);
+                        let current_token_datas = clean_data_for_db(current_token_datas, true);
+                        let current_collection_datas =
+                            clean_data_for_db(current_collection_datas, true);
+                        let token_activities = clean_data_for_db(token_activities, true);
+                        let current_token_claims = clean_data_for_db(current_token_claims, true);
+                        let nft_points = clean_data_for_db(nft_points, true);
 
-                insert_to_db_impl(
-                    pg_conn,
-                    (&tokens, &token_ownerships, &token_datas, &collection_datas),
-                    (
-                        &current_token_ownerships,
-                        &current_token_datas,
-                        &current_collection_datas,
-                    ),
-                    &token_activities,
-                    &current_token_claims,
-                    &nft_points,
-                )
-            }),
+                        insert_to_db_impl(
+                            pg_conn,
+                            (&tokens, &token_ownerships, &token_datas, &collection_datas),
+                            (
+                                &current_token_ownerships,
+                                &current_token_datas,
+                                &current_collection_datas,
+                            ),
+                            &token_activities,
+                            &current_token_claims,
+                            &nft_points,
+                        )
+                        .await
+                    })
+                })
+                .await
+        },
     }
 }
 
-fn insert_tokens(
-    conn: &mut PgConnection,
+async fn insert_tokens(
+    conn: &mut MyDbConnection,
     tokens_to_insert: &[Token],
 ) -> Result<(), diesel::result::Error> {
     use schema::tokens::dsl::*;
@@ -181,13 +191,14 @@ fn insert_tokens(
                 .on_conflict((token_data_id_hash, property_version, transaction_version))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_token_ownerships(
-    conn: &mut PgConnection,
+async fn insert_token_ownerships(
+    conn: &mut MyDbConnection,
     token_ownerships_to_insert: &[TokenOwnership],
 ) -> Result<(), diesel::result::Error> {
     use schema::token_ownerships::dsl::*;
@@ -209,13 +220,14 @@ fn insert_token_ownerships(
                 ))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_token_datas(
-    conn: &mut PgConnection,
+async fn insert_token_datas(
+    conn: &mut MyDbConnection,
     token_datas_to_insert: &[TokenData],
 ) -> Result<(), diesel::result::Error> {
     use schema::token_datas::dsl::*;
@@ -229,13 +241,14 @@ fn insert_token_datas(
                 .on_conflict((token_data_id_hash, transaction_version))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_collection_datas(
-    conn: &mut PgConnection,
+async fn insert_collection_datas(
+    conn: &mut MyDbConnection,
     collection_datas_to_insert: &[CollectionData],
 ) -> Result<(), diesel::result::Error> {
     use schema::collection_datas::dsl::*;
@@ -252,13 +265,14 @@ fn insert_collection_datas(
                 .on_conflict((collection_data_id_hash, transaction_version))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
 
-fn insert_current_token_ownerships(
-    conn: &mut PgConnection,
+async fn insert_current_token_ownerships(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTokenOwnership],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_token_ownerships::dsl::*;
@@ -284,13 +298,13 @@ fn insert_current_token_ownerships(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_current_token_datas(
-    conn: &mut PgConnection,
+async fn insert_current_token_datas(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTokenData],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_token_datas::dsl::*;
@@ -327,13 +341,13 @@ fn insert_current_token_datas(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_current_collection_datas(
-    conn: &mut PgConnection,
+async fn insert_current_collection_datas(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentCollectionData],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_collection_datas::dsl::*;
@@ -362,13 +376,13 @@ fn insert_current_collection_datas(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_token_activities(
-    conn: &mut PgConnection,
+async fn insert_token_activities(
+    conn: &mut MyDbConnection,
     items_to_insert: &[TokenActivity],
 ) -> Result<(), diesel::result::Error> {
     use schema::token_activities::dsl::*;
@@ -388,12 +402,14 @@ fn insert_token_activities(
                 ))
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
-fn insert_current_token_claims(
-    conn: &mut PgConnection,
+
+async fn insert_current_token_claims(
+    conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTokenPendingClaim],
 ) -> Result<(), diesel::result::Error> {
     use schema::current_token_pending_claims::dsl::*;
@@ -425,13 +441,13 @@ fn insert_current_token_claims(
                     collection_id.eq(excluded(collection_id)),
                 )),
             Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
-        )?;
+        ).await?;
     }
     Ok(())
 }
 
-fn insert_nft_points(
-    conn: &mut PgConnection,
+async fn insert_nft_points(
+    conn: &mut MyDbConnection,
     items_to_insert: &[NftPoints],
 ) -> Result<(), diesel::result::Error> {
     use schema::nft_points::dsl::*;
@@ -446,7 +462,8 @@ fn insert_nft_points(
                 .on_conflict(transaction_version)
                 .do_nothing(),
             None,
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -464,7 +481,7 @@ impl ProcessorTrait for TokenProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn();
+        let mut conn = self.get_conn().await;
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -505,7 +522,7 @@ impl ProcessorTrait for TokenProcessor {
                 current_token_datas,
                 current_collection_datas,
                 current_token_claims,
-            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn);
+            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn).await;
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);
@@ -589,7 +606,8 @@ impl ProcessorTrait for TokenProcessor {
             all_token_activities,
             all_current_token_claims,
             all_nft_points,
-        );
+        )
+        .await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(e) => {
