@@ -576,6 +576,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", econia_address);
         let place_market_order_type = format!("{}::user::PlaceMarketOrderEvent", econia_address);
         let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
+        let recognized_market_type = format!("{}::registry::RecognizedMarketEvent", econia_address);
 
         let mut balance_updates = vec![];
         let mut cancel_order_events = vec![];
@@ -586,6 +587,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
         let mut place_limit_order_events = vec![];
         let mut place_market_order_events = vec![];
         let mut place_swap_order_events = vec![];
+        let mut recognized_market_events = vec![];
 
         for txn in user_transactions {
             let time = *block_height_to_timestamp
@@ -605,7 +607,10 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             for (index, event) in events.iter().enumerate() {
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
-                if event.type_ == cancel_order_type {
+                if event.type_ = recognized_market_type {
+                    println!("{:?}", event);
+                    panic!("Detected!")
+                } else if event.type_ == cancel_order_type {
                     cancel_order_events.push(event_data_to_cancel_order_event(
                         event,
                         txn_version,
