@@ -18,11 +18,12 @@ use econia_db::{
     models::{
         BalanceUpdate, CancelOrderEvent, ChangeOrderSizeEvent, FillEvent, MarketAccountHandle,
         MarketRegistrationEvent, PlaceLimitOrderEvent, PlaceMarketOrderEvent, PlaceSwapOrderEvent,
+        RecognizedMarketEvent,
     },
     schema::{
         balance_updates_by_handle, cancel_order_events, change_order_size_events, fill_events,
         market_account_handles, market_registration_events, place_limit_order_events,
-        place_market_order_events, place_swap_order_events,
+        place_market_order_events, place_swap_order_events, recognized_market_events,
     },
 };
 
@@ -197,6 +198,20 @@ fn insert_market_account_handles(
     Ok(())
 }
 
+fn insert_recognized_market_events(
+    conn: &mut PgConnection,
+    events: Vec<RecognizedMarketEvent>,
+) -> Result<(), diesel::result::Error> {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(recognized_market_events::table)
+            .values(&events)
+            .on_conflict_do_nothing(),
+        None,
+    )?;
+    Ok(())
+}
+
 fn insert_market_registration_events(
     conn: &mut PgConnection,
     events: Vec<MarketRegistrationEvent>,
@@ -348,6 +363,88 @@ fn event_data_to_fill_event(
     };
 
     Ok(fill_event)
+}
+
+fn event_data_to_recognized_market_event(
+    event: &EventModel,
+    txn_version: BigDecimal,
+    event_idx: BigDecimal,
+    time: DateTime<Utc>,
+) -> anyhow::Result<RecognizedMarketEvent> {
+    let market_info = event.data.get("recognized_market_info").unwrap().get("vec").unwrap().as_array().unwrap().get(0);
+    let mut lot_size = None;
+    let mut market_id = None;
+    let mut min_size = None;
+    let mut tick_size = None;
+    let mut underwriter_id = None;
+    match market_info {
+        Some(info) => {
+            lot_size = Some(opt_value_to_big_decimal(info.get("lot_size"))?);
+            market_id = Some(opt_value_to_big_decimal(info.get("market_id"))?);
+            min_size = Some(opt_value_to_big_decimal(info.get("min_size"))?);
+            tick_size = Some(opt_value_to_big_decimal(info.get("tick_size"))?);
+            underwriter_id = Some(opt_value_to_big_decimal(info.get("underwriter_id"))?);
+        },
+        _ => {}
+    }
+    let type_data = event.data.get("trading_pair").unwrap();
+    let (base_name_generic, base_account_address, base_module_name_hex, base_struct_name_hex) =
+    if opt_value_to_string(type_data.get("base_name_generic"))?.is_empty() {
+        if let Some(base_type) = type_data.get("base_type") {
+            (
+                None,
+                Some(opt_value_to_string(base_type.get("account_address"))?),
+                Some(opt_value_to_string(base_type.get("module_name"))?),
+                Some(opt_value_to_string(base_type.get("struct_name"))?),
+            )
+        } else {
+            anyhow::bail!("could not determine base");
+        }
+    } else {
+        (
+            Some(opt_value_to_string(type_data.get("base_name_generic"))?),
+            None,
+            None,
+            None,
+        )
+    };
+    let base_module_name =
+        base_module_name_hex.map(|s| hex_to_string(s.as_str()).expect("Expected hex string"));
+    let base_struct_name =
+        base_struct_name_hex.map(|s| hex_to_string(s.as_str()).expect("Expected hex string"));
+
+    let (quote_account_address, quote_module_name_hex, quote_struct_name_hex) =
+        if let Some(quote_type) = type_data.get("quote_type") {
+            (
+                opt_value_to_string(quote_type.get("account_address"))?,
+                opt_value_to_string(quote_type.get("module_name"))?,
+                opt_value_to_string(quote_type.get("struct_name"))?,
+            )
+        } else {
+            anyhow::bail!("could not determine quote");
+        };
+    let quote_module_name = hex_to_string(&quote_module_name_hex)?;
+    let quote_struct_name = hex_to_string(&quote_struct_name_hex)?;
+
+    let recognized_market_event = RecognizedMarketEvent {
+        txn_version,
+        event_idx,
+        market_id,
+        time,
+        base_name_generic,
+        base_account_address,
+        base_module_name,
+        base_struct_name,
+        quote_account_address,
+        quote_module_name,
+        quote_struct_name,
+        lot_size,
+        tick_size,
+        min_size,
+        underwriter_id,
+    };
+
+    Ok(recognized_market_event)
 }
 
 fn event_data_to_market_registration_event(
@@ -607,9 +704,13 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             for (index, event) in events.iter().enumerate() {
                 let txn_version = BigDecimal::from(txn.version);
                 let event_idx = BigDecimal::from(index as u64);
-                if event.type_ = recognized_market_type {
-                    println!("{:?}", event);
-                    panic!("Detected!")
+                if event.type_ == recognized_market_type {
+                    recognized_market_events.push(event_data_to_recognized_market_event(
+                        event,
+                        txn_version,
+                        event_idx,
+                        time,
+                    )?);
                 } else if event.type_ == cancel_order_type {
                     cancel_order_events.push(event_data_to_cancel_order_event(
                         event,
@@ -727,6 +828,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
                 insert_place_limit_order_events(pg_conn, place_limit_order_events)?;
                 insert_place_market_order_events(pg_conn, place_market_order_events)?;
                 insert_place_swap_order_events(pg_conn, place_swap_order_events)?;
+                insert_recognized_market_events(pg_conn, recognized_market_events)?;
                 Ok(())
             })?;
 
