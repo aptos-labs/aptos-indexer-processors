@@ -2,12 +2,11 @@
 This guide will get you started with creating an Aptos indexer with custom parsing. We have several endpoints that provided a streaming RPC of transaction data.
 
 ## GRPC Data Stream Endpoints(all endpoints are in GCP us-central1 unless specified)
-* devnet: 35.225.218.95:50051
+* devnet: https://grpc.devnet.aptoslabs.com:443
 
-* testnet: 35.223.137.149:50051
-  * Asia(GCP asia-northeast3): 34.64.252.224:50051
+* testnet: https://grpc.testnet.aptoslabs.com:443
 
-* mainnet: 34.30.218.153:50051
+* mainnet: https://grpc.mainnet.aptoslabs.com:443
 
 ## Request
  - `config.yaml`
