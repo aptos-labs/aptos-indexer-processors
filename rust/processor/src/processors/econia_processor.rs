@@ -672,7 +672,7 @@ impl ProcessorTrait for EconiaTransactionProcessor {
             format!("{}::registry::MarketRegistrationEvent", econia_address);
         let place_limit_order_type = format!("{}::user::PlaceLimitOrderEvent", econia_address);
         let place_market_order_type = format!("{}::user::PlaceMarketOrderEvent", econia_address);
-        let place_swap_order_type = format!("{}::user::PlaceSwapOrderEvent", econia_address);
+        let place_swap_order_type = format!("{}::market::PlaceSwapOrderEvent", econia_address);
         let recognized_market_type = format!("{}::registry::RecognizedMarketEvent", econia_address);
 
         let mut balance_updates = vec![];
