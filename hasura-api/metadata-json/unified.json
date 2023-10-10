@@ -1009,7 +1009,7 @@
             },
             "object_relationships": [
               {
-                "name": "cdn_uris",
+                "name": "cdn_asset_uri",
                 "using": {
                   "manual_configuration": {
                     "column_mapping": {
@@ -1362,7 +1362,7 @@
                 }
               },
               {
-                "name": "cdn_uris",
+                "name": "cdn_asset_uri",
                 "using": {
                   "manual_configuration": {
                     "column_mapping": {
