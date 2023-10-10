@@ -1,5 +1,5 @@
 {
-  "resource_version": 289,
+  "resource_version": 288,
   "metadata": {
     "version": 3,
     "sources": [
@@ -256,6 +256,32 @@
                     "token_standard",
                     "transaction_timestamp",
                     "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "parsed_asset_uris",
+              "schema": "nft_metadata_crawler"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "animation_optimizer_retry_count",
+                    "asset_uri",
+                    "cdn_animation_uri",
+                    "cdn_image_uri",
+                    "cdn_json_uri",
+                    "image_optimizer_retry_count",
+                    "json_parser_retry_count",
+                    "raw_animation_uri",
+                    "raw_image_uri"
                   ],
                   "filter": {},
                   "limit": 100
@@ -981,6 +1007,23 @@
               "name": "current_collections_v2",
               "schema": "public"
             },
+            "object_relationships": [
+              {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
+                    }
+                  }
+                }
+              }
+            ],
             "select_permissions": [
               {
                 "role": "anonymous",
@@ -1314,6 +1357,21 @@
                     "remote_table": {
                       "name": "current_aptos_names",
                       "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "cdn_asset_uris",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "token_uri": "asset_uri"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "parsed_asset_uris",
+                      "schema": "nft_metadata_crawler"
                     }
                   }
                 }
@@ -2339,7 +2397,7 @@
     ],
     "api_limits": {
       "depth_limit": {
-        "global": 4,
+        "global": 5,
         "per_role": {}
       },
       "disabled": false,
