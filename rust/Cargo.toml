@@ -2,7 +2,6 @@
 resolver = "2"
 
 members = [
-    "examples/basic",
     "framework/aptos-indexer-protos",
     "framework/aptos-moving-average",
     "framework/aptos-processor-framework",

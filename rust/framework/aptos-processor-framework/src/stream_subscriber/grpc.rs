@@ -17,7 +17,7 @@ use std::time::Duration;
 use tracing::{error, info};
 
 /// GRPC request metadata key for the token ID.
-const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
+const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
@@ -99,8 +99,8 @@ impl StreamSubscriberTrait for GrpcStreamSubscriber {
             "[Parser] Connecting to GRPC endpoint",
         );
 
-        let channel = tonic::transport::Channel::from_shared(format!(
-            "http://{}",
+        let mut channel = tonic::transport::Channel::from_shared(format!(
+            "{}",
             self.config.indexer_grpc_data_service_address.clone()
         ))
         .map_err(|e| {
@@ -108,9 +108,21 @@ impl StreamSubscriberTrait for GrpcStreamSubscriber {
                 "indexer_grpc_data_service_address is not a valid URI: {:#}",
                 e,
             ))
-        })?
-        .http2_keep_alive_interval(self.config.indexer_grpc_http2_ping_interval)
-        .keep_alive_timeout(self.config.indexer_grpc_http2_ping_timeout);
+        })?;
+
+        if self
+            .config
+            .indexer_grpc_data_service_address
+            .starts_with("https")
+        {
+            channel = channel
+                .tls_config(tonic::transport::ClientTlsConfig::new())
+                .expect("[Parser] Failed to create TLS config")
+        }
+
+        channel = channel
+            .http2_keep_alive_interval(self.config.indexer_grpc_http2_ping_interval)
+            .keep_alive_timeout(self.config.indexer_grpc_http2_ping_timeout);
 
         let mut rpc_client = match RawDataClient::connect(channel).await {
             Ok(client) => client
@@ -271,9 +283,12 @@ pub fn grpc_request_builder(
         transactions_count,
         ..GetTransactionsRequest::default()
     });
-    request
-        .metadata_mut()
-        .insert(GRPC_AUTH_TOKEN_HEADER, grpc_auth_token.parse().unwrap());
+    request.metadata_mut().insert(
+        GRPC_API_GATEWAY_API_KEY_HEADER,
+        format!("Bearer {}", grpc_auth_token.clone())
+            .parse()
+            .unwrap(),
+    );
     request
         .metadata_mut()
         .insert(GRPC_REQUEST_NAME_HEADER, processor_name.parse().unwrap());
