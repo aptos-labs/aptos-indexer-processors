@@ -548,7 +548,7 @@ class IndexerProcessorServer:
             except Exception as e:
                 self.exception = e
 
-    async def run(self):
+    def run(self):
         processor_name = self.config.processor_name
         # Run DB migrations
         logging.info(
@@ -575,7 +575,7 @@ class IndexerProcessorServer:
         starting_version = self.config.get_starting_version(self.processor.name())
         ending_version = self.config.ending_version
 
-        # Create a transaction fetcher task that will continuously fetch transactions from the GRPC stream
+        # Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         # and write into a channel. Each item is of type (chain_id, vec of transactions)
         logging.info(
             json.dumps(
