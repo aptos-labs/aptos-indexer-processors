@@ -774,6 +774,7 @@ export interface Signature {
   multiEd25519?: MultiEd25519Signature | undefined;
   multiAgent?: MultiAgentSignature | undefined;
   feePayer?: FeePayerSignature | undefined;
+  secp256k1Ecdsa?: Secp256k1ECDSASignature | undefined;
 }
 
 export enum Signature_Type {
@@ -782,6 +783,7 @@ export enum Signature_Type {
   TYPE_MULTI_ED25519 = 2,
   TYPE_MULTI_AGENT = 3,
   TYPE_FEE_PAYER = 4,
+  TYPE_SECP256K1_ECDSA = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -802,6 +804,9 @@ export function signature_TypeFromJSON(object: any): Signature_Type {
     case 4:
     case "TYPE_FEE_PAYER":
       return Signature_Type.TYPE_FEE_PAYER;
+    case 5:
+    case "TYPE_SECP256K1_ECDSA":
+      return Signature_Type.TYPE_SECP256K1_ECDSA;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -821,6 +826,8 @@ export function signature_TypeToJSON(object: Signature_Type): string {
       return "TYPE_MULTI_AGENT";
     case Signature_Type.TYPE_FEE_PAYER:
       return "TYPE_FEE_PAYER";
+    case Signature_Type.TYPE_SECP256K1_ECDSA:
+      return "TYPE_SECP256K1_ECDSA";
     case Signature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -853,16 +860,23 @@ export interface FeePayerSignature {
   feePayerSigner?: AccountSignature | undefined;
 }
 
+export interface Secp256k1ECDSASignature {
+  publicKey?: Uint8Array | undefined;
+  signature?: Uint8Array | undefined;
+}
+
 export interface AccountSignature {
   type?: AccountSignature_Type | undefined;
   ed25519?: Ed25519Signature | undefined;
   multiEd25519?: MultiEd25519Signature | undefined;
+  secp256k1Ecdsa?: Secp256k1ECDSASignature | undefined;
 }
 
 export enum AccountSignature_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ED25519 = 1,
   TYPE_MULTI_ED25519 = 2,
+  TYPE_SECP256K1_ECDSA = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -877,6 +891,9 @@ export function accountSignature_TypeFromJSON(object: any): AccountSignature_Typ
     case 2:
     case "TYPE_MULTI_ED25519":
       return AccountSignature_Type.TYPE_MULTI_ED25519;
+    case 3:
+    case "TYPE_SECP256K1_ECDSA":
+      return AccountSignature_Type.TYPE_SECP256K1_ECDSA;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -892,6 +909,8 @@ export function accountSignature_TypeToJSON(object: AccountSignature_Type): stri
       return "TYPE_ED25519";
     case AccountSignature_Type.TYPE_MULTI_ED25519:
       return "TYPE_MULTI_ED25519";
+    case AccountSignature_Type.TYPE_SECP256K1_ECDSA:
+      return "TYPE_SECP256K1_ECDSA";
     case AccountSignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -908,6 +927,9 @@ export const Block = {
       Timestamp.encode(message.timestamp, writer.uint32(10).fork()).ldelim();
     }
     if (message.height !== undefined && message.height !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.height) !== message.height) {
+        throw new Error("value provided for field message.height of type uint64 too large");
+      }
       writer.uint32(16).uint64(message.height.toString());
     }
     if (message.transactions !== undefined && message.transactions.length !== 0) {
@@ -1004,7 +1026,7 @@ export const Block = {
       transactions: globalThis.Array.isArray(object?.transactions)
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
-      chainId: isSet(object.chainId) ? Number(object.chainId) : 0,
+      chainId: isSet(object.chainId) ? globalThis.Number(object.chainId) : 0,
     };
   },
 
@@ -1061,15 +1083,24 @@ export const Transaction = {
       Timestamp.encode(message.timestamp, writer.uint32(10).fork()).ldelim();
     }
     if (message.version !== undefined && message.version !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.version) !== message.version) {
+        throw new Error("value provided for field message.version of type uint64 too large");
+      }
       writer.uint32(16).uint64(message.version.toString());
     }
     if (message.info !== undefined) {
       TransactionInfo.encode(message.info, writer.uint32(26).fork()).ldelim();
     }
     if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.epoch) !== message.epoch) {
+        throw new Error("value provided for field message.epoch of type uint64 too large");
+      }
       writer.uint32(32).uint64(message.epoch.toString());
     }
     if (message.blockHeight !== undefined && message.blockHeight !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.blockHeight) !== message.blockHeight) {
+        throw new Error("value provided for field message.blockHeight of type uint64 too large");
+      }
       writer.uint32(40).uint64(message.blockHeight.toString());
     }
     if (message.type !== undefined && message.type !== 0) {
@@ -1308,6 +1339,9 @@ export const BlockMetadataTransaction = {
       writer.uint32(10).string(message.id);
     }
     if (message.round !== undefined && message.round !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.round) !== message.round) {
+        throw new Error("value provided for field message.round of type uint64 too large");
+      }
       writer.uint32(16).uint64(message.round.toString());
     }
     if (message.events !== undefined && message.events.length !== 0) {
@@ -1435,15 +1469,15 @@ export const BlockMetadataTransaction = {
 
   fromJSON(object: any): BlockMetadataTransaction {
     return {
-      id: isSet(object.id) ? String(object.id) : "",
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
       round: isSet(object.round) ? BigInt(object.round) : BigInt("0"),
       events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => Event.fromJSON(e)) : [],
       previousBlockVotesBitvec: isSet(object.previousBlockVotesBitvec)
         ? bytesFromBase64(object.previousBlockVotesBitvec)
         : new Uint8Array(0),
-      proposer: isSet(object.proposer) ? String(object.proposer) : "",
+      proposer: isSet(object.proposer) ? globalThis.String(object.proposer) : "",
       failedProposerIndices: globalThis.Array.isArray(object?.failedProposerIndices)
-        ? object.failedProposerIndices.map((e: any) => Number(e))
+        ? object.failedProposerIndices.map((e: any) => globalThis.Number(e))
         : [],
     };
   },
@@ -1795,6 +1829,9 @@ export const Event = {
       EventKey.encode(message.key, writer.uint32(10).fork()).ldelim();
     }
     if (message.sequenceNumber !== undefined && message.sequenceNumber !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.sequenceNumber) !== message.sequenceNumber) {
+        throw new Error("value provided for field message.sequenceNumber of type uint64 too large");
+      }
       writer.uint32(16).uint64(message.sequenceNumber.toString());
     }
     if (message.type !== undefined) {
@@ -1897,8 +1934,8 @@ export const Event = {
       key: isSet(object.key) ? EventKey.fromJSON(object.key) : undefined,
       sequenceNumber: isSet(object.sequenceNumber) ? BigInt(object.sequenceNumber) : BigInt("0"),
       type: isSet(object.type) ? MoveType.fromJSON(object.type) : undefined,
-      typeStr: isSet(object.typeStr) ? String(object.typeStr) : "",
-      data: isSet(object.data) ? String(object.data) : "",
+      typeStr: isSet(object.typeStr) ? globalThis.String(object.typeStr) : "",
+      data: isSet(object.data) ? globalThis.String(object.data) : "",
     };
   },
 
@@ -1965,6 +2002,9 @@ export const TransactionInfo = {
       writer.uint32(34).bytes(message.stateCheckpointHash);
     }
     if (message.gasUsed !== undefined && message.gasUsed !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.gasUsed) !== message.gasUsed) {
+        throw new Error("value provided for field message.gasUsed of type uint64 too large");
+      }
       writer.uint32(40).uint64(message.gasUsed.toString());
     }
     if (message.success === true) {
@@ -2102,8 +2142,8 @@ export const TransactionInfo = {
       eventRootHash: isSet(object.eventRootHash) ? bytesFromBase64(object.eventRootHash) : new Uint8Array(0),
       stateCheckpointHash: isSet(object.stateCheckpointHash) ? bytesFromBase64(object.stateCheckpointHash) : undefined,
       gasUsed: isSet(object.gasUsed) ? BigInt(object.gasUsed) : BigInt("0"),
-      success: isSet(object.success) ? Boolean(object.success) : false,
-      vmStatus: isSet(object.vmStatus) ? String(object.vmStatus) : "",
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      vmStatus: isSet(object.vmStatus) ? globalThis.String(object.vmStatus) : "",
       accumulatorRootHash: isSet(object.accumulatorRootHash)
         ? bytesFromBase64(object.accumulatorRootHash)
         : new Uint8Array(0),
@@ -2170,6 +2210,9 @@ function createBaseEventKey(): EventKey {
 export const EventKey = {
   encode(message: EventKey, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.creationNumber !== undefined && message.creationNumber !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.creationNumber) !== message.creationNumber) {
+        throw new Error("value provided for field message.creationNumber of type uint64 too large");
+      }
       writer.uint32(8).uint64(message.creationNumber.toString());
     }
     if (message.accountAddress !== undefined && message.accountAddress !== "") {
@@ -2243,7 +2286,7 @@ export const EventKey = {
   fromJSON(object: any): EventKey {
     return {
       creationNumber: isSet(object.creationNumber) ? BigInt(object.creationNumber) : BigInt("0"),
-      accountAddress: isSet(object.accountAddress) ? String(object.accountAddress) : "",
+      accountAddress: isSet(object.accountAddress) ? globalThis.String(object.accountAddress) : "",
     };
   },
 
@@ -2287,12 +2330,21 @@ export const UserTransactionRequest = {
       writer.uint32(10).string(message.sender);
     }
     if (message.sequenceNumber !== undefined && message.sequenceNumber !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.sequenceNumber) !== message.sequenceNumber) {
+        throw new Error("value provided for field message.sequenceNumber of type uint64 too large");
+      }
       writer.uint32(16).uint64(message.sequenceNumber.toString());
     }
     if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.maxGasAmount) !== message.maxGasAmount) {
+        throw new Error("value provided for field message.maxGasAmount of type uint64 too large");
+      }
       writer.uint32(24).uint64(message.maxGasAmount.toString());
     }
     if (message.gasUnitPrice !== undefined && message.gasUnitPrice !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.gasUnitPrice) !== message.gasUnitPrice) {
+        throw new Error("value provided for field message.gasUnitPrice of type uint64 too large");
+      }
       writer.uint32(32).uint64(message.gasUnitPrice.toString());
     }
     if (message.expirationTimestampSecs !== undefined) {
@@ -2408,7 +2460,7 @@ export const UserTransactionRequest = {
 
   fromJSON(object: any): UserTransactionRequest {
     return {
-      sender: isSet(object.sender) ? String(object.sender) : "",
+      sender: isSet(object.sender) ? globalThis.String(object.sender) : "",
       sequenceNumber: isSet(object.sequenceNumber) ? BigInt(object.sequenceNumber) : BigInt("0"),
       maxGasAmount: isSet(object.maxGasAmount) ? BigInt(object.maxGasAmount) : BigInt("0"),
       gasUnitPrice: isSet(object.gasUnitPrice) ? BigInt(object.gasUnitPrice) : BigInt("0"),
@@ -2673,7 +2725,7 @@ export const ScriptWriteSet = {
 
   fromJSON(object: any): ScriptWriteSet {
     return {
-      executeAs: isSet(object.executeAs) ? String(object.executeAs) : "",
+      executeAs: isSet(object.executeAs) ? globalThis.String(object.executeAs) : "",
       script: isSet(object.script) ? ScriptPayload.fromJSON(object.script) : undefined,
     };
   },
@@ -3104,7 +3156,7 @@ export const DeleteModule = {
 
   fromJSON(object: any): DeleteModule {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
       stateKeyHash: isSet(object.stateKeyHash) ? bytesFromBase64(object.stateKeyHash) : new Uint8Array(0),
       module: isSet(object.module) ? MoveModuleId.fromJSON(object.module) : undefined,
     };
@@ -3237,10 +3289,10 @@ export const DeleteResource = {
 
   fromJSON(object: any): DeleteResource {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
       stateKeyHash: isSet(object.stateKeyHash) ? bytesFromBase64(object.stateKeyHash) : new Uint8Array(0),
       type: isSet(object.type) ? MoveStructTag.fromJSON(object.type) : undefined,
-      typeStr: isSet(object.typeStr) ? String(object.typeStr) : "",
+      typeStr: isSet(object.typeStr) ? globalThis.String(object.typeStr) : "",
     };
   },
 
@@ -3376,8 +3428,8 @@ export const DeleteTableItem = {
   fromJSON(object: any): DeleteTableItem {
     return {
       stateKeyHash: isSet(object.stateKeyHash) ? bytesFromBase64(object.stateKeyHash) : new Uint8Array(0),
-      handle: isSet(object.handle) ? String(object.handle) : "",
-      key: isSet(object.key) ? String(object.key) : "",
+      handle: isSet(object.handle) ? globalThis.String(object.handle) : "",
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
       data: isSet(object.data) ? DeleteTableData.fromJSON(object.data) : undefined,
     };
   },
@@ -3493,8 +3545,8 @@ export const DeleteTableData = {
 
   fromJSON(object: any): DeleteTableData {
     return {
-      key: isSet(object.key) ? String(object.key) : "",
-      keyType: isSet(object.keyType) ? String(object.keyType) : "",
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      keyType: isSet(object.keyType) ? globalThis.String(object.keyType) : "",
     };
   },
 
@@ -3609,7 +3661,7 @@ export const WriteModule = {
 
   fromJSON(object: any): WriteModule {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
       stateKeyHash: isSet(object.stateKeyHash) ? bytesFromBase64(object.stateKeyHash) : new Uint8Array(0),
       data: isSet(object.data) ? MoveModuleBytecode.fromJSON(object.data) : undefined,
     };
@@ -3752,11 +3804,11 @@ export const WriteResource = {
 
   fromJSON(object: any): WriteResource {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
       stateKeyHash: isSet(object.stateKeyHash) ? bytesFromBase64(object.stateKeyHash) : new Uint8Array(0),
       type: isSet(object.type) ? MoveStructTag.fromJSON(object.type) : undefined,
-      typeStr: isSet(object.typeStr) ? String(object.typeStr) : "",
-      data: isSet(object.data) ? String(object.data) : "",
+      typeStr: isSet(object.typeStr) ? globalThis.String(object.typeStr) : "",
+      data: isSet(object.data) ? globalThis.String(object.data) : "",
     };
   },
 
@@ -3895,10 +3947,10 @@ export const WriteTableData = {
 
   fromJSON(object: any): WriteTableData {
     return {
-      key: isSet(object.key) ? String(object.key) : "",
-      keyType: isSet(object.keyType) ? String(object.keyType) : "",
-      value: isSet(object.value) ? String(object.value) : "",
-      valueType: isSet(object.valueType) ? String(object.valueType) : "",
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      keyType: isSet(object.keyType) ? globalThis.String(object.keyType) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+      valueType: isSet(object.valueType) ? globalThis.String(object.valueType) : "",
     };
   },
 
@@ -4032,8 +4084,8 @@ export const WriteTableItem = {
   fromJSON(object: any): WriteTableItem {
     return {
       stateKeyHash: isSet(object.stateKeyHash) ? bytesFromBase64(object.stateKeyHash) : new Uint8Array(0),
-      handle: isSet(object.handle) ? String(object.handle) : "",
-      key: isSet(object.key) ? String(object.key) : "",
+      handle: isSet(object.handle) ? globalThis.String(object.handle) : "",
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
       data: isSet(object.data) ? WriteTableData.fromJSON(object.data) : undefined,
     };
   },
@@ -4368,8 +4420,10 @@ export const EntryFunctionPayload = {
       typeArguments: globalThis.Array.isArray(object?.typeArguments)
         ? object.typeArguments.map((e: any) => MoveType.fromJSON(e))
         : [],
-      arguments: globalThis.Array.isArray(object?.arguments) ? object.arguments.map((e: any) => String(e)) : [],
-      entryFunctionIdStr: isSet(object.entryFunctionIdStr) ? String(object.entryFunctionIdStr) : "",
+      arguments: globalThis.Array.isArray(object?.arguments)
+        ? object.arguments.map((e: any) => globalThis.String(e))
+        : [],
+      entryFunctionIdStr: isSet(object.entryFunctionIdStr) ? globalThis.String(object.entryFunctionIdStr) : "",
     };
   },
 
@@ -4610,7 +4664,9 @@ export const ScriptPayload = {
       typeArguments: globalThis.Array.isArray(object?.typeArguments)
         ? object.typeArguments.map((e: any) => MoveType.fromJSON(e))
         : [],
-      arguments: globalThis.Array.isArray(object?.arguments) ? object.arguments.map((e: any) => String(e)) : [],
+      arguments: globalThis.Array.isArray(object?.arguments)
+        ? object.arguments.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -4721,7 +4777,7 @@ export const MultisigPayload = {
 
   fromJSON(object: any): MultisigPayload {
     return {
-      multisigAddress: isSet(object.multisigAddress) ? String(object.multisigAddress) : "",
+      multisigAddress: isSet(object.multisigAddress) ? globalThis.String(object.multisigAddress) : "",
       transactionPayload: isSet(object.transactionPayload)
         ? MultisigTransactionPayload.fromJSON(object.transactionPayload)
         : undefined,
@@ -5184,8 +5240,8 @@ export const MoveModule = {
 
   fromJSON(object: any): MoveModule {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
-      name: isSet(object.name) ? String(object.name) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
       friends: globalThis.Array.isArray(object?.friends)
         ? object.friends.map((e: any) => MoveModuleId.fromJSON(e))
         : [],
@@ -5355,9 +5411,9 @@ export const MoveFunction = {
 
   fromJSON(object: any): MoveFunction {
     return {
-      name: isSet(object.name) ? String(object.name) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
       visibility: isSet(object.visibility) ? moveFunction_VisibilityFromJSON(object.visibility) : 0,
-      isEntry: isSet(object.isEntry) ? Boolean(object.isEntry) : false,
+      isEntry: isSet(object.isEntry) ? globalThis.Boolean(object.isEntry) : false,
       genericTypeParams: globalThis.Array.isArray(object?.genericTypeParams)
         ? object.genericTypeParams.map((e: any) => MoveFunctionGenericTypeParam.fromJSON(e))
         : [],
@@ -5531,8 +5587,8 @@ export const MoveStruct = {
 
   fromJSON(object: any): MoveStruct {
     return {
-      name: isSet(object.name) ? String(object.name) : "",
-      isNative: isSet(object.isNative) ? Boolean(object.isNative) : false,
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      isNative: isSet(object.isNative) ? globalThis.Boolean(object.isNative) : false,
       abilities: globalThis.Array.isArray(object?.abilities)
         ? object.abilities.map((e: any) => moveAbilityFromJSON(e))
         : [],
@@ -5677,7 +5733,7 @@ export const MoveStructGenericTypeParam = {
       constraints: globalThis.Array.isArray(object?.constraints)
         ? object.constraints.map((e: any) => moveAbilityFromJSON(e))
         : [],
-      isPhantom: isSet(object.isPhantom) ? Boolean(object.isPhantom) : false,
+      isPhantom: isSet(object.isPhantom) ? globalThis.Boolean(object.isPhantom) : false,
     };
   },
 
@@ -5782,7 +5838,7 @@ export const MoveStructField = {
 
   fromJSON(object: any): MoveStructField {
     return {
-      name: isSet(object.name) ? String(object.name) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
       type: isSet(object.type) ? MoveType.fromJSON(object.type) : undefined,
     };
   },
@@ -6047,9 +6103,11 @@ export const MoveType = {
       type: isSet(object.type) ? moveTypesFromJSON(object.type) : 0,
       vector: isSet(object.vector) ? MoveType.fromJSON(object.vector) : undefined,
       struct: isSet(object.struct) ? MoveStructTag.fromJSON(object.struct) : undefined,
-      genericTypeParamIndex: isSet(object.genericTypeParamIndex) ? Number(object.genericTypeParamIndex) : undefined,
+      genericTypeParamIndex: isSet(object.genericTypeParamIndex)
+        ? globalThis.Number(object.genericTypeParamIndex)
+        : undefined,
       reference: isSet(object.reference) ? MoveType_ReferenceType.fromJSON(object.reference) : undefined,
-      unparsable: isSet(object.unparsable) ? String(object.unparsable) : undefined,
+      unparsable: isSet(object.unparsable) ? globalThis.String(object.unparsable) : undefined,
     };
   },
 
@@ -6178,7 +6236,7 @@ export const MoveType_ReferenceType = {
 
   fromJSON(object: any): MoveType_ReferenceType {
     return {
-      mutable: isSet(object.mutable) ? Boolean(object.mutable) : false,
+      mutable: isSet(object.mutable) ? globalThis.Boolean(object.mutable) : false,
       to: isSet(object.to) ? MoveType.fromJSON(object.to) : undefined,
     };
   },
@@ -6376,7 +6434,7 @@ export const EntryFunctionId = {
   fromJSON(object: any): EntryFunctionId {
     return {
       module: isSet(object.module) ? MoveModuleId.fromJSON(object.module) : undefined,
-      name: isSet(object.name) ? String(object.name) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
     };
   },
 
@@ -6483,8 +6541,8 @@ export const MoveModuleId = {
 
   fromJSON(object: any): MoveModuleId {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
-      name: isSet(object.name) ? String(object.name) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
     };
   },
 
@@ -6611,9 +6669,9 @@ export const MoveStructTag = {
 
   fromJSON(object: any): MoveStructTag {
     return {
-      address: isSet(object.address) ? String(object.address) : "",
-      module: isSet(object.module) ? String(object.module) : "",
-      name: isSet(object.name) ? String(object.name) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      module: isSet(object.module) ? globalThis.String(object.module) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
       genericTypeParams: globalThis.Array.isArray(object?.genericTypeParams)
         ? object.genericTypeParams.map((e: any) => MoveType.fromJSON(e))
         : [],
@@ -6651,7 +6709,14 @@ export const MoveStructTag = {
 };
 
 function createBaseSignature(): Signature {
-  return { type: 0, ed25519: undefined, multiEd25519: undefined, multiAgent: undefined, feePayer: undefined };
+  return {
+    type: 0,
+    ed25519: undefined,
+    multiEd25519: undefined,
+    multiAgent: undefined,
+    feePayer: undefined,
+    secp256k1Ecdsa: undefined,
+  };
 }
 
 export const Signature = {
@@ -6670,6 +6735,9 @@ export const Signature = {
     }
     if (message.feePayer !== undefined) {
       FeePayerSignature.encode(message.feePayer, writer.uint32(42).fork()).ldelim();
+    }
+    if (message.secp256k1Ecdsa !== undefined) {
+      Secp256k1ECDSASignature.encode(message.secp256k1Ecdsa, writer.uint32(50).fork()).ldelim();
     }
     return writer;
   },
@@ -6715,6 +6783,13 @@ export const Signature = {
           }
 
           message.feePayer = FeePayerSignature.decode(reader, reader.uint32());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.secp256k1Ecdsa = Secp256k1ECDSASignature.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -6764,6 +6839,9 @@ export const Signature = {
       multiEd25519: isSet(object.multiEd25519) ? MultiEd25519Signature.fromJSON(object.multiEd25519) : undefined,
       multiAgent: isSet(object.multiAgent) ? MultiAgentSignature.fromJSON(object.multiAgent) : undefined,
       feePayer: isSet(object.feePayer) ? FeePayerSignature.fromJSON(object.feePayer) : undefined,
+      secp256k1Ecdsa: isSet(object.secp256k1Ecdsa)
+        ? Secp256k1ECDSASignature.fromJSON(object.secp256k1Ecdsa)
+        : undefined,
     };
   },
 
@@ -6783,6 +6861,9 @@ export const Signature = {
     }
     if (message.feePayer !== undefined) {
       obj.feePayer = FeePayerSignature.toJSON(message.feePayer);
+    }
+    if (message.secp256k1Ecdsa !== undefined) {
+      obj.secp256k1Ecdsa = Secp256k1ECDSASignature.toJSON(message.secp256k1Ecdsa);
     }
     return obj;
   },
@@ -6804,6 +6885,9 @@ export const Signature = {
       : undefined;
     message.feePayer = (object.feePayer !== undefined && object.feePayer !== null)
       ? FeePayerSignature.fromPartial(object.feePayer)
+      : undefined;
+    message.secp256k1Ecdsa = (object.secp256k1Ecdsa !== undefined && object.secp256k1Ecdsa !== null)
+      ? Secp256k1ECDSASignature.fromPartial(object.secp256k1Ecdsa)
       : undefined;
     return message;
   },
@@ -7040,9 +7124,9 @@ export const MultiEd25519Signature = {
       signatures: globalThis.Array.isArray(object?.signatures)
         ? object.signatures.map((e: any) => bytesFromBase64(e))
         : [],
-      threshold: isSet(object.threshold) ? Number(object.threshold) : 0,
+      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
       publicKeyIndices: globalThis.Array.isArray(object?.publicKeyIndices)
-        ? object.publicKeyIndices.map((e: any) => Number(e))
+        ? object.publicKeyIndices.map((e: any) => globalThis.Number(e))
         : [],
     };
   },
@@ -7174,7 +7258,7 @@ export const MultiAgentSignature = {
     return {
       sender: isSet(object.sender) ? AccountSignature.fromJSON(object.sender) : undefined,
       secondarySignerAddresses: globalThis.Array.isArray(object?.secondarySignerAddresses)
-        ? object.secondarySignerAddresses.map((e: any) => String(e))
+        ? object.secondarySignerAddresses.map((e: any) => globalThis.String(e))
         : [],
       secondarySigners: globalThis.Array.isArray(object?.secondarySigners)
         ? object.secondarySigners.map((e: any) => AccountSignature.fromJSON(e))
@@ -7331,12 +7415,12 @@ export const FeePayerSignature = {
     return {
       sender: isSet(object.sender) ? AccountSignature.fromJSON(object.sender) : undefined,
       secondarySignerAddresses: globalThis.Array.isArray(object?.secondarySignerAddresses)
-        ? object.secondarySignerAddresses.map((e: any) => String(e))
+        ? object.secondarySignerAddresses.map((e: any) => globalThis.String(e))
         : [],
       secondarySigners: globalThis.Array.isArray(object?.secondarySigners)
         ? object.secondarySigners.map((e: any) => AccountSignature.fromJSON(e))
         : [],
-      feePayerAddress: isSet(object.feePayerAddress) ? String(object.feePayerAddress) : "",
+      feePayerAddress: isSet(object.feePayerAddress) ? globalThis.String(object.feePayerAddress) : "",
       feePayerSigner: isSet(object.feePayerSigner) ? AccountSignature.fromJSON(object.feePayerSigner) : undefined,
     };
   },
@@ -7379,8 +7463,116 @@ export const FeePayerSignature = {
   },
 };
 
+function createBaseSecp256k1ECDSASignature(): Secp256k1ECDSASignature {
+  return { publicKey: new Uint8Array(0), signature: new Uint8Array(0) };
+}
+
+export const Secp256k1ECDSASignature = {
+  encode(message: Secp256k1ECDSASignature, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.publicKey !== undefined && message.publicKey.length !== 0) {
+      writer.uint32(10).bytes(message.publicKey);
+    }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(18).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): Secp256k1ECDSASignature {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSecp256k1ECDSASignature();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.publicKey = reader.bytes();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<Secp256k1ECDSASignature, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<Secp256k1ECDSASignature | Secp256k1ECDSASignature[]>
+      | Iterable<Secp256k1ECDSASignature | Secp256k1ECDSASignature[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [Secp256k1ECDSASignature.encode(p).finish()];
+        }
+      } else {
+        yield* [Secp256k1ECDSASignature.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, Secp256k1ECDSASignature>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<Secp256k1ECDSASignature> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [Secp256k1ECDSASignature.decode(p)];
+        }
+      } else {
+        yield* [Secp256k1ECDSASignature.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): Secp256k1ECDSASignature {
+    return {
+      publicKey: isSet(object.publicKey) ? bytesFromBase64(object.publicKey) : new Uint8Array(0),
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: Secp256k1ECDSASignature): unknown {
+    const obj: any = {};
+    if (message.publicKey !== undefined && message.publicKey.length !== 0) {
+      obj.publicKey = base64FromBytes(message.publicKey);
+    }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Secp256k1ECDSASignature>): Secp256k1ECDSASignature {
+    return Secp256k1ECDSASignature.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Secp256k1ECDSASignature>): Secp256k1ECDSASignature {
+    const message = createBaseSecp256k1ECDSASignature();
+    message.publicKey = object.publicKey ?? new Uint8Array(0);
+    message.signature = object.signature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseAccountSignature(): AccountSignature {
-  return { type: 0, ed25519: undefined, multiEd25519: undefined };
+  return { type: 0, ed25519: undefined, multiEd25519: undefined, secp256k1Ecdsa: undefined };
 }
 
 export const AccountSignature = {
@@ -7393,6 +7585,9 @@ export const AccountSignature = {
     }
     if (message.multiEd25519 !== undefined) {
       MultiEd25519Signature.encode(message.multiEd25519, writer.uint32(26).fork()).ldelim();
+    }
+    if (message.secp256k1Ecdsa !== undefined) {
+      Secp256k1ECDSASignature.encode(message.secp256k1Ecdsa, writer.uint32(34).fork()).ldelim();
     }
     return writer;
   },
@@ -7424,6 +7619,13 @@ export const AccountSignature = {
           }
 
           message.multiEd25519 = MultiEd25519Signature.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.secp256k1Ecdsa = Secp256k1ECDSASignature.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -7471,6 +7673,9 @@ export const AccountSignature = {
       type: isSet(object.type) ? accountSignature_TypeFromJSON(object.type) : 0,
       ed25519: isSet(object.ed25519) ? Ed25519Signature.fromJSON(object.ed25519) : undefined,
       multiEd25519: isSet(object.multiEd25519) ? MultiEd25519Signature.fromJSON(object.multiEd25519) : undefined,
+      secp256k1Ecdsa: isSet(object.secp256k1Ecdsa)
+        ? Secp256k1ECDSASignature.fromJSON(object.secp256k1Ecdsa)
+        : undefined,
     };
   },
 
@@ -7484,6 +7689,9 @@ export const AccountSignature = {
     }
     if (message.multiEd25519 !== undefined) {
       obj.multiEd25519 = MultiEd25519Signature.toJSON(message.multiEd25519);
+    }
+    if (message.secp256k1Ecdsa !== undefined) {
+      obj.secp256k1Ecdsa = Secp256k1ECDSASignature.toJSON(message.secp256k1Ecdsa);
     }
     return obj;
   },
@@ -7499,6 +7707,9 @@ export const AccountSignature = {
       : undefined;
     message.multiEd25519 = (object.multiEd25519 !== undefined && object.multiEd25519 !== null)
       ? MultiEd25519Signature.fromPartial(object.multiEd25519)
+      : undefined;
+    message.secp256k1Ecdsa = (object.secp256k1Ecdsa !== undefined && object.secp256k1Ecdsa !== null)
+      ? Secp256k1ECDSASignature.fromPartial(object.secp256k1Ecdsa)
       : undefined;
     return message;
   },
@@ -7532,7 +7743,8 @@ function base64FromBytes(arr: Uint8Array): string {
 type Builtin = Date | Function | Uint8Array | string | number | boolean | bigint | undefined;
 
 type DeepPartial<T> = T extends Builtin ? T
-  : T extends Array<infer U> ? Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
   : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
