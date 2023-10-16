@@ -7,9 +7,9 @@ WORKDIR /app
 COPY poetry.lock pyproject.toml /app/
 
 # Copy files and folders
-COPY /aptos-indexer-protos /app
-COPY /utils/ /app
-COPY /processors/ /app
+COPY /aptos-indexer-protos/ /app/aptos-indexer-protos
+COPY /utils/ /app/utils
+COPY /processors/ /app/processors
 
 # Project initialization
 RUN poetry config virtualenvs.create false \
