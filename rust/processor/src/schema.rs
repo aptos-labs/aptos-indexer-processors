@@ -878,7 +878,7 @@ diesel::table! {
         is_sender_primary -> Bool,
         #[sql_name = "type"]
         type_ -> Varchar,
-        #[max_length = 66]
+        #[max_length = 136]
         public_key -> Varchar,
         #[max_length = 200]
         signature -> Varchar,

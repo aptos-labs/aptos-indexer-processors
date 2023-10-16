@@ -9,7 +9,8 @@ use aptos_indexer_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum, signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
-    MultiEd25519Signature as ProtoMultiEd25519Signature, Signature as TransactionSignaturePB,
+    MultiEd25519Signature as ProtoMultiEd25519Signature,
+    Secp256k1EcdsaSignature as Secp256k1ECDSASignaturePB, Signature as TransactionSignaturePB,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -54,6 +55,15 @@ impl Signature {
                 0,
                 None,
             )]),
+            SignatureEnum::Secp256k1Ecdsa(sig) => Ok(vec![Self::parse_secp256k1_signature(
+                sig,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                true,
+                0,
+                None,
+            )]),
             SignatureEnum::MultiEd25519(sig) => Ok(Self::parse_multi_signature(
                 sig,
                 sender,
@@ -84,6 +94,7 @@ impl Signature {
             SignatureEnum::MultiEd25519(_) => String::from("multi_ed25519_signature"),
             SignatureEnum::MultiAgent(_) => String::from("multi_agent_signature"),
             SignatureEnum::FeePayer(_) => String::from("fee_payer_signature"),
+            SignatureEnum::Secp256k1Ecdsa(_) => String::from("secp256k1_signature"),
         }
     }
 
@@ -119,6 +130,31 @@ impl Signature {
             signer,
             is_sender_primary,
             type_: String::from("ed25519_signature"),
+            public_key: format!("0x{}", hex::encode(s.public_key.as_slice())),
+            threshold: 1,
+            public_key_indices: serde_json::Value::Array(vec![]),
+            signature: format!("0x{}", hex::encode(s.signature.as_slice())),
+            multi_agent_index,
+            multi_sig_index: 0,
+        }
+    }
+
+    fn parse_secp256k1_signature(
+        s: &Secp256k1ECDSASignaturePB,
+        sender: &String,
+        transaction_version: i64,
+        transaction_block_height: i64,
+        is_sender_primary: bool,
+        multi_agent_index: i64,
+        override_address: Option<&String>,
+    ) -> Self {
+        let signer = standardize_address(override_address.unwrap_or(sender));
+        Self {
+            transaction_version,
+            transaction_block_height,
+            signer,
+            is_sender_primary,
+            type_: String::from("secp256k1_signature"),
             public_key: format!("0x{}", hex::encode(s.public_key.as_slice())),
             threshold: 1,
             public_key_indices: serde_json::Value::Array(vec![]),
@@ -274,6 +310,15 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
+            AccountSignatureEnum::Secp256k1Ecdsa(sig) => vec![Self::parse_secp256k1_signature(
+                sig,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                is_sender_primary,
+                multi_agent_index,
+                override_address,
+            )],
         }
     }
 }
