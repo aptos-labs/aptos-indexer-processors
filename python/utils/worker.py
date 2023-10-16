@@ -487,10 +487,26 @@ class IndexerProcessorServer:
     num_concurrent_processing_tasks: int
 
     def __init__(self, config: Config):
-        logging.getLogger().setLevel(logging.INFO)
-        logging.info(json.dumps({"message": "[Parser] Kicking off"}))
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter(
+            fmt='{"timestamp": "%(asctime)s", "level": "%(levelname)s", "fields": %(message)s}'
+        )
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
 
         self.config = config
+        logging.info(
+            json.dumps(
+                {
+                    "processor_name": self.config.processor_name,
+                    "message": "[Parser] Kicking off",
+                }
+            )
+        )
 
         # Instantiate the correct processor based on config
         match self.config.processor_name:
@@ -590,6 +606,7 @@ class IndexerProcessorServer:
         q = queue.Queue(FETCHER_QUEUE_SIZE)
         producer_thread = threading.Thread(
             target=producer,
+            daemon=True,
             args=(
                 q,
                 self.config.grpc_data_stream_endpoint,
@@ -606,6 +623,7 @@ class IndexerProcessorServer:
 
         consumer_thread = threading.Thread(
             target=consumer,
+            daemon=True,
             args=(
                 q,
                 producer_thread,
