@@ -4,7 +4,7 @@ import json
 
 from aptos_indexer_protos.aptos.indexer.v1 import raw_data_pb2, raw_data_pb2_grpc
 from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
-from utils.config import Config
+from utils.config import Config, NFTMarketplaceV2Config
 from utils.models.general_models import Base
 from utils.session import Session
 from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
@@ -383,16 +383,6 @@ async def consumer_impl(
             last_fetched_version = transactions[-1].version
             transaction_batches.append(transactions)
 
-        # Process the transactions in parallel
-        # TODO: Add processor metrics
-        async def create_processor_task(transactions):
-            start_version = transactions[0].version
-            end_version = transactions[-1].version
-            processing_result = processor.process_transactions(
-                transactions, start_version, end_version
-            )
-            return processing_result
-
         processor_threads = []
         for transactions in transaction_batches:
             thread = IndexerProcessorServer.WorkerThread(processor, transactions)
@@ -502,20 +492,22 @@ class IndexerProcessorServer:
         logging.info(
             json.dumps(
                 {
-                    "processor_name": self.config.processor_name,
+                    "processor_name": self.config.server_config.processor_config.type,
                     "message": "[Parser] Kicking off",
                 }
             )
         )
 
         # Instantiate the correct processor based on config
-        match self.config.processor_name:
+        processor_config = self.config.server_config.processor_config
+        match processor_config.type:
             case ProcessorName.EXAMPLE_EVENT_PROCESSOR.value:
                 self.processor = ExampleEventProcessor()
             case ProcessorName.NFT_MARKETPLACE_V1_PROCESSOR.value:
                 self.processor = NFTMarketplaceProcesser()
             case ProcessorName.NFT_MARKETPLACE_V2_PROCESSOR.value:
-                self.processor = NFTMarketplaceV2Processor()
+                assert isinstance(processor_config, NFTMarketplaceV2Config)
+                self.processor = NFTMarketplaceV2Processor(processor_config)
             case ProcessorName.COIN_FLIP.value:
                 self.processor = CoinFlipProcessor()
             case ProcessorName.EXAMPLE_AMBASSADOR_TOKEN_PROCESSOR.value:
@@ -527,8 +519,6 @@ class IndexerProcessorServer:
                     "         - If you are using a custom processor, make sure to add it to the ProcessorName enum in utils/processor_name.py.\n"
                     "         - Ensure the IndexerProcessorServer constructor in utils/worker.py uses the new enum value.\n"
                 )
-
-        self.processor.config = self.config
 
         # TODO: Move this to a config
         self.num_concurrent_processing_tasks = 10
@@ -565,7 +555,11 @@ class IndexerProcessorServer:
                 self.exception = e
 
     def run(self):
-        processor_name = self.config.processor_name
+        processor_name = self.config.server_config.processor_config.type
+        indexer_grpc_address = (
+            self.config.server_config.indexer_grpc_data_service_address
+        )
+
         # Run DB migrations
         logging.info(
             json.dumps(
@@ -589,7 +583,7 @@ class IndexerProcessorServer:
 
         # Get starting version from DB
         starting_version = self.config.get_starting_version(self.processor.name())
-        ending_version = self.config.ending_version
+        ending_version = self.config.server_config.ending_version
 
         # Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         # and write into a channel. Each item is of type (chain_id, vec of transactions)
@@ -597,7 +591,7 @@ class IndexerProcessorServer:
             json.dumps(
                 {
                     "processor_name": processor_name,
-                    "stream_address": self.config.grpc_data_stream_endpoint,
+                    "stream_address": self.config.server_config.indexer_grpc_data_service_address,
                     "start_version": starting_version,
                     "message": "[Parser] Starting fetcher task",
                 }
@@ -609,10 +603,10 @@ class IndexerProcessorServer:
             daemon=True,
             args=(
                 q,
-                self.config.grpc_data_stream_endpoint,
-                self.config.grpc_data_stream_api_key,
-                self.config.indexer_grpc_http2_ping_interval_in_secs,
-                self.config.indexer_grpc_http2_ping_timeout_in_secs,
+                indexer_grpc_address,
+                self.config.server_config.auth_token,
+                self.config.server_config.indexer_grpc_http2_ping_interval_in_secs,
+                self.config.server_config.indexer_grpc_http2_ping_timeout_in_secs,
                 starting_version,
                 ending_version,
                 processor_name,
@@ -627,7 +621,7 @@ class IndexerProcessorServer:
             args=(
                 q,
                 producer_thread,
-                self.config.grpc_data_stream_endpoint,
+                indexer_grpc_address,
                 self.processor,
                 self.num_concurrent_processing_tasks,
                 starting_version,
@@ -640,7 +634,7 @@ class IndexerProcessorServer:
         consumer_thread.join()
 
     def init_db_tables(self, schema_name: str) -> None:
-        engine = create_engine(self.config.db_connection_uri)
+        engine = create_engine(self.config.server_config.postgres_connection_string)
         engine = engine.execution_options(
             schema_translate_map={"per_schema": schema_name}
         )
@@ -664,7 +658,7 @@ class IndexerProcessorServer:
 
             root.putChild(b"", ServerOk())  # type: ignore
             factory = Site(root)
-            reactor.listenTCP(self.config.health_port, factory)  # type: ignore
+            reactor.listenTCP(self.config.health_check_port, factory)  # type: ignore
             reactor.run(installSignalHandlers=False)  # type: ignore
 
         t = threading.Thread(target=start_health_server, daemon=True)

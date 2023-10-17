@@ -1,15 +1,15 @@
-processor_name: "nft_marketplace_v2_processor"
-grpc_data_stream_endpoint: "grpc.mainnet.aptoslabs.com:443"
-grpc_data_stream_api_key: "<grpc_data_stream_api_key>"
-db_connection_uri: "postgresql://<your_connection_uri_to_postgres>"
-health_port: 8080
-indexer_grpc_http2_ping_interval_in_secs: 30
-indexer_grpc_http2_ping_timeout_in_secs: 5
-
-# If there is no version in the DB, start processor from starting_version_default
-# starting_version_default: <starting_version_default>
-# Even if there is a version stored in the DB, start processor from starting_version_backfill
-# starting_version_backfill: 113880
-
-# Optionally stop processor after ending_version
-# ending_version: 114000
+health_check_port: 8080
+server_config:
+    processor_config: 
+        type: "python_example_event_processor"
+    indexer_grpc_data_service_address: "grpc.mainnet.aptoslabs.com:443"
+    auth_token: "<grpc_data_stream_api_key>"
+    postgres_connection_string: "postgresql://<your_connection_uri_to_postgres>"
+    # Optional. Start processor at starting_version
+    starting_version: 100000
+    # Optional. Stop processor after ending_version.
+    ending_version: 114000
+    # Optional. HTTP2 ping interval in seconds to detect if the connection is still alive. Defaults to 30.
+    indexer_grpc_http2_ping_interval_in_secs: 30
+    # Optional. HTTP2 ping timeout in seconds to detect if the connection is still alive. Defaults to 10
+    indexer_grpc_http2_ping_timeout_in_secs: 10

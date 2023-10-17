@@ -54,15 +54,20 @@ from utils.token_utils import TokenStandard
 from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
 from utils.session import Session
 from sqlalchemy.dialects.postgresql import insert
-from utils.config import Config
+from utils.config import NFTMarketplaceV2Config
 
 
 class NFTMarketplaceV2Processor(TransactionsProcessor):
+    config: NFTMarketplaceV2Config
+
     def name(self) -> str:
         return ProcessorName.NFT_MARKETPLACE_V2_PROCESSOR.value
 
     def schema(self) -> str:
         return NFT_MARKETPLACE_V2_SCHEMA_NAME
+
+    def __init__(self, nft_marketplace_v2_config: NFTMarketplaceV2Config):
+        self.config = nft_marketplace_v2_config
 
     def process_transactions(
         self,
@@ -70,10 +75,7 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         start_version: int,
         end_version: int,
     ) -> ProcessingResult:
-        assert self.config.custom_config, "Custom config must be set for this processor"
-        marketplace_contract_address = str(
-            self.config.custom_config["marketplace_contract_address"]
-        )
+        marketplace_contract_address = str(self.config.marketplace_contract_address)
 
         for transaction in transactions:
             user_transaction = transaction_utils.get_user_transaction(transaction)

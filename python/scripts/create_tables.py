@@ -12,6 +12,6 @@ if __name__ == "__main__":
 
     config = Config.from_yaml_file(args.config)
 
-    engine = create_engine(config.db_connection_uri)
+    engine = create_engine(config.server_config.postgres_connection_string)
     Base.metadata.create_all(engine)
     example_models.Base.metadata.create_all(engine)

@@ -1,28 +1,38 @@
 import yaml
-
 from utils.models.general_models import NextVersionToProcess
 from pydantic import BaseModel, BaseSettings
 from pydantic.env_settings import SettingsSourceCallable
 from utils.session import Session
 from typing import Any, Dict, List, Optional
+import logging
+import json
+
+
+class ProcessorConfig(BaseModel):
+    type: str
+
+
+class NFTMarketplaceV2Config(ProcessorConfig):
+    marketplace_contract_address: str
+
+
+class ServerConfig(BaseModel):
+    processor_config: NFTMarketplaceV2Config | ProcessorConfig
+    indexer_grpc_data_service_address: str
+    auth_token: str
+    postgres_connection_string: str
+    starting_version: Optional[int] = None
+    ending_version: Optional[int] = None
+    # Used for k8s liveness and readiness probes
+    # HTTP2 ping interval in seconds to detect if the connection is still alive
+    indexer_grpc_http2_ping_interval_in_secs: int = 30
+    # HTTP2 ping timeout in seconds to detect if the connection is still alive
+    indexer_grpc_http2_ping_timeout_in_secs: int = 10
 
 
 class Config(BaseSettings):
-    processor_name: str
-    grpc_data_stream_endpoint: str
-    grpc_data_stream_api_key: str
-    db_connection_uri: str
-    # Used for k8s liveness and readiness probes
-    health_port: int
-    # HTTP2 ping interval in seconds to detect if the connection is still alive
-    indexer_grpc_http2_ping_interval_in_secs: int
-    # HTTP2 ping timeout in seconds to detect if the connection is still alive
-    indexer_grpc_http2_ping_timeout_in_secs: int
-    starting_version_default: Optional[int] = None
-    starting_version_backfill: Optional[int] = None
-    ending_version: Optional[int] = None
-    # Custom config variables for each processor
-    custom_config: Optional[Dict[str, Any]] = None
+    health_check_port: int
+    server_config: ServerConfig
 
     class Config:
         # change order of priority of settings sources such that environment variables take precedence over config file settings
@@ -46,7 +56,7 @@ class Config(BaseSettings):
     def get_starting_version(self, processor_name: str) -> int:
         next_version_to_process = None
 
-        if self.db_connection_uri is not None:
+        if self.server_config.postgres_connection_string is not None:
             try:
                 with Session() as session, session.begin():
                     next_version_to_process_from_db = session.get(
@@ -57,23 +67,31 @@ class Config(BaseSettings):
                             next_version_to_process_from_db.next_version
                         )
             except:
-                print("Database error when getting NextVersionToProcess. Skipping...")
+                logging.warn(
+                    json.dumps(
+                        {
+                            "message": "Config] Database error when getting NextVersionToProcess. Skipping..."
+                        }
+                    )
+                )
 
         # By default, if nothing is set, start from 0
         starting_version = 0
-        if self.starting_version_backfill != None:
-            # Start from config's starting_version_backfill if set
-            print("[Config] Starting from starting_version_backfill")
-            starting_version = self.starting_version_backfill
+        if self.server_config.starting_version != None:
+            # Start from config's starting_version
+            logging.info(
+                json.dumps(
+                    {"message": "[Config] Starting from config starting_version"}
+                )
+            )
+            starting_version = self.server_config.starting_version
         elif next_version_to_process != None:
             # Start from next version to process in db
-            print("[Config] Starting from version from db")
+            logging.info(
+                json.dumps({"message": "[Config] Starting from version from db"})
+            )
             starting_version = next_version_to_process
-        elif self.starting_version_default != None:
-            # Start from config's starting_version_default if set
-            print("[Config] Starting from starting_version_default")
-            starting_version = self.starting_version_default
         else:
-            print("Starting from version 0")
+            logging.info(json.dumps({"message": "Starting from version 0"}))
 
         return starting_version
