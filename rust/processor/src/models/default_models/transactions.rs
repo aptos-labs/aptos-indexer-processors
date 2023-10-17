@@ -95,7 +95,7 @@ impl Transaction {
             .as_ref()
             .expect("Txn Data doesn't exit!");
         let version = transaction.version as i64;
-        let transaction_type = TransactionType::from_i32(transaction.r#type)
+        let transaction_type = TransactionType::try_from(transaction.r#type)
             .expect("Transaction type doesn't exist!")
             .as_str_name()
             .to_string();
