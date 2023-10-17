@@ -185,7 +185,7 @@ impl WriteSetChange {
     }
 
     fn get_write_set_change_type(t: &WriteSetChangePB) -> String {
-        match WriteSetChangeTypeEnum::from_i32(t.r#type)
+        match WriteSetChangeTypeEnum::try_from(t.r#type)
             .expect("WriteSetChange must have a valid type.")
         {
             WriteSetChangeTypeEnum::DeleteModule => "delete_module".to_string(),
