@@ -899,6 +899,7 @@ class Signature(_message.Message):
         "multi_agent",
         "fee_payer",
         "secp256k1_ecdsa",
+        "single_sender",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -909,24 +910,28 @@ class Signature(_message.Message):
         TYPE_MULTI_AGENT: _ClassVar[Signature.Type]
         TYPE_FEE_PAYER: _ClassVar[Signature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[Signature.Type]
+        TYPE_SINGLE_SENDER: _ClassVar[Signature.Type]
     TYPE_UNSPECIFIED: Signature.Type
     TYPE_ED25519: Signature.Type
     TYPE_MULTI_ED25519: Signature.Type
     TYPE_MULTI_AGENT: Signature.Type
     TYPE_FEE_PAYER: Signature.Type
     TYPE_SECP256K1_ECDSA: Signature.Type
+    TYPE_SINGLE_SENDER: Signature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     MULTI_ED25519_FIELD_NUMBER: _ClassVar[int]
     MULTI_AGENT_FIELD_NUMBER: _ClassVar[int]
     FEE_PAYER_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
+    SINGLE_SENDER_FIELD_NUMBER: _ClassVar[int]
     type: Signature.Type
     ed25519: Ed25519Signature
     multi_ed25519: MultiEd25519Signature
     multi_agent: MultiAgentSignature
     fee_payer: FeePayerSignature
     secp256k1_ecdsa: Secp256k1ECDSASignature
+    single_sender: SingleSender
     def __init__(
         self,
         type: _Optional[_Union[Signature.Type, str]] = ...,
@@ -935,6 +940,7 @@ class Signature(_message.Message):
         multi_agent: _Optional[_Union[MultiAgentSignature, _Mapping]] = ...,
         fee_payer: _Optional[_Union[FeePayerSignature, _Mapping]] = ...,
         secp256k1_ecdsa: _Optional[_Union[Secp256k1ECDSASignature, _Mapping]] = ...,
+        single_sender: _Optional[_Union[SingleSender, _Mapping]] = ...,
     ) -> None: ...
 
 class Ed25519Signature(_message.Message):
@@ -1021,8 +1027,104 @@ class Secp256k1ECDSASignature(_message.Message):
         self, public_key: _Optional[bytes] = ..., signature: _Optional[bytes] = ...
     ) -> None: ...
 
+class AnyPublicKey(_message.Message):
+    __slots__ = ["type", "public_key"]
+
+    class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = []
+        TYPE_UNSPECIFIED: _ClassVar[AnyPublicKey.Type]
+        TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
+        TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
+    TYPE_UNSPECIFIED: AnyPublicKey.Type
+    TYPE_ED25519: AnyPublicKey.Type
+    TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
+    type: AnyPublicKey.Type
+    public_key: bytes
+    def __init__(
+        self,
+        type: _Optional[_Union[AnyPublicKey.Type, str]] = ...,
+        public_key: _Optional[bytes] = ...,
+    ) -> None: ...
+
+class AnySignature(_message.Message):
+    __slots__ = ["type", "signature"]
+
+    class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = []
+        TYPE_UNSPECIFIED: _ClassVar[AnySignature.Type]
+        TYPE_ED25519: _ClassVar[AnySignature.Type]
+        TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
+    TYPE_UNSPECIFIED: AnySignature.Type
+    TYPE_ED25519: AnySignature.Type
+    TYPE_SECP256K1_ECDSA: AnySignature.Type
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    type: AnySignature.Type
+    signature: bytes
+    def __init__(
+        self,
+        type: _Optional[_Union[AnySignature.Type, str]] = ...,
+        signature: _Optional[bytes] = ...,
+    ) -> None: ...
+
+class SingleKeySignature(_message.Message):
+    __slots__ = ["public_key", "signature"]
+    PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    public_key: AnyPublicKey
+    signature: AnySignature
+    def __init__(
+        self,
+        public_key: _Optional[_Union[AnyPublicKey, _Mapping]] = ...,
+        signature: _Optional[_Union[AnySignature, _Mapping]] = ...,
+    ) -> None: ...
+
+class IndexedSignature(_message.Message):
+    __slots__ = ["index", "signature"]
+    INDEX_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    index: int
+    signature: AnySignature
+    def __init__(
+        self,
+        index: _Optional[int] = ...,
+        signature: _Optional[_Union[AnySignature, _Mapping]] = ...,
+    ) -> None: ...
+
+class MultiKeySignature(_message.Message):
+    __slots__ = ["public_keys", "signatures", "signatures_required"]
+    PUBLIC_KEYS_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURES_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURES_REQUIRED_FIELD_NUMBER: _ClassVar[int]
+    public_keys: _containers.RepeatedCompositeFieldContainer[AnyPublicKey]
+    signatures: _containers.RepeatedCompositeFieldContainer[IndexedSignature]
+    signatures_required: int
+    def __init__(
+        self,
+        public_keys: _Optional[_Iterable[_Union[AnyPublicKey, _Mapping]]] = ...,
+        signatures: _Optional[_Iterable[_Union[IndexedSignature, _Mapping]]] = ...,
+        signatures_required: _Optional[int] = ...,
+    ) -> None: ...
+
+class SingleSender(_message.Message):
+    __slots__ = ["sender"]
+    SENDER_FIELD_NUMBER: _ClassVar[int]
+    sender: AccountSignature
+    def __init__(
+        self, sender: _Optional[_Union[AccountSignature, _Mapping]] = ...
+    ) -> None: ...
+
 class AccountSignature(_message.Message):
-    __slots__ = ["type", "ed25519", "multi_ed25519", "secp256k1_ecdsa"]
+    __slots__ = [
+        "type",
+        "ed25519",
+        "multi_ed25519",
+        "secp256k1_ecdsa",
+        "single_key_signature",
+        "multi_key_signature",
+    ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
@@ -1030,22 +1132,32 @@ class AccountSignature(_message.Message):
         TYPE_ED25519: _ClassVar[AccountSignature.Type]
         TYPE_MULTI_ED25519: _ClassVar[AccountSignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AccountSignature.Type]
+        TYPE_SINGLE_KEY: _ClassVar[AccountSignature.Type]
+        TYPE_MULTI_KEY: _ClassVar[AccountSignature.Type]
     TYPE_UNSPECIFIED: AccountSignature.Type
     TYPE_ED25519: AccountSignature.Type
     TYPE_MULTI_ED25519: AccountSignature.Type
     TYPE_SECP256K1_ECDSA: AccountSignature.Type
+    TYPE_SINGLE_KEY: AccountSignature.Type
+    TYPE_MULTI_KEY: AccountSignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     MULTI_ED25519_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
+    SINGLE_KEY_SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    MULTI_KEY_SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     type: AccountSignature.Type
     ed25519: Ed25519Signature
     multi_ed25519: MultiEd25519Signature
     secp256k1_ecdsa: Secp256k1ECDSASignature
+    single_key_signature: SingleKeySignature
+    multi_key_signature: MultiKeySignature
     def __init__(
         self,
         type: _Optional[_Union[AccountSignature.Type, str]] = ...,
         ed25519: _Optional[_Union[Ed25519Signature, _Mapping]] = ...,
         multi_ed25519: _Optional[_Union[MultiEd25519Signature, _Mapping]] = ...,
         secp256k1_ecdsa: _Optional[_Union[Secp256k1ECDSASignature, _Mapping]] = ...,
+        single_key_signature: _Optional[_Union[SingleKeySignature, _Mapping]] = ...,
+        multi_key_signature: _Optional[_Union[MultiKeySignature, _Mapping]] = ...,
     ) -> None: ...
