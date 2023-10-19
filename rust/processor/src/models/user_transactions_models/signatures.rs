@@ -13,7 +13,9 @@ use aptos_protos::transaction::v1::{
     any_signature::Type as AnySignatureTypeEnumPb, signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
-    MultiEd25519Signature as MultiEd25519SignaturePb, Signature as TransactionSignaturePb,
+    MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
+    Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
+    SingleSender as SingleSenderPb,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -79,7 +81,12 @@ impl Signature {
                 transaction_version,
                 transaction_block_height,
             ),
-            SignatureEnum::SingleSender(_s) => panic!("SingleSender signature is not supported"),
+            SignatureEnum::SingleSender(s) => Ok(Self::parse_single_sender(
+                s,
+                sender,
+                transaction_version,
+                transaction_block_height,
+            )),
         }
     }
 
@@ -89,8 +96,21 @@ impl Signature {
             SignatureEnum::MultiEd25519(_) => String::from("multi_ed25519_signature"),
             SignatureEnum::MultiAgent(_) => String::from("multi_agent_signature"),
             SignatureEnum::FeePayer(_) => String::from("fee_payer_signature"),
-            SignatureEnum::SingleSender(_sender) => {
-                panic!("SingleSender signature is not supported")
+            SignatureEnum::SingleSender(sender) => {
+                let account_signature = sender.sender.as_ref().unwrap();
+                let signature = account_signature.signature.as_ref().unwrap();
+                match signature {
+                    AccountSignatureEnum::Ed25519(_) => String::from("ed25519_signature"),
+                    AccountSignatureEnum::MultiEd25519(_) => {
+                        String::from("multi_ed25519_signature")
+                    },
+                    AccountSignatureEnum::SingleKeySignature(_) => {
+                        String::from("single_key_signature")
+                    },
+                    AccountSignatureEnum::MultiKeySignature(_) => {
+                        String::from("multi_key_signature")
+                    },
+                }
             },
         }
     }
@@ -282,11 +302,44 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
-            AccountSignatureEnum::SingleKeySignature(_sig) => {
-                panic!("SingleKeySignature is not supported")
+            AccountSignatureEnum::SingleKeySignature(sig) => {
+                vec![Self::parse_single_key_signature(
+                    sig,
+                    sender,
+                    transaction_version,
+                    transaction_block_height,
+                    is_sender_primary,
+                    multi_agent_index,
+                    override_address,
+                )]
             },
-            AccountSignatureEnum::MultiKeySignature(_sig) => {
-                panic!("MultiKeySignature is not supported")
+            AccountSignatureEnum::MultiKeySignature(sig) => Self::parse_multi_key_signature(
+                sig,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                is_sender_primary,
+                multi_agent_index,
+                override_address,
+            ),
+        }
+    }
+
+    fn parse_single_key_signature(
+        s: &SingleKeySignaturePb,
+        sender: &String,
+        transaction_version: i64,
+        transaction_block_height: i64,
+        is_sender_primary: bool,
+        multi_agent_index: i64,
+        override_address: Option<&String>,
+    ) -> Self {
+        let signer = standardize_address(override_address.unwrap_or(sender));
+        let signature = s.signature.as_ref().unwrap();
+        let type_ = match AnySignatureTypeEnumPb::try_from(signature.r#type) {
+            Ok(AnySignatureTypeEnumPb::Ed25519) => String::from("single_key_ed25519_signature"),
+            Ok(AnySignatureTypeEnumPb::Secp256k1Ecdsa) => {
+                String::from("single_key_secp256k1_ecdsa_signature")
             },
             _ => {
                 panic!("Unspecified signature type or un-recognized type is not supported")
@@ -407,8 +460,15 @@ impl Signature {
                 None,
             )],
             Some(AccountSignatureEnum::MultiEd25519(s)) => Self::parse_multi_ed25519_signature(
-                s, sender, transaction_version, transaction_block_height, true, 0, None),
-            _ => vec![],
+                s,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                true,
+                0,
+                None,
+            ),
+            None => vec![],
         }
     }
 }
