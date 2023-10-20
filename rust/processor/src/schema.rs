@@ -687,6 +687,21 @@ diesel::table! {
 }
 
 diesel::table! {
+    events_cockroach (transaction_version, event_index) {
+        sequence_number -> Int8,
+        creation_number -> Int8,
+        #[max_length = 66]
+        account_address -> Varchar,
+        transaction_version -> Int8,
+        transaction_block_height -> Int8,
+        event_index -> Int8,
+        event_type -> Text,
+        data -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     fungible_asset_activities (transaction_version, event_index) {
         transaction_version -> Int8,
         event_index -> Int8,
@@ -1132,6 +1147,50 @@ diesel::table! {
 }
 
 diesel::table! {
+    transactions_cockroach (transaction_version) {
+        transaction_version -> Int8,
+        transaction_block_height -> Int8,
+        #[max_length = 66]
+        hash -> Varchar,
+        #[max_length = 50]
+        transaction_type -> Varchar,
+        payload -> Nullable<Jsonb>,
+        #[max_length = 66]
+        state_change_hash -> Varchar,
+        #[max_length = 66]
+        event_root_hash -> Varchar,
+        #[max_length = 66]
+        state_checkpoint_hash -> Nullable<Varchar>,
+        gas_used -> Numeric,
+        success -> Bool,
+        vm_status -> Text,
+        #[max_length = 66]
+        accumulator_root_hash -> Varchar,
+        num_events -> Int8,
+        num_write_set_changes -> Int8,
+        epoch -> Int8,
+        parent_signature_type -> Nullable<Text>,
+        #[max_length = 66]
+        sender -> Nullable<Varchar>,
+        sequence_number -> Nullable<Int8>,
+        max_gas_amount -> Nullable<Numeric>,
+        expiration_timestamp_secs -> Nullable<Timestamp>,
+        gas_unit_price -> Nullable<Numeric>,
+        timestamp -> Nullable<Timestamp>,
+        entry_function_id_str -> Nullable<Text>,
+        signature -> Nullable<Jsonb>,
+        #[max_length = 66]
+        id -> Nullable<Varchar>,
+        round -> Nullable<Int8>,
+        previous_block_votes_bitvec -> Nullable<Jsonb>,
+        #[max_length = 66]
+        proposer -> Nullable<Varchar>,
+        failed_proposer_indices -> Nullable<Jsonb>,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     user_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -1166,11 +1225,46 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    wsc_cockroach (transaction_version, index) {
+        transaction_version -> Int8,
+        transaction_block_height -> Int8,
+        #[max_length = 66]
+        hash -> Varchar,
+        write_set_change_type -> Text,
+        #[max_length = 66]
+        address -> Varchar,
+        index -> Int8,
+        payload -> Nullable<Jsonb>,
+        bytecode -> Nullable<Bytea>,
+        friends -> Nullable<Jsonb>,
+        exposed_functions -> Nullable<Jsonb>,
+        structs -> Nullable<Jsonb>,
+        is_deleted -> Bool,
+        name -> Nullable<Text>,
+        module -> Nullable<Text>,
+        generic_type_params -> Nullable<Jsonb>,
+        #[max_length = 66]
+        state_key_hash -> Nullable<Varchar>,
+        #[max_length = 66]
+        table_handle -> Nullable<Varchar>,
+        decoded_key -> Nullable<Jsonb>,
+        decoded_value -> Nullable<Jsonb>,
+        key_type -> Nullable<Text>,
+        value_type -> Nullable<Text>,
+        key -> Nullable<Text>,
+        data -> Nullable<Jsonb>,
+        inserted_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(block_metadata_transactions -> transactions (version));
+diesel::joinable!(events_cockroach -> transactions_cockroach (transaction_version));
 diesel::joinable!(move_modules -> transactions (transaction_version));
 diesel::joinable!(move_resources -> transactions (transaction_version));
 diesel::joinable!(table_items -> transactions (transaction_version));
 diesel::joinable!(write_set_changes -> transactions (transaction_version));
+diesel::joinable!(wsc_cockroach -> transactions_cockroach (transaction_version));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
@@ -1209,6 +1303,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     delegated_staking_pool_balances,
     delegated_staking_pools,
     events,
+    events_cockroach,
     fungible_asset_activities,
     fungible_asset_balances,
     fungible_asset_metadata,
@@ -1231,6 +1326,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships_v2,
     tokens,
     transactions,
+    transactions_cockroach,
     user_transactions,
     write_set_changes,
+    wsc_cockroach,
 );
