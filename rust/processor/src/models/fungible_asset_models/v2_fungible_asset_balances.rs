@@ -18,7 +18,7 @@ use crate::{
     schema::{current_fungible_asset_balances, fungible_asset_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use aptos_indexer_protos::transaction::v1::WriteResource;
+use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use hex::FromHex;

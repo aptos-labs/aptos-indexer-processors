@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::models::property_map::{PropertyMap, TokenObjectPropertyMap};
-use aptos_indexer_protos::{
+use aptos_protos::{
     transaction::v1::{
         multisig_transaction_payload::Payload as MultisigPayloadType,
         transaction_payload::Payload as PayloadType, write_set::WriteSet as WriteSetType,

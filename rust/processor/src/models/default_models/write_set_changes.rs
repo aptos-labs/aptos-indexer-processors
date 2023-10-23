@@ -9,7 +9,7 @@ use super::{
     transactions::Transaction,
 };
 use crate::{schema::write_set_changes, utils::util::standardize_address};
-use aptos_indexer_protos::transaction::v1::{
+use aptos_protos::transaction::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
     WriteSetChange as WriteSetChangePB,
 };

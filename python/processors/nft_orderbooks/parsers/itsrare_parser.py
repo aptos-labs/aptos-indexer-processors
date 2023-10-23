@@ -1,4 +1,4 @@
-from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
+from aptos_protos.aptos.transaction.v1 import transaction_pb2
 import json
 from typing import List
 from processors.nft_orderbooks.nft_marketplace_enums import (

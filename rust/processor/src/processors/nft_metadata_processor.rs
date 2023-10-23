@@ -18,7 +18,7 @@ use crate::{
         util::{parse_timestamp, standardize_address},
     },
 };
-use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use futures_util::future::try_join_all;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;

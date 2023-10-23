@@ -5,12 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
-  '@aptos-labs/aptos-indexer-protos':
-    specifier: '=0.2.3'
-    version: 0.2.3
   '@aptos-labs/aptos-processor-sdk':
-    specifier: '=0.1.1'
-    version: 0.1.1(pg@8.11.3)(ts-node@10.9.1)
+    specifier: '=0.2.0'
+    version: 0.2.0(pg@8.11.3)(ts-node@10.9.1)
   commander:
     specifier: ^11.0.0
     version: 11.0.0
@@ -54,20 +51,11 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /@aptos-labs/aptos-indexer-protos@0.2.3:
-    resolution: {integrity: sha512-MR5+n3mr61LQUkU2MftaQPofEqMiCT8dO+W1H+C1Q23DKGMNf6CyPH6fba+WiDSypMsobpeSKY4uJZ7VUAADTA==}
+  /@aptos-labs/aptos-processor-sdk@0.2.0(pg@8.11.3)(ts-node@10.9.1):
+    resolution: {integrity: sha512-z/ZCghZDt4Y4l56EToL28mhbr22uAx2nGid7mYDo7N/zeJ4hB9G7tpMjZEqZCSg6pbfSx53tYBMIrdBbON/QdA==}
     engines: {node: '>=14.0.0'}
     dependencies:
-      '@grpc/grpc-js': 1.9.2
-      long: 5.2.3
-      protobufjs: 7.2.5
-    dev: false
-
-  /@aptos-labs/aptos-processor-sdk@0.1.1(pg@8.11.3)(ts-node@10.9.1):
-    resolution: {integrity: sha512-oEjCUoe7M9zTMFH2iNHnI/HvSB+lP5aYbdz2xgFYIKMboADeNoJ2WSyHtmrwVo2NmwACvW7of2D3/TCQy6A5uQ==}
-    engines: {node: '>=14.0.0'}
-    dependencies:
-      '@aptos-labs/aptos-indexer-protos': 0.2.3
+      '@aptos-labs/aptos-protos': 1.1.2
       '@grpc/grpc-js': 1.9.2
       google-protobuf: 3.21.2
       pg-connection-string: 2.6.2
@@ -93,6 +81,15 @@ packages:
       - supports-color
       - ts-node
       - typeorm-aurora-data-api-driver
+    dev: false
+
+  /@aptos-labs/aptos-protos@1.1.2:
+    resolution: {integrity: sha512-DwOefasA9R9fY7KaPvVNETEeYwwruzsOfNBGlUZNzeeiJW6i79GNLPgoxL0sk6BlnuWqPkHzhRryq+IrSaJsaQ==}
+    engines: {node: '>=14.0.0'}
+    dependencies:
+      '@grpc/grpc-js': 1.9.2
+      long: 5.2.3
+      protobufjs: 7.2.5
     dev: false
 
   /@babel/runtime@7.22.11:

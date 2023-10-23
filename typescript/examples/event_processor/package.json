@@ -13,8 +13,7 @@
     "fmt": "prettier --write '**/*.(ts|tsx)'"
   },
   "dependencies": {
-    "@aptos-labs/aptos-indexer-protos": "=0.2.3",
-    "@aptos-labs/aptos-processor-sdk": "=0.1.1",
+    "@aptos-labs/aptos-processor-sdk": "=0.2.0",
     "commander": "^11.0.0",
     "pg": "^8.11.3",
     "typeorm": "=0.3.17"

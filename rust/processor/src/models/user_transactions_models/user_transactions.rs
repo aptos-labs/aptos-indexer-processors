@@ -15,7 +15,7 @@ use crate::{
         u64_to_bigdecimal,
     },
 };
-use aptos_indexer_protos::{
+use aptos_protos::{
     transaction::v1::{UserTransaction as UserTransactionPB, UserTransactionRequest},
     util::timestamp::Timestamp,
 };

@@ -3,7 +3,7 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{schema::events, utils::util::standardize_address};
-use aptos_indexer_protos::transaction::v1::Event as EventPB;
+use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

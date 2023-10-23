@@ -2,7 +2,6 @@
 resolver = "2"
 
 members = [
-    "aptos-indexer-protos",
     "moving-average",
     "post-processor",
     "processor",
@@ -19,13 +18,13 @@ repository = "https://github.com/aptos-labs/aptos-indexer-processors"
 rust-version = "1.70"
 
 [workspace.dependencies]
-aptos-indexer-protos = { path = "aptos-indexer-protos" }
 processor = { path = "processor" }
 server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }
 
 anyhow = "1.0.62"
 async-trait = "0.1.53"
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "af4067b6606c0c4823dbb640e8f2db4cb2a1a7f9" }
 backtrace = "0.3.58"
 base64 = "0.13.0"
 bb8 = "0.8.1"
@@ -66,7 +65,7 @@ reqwest = { version = "0.11.20", features = [
     "json",
     "stream",
 ] }
-serde = { version = "1.0.152", features = ["derive", "rc"] }
+serde = { version = "=1.0.152", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_yaml = "0.8.24"
 sha2 = "0.9.3"

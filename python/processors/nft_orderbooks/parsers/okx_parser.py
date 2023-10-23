@@ -1,4 +1,4 @@
-from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
+from aptos_protos.aptos.transaction.v1 import transaction_pb2
 import json
 import re
 from typing import Dict, List, Optional, TypedDict

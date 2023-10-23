@@ -1,7 +1,7 @@
 import datetime
 import re
 
-from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
+from aptos_protos.aptos.transaction.v1 import transaction_pb2
 from dataclasses import dataclass
 from typing import List
 from processors.nft_orderbooks.nft_marketplace_constants import (

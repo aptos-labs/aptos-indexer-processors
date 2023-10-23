@@ -10,7 +10,7 @@ use crate::{
     schema::block_metadata_transactions,
     utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_indexer_protos::{
+use aptos_protos::{
     transaction::v1::BlockMetadataTransaction as BlockMetadataTransactionPB,
     util::timestamp::Timestamp,
 };

@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
-  '@aptos-labs/aptos-indexer-protos':
-    specifier: '=0.2.3'
-    version: 0.2.3
+  '@aptos-labs/aptos-protos':
+    specifier: 1.1.2
+    version: 1.1.2
   '@grpc/grpc-js':
     specifier: '=1.9.2'
     version: 1.9.2
@@ -63,8 +63,8 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
-  /@aptos-labs/aptos-indexer-protos@0.2.3:
-    resolution: {integrity: sha512-MR5+n3mr61LQUkU2MftaQPofEqMiCT8dO+W1H+C1Q23DKGMNf6CyPH6fba+WiDSypMsobpeSKY4uJZ7VUAADTA==}
+  /@aptos-labs/aptos-protos@1.1.2:
+    resolution: {integrity: sha512-DwOefasA9R9fY7KaPvVNETEeYwwruzsOfNBGlUZNzeeiJW6i79GNLPgoxL0sk6BlnuWqPkHzhRryq+IrSaJsaQ==}
     engines: {node: '>=14.0.0'}
     dependencies:
       '@grpc/grpc-js': 1.9.2

@@ -23,7 +23,7 @@ use crate::{
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;
-use aptos_indexer_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
+use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

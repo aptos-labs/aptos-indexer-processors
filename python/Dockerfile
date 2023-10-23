@@ -7,7 +7,6 @@ WORKDIR /app
 COPY poetry.lock pyproject.toml /app/
 
 # Copy files and folders
-COPY /aptos-indexer-protos/ /app/aptos-indexer-protos
 COPY /utils/ /app/utils
 COPY /processors/ /app/processors
 
