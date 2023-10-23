@@ -13,7 +13,7 @@ use crate::{
     schema::current_delegated_voter,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use aptos_indexer_protos::transaction::v1::WriteTableItem;
+use aptos_protos::transaction::v1::WriteTableItem;
 use diesel::{prelude::*, ExpressionMethods};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;

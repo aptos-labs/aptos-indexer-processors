@@ -16,7 +16,7 @@ use crate::{
     },
     utils::util::standardize_address,
 };
-use aptos_indexer_protos::transaction::v1::{Event, WriteResource};
+use aptos_protos::transaction::v1::{Event, WriteResource};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

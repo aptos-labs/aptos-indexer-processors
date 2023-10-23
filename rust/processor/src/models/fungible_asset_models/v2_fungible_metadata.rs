@@ -16,7 +16,7 @@ use crate::{
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;
-use aptos_indexer_protos::transaction::v1::WriteResource;
+use aptos_protos::transaction::v1::WriteResource;
 use diesel::{prelude::*, sql_query, sql_types::Text};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;

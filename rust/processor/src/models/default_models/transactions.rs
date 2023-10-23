@@ -13,7 +13,7 @@ use crate::{
     schema::transactions,
     utils::util::{get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal},
 };
-use aptos_indexer_protos::transaction::v1::{
+use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
     Transaction as TransactionPB, TransactionInfo,
 };

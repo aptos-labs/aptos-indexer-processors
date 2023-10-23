@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_indexer_protos::transaction::v1::{
+use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
 use async_trait::async_trait;

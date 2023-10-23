@@ -10,7 +10,7 @@ use crate::{
     processors::coin_processor::APTOS_COIN_TYPE_STR, schema::coin_supply, utils::util::hash_str,
 };
 use anyhow::Context;
-use aptos_indexer_protos::transaction::v1::WriteTableItem;
+use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_indexer_protos::transaction::v1::Transaction;
+use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::result::Error;
 use field_count::FieldCount;

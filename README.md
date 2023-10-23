@@ -20,34 +20,7 @@ This guide will get you started with creating an Aptos indexer with custom parsi
 
 ## Response
 - The response is a stream of `RawDatastreamResponse` objects.
-- For each supported language, there is an `aptos` folder which contains the auto-generate protobuf files in that language. You can check out the files to see the stream response format and figure out how to parse the response.
+- To learn more about the protos and the code generated from those protos see [protos/](https://github.com/aptos-labs/aptos-core/tree/main/protos) in aptos-core.
 
 ## [Aptos Indexer GRPC Release Notes](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/indexer-grpc/release_notes.md)
 
-
-## Dev Guide
-
-### Development
-If you update the proto definitions in `proto/`, you can regenerate them for all languages by running this script:
-```
-./scripts/build_protos.sh
-```
-
-Make sure you have the following deps installed:
-```bash
-# Install buf
-brew install bufbuild/buf/buf
-
-# For generating Rust code
-cargo install protoc-gen-prost
-cargo install protoc-gen-prost-serde
-cargo install protoc-gen-prost-crate
-cargo install protoc-gen-tonic
-
-# For generating TS code
-pnpm install -g protoc-gen-ts@0.8.7
-
-# For generating Python code
-cd python/aptos-indexer-protos
-poetry install
-```

@@ -14,7 +14,7 @@ use crate::{
     schema::{current_objects, objects},
     utils::database::PgPoolConnection,
 };
-use aptos_indexer_protos::transaction::v1::{DeleteResource, WriteResource};
+use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;

@@ -1,4 +1,4 @@
-import { aptos } from "@aptos-labs/aptos-indexer-protos";
+import { aptos } from "@aptos-labs/aptos-protos";
 import { Config } from "./config";
 import { Timer } from "timer-node";
 import { exit } from "process";

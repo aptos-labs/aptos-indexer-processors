@@ -1,4 +1,4 @@
-import { aptos } from "@aptos-labs/aptos-indexer-protos";
+import { aptos } from "@aptos-labs/aptos-protos";
 import { DataSource } from "typeorm";
 
 /**

@@ -1,6 +1,6 @@
 import json
 
-from aptos_indexer_protos.aptos.transaction.v1 import transaction_pb2
+from aptos_protos.aptos.transaction.v1 import transaction_pb2
 from typing import List, Optional, Tuple
 from processors.nft_orderbooks.nft_marketplace_constants import (
     TOPAZ_BIDS_TABLE_HANDLE,

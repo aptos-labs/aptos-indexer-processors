@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_indexer_protos::transaction::v1::{write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;

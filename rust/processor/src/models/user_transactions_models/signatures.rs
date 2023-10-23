@@ -8,7 +8,7 @@ use crate::{
     utils::util::standardize_address,
 };
 use anyhow::{Context, Result};
-use aptos_indexer_protos::transaction::v1::{
+use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum, signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,

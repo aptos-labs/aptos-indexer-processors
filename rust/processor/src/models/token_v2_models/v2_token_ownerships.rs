@@ -28,7 +28,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use aptos_indexer_protos::transaction::v1::{
+use aptos_protos::transaction::v1::{
     DeleteResource, DeleteTableItem, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, One, Zero};

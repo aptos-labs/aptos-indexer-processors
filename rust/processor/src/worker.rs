@@ -25,11 +25,11 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_indexer_protos::{
+use aptos_moving_average::MovingAverage;
+use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
 };
-use aptos_moving_average::MovingAverage;
 use futures::StreamExt;
 use prost::Message;
 use std::{sync::Arc, time::Duration};

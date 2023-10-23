@@ -1,7 +1,7 @@
 {
   "name": "@aptos-labs/aptos-processor-sdk",
   "description": "SDK to enable you write Custom Indexer Processors for Aptos",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "packageManager": "pnpm@8.6.2",
   "license": "Apache-2.0",
   "engines": {
@@ -14,7 +14,7 @@
     "fmt": "prettier --write 'src/**/*.(ts|tsx)'"
   },
   "dependencies": {
-    "@aptos-labs/aptos-indexer-protos": "=0.2.3",
+    "@aptos-labs/aptos-protos": "1.1.2",
     "@grpc/grpc-js": "=1.9.2",
     "google-protobuf": "^3.21.2",
     "pg-connection-string": "^2.6.2",

@@ -1,4 +1,4 @@
-import { aptos } from "@aptos-labs/aptos-indexer-protos";
+import { aptos } from "@aptos-labs/aptos-protos";
 
 /**
  * Convert a grpc timestamp to a Date object.

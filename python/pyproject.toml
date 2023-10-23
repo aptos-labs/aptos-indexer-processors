@@ -8,8 +8,8 @@ readme = "README.md"
 [tool.poe.tasks]
 lint = ["pyright", "format-check"]
 pyright = "pyright"
-format-check = "black --diff -v --check --exclude (aptos|proto_autogen|aptos-indexer-protos|.venv) ."
-format = "black --exclude (aptos|proto_autogen|aptos-indexer-protos|.venv) ."
+format-check = "black --diff -v --check --exclude (aptos|.venv) ."
+format = "black --exclude (aptos|.venv) ."
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -27,7 +27,7 @@ prometheus-client = "^0.17.1"
 twisted = "^22.10.0"
 grpclib = "^0.4.5"
 alembic = "^1.11.1"
-aptos_indexer_protos = { path = "./aptos-indexer-protos", develop = true }
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "af4067b6606c0c4823dbb640e8f2db4cb2a1a7f9", subdirectory = "protos/python" }
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.53.0"

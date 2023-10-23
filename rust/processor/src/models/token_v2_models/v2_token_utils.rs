@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_indexer_protos::transaction::v1::{Event, WriteResource};
+use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::{

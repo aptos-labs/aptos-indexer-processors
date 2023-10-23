@@ -12,7 +12,7 @@ use crate::{
     },
     utils::util::standardize_address,
 };
-use aptos_indexer_protos::transaction::v1::{
+use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::BigDecimal;
