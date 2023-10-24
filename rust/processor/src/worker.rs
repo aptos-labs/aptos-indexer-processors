@@ -80,6 +80,7 @@ pub struct Worker {
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub enable_verbose_logging: Option<bool>,
+    pub cockroach_db: Option<String>,
 }
 
 impl Worker {
@@ -93,6 +94,7 @@ impl Worker {
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         enable_verbose_logging: Option<bool>,
+        cockroach_db: Option<String>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -122,6 +124,7 @@ impl Worker {
             auth_token,
             number_concurrent_processing_tasks,
             enable_verbose_logging,
+            cockroach_db,
         })
     }
 
@@ -179,7 +182,7 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // Build the processor based on the config.
-        let processor = build_processor(&self.processor_config, self.db_pool.clone(), self.postgres_connection_string.clone());
+        let processor = build_processor(&self.processor_config, self.db_pool.clone(), self.cockroach_db.clone());
         let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
@@ -760,7 +763,7 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool, postgres_connection_string: String) -> Processor {
+pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool, cockroach_db: Option<String>) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
@@ -770,7 +773,12 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool, postgres_con
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
-        ProcessorConfig::DefaultProcessor2 => Processor::from(DefaultProcessor2::new(db_pool, postgres_connection_string)),
+        ProcessorConfig::DefaultProcessor2 => {
+            let cockroach_db = cockroach_db
+                .clone()
+                .expect("cockroach_db is required for DefaultProcessor2");
+            Processor::from(DefaultProcessor2::new(db_pool, cockroach_db))
+        },
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))

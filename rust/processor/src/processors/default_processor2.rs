@@ -39,13 +39,13 @@ pub trait PGInsertable {
 
 pub struct DefaultProcessor2 {
     connection_pool: PgDbPool,
-    postgres_connection_string: String,
+    cockroach_postgres_connection_string: String,
 }
 
 impl DefaultProcessor2 {
-    pub fn new(connection_pool: PgDbPool, postgres_connection_string: String) -> Self {
+    pub fn new(connection_pool: PgDbPool, cockroach_postgres_connection_string: String) -> Self {
         tracing::info!("init DefaultProcessor2");
-        Self { connection_pool, postgres_connection_string }
+        Self { connection_pool, cockroach_postgres_connection_string }
     }
 }
 
@@ -153,7 +153,7 @@ impl ProcessorTrait for DefaultProcessor2 {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let (client, connection) = tokio_postgres::connect(
-            &self.postgres_connection_string,
+            &self.cockroach_postgres_connection_string,
             NoTls,
         )
         .await?;
