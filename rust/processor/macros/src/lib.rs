@@ -25,18 +25,18 @@ pub fn insertable_trait(input: TokenStream) -> TokenStream {
                     }
                 };
                 insert_code
-            }
+            },
             _ => {
                 quote! {
                     compile_error!("Only named fields are supported.");
                 }
-            }
+            },
         },
         _ => {
             quote! {
                 compile_error!("Only structs are supported.");
             }
-        }
+        },
     };
 
     gen.into()

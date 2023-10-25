@@ -4,31 +4,32 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
-        default_models2::{
-            transactions::TransactionCockroach,
-            events::EventsCockroach,
-            write_set_changes::{WriteSetChangeCockroach, WriteSetChangeResource, WriteSetChangeModule, WriteSetChangeTable},
-        },
         default_models::transactions::TransactionModel,
-    }, utils::database::PgDbPool,
-};
-use aptos_indexer_protos::transaction::v1::transaction::TxnData;
-use aptos_indexer_protos::transaction::v1::Transaction as TransactionPB;
-use tokio_postgres::{
-    Client, Error, NoTls, types::ToSql,
+        default_models2::{
+            events::EventsCockroach,
+            transactions::TransactionCockroach,
+            write_set_changes::{
+                WriteSetChangeCockroach, WriteSetChangeModule, WriteSetChangeResource,
+                WriteSetChangeTable,
+            },
+        },
+    },
+    utils::database::PgDbPool,
 };
 use anyhow::bail;
+use aptos_protos::transaction::v1::{transaction::TxnData, Transaction as TransactionPB};
 use async_trait::async_trait;
 use std::fmt::Debug;
+use tokio_postgres::{types::ToSql, Client, Error, NoTls};
 use tracing::error;
 
 pub const NAME: &str = "default_processor2";
 pub const CHUNK_SIZE: usize = 1000;
-const TRANSACTIONS_TABLE: &str = "transactions_cockroach";
-const EVENTS_TABLE: &str = "events_cockroach";
-const WRITE_SET_CHANGE_RESOURCE_TABLE: &str = "write_set_change_resource";
-const WRITE_SET_CHANGE_MODULE_TABLE: &str = "write_set_change_module";
-const WRITE_SET_CHANGE_TABLE_TABLE: &str = "write_set_change_table";
+const TRANSACTIONS_TABLE: &str = "transactions";
+const EVENTS_TABLE: &str = "events";
+const WRITE_SET_CHANGE_RESOURCE_TABLE: &str = "write_set_changes_resource";
+const WRITE_SET_CHANGE_MODULE_TABLE: &str = "write_set_changes_module";
+const WRITE_SET_CHANGE_TABLE_TABLE: &str = "write_set_changes_table";
 const TRANSACTION_PK: &[&str] = &["transaction_version"];
 const EVENT_PK: &[&str] = &["transaction_version", "event_index"];
 const WRITE_SET_CHANGE_PK: &[&str] = &["transaction_version", "index"];
@@ -45,7 +46,10 @@ pub struct DefaultProcessor2 {
 impl DefaultProcessor2 {
     pub fn new(connection_pool: PgDbPool, cockroach_postgres_connection_string: String) -> Self {
         tracing::info!("init DefaultProcessor2");
-        Self { connection_pool, cockroach_postgres_connection_string }
+        Self {
+            connection_pool,
+            cockroach_postgres_connection_string,
+        }
     }
 }
 
@@ -102,10 +106,7 @@ async fn insert_transactions(
     insert_to_table(client, TRANSACTIONS_TABLE, TRANSACTION_PK, txns).await
 }
 
-async fn insert_events(
-    events: Vec<EventsCockroach>,
-    client: &Client,
-) -> Result<(), Error> {
+async fn insert_events(events: Vec<EventsCockroach>, client: &Client) -> Result<(), Error> {
     insert_to_table(client, EVENTS_TABLE, EVENT_PK, events).await
 }
 
@@ -121,23 +122,40 @@ async fn insert_ws_changes(
         match ws_change {
             WriteSetChangeCockroach::Resource(resource) => {
                 resource_transactions.push(resource);
-            }
+            },
             WriteSetChangeCockroach::Module(module) => {
                 module_transactions.push(module);
-            }
+            },
             WriteSetChangeCockroach::Table(table) => {
                 table_transactions.push(table);
-            }
+            },
         }
     }
 
-    insert_to_table(client, WRITE_SET_CHANGE_RESOURCE_TABLE, WRITE_SET_CHANGE_PK, resource_transactions).await?;
-    insert_to_table(client, WRITE_SET_CHANGE_MODULE_TABLE, WRITE_SET_CHANGE_PK, module_transactions).await?;
-    insert_to_table(client, WRITE_SET_CHANGE_TABLE_TABLE, WRITE_SET_CHANGE_PK, table_transactions).await?;
+    insert_to_table(
+        client,
+        WRITE_SET_CHANGE_RESOURCE_TABLE,
+        WRITE_SET_CHANGE_PK,
+        resource_transactions,
+    )
+    .await?;
+    insert_to_table(
+        client,
+        WRITE_SET_CHANGE_MODULE_TABLE,
+        WRITE_SET_CHANGE_PK,
+        module_transactions,
+    )
+    .await?;
+    insert_to_table(
+        client,
+        WRITE_SET_CHANGE_TABLE_TABLE,
+        WRITE_SET_CHANGE_PK,
+        table_transactions,
+    )
+    .await?;
 
     Ok(())
 }
-
 
 #[async_trait]
 impl ProcessorTrait for DefaultProcessor2 {
@@ -152,12 +170,9 @@ impl ProcessorTrait for DefaultProcessor2 {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let (client, connection) = tokio_postgres::connect(
-            &self.cockroach_postgres_connection_string,
-            NoTls,
-        )
-        .await?;
-    
+        let (client, connection) =
+            tokio_postgres::connect(&self.cockroach_postgres_connection_string, NoTls).await?;
+
         tokio::spawn(async move {
             if let Err(e) = connection.await {
                 eprintln!("connection error: {}", e);
@@ -205,16 +220,14 @@ impl ProcessorTrait for DefaultProcessor2 {
                     err
                 );
 
-                bail!(
-                    format!(
-                        "Error inserting {} to db. Processor {}. Start {}. End {}. Error {:?}",
-                        operation_name,
-                        self.name(),
-                        start_version,
-                        end_version,
-                        err
-                    )
-                );
+                bail!(format!(
+                    "Error inserting {} to db. Processor {}. Start {}. End {}. Error {:?}",
+                    operation_name,
+                    self.name(),
+                    start_version,
+                    end_version,
+                    err
+                ));
             }
         }
 

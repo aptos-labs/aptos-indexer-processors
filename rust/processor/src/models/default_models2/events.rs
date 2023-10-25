@@ -7,10 +7,14 @@
 
 extern crate proc_macro;
 
+use crate::{processors::default_processor2::PGInsertable, utils::util::standardize_address};
 use aptos_indexer_protos::transaction::v1::Event as EventPB;
-use crate::{utils::util::standardize_address, processors::default_processor2::PGInsertable};
-use serde::{Deserialize, Serialize};
 use my_macros::PGInsertable;
+use serde::{Deserialize, Serialize};
+use crate::{processors::default_processor2::PGInsertable, utils::util::standardize_address};
+use aptos_protos::transaction::v1::Event as EventPB;
+use my_macros::PGInsertable;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct EventsCockroach {
@@ -43,7 +47,7 @@ impl EventsCockroach {
             })
             .collect::<Vec<EventsCockroach>>()
     }
-    
+
     fn from_event(
         event: EventPB,
         transaction_version: i64,

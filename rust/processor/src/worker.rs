@@ -7,8 +7,8 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        default_processor2::DefaultProcessor2,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        default_processor2::DefaultProcessor2, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
@@ -182,7 +182,11 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // Build the processor based on the config.
-        let processor = build_processor(&self.processor_config, self.db_pool.clone(), self.cockroach_db.clone());
+        let processor = build_processor(
+            &self.processor_config,
+            self.db_pool.clone(),
+            self.cockroach_db.clone(),
+        );
         let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
@@ -763,7 +767,11 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool, cockroach_db: Option<String>) -> Processor {
+pub fn build_processor(
+    config: &ProcessorConfig,
+    db_pool: PgDbPool,
+    cockroach_db: Option<String>,
+) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))

@@ -6,8 +6,8 @@ members = [
     "moving-average",
     "post-processor",
     "processor",
-    "server-framework",
     "processor/macros",
+    "server-framework",
 ]
 
 [workspace.package]

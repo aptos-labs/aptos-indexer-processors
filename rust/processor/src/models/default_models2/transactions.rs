@@ -7,15 +7,27 @@
 
 extern crate proc_macro;
 
-use crate::{models::{default_models::{
-        transactions::TransactionModel,
-        block_metadata_transactions::BlockMetadataTransactionModel,
-    }, user_transactions_models::user_transactions::UserTransactionModel}, processors::default_processor2::PGInsertable};
-use aptos_indexer_protos::{transaction::v1::{Transaction as TransactionPB, transaction::TxnData}, util::timestamp::Timestamp};
-
+use crate::{
+    models::{
+        default_models::{
+            block_metadata_transactions::BlockMetadataTransactionModel,
+            transactions::TransactionModel,
+        },
+        user_transactions_models::user_transactions::UserTransactionModel,
+    },
+    processors::default_processor2::PGInsertable,
+};
+use aptos_indexer_protos::{
+    transaction::v1::{
+        transaction::TxnData, transaction_payload::Type, write_set::WriteSetType,
+        Transaction as TransactionPB,
+    },
+    util::timestamp::Timestamp,
+};
+use my_macros::PGInsertable;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use my_macros::PGInsertable;
+use std::str::FromStr;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct TransactionCockroach {
@@ -24,6 +36,7 @@ pub struct TransactionCockroach {
     pub hash: String,
     pub transaction_type: String,
     pub payload: Option<serde_json::Value>,
+    pub payload_type: Option<String>,
     pub state_change_hash: String,
     pub event_root_hash: String,
     pub state_checkpoint_hash: Option<String>,
@@ -68,7 +81,8 @@ impl TransactionCockroach {
             ));
         }
         transactions_to_return
-    }    
+    }
+
 
     fn transaction_to_insert(
         txn: TransactionModel,
@@ -76,53 +90,81 @@ impl TransactionCockroach {
         blockmetadata_txn: Option<BlockMetadataTransactionModel>,
         timestamp: &Timestamp,
     ) -> Self {
-        let mut transaction = TransactionCockroach::default();
-    
-        transaction.transaction_version = txn.version;
-        transaction.transaction_block_height = txn.block_height;
-        transaction.hash = txn.hash;
-        transaction.transaction_type = txn.type_;
-        transaction.payload = Some(serde_json::to_value(&txn.payload).unwrap());
-        transaction.state_change_hash = txn.state_change_hash;
-        transaction.event_root_hash = txn.event_root_hash;
-        transaction.state_checkpoint_hash = txn.state_checkpoint_hash;
-        transaction.gas_used = Decimal::default();
-        transaction.success = txn.success;
-        transaction.vm_status = txn.vm_status;
-        transaction.accumulator_root_hash = txn.accumulator_root_hash;
-        transaction.num_events = txn.num_events;
-        transaction.num_write_set_changes = txn.num_write_set_changes;
-        transaction.epoch = txn.epoch;
-    
-        if let TxnData::User(inner) = txn_detail {
-            let (user_transaction, sigs) = UserTransactionModel::from_transaction(
-                inner,
-                timestamp,
-                txn.block_height,
-                txn.epoch,
-                txn.version,
-            );
-    
-            transaction.parent_signature_type = user_transaction.parent_signature_type;
-            transaction.sender = user_transaction.sender;
-            transaction.sequence_number = user_transaction.sequence_number;
-            transaction.max_gas_amount = Decimal::default();
-            transaction.expiration_timestamp_secs = user_transaction.expiration_timestamp_secs;
-            transaction.gas_unit_price = Decimal::default();
-            transaction.timestamp = user_transaction.timestamp;
-            transaction.entry_function_id_str = user_transaction.entry_function_id_str;
-            transaction.signature = Some(serde_json::to_value(sigs).unwrap());
-        } else if let Some(blockmetadata_txn) = blockmetadata_txn {
-            let previous_block_votes_bitvec =
-                serde_json::to_string(&blockmetadata_txn.previous_block_votes_bitvec).unwrap_or_default();
-            transaction.id = blockmetadata_txn.id;
-            transaction.round = blockmetadata_txn.round;
-            transaction.previous_block_votes_bitvec =
-                serde_json::Value::String(previous_block_votes_bitvec);
-            transaction.proposer = blockmetadata_txn.proposer;
-            transaction.failed_proposer_indices = serde_json::Value::Null;
+        let mut transaction = TransactionCockroach {
+            transaction_version: txn.version,
+            transaction_block_height: txn.block_height,
+            hash: txn.hash,
+            transaction_type: txn.type_,
+            payload: Some(serde_json::to_value(&txn.payload).unwrap()),
+            state_change_hash: txn.state_change_hash,
+            event_root_hash: txn.event_root_hash,
+            state_checkpoint_hash: txn.state_checkpoint_hash,
+            success: txn.success,
+            vm_status: txn.vm_status,
+            accumulator_root_hash: txn.accumulator_root_hash,
+            gas_used: Decimal::from_str(&txn.gas_used.to_string()).unwrap_or(Decimal::ZERO),
+            ..Self::default()
+        };
+
+        match txn_detail {
+            TxnData::User(inner) => {
+                let (user_transaction, sigs) = UserTransactionModel::from_transaction(
+                    inner,
+                    timestamp,
+                    txn.block_height,
+                    txn.epoch,
+                    txn.version,
+                );
+                transaction.parent_signature_type = user_transaction.parent_signature_type;
+                transaction.sender = user_transaction.sender;
+                transaction.sequence_number = user_transaction.sequence_number;
+                transaction.expiration_timestamp_secs = user_transaction.expiration_timestamp_secs;
+                transaction.timestamp = user_transaction.timestamp;
+                transaction.entry_function_id_str = user_transaction.entry_function_id_str;
+                transaction.gas_unit_price =
+                    Decimal::from_str(&user_transaction.gas_unit_price.to_string())
+                        .unwrap_or(Decimal::ZERO);
+                transaction.max_gas_amount =
+                    Decimal::from_str(&user_transaction.max_gas_amount.to_string())
+                        .unwrap_or(Decimal::ZERO);
+                transaction.signature = Some(serde_json::to_value(sigs).unwrap());
+                let payload = inner
+                    .request
+                    .as_ref()
+                    .expect("Getting user request failed.")
+                    .payload
+                    .as_ref()
+                    .expect("Getting payload failed.");
+                transaction.payload_type = Some(
+                    Type::try_from(payload.r#type)
+                        .expect("Payload type doesn't exist!")
+                        .as_str_name()
+                        .to_string(),
+                );
+            },
+            TxnData::BlockMetadata(_) if blockmetadata_txn.is_some() => {
+                let blockmetadata_txn = blockmetadata_txn.unwrap();
+                transaction.id = blockmetadata_txn.id;
+                transaction.round = blockmetadata_txn.round;
+                let previous_block_votes_bitvec =
+                    serde_json::to_string(&blockmetadata_txn.previous_block_votes_bitvec)
+                        .unwrap_or_default();
+                transaction.previous_block_votes_bitvec =
+                    serde_json::Value::String(previous_block_votes_bitvec);
+                transaction.proposer = blockmetadata_txn.proposer;
+            },
+            TxnData::Genesis(inner) => {
+                let payload = inner.payload.as_ref().unwrap();
+                transaction.payload_type = Some(
+                    WriteSetType::try_from(payload.write_set_type)
+                        .expect("WriteSet type doesn't exist!")
+                        .as_str_name()
+                        .to_string(),
+                );
+            },
+            _ => {},
         }
-    
+
         transaction
     }
 }
