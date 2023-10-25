@@ -341,8 +341,11 @@ impl Signature {
             Ok(AnySignatureTypeEnumPb::Secp256k1Ecdsa) => {
                 String::from("single_key_secp256k1_ecdsa_signature")
             },
-            _ => {
-                panic!("Unspecified signature type or un-recognized type is not supported")
+            wildcard => {
+                panic!(
+                    "Unspecified signature type or un-recognized type is not supported: {:?}",
+                    wildcard
+                )
             },
         };
         Self {
