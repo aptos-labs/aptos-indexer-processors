@@ -1808,7 +1808,8 @@
                     "sequence_number",
                     "transaction_block_height",
                     "transaction_version",
-                    "type"
+                    "type",
+                    "ev_itype_index"
                   ],
                   "filter": {},
                   "limit": 100

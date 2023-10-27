@@ -683,6 +683,8 @@ diesel::table! {
         data -> Jsonb,
         inserted_at -> Timestamp,
         event_index -> Int8,
+        #[max_length = 300]
+        indexed_type -> Varchar,
     }
 }
 
@@ -885,6 +887,15 @@ diesel::table! {
         threshold -> Int8,
         public_key_indices -> Jsonb,
         inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    spam_assets (asset) {
+        #[max_length = 1100]
+        asset -> Varchar,
+        is_spam -> Bool,
+        last_updated -> Timestamp,
     }
 }
 
@@ -1167,10 +1178,6 @@ diesel::table! {
 }
 
 diesel::joinable!(block_metadata_transactions -> transactions (version));
-diesel::joinable!(move_modules -> transactions (transaction_version));
-diesel::joinable!(move_resources -> transactions (transaction_version));
-diesel::joinable!(table_items -> transactions (transaction_version));
-diesel::joinable!(write_set_changes -> transactions (transaction_version));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
@@ -1221,6 +1228,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     processor_status,
     proposal_votes,
     signatures,
+    spam_assets,
     table_items,
     table_metadatas,
     token_activities,
