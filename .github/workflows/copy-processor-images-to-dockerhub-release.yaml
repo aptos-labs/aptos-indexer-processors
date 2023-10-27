@@ -1,0 +1,26 @@
+name: Copy images to dockerhub on release
+on:
+  push:
+    branches:
+      # aptos-indexer-processors network-specific release branches
+      - aptos-indexer-processors-devnet
+      - aptos-indexer-processors-testnet
+      - aptos-indexer-processors-mainnet
+    tags:
+      - aptos-indexer-processors-v*
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation
+
+jobs:
+  copy-images-to-docker-hub:
+    strategy:
+      matrix:
+        lanuage: ["rust", "python", "typescript"]
+    uses: ./.github/workflows/copy-processor-images-to-dockerhub.yaml
+    with:
+      processor_language: ${{ matrix.language }}
+      version_tag: ${{ github.ref_name }}
+      GIT_SHA: ${{ github.sha }}
+    secrets: inherit

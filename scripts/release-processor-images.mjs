@@ -107,8 +107,9 @@ console.info(chalk.green(`INFO: Tagging image as latest`));
 await $`${crane} tag ${imageGitShaTarget} latest`;
 
 if(parsedArgs.VERSION_TAG !== null) {
-    console.info(chalk.green(`INFO: Tagging image as ${parsedArgs.VERSION_TAG}`));
-    await $`${crane} tag ${imageGitShaTarget} ${parsedArgs.VERSION_TAG}`;
+    console.info(chalk.green(`INFO: Tagging image as ${parsedArgs.VERSION_TAG} and ${parsedArgs.VERSION_TAG}_${parsedArgs.GIT_SHA}`));
+    await $`${crane} tag ${imageGitShaTarget} ${parsedArgs.VERSION_TAG}`; // just the version tag
+    await $`${crane} tag ${imageGitShaTarget} ${parsedArgs.VERSION_TAG}_${parsedArgs.GIT_SHA}`; // version tag with git sha
 }
 
 async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds) {

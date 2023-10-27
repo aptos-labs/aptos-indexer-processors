@@ -1,12 +1,27 @@
 name: Release Processor Images
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       processor_language:
         required: true
         type: string
         default: rust
-        choices: [rust, python, typescript]
+      version_tag:
+        required: false
+        type: string
+        description: After we copy the image from GAR to DockerHub, we will add this tag to the image. For example aptos-indexer-processors-v1.0.4.
+      GIT_SHA:
+        required: true
+        type: string
+        description: The git SHA you want to copy from GAR to DockerHub. For example de766ae36a1c74212d370aae75bf234320612bbc.
+
+  workflow_dispatch:
+    inputs:
+      processor_language:
+        required: true
+        type: choice
+        default: rust
+        options: [rust, python, typescript]
       version_tag:
         required: false
         type: string
