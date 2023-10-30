@@ -106,7 +106,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.1.2"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af4067b6606c0c4823dbb640e8f2db4cb2a1a7f9#af4067b6606c0c4823dbb640e8f2db4cb2a1a7f9"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=14c8813c9a0c31437a679c2601d1c828060c4a3c#14c8813c9a0c31437a679c2601d1c828060c4a3c"
 dependencies = [
  "futures-core",
  "pbjson",
