@@ -31,7 +31,7 @@ use std::str::FromStr;
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct TransactionCockroach {
-    pub transaction_version: i64,
+    pub transaction_version: String,
     pub transaction_block_height: i64,
     pub hash: String,
     pub transaction_type: String,
@@ -91,7 +91,7 @@ impl TransactionCockroach {
         timestamp: &Timestamp,
     ) -> Self {
         let mut transaction = TransactionCockroach {
-            transaction_version: txn.version,
+            transaction_version: txn.version.to_string(),
             transaction_block_height: txn.block_height,
             hash: txn.hash,
             transaction_type: txn.type_,
@@ -103,6 +103,7 @@ impl TransactionCockroach {
             vm_status: txn.vm_status,
             accumulator_root_hash: txn.accumulator_root_hash,
             gas_used: Decimal::from_str(&txn.gas_used.to_string()).unwrap_or(Decimal::ZERO),
+            epoch: txn.epoch,
             ..Self::default()
         };
 

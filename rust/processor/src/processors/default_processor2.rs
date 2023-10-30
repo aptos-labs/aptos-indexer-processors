@@ -65,7 +65,7 @@ impl Debug for DefaultProcessor2 {
 }
 
 async fn insert_to_table<T>(
-    client: &Client,
+    client: &mut Client,
     table_name: &str,
     pk: &[&str],
     data: Vec<T>,
@@ -73,6 +73,8 @@ async fn insert_to_table<T>(
 where
     T: PGInsertable,
 {
+    let transaction = client.transaction().await?;
+
     for item in data {
         let (column_names, query_values) = item.get_insertable_sql_values();
 
@@ -91,28 +93,29 @@ where
             pk_str
         );
 
-        client
+        transaction
             .execute(query.as_str(), query_values.as_slice())
             .await?;
     }
 
+    transaction.commit().await?;
     Ok(())
 }
 
 async fn insert_transactions(
     txns: Vec<TransactionCockroach>,
-    client: &Client,
+    client: &mut Client,
 ) -> Result<(), Error> {
     insert_to_table(client, TRANSACTIONS_TABLE, TRANSACTION_PK, txns).await
 }
 
-async fn insert_events(events: Vec<EventsCockroach>, client: &Client) -> Result<(), Error> {
+async fn insert_events(events: Vec<EventsCockroach>, client: &mut Client,) -> Result<(), Error> {
     insert_to_table(client, EVENTS_TABLE, EVENT_PK, events).await
 }
 
 async fn insert_ws_changes(
     ws_changes: Vec<WriteSetChangeCockroach>,
-    client: &Client,
+    client: &mut Client,
 ) -> Result<(), Error> {
     let mut resource_transactions: Vec<WriteSetChangeResource> = Vec::new();
     let mut module_transactions: Vec<WriteSetChangeModule> = Vec::new();
@@ -170,7 +173,7 @@ impl ProcessorTrait for DefaultProcessor2 {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let (client, connection) =
+        let (mut client, connection) =
             tokio_postgres::connect(&self.cockroach_postgres_connection_string, NoTls).await?;
 
         tokio::spawn(async move {
@@ -204,9 +207,9 @@ impl ProcessorTrait for DefaultProcessor2 {
         let wscs = WriteSetChangeCockroach::from_wscs(write_set_changes, wsc_details);
 
         let insert_operations: Vec<(&str, Result<(), Error>)> = vec![
-            ("transactions", insert_transactions(txns, &client).await),
-            ("events", insert_events(events, &client).await),
-            ("write set changes", insert_ws_changes(wscs, &client).await),
+            ("transactions", insert_transactions(txns, &mut client).await),
+            ("events", insert_events(events, &mut client).await),
+            ("write set changes", insert_ws_changes(wscs, &mut client).await),
         ];
 
         for (operation_name, insert_result) in insert_operations {

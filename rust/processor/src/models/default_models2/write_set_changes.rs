@@ -24,7 +24,7 @@ pub enum WriteSetChangeCockroach {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct WriteSetChangeResource {
-    pub transaction_version: i64,
+    pub transaction_version: String,
     pub transaction_block_height: i64,
     pub hash: String,
     pub write_set_change_type: String,
@@ -41,7 +41,7 @@ pub struct WriteSetChangeResource {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct WriteSetChangeModule {
-    pub transaction_version: i64,
+    pub transaction_version: String,
     pub transaction_block_height: i64,
     pub hash: String,
     pub write_set_change_type: String,
@@ -56,7 +56,7 @@ pub struct WriteSetChangeModule {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct WriteSetChangeTable {
-    pub transaction_version: i64,
+    pub transaction_version: String,
     pub transaction_block_height: i64,
     pub hash: String,
     pub write_set_change_type: String,
@@ -68,7 +68,7 @@ pub struct WriteSetChangeTable {
     pub data: Option<serde_json::Value>,
 }
 
-// p99 currently is ? so using ? as a safe max length
+// p99 currently is 296 so using 300 as a safe max length
 const WRITE_RESOURCE_TYPE_MAX_LENGTH: usize = 300;
 
 impl WriteSetChangeCockroach {
@@ -99,7 +99,7 @@ impl WriteSetChangeCockroach {
         let wsc = match write_set_change_detail {
             WriteSetChangeDetail::Module(move_module) => {
                 WriteSetChangeCockroach::Module(WriteSetChangeModule {
-                    transaction_version,
+                    transaction_version: transaction_version.to_string(),
                     transaction_block_height,
                     hash,
                     write_set_change_type,
@@ -116,7 +116,7 @@ impl WriteSetChangeCockroach {
             },
             WriteSetChangeDetail::Resource(move_resource) => {
                 WriteSetChangeCockroach::Resource(WriteSetChangeResource {
-                    transaction_version,
+                    transaction_version: transaction_version.to_string(),
                     transaction_block_height,
                     hash,
                     write_set_change_type,
@@ -157,7 +157,7 @@ impl WriteSetChangeCockroach {
                     };
 
                 WriteSetChangeCockroach::Table(WriteSetChangeTable {
-                    transaction_version,
+                    transaction_version: transaction_version.to_string(),
                     transaction_block_height,
                     hash,
                     write_set_change_type,

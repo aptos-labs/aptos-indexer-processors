@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone, PGInsertable, Default)]
 pub struct EventsCockroach {
-    pub transaction_version: i64,
+    pub transaction_version: String,
     pub sequence_number: i64,
     pub creation_number: i64,
     pub account_address: String,
@@ -60,7 +60,7 @@ impl EventsCockroach {
             account_address: standardize_address(
                 event.key.as_ref().unwrap().account_address.as_str(),
             ),
-            transaction_version,
+            transaction_version: transaction_version.to_string(),
             transaction_block_height,
             event_type: event.type_str.clone(),
             data: serde_json::from_str(event.data.as_str()).unwrap(),
