@@ -6,6 +6,10 @@ on:
   push:
     branches:
       - main
+      # aptos-indexer-processors network-specific release branches
+      - aptos-indexer-processors-devnet
+      - aptos-indexer-processors-testnet
+      - aptos-indexer-processors-mainnet
 
 # cancel redundant builds
 concurrency:
