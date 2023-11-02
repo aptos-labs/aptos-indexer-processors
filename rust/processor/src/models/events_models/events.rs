@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{schema::events, utils::util::{standardize_address, truncate_str}};
+use crate::{
+    schema::events,
+    utils::util::{standardize_address, truncate_str},
+};
 use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-// p99 currently is 303 so using 300 as a safe max length 
+// p99 currently is 303 so using 300 as a safe max length
 const EVENT_TYPE_MAX_LENGTH: usize = 300;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
