@@ -13,7 +13,7 @@ use crate::{
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::result::Error;
+use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
 use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
@@ -93,7 +93,11 @@ async fn insert_events(
             diesel::insert_into(schema::events::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, event_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    indexed_type.eq(excluded(indexed_type)),
+                )),
             None,
         )
         .await?;
