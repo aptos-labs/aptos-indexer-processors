@@ -55,6 +55,12 @@ const MIN_SEC_BETWEEN_GRPC_RECONNECTS: u64 = 15;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
 const RECONNECTION_MAX_RETRIES: u64 = 5;
 
+pub struct TransactionsPBResponse {
+    pub transactions: Vec<Transaction>,
+    pub chain_id: u64,
+    pub size_in_bytes: u64,
+}
+
 pub struct Worker {
     pub db_pool: PgDbPool,
     pub processor_config: ProcessorConfig,
@@ -170,7 +176,7 @@ impl Worker {
         // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
-        let (tx, mut receiver) = tokio::sync::mpsc::channel::<(u64, Vec<Transaction>)>(BUFFER_SIZE);
+        let (tx, mut receiver) = tokio::sync::mpsc::channel::<TransactionsPBResponse>(BUFFER_SIZE);
         let request_ending_version = self.ending_version;
         let auth_token = self.auth_token.clone();
         tokio::spawn(async move {
@@ -203,7 +209,7 @@ impl Worker {
         // 5. If it's the wrong chain, panic.
         let mut db_chain_id = None;
         loop {
-            let mut transactions_batches = vec![];
+            let mut transactions_batches: Vec<TransactionsPBResponse> = vec![];
             let mut last_fetched_version = batch_start_version as i64 - 1;
             for task_index in 0..concurrent_tasks {
                 let receive_status = match task_index {
@@ -217,14 +223,14 @@ impl Worker {
                     },
                 };
                 match receive_status {
-                    Ok((chain_id, transactions)) => {
+                    Ok(txn_pb) => {
                         if let Some(existing_id) = db_chain_id {
-                            if chain_id != existing_id {
+                            if txn_pb.chain_id != existing_id {
                                 error!(
                                     processor_name = processor_name,
                                     stream_address =
                                         self.indexer_grpc_data_service_address.as_str(),
-                                    chain_id = chain_id,
+                                    chain_id = txn_pb.chain_id,
                                     existing_id = existing_id,
                                     "[Parser] Stream somehow changed chain id!",
                                 );
@@ -232,13 +238,13 @@ impl Worker {
                             }
                         } else {
                             db_chain_id = Some(
-                                self.check_or_update_chain_id(chain_id as i64)
+                                self.check_or_update_chain_id(txn_pb.chain_id as i64)
                                     .await
                                     .unwrap(),
                             );
                         }
                         let current_fetched_version =
-                            transactions.as_slice().first().unwrap().version;
+                            txn_pb.transactions.as_slice().first().unwrap().version;
                         if last_fetched_version + 1 != current_fetched_version as i64 {
                             error!(
                                 batch_start_version = batch_start_version,
@@ -249,8 +255,8 @@ impl Worker {
                             panic!("[Parser] Received batch with gap from GRPC stream");
                         }
                         last_fetched_version =
-                            transactions.as_slice().last().unwrap().version as i64;
-                        transactions_batches.push(transactions);
+                            txn_pb.transactions.as_slice().last().unwrap().version as i64;
+                        transactions_batches.push(txn_pb);
                     },
                     // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
                     Err(TryRecvError::Empty) => {
@@ -270,7 +276,10 @@ impl Worker {
 
             // Process the transactions in parallel
             let mut tasks = vec![];
-            for transactions in transactions_batches {
+            for transactions_pb in transactions_batches {
+                // TODO use this
+                let _size_in_bytes = transactions_pb.size_in_bytes;
+                let transactions = transactions_pb.transactions;
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
@@ -585,7 +594,7 @@ pub async fn get_stream(
 /// 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
 /// all existing transactions are processed
 pub async fn create_fetcher_loop(
-    tx: tokio::sync::mpsc::Sender<(u64, Vec<Transaction>)>,
+    tx: tokio::sync::mpsc::Sender<TransactionsPBResponse>,
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
@@ -622,16 +631,23 @@ pub async fn create_fetcher_loop(
     loop {
         let is_success = match resp_stream.next().await {
             Some(Ok(r)) => {
+                let size_in_bytes = r.encoded_len() as u64;
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
                 let end_version = r.transactions.as_slice().last().unwrap().version;
                 next_version_to_fetch = end_version + 1;
 
+                // TODO: evaluate remove
                 TRANSMITTED_BYTES_COUNT
                     .with_label_values(&[&processor_name])
-                    .inc_by(r.encoded_len() as u64);
+                    .inc_by(size_in_bytes);
                 let chain_id = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
-                match tx.send((chain_id, r.transactions)).await {
+                let txn_pb = TransactionsPBResponse {
+                    transactions: r.transactions,
+                    chain_id,
+                    size_in_bytes,
+                };
+                match tx.send(txn_pb).await {
                     Ok(()) => {},
                     Err(e) => {
                         error!(
