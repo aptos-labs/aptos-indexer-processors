@@ -1809,7 +1809,7 @@
                     "transaction_block_height",
                     "transaction_version",
                     "type",
-                    "ev_itype_index"
+                    "indexed_type"
                   ],
                   "filter": {},
                   "limit": 100
