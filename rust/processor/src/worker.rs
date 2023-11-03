@@ -33,8 +33,7 @@ use aptos_protos::{
 use futures::StreamExt;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::error::TryRecvError;
-use tokio::time::timeout;
+use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 use tonic::Streaming;
 use tracing::{error, info};
 use url::Url;
@@ -76,6 +75,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
+    pub enable_verbose_logging: Option<bool>,
 }
 
 impl Worker {
@@ -88,6 +88,7 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
+        enable_verbose_logging: Option<bool>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -116,6 +117,7 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
+            enable_verbose_logging,
         })
     }
 
@@ -127,6 +129,7 @@ impl Worker {
     /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
         let processor_name = self.processor_config.name();
+        let enable_verbose_logging = self.enable_verbose_logging.unwrap_or(false);
         info!(
             processor_name = processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
@@ -195,7 +198,7 @@ impl Worker {
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                ending_version = ending_version,
+                end_version = ending_version,
                 start_version = batch_start_version,
                 "[Parser] Starting fetcher thread"
             );
@@ -315,20 +318,20 @@ impl Worker {
                 }
             }
 
-            let size_in_kbs = transactions_batches
+            let size_in_bytes = transactions_batches
                 .iter()
-                .fold(0.0, |acc, txn_batch| acc + txn_batch.size_in_bytes as f64)
-                / 1024.0;
+                .fold(0.0, |acc, txn_batch| acc + txn_batch.size_in_bytes as f64);
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
                 start_version = batch_start_version,
                 end_version = last_fetched_version,
-                size_in_kbs,
+                num_of_transactions = last_fetched_version - batch_start_version as i64 + 1,
+                size_in_bytes,
                 duration_in_secs = txn_channel_fetch_latency.elapsed().as_secs_f64(),
                 tps = (last_fetched_version as f64 - batch_start_version as f64)
                     / txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                kbps = size_in_kbs / txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                bytes_per_sec = size_in_bytes / txn_channel_fetch_latency.elapsed().as_secs_f64(),
                 "[Parser] Successfully fetched transaction batches from channel."
             );
 
@@ -366,14 +369,17 @@ impl Worker {
                         .with_label_values(&[processor_name])
                         .inc();
 
-                    info!(
-                        processor_name = processor_name,
-                        service_type = PROCESSOR_SERVICE_TYPE,
-                        start_version,
-                        end_version,
-                        size_in_kbs = transactions_pb.size_in_bytes as f64 / 1024.0,
-                        "[Parser] Started processing a batch of transactions"
-                    );
+                    if enable_verbose_logging {
+                        info!(
+                            processor_name = processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            start_version,
+                            end_version,
+                            size_in_kbs = transactions_pb.size_in_bytes as f64 / 1024.0,
+                            "[Parser] Started processing one batch of transactions"
+                        );
+                    }
+
                     let processing_duration = std::time::Instant::now();
 
                     let processed_result = processor_clone
@@ -390,20 +396,25 @@ impl Worker {
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
 
-                    info!(
-                        processor_name = processor_name,
-                        service_type = PROCESSOR_SERVICE_TYPE,
-                        start_version,
-                        end_version,
-                        size_in_kbs = transactions_pb.size_in_bytes as f64 / 1024.0,
-                        duration_in_secs = processing_duration.elapsed().as_secs_f64(),
-                        tps = (end_version - start_version) as f64
-                            / processing_duration.elapsed().as_secs_f64(),
-                        kbps = transactions_pb.size_in_bytes as f64
-                            / 1024.0
-                            / processing_duration.elapsed().as_secs_f64(),
-                        "[Parser] Finished processing a batch of transactions"
-                    );
+                    if enable_verbose_logging {
+                        if let Ok(res) = processed_result {
+                            info!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                start_version,
+                                end_version,
+                                size_in_bytes = transactions_pb.size_in_bytes,
+                                processing_duration_in_secs = res.processing_duration_in_secs,
+                                db_insertion_duration_in_secs = res.db_insertion_duration_in_secs,
+                                duration_in_secs = processing_duration.elapsed().as_secs_f64(),
+                                tps = (end_version - start_version) as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                bytes_per_sec = transactions_pb.size_in_bytes as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                "[Parser] Finished processing one batch of transactions"
+                            );
+                        }
+                    }
 
                     processed_result
                 });
@@ -443,11 +454,19 @@ impl Worker {
             }
 
             // Make sure there are no gaps and advance states
-            processed_versions.sort();
+            processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
             let mut prev_start = None;
             let mut prev_end = None;
+            let mut max_processing_duration_in_secs: f64 = 0.0;
+            let mut max_db_insertion_duration_in_secs: f64 = 0.0;
             let processed_versions_sorted = processed_versions.clone();
-            for (start, end) in processed_versions {
+            for processing_result in processed_versions {
+                let start = processing_result.start_version;
+                let end = processing_result.end_version;
+                max_processing_duration_in_secs = max_processing_duration_in_secs
+                    .max(processing_result.processing_duration_in_secs);
+                max_db_insertion_duration_in_secs = max_db_insertion_duration_in_secs
+                    .max(processing_result.db_insertion_duration_in_secs);
                 if prev_start.is_none() {
                     prev_start = Some(start);
                     prev_end = Some(end);
@@ -458,7 +477,10 @@ impl Worker {
                             stream_address = self.indexer_grpc_data_service_address.to_string(),
                             processed_versions = processed_versions_sorted
                                 .iter()
-                                .map(|(s, e)| format!("{}-{}", s, e))
+                                .map(|result| format!(
+                                    "{}-{}",
+                                    result.start_version, result.end_version
+                                ))
                                 .collect::<Vec<_>>()
                                 .join(", "),
                             "[Parser] Gaps in processing stream"
@@ -469,8 +491,8 @@ impl Worker {
                     prev_end = Some(end);
                 }
             }
-            let batch_start = processed_versions_sorted.first().unwrap().0;
-            let batch_end = processed_versions_sorted.last().unwrap().1;
+            let batch_start = processed_versions_sorted.first().unwrap().start_version;
+            let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
 
             LATEST_PROCESSED_VERSION
@@ -487,12 +509,12 @@ impl Worker {
                 service_type = PROCESSOR_SERVICE_TYPE,
                 start_version = batch_start,
                 end_version = batch_end,
-                batch_size = batch_end - batch_start + 1,
+                num_of_transactions = batch_end - batch_start + 1,
                 task_count,
-                size_in_kbs,
+                size_in_bytes,
                 duration_in_secs = processing_time.elapsed().as_secs_f64(),
                 tps = (ma.avg() * 1000.0) as u64,
-                kbps = size_in_kbs / processing_time.elapsed().as_secs_f64(),
+                bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
                 "[Parser] Finished processing transaction batches"
             );
         }
@@ -632,7 +654,7 @@ pub async fn get_stream(
         service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
-        ending_version = ending_version,
+        end_version = ending_version,
         "[Parser] Setting up rpc channel"
     );
 
@@ -660,7 +682,7 @@ pub async fn get_stream(
         service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
-        ending_version = ending_version,
+        end_version = ending_version,
         "[Parser] Setting up GRPC client"
     );
     let mut rpc_client = match RawDataClient::connect(channel).await {
@@ -689,8 +711,9 @@ pub async fn get_stream(
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
-        count = ?count,
-        "[Parser] Setting up GRPC stream");
+        num_of_transactions = ?count,
+        "[Parser] Setting up GRPC stream",
+    );
     let request = grpc_request_builder(starting_version, count, auth_token, processor_name);
     rpc_client
         .get_transactions(request)
@@ -768,14 +791,13 @@ pub async fn create_fetcher_loop(
                     start_version,
                     end_version,
                     channel_size = BUFFER_SIZE - tx.capacity(),
-                    size_in_kbs = r.encoded_len() as f64 / 1024.0,
+                    size_in_bytes = r.encoded_len() as f64,
                     duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64(),
                     tps = (r.transactions.len() as f64
                         / grpc_channel_recv_latency.elapsed().as_secs_f64())
                         as u64,
-                    kbps = (r.encoded_len() as f64
-                        / grpc_channel_recv_latency.elapsed().as_secs_f64()
-                        / 1024.0) as u64,
+                    bytes_per_sec =
+                        r.encoded_len() as f64 / grpc_channel_recv_latency.elapsed().as_secs_f64(),
                     "[Parser] Received transactions from GRPC. Sending transactions to channel.",
                 );
 
@@ -804,13 +826,12 @@ pub async fn create_fetcher_loop(
                     start_version = start_version,
                     end_version = end_version,
                     channel_size = BUFFER_SIZE - tx.capacity(),
-                    size_in_kbs = txn_pb.size_in_bytes as f64 / 1024.0,
+                    size_in_bytes = txn_pb.size_in_bytes,
                     duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64(),
                     tps = (txn_pb.transactions.len() as f64
                         / txn_channel_send_latency.elapsed().as_secs_f64())
                         as u64,
-                    kbps = txn_pb.size_in_bytes as f64
-                        / 1024.0
+                    bytes_per_sec = txn_pb.size_in_bytes as f64
                         / txn_channel_send_latency.elapsed().as_secs_f64(),
                     "[Parser] Successfully sent transactions to channel."
                 );
