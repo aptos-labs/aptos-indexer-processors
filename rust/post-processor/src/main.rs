@@ -25,7 +25,7 @@ pub struct PostProcessorConfig {
 
 #[async_trait::async_trait]
 impl RunnableConfig for PostProcessorConfig {
-    async fn run(&self, _verbose: Option<bool>) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         let mut tasks = vec![];
 
         if let Some(config) = &self.processor_status_checker_config {

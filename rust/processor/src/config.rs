@@ -21,11 +21,12 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
+    pub enable_verbose_logging: Option<bool>,
 }
 
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
-    async fn run(&self, verbose: Option<bool>) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         let mut worker = Worker::new(
             self.processor_config.clone(),
             self.postgres_connection_string.clone(),
@@ -35,7 +36,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            verbose,
+            self.enable_verbose_logging,
         )
         .await
         .context("Failed to build worker")?;
