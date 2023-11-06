@@ -535,7 +535,7 @@ fn parse_ans(
             }
 
             // Parse V2 ANS subdomain exts
-            for (_, wsc) in transaction_info.changes.iter().enumerate() {
+            for wsc in transaction_info.changes.iter() {
                 match wsc.change.as_ref().unwrap() {
                     WriteSetChange::WriteResource(write_resource) => {
                         if let Some(subdomain_ext) = SubdomainExtV2::from_write_resource(

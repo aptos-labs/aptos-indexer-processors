@@ -203,7 +203,7 @@ async fn parse_v2_token(
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
         let mut token_v2_metadata_helper: TokenV2AggregatedDataMapping = HashMap::new();
-        for (_, wsc) in transaction_info.changes.iter().enumerate() {
+        for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                 if let Some(object) =
                     ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()

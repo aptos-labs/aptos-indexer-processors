@@ -524,7 +524,7 @@ async fn parse_v2_token(
             let mut tokens_burned: TokenV2Burned = HashSet::new();
 
             // Need to do a first pass to get all the objects
-            for (_, wsc) in transaction_info.changes.iter().enumerate() {
+            for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     if let Some(object) =
                         ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
@@ -549,7 +549,7 @@ async fn parse_v2_token(
             }
 
             // Need to do a second pass to get all the structs related to the object
-            for (_, wsc) in transaction_info.changes.iter().enumerate() {
+            for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     let address = standardize_address(&wr.address.to_string());
                     if let Some(aggregated_data) = token_v2_metadata_helper.get_mut(&address) {
