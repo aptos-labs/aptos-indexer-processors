@@ -17,8 +17,6 @@ use warp::{http::Response, Filter};
 pub struct ServerArgs {
     #[clap(short, long, value_parser)]
     pub config_path: PathBuf,
-    #[clap(short, long)]
-    pub verbose: Option<bool>,
 }
 
 impl ServerArgs {
@@ -30,17 +28,13 @@ impl ServerArgs {
         setup_logging();
         setup_panic_handler();
         let config = load::<GenericConfig<C>>(&self.config_path)?;
-        run_server_with_config(config, handle, self.verbose).await
+        run_server_with_config(config, handle).await
     }
 }
 
 /// Run a server and the necessary probes. For spawning these tasks, the user must
 /// provide a handle to a runtime they already have.
-pub async fn run_server_with_config<C>(
-    config: GenericConfig<C>,
-    handle: Handle,
-    verbose: Option<bool>,
-) -> Result<()>
+pub async fn run_server_with_config<C>(config: GenericConfig<C>, handle: Handle) -> Result<()>
 where
     C: RunnableConfig,
 {
@@ -50,7 +44,7 @@ where
         register_probes_and_metrics_handler(health_port).await;
         Ok(())
     });
-    let main_task_handler = handle.spawn(async move { config.run(verbose).await });
+    let main_task_handler = handle.spawn(async move { config.run().await });
     tokio::select! {
         _ = task_handler => {
             error!("Probes and metrics handler unexpectedly exited");
@@ -77,8 +71,8 @@ impl<T> RunnableConfig for GenericConfig<T>
 where
     T: RunnableConfig,
 {
-    async fn run(&self, verbose: Option<bool>) -> Result<()> {
-        self.server_config.run(verbose).await
+    async fn run(&self) -> Result<()> {
+        self.server_config.run().await
     }
 
     fn get_server_name(&self) -> String {
@@ -89,7 +83,7 @@ where
 /// RunnableConfig is a trait that all services must implement for their configuration.
 #[async_trait::async_trait]
 pub trait RunnableConfig: DeserializeOwned + Send + Sync + 'static {
-    async fn run(&self, verbose: Option<bool>) -> Result<()>;
+    async fn run(&self) -> Result<()>;
     fn get_server_name(&self) -> String;
 }
 
@@ -190,7 +184,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl RunnableConfig for TestConfig {
-        async fn run(&self, _verbose: Option<bool>) -> Result<()> {
+        async fn run(&self) -> Result<()> {
             assert_eq!(self.test, 123);
             assert_eq!(self.test_name, "test");
             Ok(())
