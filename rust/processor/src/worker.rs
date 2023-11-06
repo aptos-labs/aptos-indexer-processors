@@ -34,7 +34,7 @@ use futures::StreamExt;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
-use tonic::Streaming;
+use tonic::{Response, Streaming};
 use tracing::{error, info};
 use url::Url;
 
@@ -43,6 +43,8 @@ const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
+/// GRPC connection id
+const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
@@ -375,7 +377,7 @@ impl Worker {
                             service_type = PROCESSOR_SERVICE_TYPE,
                             start_version,
                             end_version,
-                            size_in_kbs = transactions_pb.size_in_bytes as f64 / 1024.0,
+                            size_in_bytes = transactions_pb.size_in_bytes,
                             "[Parser] Started processing one batch of transactions"
                         );
                     }
@@ -648,7 +650,7 @@ pub async fn get_stream(
     ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
-) -> Streaming<TransactionsResponse> {
+) -> Response<Streaming<TransactionsResponse>> {
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
@@ -719,7 +721,6 @@ pub async fn get_stream(
         .get_transactions(request)
         .await
         .expect("[Parser] Failed to get grpc response. Is the server running?")
-        .into_inner()
 }
 
 /// Gets a batch of transactions from the stream. Batch size is set in the grpc server.
@@ -751,7 +752,7 @@ pub async fn create_fetcher_loop(
         end_version = request_ending_version,
         "[Parser] Connecting to GRPC stream",
     );
-    let mut resp_stream = get_stream(
+    let mut response = get_stream(
         indexer_grpc_data_service_address.clone(),
         indexer_grpc_http2_ping_interval,
         indexer_grpc_http2_ping_timeout,
@@ -761,10 +762,16 @@ pub async fn create_fetcher_loop(
         processor_name.to_string(),
     )
     .await;
+    let mut connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
+        Some(connection_id) => connection_id.to_str().unwrap().to_string(),
+        None => "".to_string(),
+    };
+    let mut resp_stream = response.into_inner();
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
+        connection_id,
         start_version = starting_version,
         end_version = request_ending_version,
         "[Parser] Successfully connected to GRPC stream",
@@ -788,6 +795,7 @@ pub async fn create_fetcher_loop(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
                     start_version,
                     end_version,
                     channel_size = BUFFER_SIZE - tx.capacity(),
@@ -813,6 +821,7 @@ pub async fn create_fetcher_loop(
                         error!(
                             processor_name = processor_name,
                             stream_address = indexer_grpc_data_service_address.to_string(),
+                            connection_id,
                             channel_size = BUFFER_SIZE - tx.capacity(),
                             error = ?e,
                             "[Parser] Error sending GRPC response to channel."
@@ -823,6 +832,8 @@ pub async fn create_fetcher_loop(
                 info!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
                     start_version = start_version,
                     end_version = end_version,
                     channel_size = BUFFER_SIZE - tx.capacity(),
@@ -843,6 +854,7 @@ pub async fn create_fetcher_loop(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
                     start_version = starting_version,
                     end_version = request_ending_version,
                     error = ?rpc_error,
@@ -855,6 +867,7 @@ pub async fn create_fetcher_loop(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
                     start_version = starting_version,
                     end_version = request_ending_version,
                     "[Parser] Stream ended."
@@ -873,6 +886,7 @@ pub async fn create_fetcher_loop(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
+                connection_id,
                 ending_version = request_ending_version,
                 next_version_to_fetch = next_version_to_fetch,
                 "[Parser] Reached ending version.",
@@ -883,6 +897,8 @@ pub async fn create_fetcher_loop(
                 info!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
                     channel_size = BUFFER_SIZE - channel_capacity,
                     "[Parser] Waiting for channel to be empty"
                 );
@@ -895,6 +911,7 @@ pub async fn create_fetcher_loop(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
+                connection_id,
                 "[Parser] The stream is ended."
             );
             break;
@@ -929,7 +946,7 @@ pub async fn create_fetcher_loop(
                 reconnection_retries = reconnection_retries,
                 "[Parser] Reconnecting to GRPC stream"
             );
-            resp_stream = get_stream(
+            response = get_stream(
                 indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
@@ -939,10 +956,16 @@ pub async fn create_fetcher_loop(
                 processor_name.to_string(),
             )
             .await;
+            connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
+                Some(connection_id) => connection_id.to_str().unwrap().to_string(),
+                None => "".to_string(),
+            };
+            resp_stream = response.into_inner();
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
+                connection_id,
                 starting_version = next_version_to_fetch,
                 ending_version = request_ending_version,
                 reconnection_retries = reconnection_retries,
