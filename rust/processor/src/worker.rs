@@ -406,6 +406,32 @@ impl Worker {
                                 start_version,
                                 end_version,
                                 size_in_bytes = transactions_pb.size_in_bytes,
+                                duration_in_secs = res.db_insertion_duration_in_secs,
+                                tps = (end_version - start_version) as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                bytes_per_sec = transactions_pb.size_in_bytes as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                "[Parser] DB insertion time of one batch of transactions"
+                            );
+                            info!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                start_version,
+                                end_version,
+                                size_in_bytes = transactions_pb.size_in_bytes,
+                                duration_in_secs = res.processing_duration_in_secs,
+                                tps = (end_version - start_version) as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                bytes_per_sec = transactions_pb.size_in_bytes as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                "[Parser] Parsing time of one batch of transactions"
+                            );
+                            info!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                start_version,
+                                end_version,
+                                size_in_bytes = transactions_pb.size_in_bytes,
                                 processing_duration_in_secs = res.processing_duration_in_secs,
                                 db_insertion_duration_in_secs = res.db_insertion_duration_in_secs,
                                 duration_in_secs = processing_duration.elapsed().as_secs_f64(),
@@ -413,7 +439,7 @@ impl Worker {
                                     / processing_duration.elapsed().as_secs_f64(),
                                 bytes_per_sec = transactions_pb.size_in_bytes as f64
                                     / processing_duration.elapsed().as_secs_f64(),
-                                "[Parser] Finished processing one batch of transactions"
+                                "[Parser] Overall processing time of one batch of transactions"
                             );
                         }
                     }
@@ -517,7 +543,7 @@ impl Worker {
                 duration_in_secs = processing_time.elapsed().as_secs_f64(),
                 tps = (ma.avg() * 1000.0) as u64,
                 bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
-                "[Parser] Finished processing transaction batches"
+                "[Parser] Finished processing multiple transaction batches"
             );
         }
     }
