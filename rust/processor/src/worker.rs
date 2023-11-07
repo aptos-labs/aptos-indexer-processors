@@ -441,6 +441,23 @@ impl Worker {
                                     / processing_duration.elapsed().as_secs_f64(),
                                 "[Parser] Overall processing time of one batch of transactions"
                             );
+                            info!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                start_version,
+                                end_version,
+                                num_of_transactions = end_version - start_version + 1,
+                                size_in_bytes = transactions_pb.size_in_bytes,
+                                processing_duration_in_secs = res.processing_duration_in_secs,
+                                db_insertion_duration_in_secs = res.db_insertion_duration_in_secs,
+                                duration_in_secs = processing_duration.elapsed().as_secs_f64(),
+                                tps = (end_version - start_version) as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                bytes_per_sec = transactions_pb.size_in_bytes as f64
+                                    / processing_duration.elapsed().as_secs_f64(),
+                                step = 2,
+                                "[Parser] Processor finished processing one batch of transaction"
+                            );
                         }
                     }
 
@@ -543,6 +560,7 @@ impl Worker {
                 duration_in_secs = processing_time.elapsed().as_secs_f64(),
                 tps = (ma.avg() * 1000.0) as u64,
                 bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
+                step = 3,
                 "[Parser] Finished processing multiple transaction batches"
             );
         }
@@ -824,6 +842,7 @@ pub async fn create_fetcher_loop(
                     connection_id,
                     start_version,
                     end_version,
+                    num_of_transactions = end_version - start_version + 1,
                     channel_size = BUFFER_SIZE - tx.capacity(),
                     size_in_bytes = r.encoded_len() as f64,
                     duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64(),
@@ -832,6 +851,7 @@ pub async fn create_fetcher_loop(
                         as u64,
                     bytes_per_sec =
                         r.encoded_len() as f64 / grpc_channel_recv_latency.elapsed().as_secs_f64(),
+                    step = 1,
                     "[Parser] Received transactions from GRPC. Sending transactions to channel.",
                 );
 
