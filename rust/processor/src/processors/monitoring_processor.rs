@@ -12,7 +12,7 @@ use crate::{
         v2_objects::{CurrentObject, Object},
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
-    schema,
+    schemas::public as schema,
     utils::database::{
         clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,

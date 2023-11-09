@@ -9,7 +9,7 @@
 
 use super::signatures::Signature;
 use crate::{
-    schema::user_transactions,
+    schemas::public::user_transactions,
     utils::util::{
         get_entry_function_from_user_request, parse_timestamp, standardize_address,
         u64_to_bigdecimal,

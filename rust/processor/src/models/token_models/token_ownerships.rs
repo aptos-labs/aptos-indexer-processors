@@ -10,7 +10,7 @@ use super::{
     tokens::{TableHandleToOwner, Token},
 };
 use crate::{
-    schema::{current_token_ownerships, token_ownerships},
+    schemas::public::{current_token_ownerships, token_ownerships},
     utils::util::standardize_address,
 };
 use bigdecimal::BigDecimal;

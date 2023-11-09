@@ -6,7 +6,7 @@
 
 use super::stake_utils::{StakeResource, StakeTableItem};
 use crate::{
-    schema::{
+    schemas::public::{
         current_delegated_staking_pool_balances, delegated_staking_pool_balances,
         delegated_staking_pools,
     },

@@ -11,7 +11,7 @@ use crate::{
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
         token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
-    schema::{current_objects, objects},
+    schemas::public::{current_objects, objects},
     utils::database::PgPoolConnection,
 };
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};

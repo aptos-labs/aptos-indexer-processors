@@ -14,7 +14,7 @@ use crate::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
         token_models::token_utils::{TokenDataIdType, TokenEvent},
     },
-    schema::token_activities_v2,
+    schemas::public::token_activities_v2,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::Event;

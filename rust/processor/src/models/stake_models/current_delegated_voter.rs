@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     models::token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    schema::current_delegated_voter,
+    schemas::public::current_delegated_voter,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::WriteTableItem;

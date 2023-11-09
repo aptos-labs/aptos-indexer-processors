@@ -4,7 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::account_transaction_models::account_transactions::AccountTransaction,
-    schema,
+    schemas::public as schema,
     utils::database::{
         clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,

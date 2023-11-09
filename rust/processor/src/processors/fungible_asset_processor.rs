@@ -17,7 +17,7 @@ use crate::{
         },
         token_v2_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
     },
-    schema,
+    schemas::public as schema,
     utils::{
         database::{
             clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,

@@ -24,7 +24,7 @@ pub struct AptosTournamentProcessor {
 
 impl AptosTournamentProcessor {
     pub fn new(connection_pool: PgDbPool, config: AptosTournamentProcessorConfig) -> Self {
-        tracing::info!("init TournamentProcessor");
+        tracing::info!("init AptosTournamentProcessor");
         Self {
             connection_pool,
             chain_id: 0,
@@ -42,7 +42,7 @@ impl Debug for AptosTournamentProcessor {
         let state = &self.connection_pool.state();
         write!(
             f,
-            "TournamentProcessor {{ connections: {:?}  idle_connections: {:?} }}",
+            "AptosTournamentProcessor {{ connections: {:?}  idle_connections: {:?} }}",
             state.connections, state.idle_connections
         )
     }
@@ -51,7 +51,7 @@ impl Debug for AptosTournamentProcessor {
 #[async_trait]
 impl ProcessorTrait for AptosTournamentProcessor {
     fn name(&self) -> &'static str {
-        ProcessorName::TournamentProcessor.into()
+        ProcessorName::AptosTournamentProcessor.into()
     }
 
     async fn process_transactions(

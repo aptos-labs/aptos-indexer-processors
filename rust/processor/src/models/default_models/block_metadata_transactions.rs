@@ -7,7 +7,7 @@
 
 use super::transactions::Transaction;
 use crate::{
-    schema::block_metadata_transactions,
+    schemas::public::block_metadata_transactions,
     utils::util::{parse_timestamp, standardize_address},
 };
 use aptos_protos::{

@@ -2,8 +2,9 @@
 # see diesel.rs/guides/configuring-diesel-cli
 
 [print_schema]
-file = "src/schema.rs"
+file = "src/schemas/public.rs"
 
+# Diesel does not support multiple schemas, so the generation of the schema must be done manually
 # [print_schema]
 # schema = "aptos_tournament"
-# file = "src/aptos_tournament_schema.rs"
+# file = "src/schemas/aptos_tournament.rs"

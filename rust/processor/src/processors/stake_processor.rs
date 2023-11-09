@@ -14,7 +14,7 @@ use crate::{
         stake_utils::DelegationVoteGovernanceRecordsResource,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
-    schema,
+    schemas::public as schema,
     utils::{
         database::{
             clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,

@@ -10,7 +10,7 @@ use super::{
     tokens::TableHandleToOwner,
 };
 use crate::{
-    schema::{collection_datas, current_collection_datas},
+    schemas::public::{collection_datas, current_collection_datas},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::WriteTableItem;

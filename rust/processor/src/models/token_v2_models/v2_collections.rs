@@ -15,7 +15,7 @@ use crate::{
             tokens::TableHandleToOwner,
         },
     },
-    schema::{collections_v2, current_collections_v2},
+    schemas::public::{collections_v2, current_collections_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;

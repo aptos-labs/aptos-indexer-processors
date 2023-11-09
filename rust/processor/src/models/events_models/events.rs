@@ -3,7 +3,7 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{
-    schema::events,
+    schemas::public::events,
     utils::util::{standardize_address, truncate_str},
 };
 use aptos_protos::transaction::v1::Event as EventPB;

@@ -12,7 +12,7 @@ use crate::{
         default_models::move_resources::MoveResource,
         token_models::token_utils::{NAME_LENGTH, TOKEN_ADDR},
     },
-    schema::current_token_v2_metadata,
+    schemas::public::current_token_v2_metadata,
     utils::util::{standardize_address, truncate_str},
 };
 use anyhow::Context;

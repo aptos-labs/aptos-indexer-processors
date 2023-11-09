@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::token_utils::TokenWriteSet;
-use crate::schema::{current_token_datas, token_datas};
+use crate::schemas::public::{current_token_datas, token_datas};
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;

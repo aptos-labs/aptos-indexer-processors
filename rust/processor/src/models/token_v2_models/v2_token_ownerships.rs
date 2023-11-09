@@ -21,7 +21,7 @@ use crate::{
             tokens::TableHandleToOwner,
         },
     },
-    schema::{current_token_ownerships_v2, token_ownerships_v2},
+    schemas::public::{current_token_ownerships_v2, token_ownerships_v2},
     utils::{
         database::PgPoolConnection,
         util::{ensure_not_negative, standardize_address},

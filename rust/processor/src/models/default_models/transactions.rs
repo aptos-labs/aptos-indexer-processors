@@ -10,7 +10,7 @@ use super::{
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
-    schema::transactions,
+    schemas::public::transactions,
     utils::util::{get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal},
 };
 use aptos_protos::transaction::v1::{

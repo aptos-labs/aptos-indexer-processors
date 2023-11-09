@@ -15,7 +15,7 @@ use crate::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
         token_v2_models::v2_token_utils::TokenStandard,
     },
-    schema::{current_fungible_asset_balances, fungible_asset_balances},
+    schemas::public::{current_fungible_asset_balances, fungible_asset_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::WriteResource;

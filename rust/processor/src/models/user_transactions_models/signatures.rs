@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    schema::signatures::{self},
+    schemas::public::signatures::{self},
     utils::util::standardize_address,
 };
 use anyhow::{Context, Result};

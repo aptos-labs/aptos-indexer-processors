@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    schema::nft_points,
+    schemas::public::nft_points,
     utils::util::{
         get_clean_payload, get_entry_function_from_user_request, parse_timestamp,
         standardize_address,

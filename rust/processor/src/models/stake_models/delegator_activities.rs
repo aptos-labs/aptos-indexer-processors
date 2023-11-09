@@ -5,7 +5,7 @@
 
 use super::stake_utils::StakeEvent;
 use crate::{
-    schema::delegated_staking_activities,
+    schemas::public::delegated_staking_activities,
     utils::util::{standardize_address, u64_to_bigdecimal},
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};

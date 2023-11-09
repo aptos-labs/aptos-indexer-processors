@@ -11,7 +11,7 @@ use crate::{
         collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
         token_utils::TokenWriteSet,
     },
-    schema::{current_token_datas_v2, token_datas_v2},
+    schemas::public::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;

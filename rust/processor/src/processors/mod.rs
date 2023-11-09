@@ -9,6 +9,7 @@
 
 pub mod account_transactions_processor;
 pub mod ans_processor;
+pub mod aptos_tournament_processor;
 pub mod coin_processor;
 pub mod default_processor;
 pub mod events_processor;
@@ -17,12 +18,12 @@ pub mod nft_metadata_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
-pub mod tournament_processor;
 pub mod user_transaction_processor;
 
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
     ans_processor::{AnsProcessor, AnsProcessorConfig},
+    aptos_tournament_processor::{AptosTournamentProcessor, AptosTournamentProcessorConfig},
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
     events_processor::EventsProcessor,
@@ -31,12 +32,11 @@ use self::{
     stake_processor::StakeProcessor,
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
-    tournament_processor::{AptosTournamentProcessor, AptosTournamentProcessorConfig},
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
     models::processor_status::ProcessorStatus,
-    schema::processor_status,
+    schemas::public::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
@@ -166,7 +166,7 @@ pub enum ProcessorConfig {
     StakeProcessor,
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor,
-    TournamentProcessor(AptosTournamentProcessorConfig),
+    AptosTournamentProcessor(AptosTournamentProcessorConfig),
     UserTransactionProcessor,
 }
 

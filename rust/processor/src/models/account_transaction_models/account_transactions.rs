@@ -10,7 +10,7 @@ use crate::{
         token_v2_models::v2_token_utils::ObjectWithMetadata,
         user_transactions_models::user_transactions::UserTransaction,
     },
-    schema::account_transactions,
+    schemas::public::account_transactions,
     utils::util::standardize_address,
 };
 use aptos_protos::transaction::v1::{

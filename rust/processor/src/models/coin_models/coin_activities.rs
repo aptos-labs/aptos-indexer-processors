@@ -23,7 +23,7 @@ use crate::{
         user_transactions_models::signatures::Signature,
     },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
-    schema::coin_activities,
+    schemas::public::coin_activities,
     utils::util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
 };
 use aptos_protos::transaction::v1::{

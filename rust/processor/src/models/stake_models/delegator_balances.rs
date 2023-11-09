@@ -9,7 +9,7 @@ use crate::{
         default_models::move_tables::TableItem,
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     },
-    schema::current_delegator_balances,
+    schemas::public::current_delegator_balances,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;

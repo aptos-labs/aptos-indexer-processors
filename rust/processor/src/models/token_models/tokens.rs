@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     models::default_models::move_resources::MoveResource,
-    schema::tokens,
+    schemas::public::tokens,
     utils::{
         database::PgPoolConnection,
         util::{ensure_not_negative, parse_timestamp, standardize_address},

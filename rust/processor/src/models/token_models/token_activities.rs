@@ -7,7 +7,7 @@
 
 use super::token_utils::{TokenDataIdType, TokenEvent};
 use crate::{
-    schema::token_activities,
+    schemas::public::token_activities,
     utils::util::{parse_timestamp, standardize_address},
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Event, Transaction};

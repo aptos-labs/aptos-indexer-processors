@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::aptos_tournament_schema::aptos_tournament::rooms;
+use crate::schemas::aptos_tournament::rooms;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

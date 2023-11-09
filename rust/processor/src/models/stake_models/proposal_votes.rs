@@ -6,7 +6,7 @@
 
 use super::stake_utils::StakeEvent;
 use crate::{
-    schema::proposal_votes,
+    schemas::public::proposal_votes,
     utils::util::{parse_timestamp, standardize_address},
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};

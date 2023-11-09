@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
-use crate::{schema::current_token_pending_claims, utils::util::standardize_address};
+use crate::{schemas::public::current_token_pending_claims, utils::util::standardize_address};
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
