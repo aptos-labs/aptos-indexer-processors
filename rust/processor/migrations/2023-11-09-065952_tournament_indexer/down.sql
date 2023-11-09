@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS tournament.room_players;
-DROP TABLE IF EXISTS tournament.rooms;
-DROP TABLE IF EXISTS tournament.tournaments;
+DROP TABLE IF EXISTS tournament.room_players CASCADE;
+DROP TABLE IF EXISTS tournament.rooms CASCADE;
+DROP TABLE IF EXISTS tournament.tournaments CASCADE;
 DROP SCHEMA IF EXISTS tournament CASCADE;
