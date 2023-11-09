@@ -73,7 +73,11 @@ impl MoveModule {
             transaction_version,
             transaction_block_height,
             write_set_change_index,
-            name: delete_module.module.as_ref().unwrap().name.to_string(),
+            name: delete_module
+                .module
+                .as_ref()
+                .map(|d| d.name.clone())
+                .unwrap_or_default(),
             address: standardize_address(&delete_module.address.to_string()),
             bytecode: None,
             exposed_functions: None,
@@ -86,10 +90,9 @@ impl MoveModule {
     pub fn convert_move_module_bytecode(
         mmb: &MoveModuleBytecode,
     ) -> Option<MoveModuleByteCodeParsed> {
-        Some(Self::convert_move_module(
-            mmb.abi.as_ref().unwrap(),
-            mmb.bytecode.clone(),
-        ))
+        mmb.abi
+            .as_ref()
+            .map(|abi| Self::convert_move_module(abi, mmb.bytecode.clone()))
     }
 
     pub fn convert_move_module(

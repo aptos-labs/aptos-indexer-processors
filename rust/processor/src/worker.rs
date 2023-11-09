@@ -279,11 +279,11 @@ impl Worker {
                     let txn_time = transactions.as_slice().first().unwrap().timestamp.clone();
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS
-                            .with_label_values(&[auth_token.as_str(), &processor_name])
+                            .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
                     PROCESSOR_INVOCATIONS_COUNT
-                        .with_label_values(&[&processor_name])
+                        .with_label_values(&[processor_name])
                         .inc();
 
                     let processed_result = processor_clone
@@ -291,7 +291,7 @@ impl Worker {
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
-                            .with_label_values(&[auth_token.as_str(), &processor_name])
+                            .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
                     processed_result
@@ -316,7 +316,7 @@ impl Worker {
                 let processed: ProcessingResult = match res {
                     Ok(versions) => {
                         PROCESSOR_SUCCESSES_COUNT
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[processor_name])
                             .inc();
                         versions
                     },
@@ -328,7 +328,7 @@ impl Worker {
                             "[Parser] Error processing transactions"
                         );
                         PROCESSOR_ERRORS_COUNT
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[processor_name])
                             .inc();
                         panic!();
                     },
@@ -368,7 +368,7 @@ impl Worker {
             batch_start_version = batch_end + 1;
 
             LATEST_PROCESSED_VERSION
-                .with_label_values(&[&processor_name])
+                .with_label_values(&[processor_name])
                 .set(batch_end as i64);
             processor
                 .update_last_processed_version(batch_end)
