@@ -90,14 +90,9 @@ impl MoveModule {
     pub fn convert_move_module_bytecode(
         mmb: &MoveModuleBytecode,
     ) -> Option<MoveModuleByteCodeParsed> {
-        let abi = mmb.abi.as_ref();
-        if abi.is_none() {
-            return None;
-        }
-        Some(Self::convert_move_module(
-            abi.unwrap(),
-            mmb.bytecode.clone(),
-        ))
+        mmb.abi
+            .as_ref()
+            .map(|abi| Self::convert_move_module(abi, mmb.bytecode.clone()))
     }
 
     pub fn convert_move_module(
