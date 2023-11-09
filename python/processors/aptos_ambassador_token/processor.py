@@ -12,9 +12,12 @@ from utils.general_utils import standardize_address
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from utils.models.schema_names import EXAMPLE
 
-qualified_module_name = "0x9bfdd4efe15f4d8aa145bef5f64588c7c391bcddaf34f9e977f59bd93b498f2a::ambassador"
+qualified_module_name = (
+    "0x9bfdd4efe15f4d8aa145bef5f64588c7c391bcddaf34f9e977f59bd93b498f2a::ambassador"
+)
 qualified_event_name = qualified_module_name + "::LevelUpdateEvent"
 qualified_resource_name = qualified_module_name + "::AmbassadorLevel"
+
 
 class AptosAmbassadorTokenProcessor(TransactionsProcessor):
     def name(self) -> str:
@@ -38,41 +41,45 @@ class AptosAmbassadorTokenProcessor(TransactionsProcessor):
                     data = event.data
                     if type == qualified_event_name:
                         found = True
-                        print('-------------')
-                        print('Event emitted')
-                        print('-------------')
-                        print('ambassador token addr:', addr)
+                        print("-------------")
+                        print("Event emitted")
+                        print("-------------")
+                        print("ambassador token addr:", addr)
                         data_dic = ast.literal_eval(data)
-                        print('old_level:', data_dic["old_level"])
-                        print('new_level:', data_dic["new_level"])
+                        print("old_level:", data_dic["old_level"])
+                        print("new_level:", data_dic["new_level"])
                         print()
 
                 for change in transaction.info.changes:
-                    if change.type == transaction_pb2.WriteSetChange.TYPE_WRITE_RESOURCE:
-                        addr = standardize_address(
-                            change.write_resource.address)
+                    if (
+                        change.type
+                        == transaction_pb2.WriteSetChange.TYPE_WRITE_RESOURCE
+                    ):
+                        addr = standardize_address(change.write_resource.address)
                         type = change.write_resource.type_str
                         data = change.write_resource.data
                         if type == qualified_resource_name:
                             found = True
-                            print('-------------')
-                            print('State changed')
-                            print('-------------')
-                            print('ambassador token addr:', addr)
+                            print("-------------")
+                            print("State changed")
+                            print("-------------")
+                            print("ambassador token addr:", addr)
                             data_dic = ast.literal_eval(data)
-                            print('ambassador_level:',
-                                  data_dic["ambassador_level"])
+                            print("ambassador_level:", data_dic["ambassador_level"])
                             print()
 
                 if found:
-                    print('Found from the transaction with:', json.dumps(
-                        {
-                            "version": transaction.version,
-                            "epoch": transaction.epoch,
-                            "block_height": transaction.block_height,
-                        }
-                    ))
-                    print('\n\n')
+                    print(
+                        "Found from the transaction with:",
+                        json.dumps(
+                            {
+                                "version": transaction.version,
+                                "epoch": transaction.epoch,
+                                "block_height": transaction.block_height,
+                            }
+                        ),
+                    )
+                    print("\n\n")
 
         return ProcessingResult(
             start_version=start_version,
