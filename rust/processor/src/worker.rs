@@ -16,9 +16,13 @@ use crate::{
     schema::ledger_infos,
     utils::{
         counters::{
-            LATEST_PROCESSED_VERSION, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
+            FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
+            MULTI_BATCH_PROCESSING_TIME_IN_SECS, NUM_TRANSACTIONS_PROCESSED_COUNT,
+            PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
-            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT, TRANSMITTED_BYTES_COUNT,
+            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
+            SINGLE_BATCH_PROCESSING_TIME_IN_SECS,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
         util::time_diff_since_pb_timestamp_in_secs,
@@ -458,6 +462,32 @@ impl Worker {
                                 step = 2,
                                 "[Parser] Processor finished processing one batch of transaction"
                             );
+                            LATEST_PROCESSED_VERSION
+                                .with_label_values(&[
+                                    &processor_name,
+                                    "2",
+                                    "[Parser] Processor finished processing one batch of transaction",
+                                ])
+                                .set(end_version as i64);
+                            PROCESSED_BYTES_COUNT
+                                .with_label_values(&[&processor_name, "2", "[Parser] Processor finished processing one batch of transaction"])
+                                .inc_by(transactions_pb.size_in_bytes);
+                            NUM_TRANSACTIONS_PROCESSED_COUNT
+                                .with_label_values(&[
+                                    &processor_name,
+                                    "2",
+                                    "[Parser] Processor finished processing one batch of transaction",
+                                ])
+                                .inc_by(end_version - start_version + 1);
+                            SINGLE_BATCH_PROCESSING_TIME_IN_SECS
+                                .with_label_values(&[&processor_name])
+                                .set(processing_duration.elapsed().as_secs_f64());
+                            SINGLE_BATCH_PARSING_TIME_IN_SECS
+                                .with_label_values(&[&processor_name])
+                                .set(res.processing_duration_in_secs);
+                            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
+                                .with_label_values(&[&processor_name])
+                                .set(res.db_insertion_duration_in_secs);
                         }
                     }
 
@@ -540,9 +570,6 @@ impl Worker {
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
 
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[processor_name])
-                .set(batch_end as i64);
             processor
                 .update_last_processed_version(batch_end)
                 .await
@@ -563,6 +590,30 @@ impl Worker {
                 step = 3,
                 "[Parser] Finished processing multiple transaction batches"
             );
+            LATEST_PROCESSED_VERSION
+                .with_label_values(&[
+                    &processor_name,
+                    "3",
+                    "[Parser] Finished processing multiple transaction batches",
+                ])
+                .set(batch_end as i64);
+            PROCESSED_BYTES_COUNT
+                .with_label_values(&[
+                    &processor_name,
+                    "3",
+                    "[Parser] Finished processing multiple transaction batches",
+                ])
+                .inc_by(size_in_bytes as u64);
+            NUM_TRANSACTIONS_PROCESSED_COUNT
+                .with_label_values(&[
+                    &processor_name,
+                    "3",
+                    "[Parser] Finished processing multiple transaction batches",
+                ])
+                .inc_by(batch_end - batch_start + 1);
+            MULTI_BATCH_PROCESSING_TIME_IN_SECS
+                .with_label_values(&[&processor_name])
+                .set(processing_time.elapsed().as_secs_f64());
         }
     }
 
@@ -829,10 +880,6 @@ pub async fn create_fetcher_loop(
                 let end_version = r.transactions.as_slice().last().unwrap().version;
                 next_version_to_fetch = end_version + 1;
                 let size_in_bytes = r.encoded_len() as u64;
-
-                TRANSMITTED_BYTES_COUNT
-                    .with_label_values(&[&processor_name])
-                    .inc_by(size_in_bytes);
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
 
                 info!(
@@ -854,6 +901,23 @@ pub async fn create_fetcher_loop(
                     step = 1,
                     "[Parser] Received transactions from GRPC. Sending transactions to channel.",
                 );
+                LATEST_PROCESSED_VERSION
+                    .with_label_values(&[
+                        &processor_name,
+                        "1",
+                        "[Parser] Received transactions from GRPC. Sending transactions to channel.",
+                    ])
+                    .set(end_version as i64);
+                PROCESSED_BYTES_COUNT
+                    .with_label_values(&[&processor_name, "1", "[Parser] Received transactions from GRPC. Sending transactions to channel."])
+                    .inc_by(size_in_bytes);
+                NUM_TRANSACTIONS_PROCESSED_COUNT
+                    .with_label_values(&[
+                        &processor_name,
+                        "1",
+                        "[Parser] Received transactions from GRPC. Sending transactions to channel.",
+                    ])
+                    .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
                 let txn_pb = TransactionsPBResponse {
@@ -892,6 +956,9 @@ pub async fn create_fetcher_loop(
                         / txn_channel_send_latency.elapsed().as_secs_f64(),
                     "[Parser] Successfully sent transactions to channel."
                 );
+                FETCHER_THREAD_CHANNEL_SIZE
+                    .with_label_values(&[&processor_name])
+                    .set((BUFFER_SIZE - tx.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
                 true
             },
