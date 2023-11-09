@@ -17,6 +17,7 @@ pub mod nft_metadata_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
+pub mod tournament_processor;
 pub mod user_transaction_processor;
 
 use self::{
@@ -30,6 +31,7 @@ use self::{
     stake_processor::StakeProcessor,
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
+    tournament_processor::{TournamentProcessor, TournamentProcessorConfig},
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
@@ -164,6 +166,7 @@ pub enum ProcessorConfig {
     StakeProcessor,
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor,
+    TournamentProcessor(TournamentProcessorConfig),
     UserTransactionProcessor,
 }
 
@@ -203,6 +206,7 @@ pub enum Processor {
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,
+    TournamentProcessor,
     UserTransactionProcessor,
 }
 
