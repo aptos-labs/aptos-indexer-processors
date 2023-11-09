@@ -7,7 +7,7 @@ from aptos_protos.aptos.transaction.v1 import transaction_pb2
 from utils.config import Config, NFTMarketplaceV2Config
 from utils.models.general_models import Base
 from utils.session import Session
-from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER
+from utils.metrics import PROCESSED_TRANSACTIONS_COUNTER, LATEST_PROCESSED_VERSION
 from sqlalchemy import DDL, create_engine
 from sqlalchemy import event
 from typing import Iterator, List, Optional
@@ -450,8 +450,11 @@ async def consumer_impl(
         batch_start_version = processed_end_version + 1
 
         processor.update_last_processed_version(processed_end_version)
-        PROCESSED_TRANSACTIONS_COUNTER.inc(
+        PROCESSED_TRANSACTIONS_COUNTER.labels(processor_name=processor_name).inc(
             processed_end_version - processed_start_version + 1
+        )
+        LATEST_PROCESSED_VERSION.labels(processor_name=processor_name).set(
+            processed_end_version
         )
 
         tps_end_time = perf_counter()
