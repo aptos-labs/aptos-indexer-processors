@@ -10,7 +10,7 @@ use crate::{
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        tournament_processor::TournamentProcessor,
+        tournament_processor::AptosTournamentProcessor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
     },
@@ -480,7 +480,7 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         },
         ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
         ProcessorConfig::TournamentProcessor(config) => {
-            Processor::from(TournamentProcessor::new(db_pool, config.clone()))
+            Processor::from(AptosTournamentProcessor::new(db_pool, config.clone()))
         },
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))

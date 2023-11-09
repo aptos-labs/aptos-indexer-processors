@@ -3,3 +3,7 @@
 
 [print_schema]
 file = "src/schema.rs"
+
+# [print_schema]
+# schema = "aptos_tournament"
+# file = "src/aptos_tournament_schema.rs"

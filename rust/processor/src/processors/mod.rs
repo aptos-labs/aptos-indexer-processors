@@ -31,7 +31,7 @@ use self::{
     stake_processor::StakeProcessor,
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
-    tournament_processor::{TournamentProcessor, TournamentProcessorConfig},
+    tournament_processor::{AptosTournamentProcessor, AptosTournamentProcessorConfig},
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
@@ -166,7 +166,7 @@ pub enum ProcessorConfig {
     StakeProcessor,
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor,
-    TournamentProcessor(TournamentProcessorConfig),
+    TournamentProcessor(AptosTournamentProcessorConfig),
     UserTransactionProcessor,
 }
 
@@ -206,7 +206,7 @@ pub enum Processor {
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,
-    TournamentProcessor,
+    AptosTournamentProcessor,
     UserTransactionProcessor,
 }
 

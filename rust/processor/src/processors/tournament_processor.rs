@@ -12,18 +12,18 @@ pub const CHUNK_SIZE: usize = 1000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct TournamentProcessorConfig {
+pub struct AptosTournamentProcessorConfig {
     contract_address: String,
 }
 
-pub struct TournamentProcessor {
+pub struct AptosTournamentProcessor {
     connection_pool: PgDbPool,
     chain_id: u8,
-    config: TournamentProcessorConfig,
+    config: AptosTournamentProcessorConfig,
 }
 
-impl TournamentProcessor {
-    pub fn new(connection_pool: PgDbPool, config: TournamentProcessorConfig) -> Self {
+impl AptosTournamentProcessor {
+    pub fn new(connection_pool: PgDbPool, config: AptosTournamentProcessorConfig) -> Self {
         tracing::info!("init TournamentProcessor");
         Self {
             connection_pool,
@@ -37,7 +37,7 @@ impl TournamentProcessor {
     }
 }
 
-impl Debug for TournamentProcessor {
+impl Debug for AptosTournamentProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
@@ -49,7 +49,7 @@ impl Debug for TournamentProcessor {
 }
 
 #[async_trait]
-impl ProcessorTrait for TournamentProcessor {
+impl ProcessorTrait for AptosTournamentProcessor {
     fn name(&self) -> &'static str {
         ProcessorName::TournamentProcessor.into()
     }
