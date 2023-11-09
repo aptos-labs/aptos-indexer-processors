@@ -450,10 +450,10 @@ async def consumer_impl(
         batch_start_version = processed_end_version + 1
 
         processor.update_last_processed_version(processed_end_version)
-        PROCESSED_TRANSACTIONS_COUNTER.inc(
+        PROCESSED_TRANSACTIONS_COUNTER.labels(processor_name=processor_name).inc(
             processed_end_version - processed_start_version + 1
         )
-        LATEST_PROCESSED_VERSION.set(processed_end_version)
+        LATEST_PROCESSED_VERSION.labels(processor_name=processor_name).set(processed_end_version)
 
         tps_end_time = perf_counter()
 
