@@ -490,44 +490,51 @@ impl ProcessorTrait for DefaultProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
-            txns,
-            block_metadata_transactions,
-            write_set_changes,
-            (
-                move_modules,
-                move_resources,
-                table_items,
-                current_table_items,
-                table_metadata,
-            ),
-            (all_objects, all_current_objects),
-        )
-        .await;
+        // let tx_result = insert_to_db(
+        //     &mut conn,
+        //     self.name(),
+        //     start_version,
+        //     end_version,
+        //     txns,
+        //     block_metadata_transactions,
+        //     write_set_changes,
+        //     (
+        //         move_modules,
+        //         move_resources,
+        //         table_items,
+        //         current_table_items,
+        //         table_metadata,
+        //     ),
+        //     (all_objects, all_current_objects),
+        // )
+        // .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_insertion_duration_in_secs,
+        })
+
+        // match tx_result {
+        //     Ok(_) => Ok(ProcessingResult {
+        //         start_version,
+        //         end_version,
+        //         processing_duration_in_secs,
+        //         db_insertion_duration_in_secs,
+        //     }),
+        //     Err(e) => {
+        //         error!(
+        //             start_version = start_version,
+        //             end_version = end_version,
+        //             processor_name = self.name(),
+        //             error = ?e,
+        //             "[Parser] Error inserting transactions to db",
+        //         );
+        //         bail!(e)
+        //     },
+        // }
     }
 
     fn connection_pool(&self) -> &PgDbPool {
