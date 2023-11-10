@@ -18,7 +18,6 @@ pub struct AptosTournamentProcessorConfig {
 
 pub struct AptosTournamentProcessor {
     connection_pool: PgDbPool,
-    chain_id: u8,
     config: AptosTournamentProcessorConfig,
 }
 
@@ -27,13 +26,8 @@ impl AptosTournamentProcessor {
         tracing::info!("init AptosTournamentProcessor");
         Self {
             connection_pool,
-            chain_id: 0,
             config,
         }
-    }
-
-    pub fn set_chain_id(&mut self, chain_id: u8) {
-        self.chain_id = chain_id;
     }
 }
 
