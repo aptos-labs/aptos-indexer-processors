@@ -671,6 +671,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    delegator_balances (transaction_version, write_set_change_index) {
+        transaction_version -> Int8,
+        write_set_change_index -> Int8,
+        #[max_length = 66]
+        delegator_address -> Varchar,
+        #[max_length = 66]
+        pool_address -> Varchar,
+        #[max_length = 100]
+        pool_type -> Varchar,
+        #[max_length = 66]
+        table_handle -> Varchar,
+        shares -> Numeric,
+        #[max_length = 66]
+        parent_table_handle -> Varchar,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     events (transaction_version, event_index) {
         sequence_number -> Int8,
         creation_number -> Int8,
@@ -1215,6 +1234,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     delegated_staking_activities,
     delegated_staking_pool_balances,
     delegated_staking_pools,
+    delegator_balances,
     events,
     fungible_asset_activities,
     fungible_asset_balances,
