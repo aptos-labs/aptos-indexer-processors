@@ -21,6 +21,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
       indexer_grpc_data_service_address: 127.0.0.1:50051
       indexer_grpc_http2_ping_interval_in_secs: 60
       indexer_grpc_http2_ping_timeout_in_secs: 10
+      number_concurrent_processing_tasks: 10
       auth_token: AUTH_TOKEN
       starting_version: 0 # optional
       ending_version: 0 # optional
@@ -36,6 +37,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 - `auth_token`: Auth token used for connection.
 - `starting_version`: start processor at starting_version.
 - `ending_version`: stop processor after ending_version.
+- `number_concurrent_processing_tasks`: number of tasks to parse and insert; 1 means sequential processing, otherwise, transactions are splitted into tasks and inserted with random order.
 
 ### Use docker image for existing parsers(Only for **Unix/Linux**)
 
