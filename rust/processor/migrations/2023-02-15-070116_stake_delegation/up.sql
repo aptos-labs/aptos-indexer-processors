@@ -30,4 +30,4 @@ CREATE TABLE current_delegator_balances (
   -- Constraints
   PRIMARY KEY (delegator_address, pool_address, pool_type)
 );
-CREATE INDEX cdb_insat_index ON delegated_staking_activities (inserted_at);
+CREATE INDEX cdb_insat_index ON current_delegator_balances (inserted_at);

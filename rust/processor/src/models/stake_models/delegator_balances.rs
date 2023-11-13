@@ -9,7 +9,7 @@ use crate::{
         default_models::move_tables::TableItem,
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     },
-    schema::current_delegator_balances,
+    schema::{current_delegator_balances, delegator_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;
@@ -43,6 +43,20 @@ pub struct CurrentDelegatorBalance {
     pub parent_table_handle: String,
 }
 
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(transaction_version, write_set_change_index))]
+#[diesel(table_name = delegator_balances)]
+pub struct DelegatorBalance {
+    pub transaction_version: i64,
+    pub write_set_change_index: i64,
+    pub delegator_address: String,
+    pub pool_address: String,
+    pub pool_type: String,
+    pub table_handle: String,
+    pub shares: BigDecimal,
+    pub parent_table_handle: String,
+}
+
 #[derive(Debug, Identifiable, Queryable)]
 #[diesel(primary_key(delegator_address, pool_address, pool_type))]
 #[diesel(table_name = current_delegator_balances)]
@@ -62,8 +76,9 @@ impl CurrentDelegatorBalance {
     pub async fn get_active_share_from_write_table_item(
         write_table_item: &WriteTableItem,
         txn_version: i64,
+        write_set_change_index: i64,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item is an active share table
         if let Some(pool_balance) = active_pool_to_staking_pool.get(&table_handle) {
@@ -87,15 +102,27 @@ impl CurrentDelegatorBalance {
                     txn_version
                 ))?;
             let shares = shares / &pool_balance.scaling_factor;
-            Ok(Some(Self {
-                delegator_address,
-                pool_address,
-                pool_type: "active_shares".to_string(),
-                table_handle: table_handle.clone(),
-                last_transaction_version: txn_version,
-                shares,
-                parent_table_handle: table_handle,
-            }))
+            Ok(Some((
+                DelegatorBalance {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    delegator_address: delegator_address.clone(),
+                    pool_address: pool_address.clone(),
+                    pool_type: "active_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    shares: shares.clone(),
+                    parent_table_handle: table_handle.clone(),
+                },
+                Self {
+                    delegator_address,
+                    pool_address,
+                    pool_type: "active_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    last_transaction_version: txn_version,
+                    shares,
+                    parent_table_handle: table_handle,
+                },
+            )))
         } else {
             Ok(None)
         }
@@ -106,10 +133,11 @@ impl CurrentDelegatorBalance {
     pub async fn get_inactive_share_from_write_table_item(
         write_table_item: &WriteTableItem,
         txn_version: i64,
+        write_set_change_index: i64,
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
         conn: &mut PgPoolConnection<'_>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
         if let Some(pool_balance) = inactive_share_to_pool.get(&table_handle) {
@@ -158,15 +186,27 @@ impl CurrentDelegatorBalance {
                     txn_version
                 ))?;
             let shares = shares / &pool_balance.scaling_factor;
-            Ok(Some(Self {
-                delegator_address,
-                pool_address,
-                pool_type: "inactive_shares".to_string(),
-                table_handle: table_handle.clone(),
-                last_transaction_version: txn_version,
-                shares,
-                parent_table_handle: inactive_pool_handle,
-            }))
+            Ok(Some((
+                DelegatorBalance {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    delegator_address: delegator_address.clone(),
+                    pool_address: pool_address.clone(),
+                    pool_type: "inactive_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    shares: shares.clone(),
+                    parent_table_handle: inactive_pool_handle.clone(),
+                },
+                Self {
+                    delegator_address,
+                    pool_address,
+                    pool_type: "inactive_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    last_transaction_version: txn_version,
+                    shares,
+                    parent_table_handle: inactive_pool_handle,
+                },
+            )))
         } else {
             Ok(None)
         }
@@ -176,22 +216,35 @@ impl CurrentDelegatorBalance {
     pub fn get_active_share_from_delete_table_item(
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
+        write_set_change_index: i64,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item is an active share table
         if let Some(pool_balance) = active_pool_to_staking_pool.get(&table_handle) {
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
-            return Ok(Some(Self {
-                delegator_address,
-                pool_address: pool_balance.staking_pool_address.clone(),
-                pool_type: "active_shares".to_string(),
-                table_handle: table_handle.clone(),
-                last_transaction_version: txn_version,
-                shares: BigDecimal::zero(),
-                parent_table_handle: table_handle,
-            }));
+            return Ok(Some((
+                DelegatorBalance {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    delegator_address: delegator_address.clone(),
+                    pool_address: pool_balance.staking_pool_address.clone(),
+                    pool_type: "active_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    shares: BigDecimal::zero(),
+                    parent_table_handle: table_handle.clone(),
+                },
+                Self {
+                    delegator_address,
+                    pool_address: pool_balance.staking_pool_address.clone(),
+                    pool_type: "active_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    last_transaction_version: txn_version,
+                    shares: BigDecimal::zero(),
+                    parent_table_handle: table_handle,
+                },
+            )));
         }
         Ok(None)
     }
@@ -200,10 +253,11 @@ impl CurrentDelegatorBalance {
     pub async fn get_inactive_share_from_delete_table_item(
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
+        write_set_change_index: i64,
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
         conn: &mut PgPoolConnection<'_>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
         if let Some(pool_balance) = inactive_share_to_pool.get(&table_handle) {
@@ -225,15 +279,27 @@ impl CurrentDelegatorBalance {
             };
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
-            return Ok(Some(Self {
-                delegator_address,
-                pool_address,
-                pool_type: "inactive_shares".to_string(),
-                table_handle: table_handle.clone(),
-                last_transaction_version: txn_version,
-                shares: BigDecimal::zero(),
-                parent_table_handle: table_handle,
-            }));
+            return Ok(Some((
+                DelegatorBalance {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    delegator_address: delegator_address.clone(),
+                    pool_address: pool_address.clone(),
+                    pool_type: "inactive_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    shares: BigDecimal::zero(),
+                    parent_table_handle: inactive_pool_handle.clone(),
+                },
+                Self {
+                    delegator_address,
+                    pool_address,
+                    pool_type: "inactive_shares".to_string(),
+                    table_handle: table_handle.clone(),
+                    last_transaction_version: txn_version,
+                    shares: BigDecimal::zero(),
+                    parent_table_handle: table_handle,
+                },
+            )));
         }
         Ok(None)
     }
@@ -320,14 +386,16 @@ impl CurrentDelegatorBalance {
         transaction: &Transaction,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
         conn: &mut PgPoolConnection<'_>,
-    ) -> anyhow::Result<CurrentDelegatorBalanceMap> {
+    ) -> anyhow::Result<(Vec<DelegatorBalance>, CurrentDelegatorBalanceMap)> {
         let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = HashMap::new();
         let mut inactive_share_to_pool: ShareToPoolMapping = HashMap::new();
         let mut current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
+        let mut delegator_balances = vec![];
         let txn_version = transaction.version as i64;
 
+        let changes = &transaction.info.as_ref().unwrap().changes;
         // Do a first pass to get the mapping of active_share table handles to staking pool resource        let txn_version = transaction.version as i64;
-        for wsc in &transaction.info.as_ref().unwrap().changes {
+        for wsc in changes {
             if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                 if let Some(map) =
                     Self::get_inactive_pool_to_staking_pool_mapping(write_resource, txn_version)
@@ -346,21 +414,24 @@ impl CurrentDelegatorBalance {
             }
         }
         // Now make a pass through table items to get the actual delegator balances
-        for wsc in &transaction.info.as_ref().unwrap().changes {
+        for (index, wsc) in changes.iter().enumerate() {
             let maybe_delegator_balance = match wsc.change.as_ref().unwrap() {
                 Change::DeleteTableItem(table_item) => {
-                    if let Some(balance) = Self::get_active_share_from_delete_table_item(
-                        table_item,
-                        txn_version,
-                        active_pool_to_staking_pool,
-                    )
-                    .unwrap()
+                    if let Some((balance, current_balance)) =
+                        Self::get_active_share_from_delete_table_item(
+                            table_item,
+                            txn_version,
+                            index as i64,
+                            active_pool_to_staking_pool,
+                        )
+                        .unwrap()
                     {
-                        Some(balance)
+                        Some((balance, current_balance))
                     } else {
                         Self::get_inactive_share_from_delete_table_item(
                             table_item,
                             txn_version,
+                            index as i64,
                             &inactive_pool_to_staking_pool,
                             &inactive_share_to_pool,
                             conn,
@@ -370,19 +441,22 @@ impl CurrentDelegatorBalance {
                     }
                 },
                 Change::WriteTableItem(table_item) => {
-                    if let Some(balance) = Self::get_active_share_from_write_table_item(
-                        table_item,
-                        txn_version,
-                        active_pool_to_staking_pool,
-                    )
-                    .await
-                    .unwrap()
+                    if let Some((balance, current_balance)) =
+                        Self::get_active_share_from_write_table_item(
+                            table_item,
+                            txn_version,
+                            index as i64,
+                            active_pool_to_staking_pool,
+                        )
+                        .await
+                        .unwrap()
                     {
-                        Some(balance)
+                        Some((balance, current_balance))
                     } else {
                         Self::get_inactive_share_from_write_table_item(
                             table_item,
                             txn_version,
+                            index as i64,
                             &inactive_pool_to_staking_pool,
                             &inactive_share_to_pool,
                             conn,
@@ -393,18 +467,19 @@ impl CurrentDelegatorBalance {
                 },
                 _ => None,
             };
-            if let Some(delegator_balance) = maybe_delegator_balance {
+            if let Some((delegator_balance, current_delegator_balance)) = maybe_delegator_balance {
+                delegator_balances.push(delegator_balance);
                 current_delegator_balances.insert(
                     (
-                        delegator_balance.delegator_address.clone(),
-                        delegator_balance.pool_address.clone(),
-                        delegator_balance.pool_type.clone(),
+                        current_delegator_balance.delegator_address.clone(),
+                        current_delegator_balance.pool_address.clone(),
+                        current_delegator_balance.pool_type.clone(),
                     ),
-                    delegator_balance,
+                    current_delegator_balance,
                 );
             }
         }
-        Ok(current_delegator_balances)
+        Ok((delegator_balances, current_delegator_balances))
     }
 }
 
