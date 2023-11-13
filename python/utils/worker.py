@@ -51,10 +51,13 @@ def get_grpc_stream(
     ending_version: Optional[int],
     processor_name: str,
 ) -> Iterator[raw_data_pb2.TransactionsResponse]:
-    logging.info("[Parser] Setting up rpc channel", extra={
-        "processor_name": processor_name,
-        "stream_address": indexer_grpc_data_service_address,
-    })
+    logging.info(
+        "[Parser] Setting up rpc channel",
+        extra={
+            "processor_name": processor_name,
+            "stream_address": indexer_grpc_data_service_address,
+        },
+    )
 
     metadata = (
         ("authorization", "Bearer " + indexer_grpc_data_stream_api_key),
@@ -81,13 +84,16 @@ def get_grpc_stream(
         ending_version - starting_version + 1 if ending_version else None
     )
 
-    logging.info("[Parser] Setting up stream", extra={
-        "processor_name": processor_name,
-        "stream_address": indexer_grpc_data_service_address,
-        "starting_version": starting_version,
-        "ending_version": ending_version,
-        "count": transactions_count,
-    })
+    logging.info(
+        "[Parser] Setting up stream",
+        extra={
+            "processor_name": processor_name,
+            "stream_address": indexer_grpc_data_service_address,
+            "starting_version": starting_version,
+            "ending_version": ending_version,
+            "count": transactions_count,
+        },
+    )
 
     try:
         stub = raw_data_pb2_grpc.RawDataStub(channel)
@@ -97,7 +103,9 @@ def get_grpc_stream(
         responses = stub.GetTransactions(request, metadata=metadata)
         return iter(responses)
     except Exception as e:
-        logging.exception("[Parser] Failed to get grpc response. Is the server running?")
+        logging.exception(
+            "[Parser] Failed to get grpc response. Is the server running?"
+        )
         os._exit(1)
 
 
@@ -132,12 +140,15 @@ def producer(
         processor_name,
     )
 
-    logging.info("[Parser] Successfully connected to GRPC endpoint", extra={
-        "processor_name": processor_name,
-        "stream_address": indexer_grpc_data_service_address,
-        "starting_version": starting_version,
-        "ending_version": ending_version,
-    })
+    logging.info(
+        "[Parser] Successfully connected to GRPC endpoint",
+        extra={
+            "processor_name": processor_name,
+            "stream_address": indexer_grpc_data_service_address,
+            "starting_version": starting_version,
+            "ending_version": ending_version,
+        },
+    )
 
     while True:
         is_success = False
@@ -152,44 +163,58 @@ def producer(
             assert chain_id is not None, "[Parser] Chain Id doesn't exist"
             q.put((chain_id, response.transactions))
 
-            logging.info("[Parser] Received chunk of transactions", extra={
-                "processor_name": processor_name,
-                "start_version": str(batch_start_version),
-                "end_version": str(batch_end_version),
-                "channel_size": q.qsize(),
-                "channel_recv_latency_in_secs": str(format(perf_counter() - last_insertion_time, ".8f"))
-            })
+            logging.info(
+                "[Parser] Received chunk of transactions",
+                extra={
+                    "processor_name": processor_name,
+                    "start_version": str(batch_start_version),
+                    "end_version": str(batch_end_version),
+                    "channel_size": q.qsize(),
+                    "channel_recv_latency_in_secs": str(
+                        format(perf_counter() - last_insertion_time, ".8f")
+                    ),
+                },
+            )
             last_insertion_time = perf_counter()
             is_success = True
         except StopIteration:
-            logging.info("[Parser] Stream ended", extra={
-                "processor_name": processor_name,
-                "stream_address": indexer_grpc_data_service_address
-            })
+            logging.info(
+                "[Parser] Stream ended",
+                extra={
+                    "processor_name": processor_name,
+                    "stream_address": indexer_grpc_data_service_address,
+                },
+            )
         except Exception as e:
-            logging.exception("[Parser] Error receiving datastream response", extra={
-                "processor_name": processor_name,
-                "stream_address": indexer_grpc_data_service_address
-            })
+            logging.exception(
+                "[Parser] Error receiving datastream response",
+                extra={
+                    "processor_name": processor_name,
+                    "stream_address": indexer_grpc_data_service_address,
+                },
+            )
 
         # Check if we're at the end of the stream
         reached_ending_version = (
             next_version_to_fetch > ending_version if ending_version else False
         )
         if reached_ending_version:
-            logging.info("[Parser] Reached ending version", extra={
-                "processor_name": processor_name,
-                "stream_address": indexer_grpc_data_service_address,
-                "ending_version": ending_version,
-                "next_version_to_fetch": next_version_to_fetch
-            })
+            logging.info(
+                "[Parser] Reached ending version",
+                extra={
+                    "processor_name": processor_name,
+                    "stream_address": indexer_grpc_data_service_address,
+                    "ending_version": ending_version,
+                    "next_version_to_fetch": next_version_to_fetch,
+                },
+            )
 
             # Wait for the fetched transactions to finish processing before closing the channel
             while True:
-                logging.info("[Parser] Waiting for channel to be empty", extra={
-                    "processor_name": processor_name,
-                    "channel_size": q.qsize()
-                })
+                logging.info(
+                    "[Parser] Waiting for channel to be empty",
+                    extra={"processor_name": processor_name, "channel_size": q.qsize()},
+                )
                 if q.qsize() == 0:
                     break
             logging.info("[Parser] The stream is ended")
@@ -205,21 +230,27 @@ def producer(
                     reconnection_retries >= RECONNECTION_MAX_RETRIES
                     and elapsed_secs < MIN_SEC_BETWEEN_GRPC_RECONNECTS
                 ):
-                    logging.warning("[Parser] Recently reconnected. Will not retry", extra={
-                        "processor_name": processor_name,
-                        "stream_address": indexer_grpc_data_service_address,
-                        "seconds_since_last_retry": str(elapsed_secs)
-                    })
+                    logging.warning(
+                        "[Parser] Recently reconnected. Will not retry",
+                        extra={
+                            "processor_name": processor_name,
+                            "stream_address": indexer_grpc_data_service_address,
+                            "seconds_since_last_retry": str(elapsed_secs),
+                        },
+                    )
                     os._exit(1)
             reconnection_retries += 1
             last_reconnection_time = perf_counter()
-            logging.info("[Parser] Reconnecting to GRPC.", extra={
-                "processor_name": processor_name,
-                "stream_address": indexer_grpc_data_service_address,
-                "starting_version": next_version_to_fetch,
-                "ending_version": ending_version,
-                "reconnection_retries": reconnection_retries
-            })
+            logging.info(
+                "[Parser] Reconnecting to GRPC.",
+                extra={
+                    "processor_name": processor_name,
+                    "stream_address": indexer_grpc_data_service_address,
+                    "starting_version": next_version_to_fetch,
+                    "ending_version": ending_version,
+                    "reconnection_retries": reconnection_retries,
+                },
+            )
 
             response_stream = get_grpc_stream(
                 indexer_grpc_data_service_address,
@@ -277,9 +308,10 @@ async def consumer_impl(
 
         # Check if producer task is done
         if not producer_thread.is_alive():
-            logging.info("[Parser] Channel closed; stream ended.", extra={
-                "processor_name": processor_name
-            })
+            logging.info(
+                "[Parser] Channel closed; stream ended.",
+                extra={"processor_name": processor_name},
+            )
             os._exit(0)
 
         # Fetch transaction batches from channel to process
@@ -301,11 +333,14 @@ async def consumer_impl(
 
             current_fetched_version = transactions[0].version
             if last_fetched_version + 1 != current_fetched_version:
-                logging.warning("[Parser] Received batch with gap from GRPC stream", extra={
-                    "processor_name": processor_name,
-                    "last_fetched_version": last_fetched_version,
-                    "current_fetched_version": current_fetched_version
-                })
+                logging.warning(
+                    "[Parser] Received batch with gap from GRPC stream",
+                    extra={
+                        "processor_name": processor_name,
+                        "last_fetched_version": last_fetched_version,
+                        "current_fetched_version": current_fetched_version,
+                    },
+                )
                 os._exit(1)
             last_fetched_version = transactions[-1].version
             transaction_batches.append(transactions)
@@ -324,19 +359,24 @@ async def consumer_impl(
         processed_versions: List[ProcessingResult] = []
         for thread in processor_threads:
             if thread.exception:
-                logging.warning("[Parser] Error processing transaction batch", extra={
-                    "processor_name": processor_name
-                })
+                logging.warning(
+                    "[Parser] Error processing transaction batch",
+                    extra={"processor_name": processor_name},
+                )
                 os._exit(1)
 
             processed_versions.append(thread.processing_result)
 
-        logging.info("[Parser] Finished processing transaction batches", extra={
-            "processor_name": processor_name,
-            "task_count": task_count,
-            "processing_duration": str(format(perf_counter() - processing_time, ".8f"))
-        })
-
+        logging.info(
+            "[Parser] Finished processing transaction batches",
+            extra={
+                "processor_name": processor_name,
+                "task_count": task_count,
+                "processing_duration": str(
+                    format(perf_counter() - processing_time, ".8f")
+                ),
+            },
+        )
 
         # Make sure there are no gaps and advance states
         prev_start = None
@@ -347,11 +387,14 @@ async def consumer_impl(
                 prev_end = result.end_version
             else:
                 if prev_end + 1 != result.start_version:
-                    logging.warning("[Parser] Gaps in processing stream", extra={
-                        "processor_name": processor_name,
-                        "stream_address": indexer_grpc_data_stream_endpoint,
-                        "processed_versions": processed_versions
-                    })
+                    logging.warning(
+                        "[Parser] Gaps in processing stream",
+                        extra={
+                            "processor_name": processor_name,
+                            "stream_address": indexer_grpc_data_stream_endpoint,
+                            "processed_versions": processed_versions,
+                        },
+                    )
                     os._exit(1)
                 prev_start = result.start_version
                 prev_end = result.end_version
@@ -370,14 +413,16 @@ async def consumer_impl(
 
         tps_end_time = perf_counter()
 
-        logging.info("[Parser] Processed transactions", extra={
-            "processor_name": processor.name(),
-            "start_version": str(processed_start_version),
-            "end_version": str(processed_end_version),
-            "batch_size": str(processed_end_version - processed_start_version + 1),
-            "tps": f"{(processed_end_version - processed_start_version + 1) / (tps_end_time - tps_start_time)}"
-        })
-
+        logging.info(
+            "[Parser] Processed transactions",
+            extra={
+                "processor_name": processor.name(),
+                "start_version": str(processed_start_version),
+                "end_version": str(processed_end_version),
+                "batch_size": str(processed_end_version - processed_start_version + 1),
+                "tps": f"{(processed_end_version - processed_start_version + 1) / (tps_end_time - tps_start_time)}",
+            },
+        )
 
 
 class IndexerProcessorServer:
@@ -386,9 +431,10 @@ class IndexerProcessorServer:
 
     def __init__(self, config: Config):
         self.config = config
-        logging.info("[Parser] Kicking off", extra={
-            "processor_name": self.config.server_config.processor_config.type
-        })
+        logging.info(
+            "[Parser] Kicking off",
+            extra={"processor_name": self.config.server_config.processor_config.type},
+        )
 
         # Instantiate the correct processor based on config
         processor_config = self.config.server_config.processor_config
@@ -453,13 +499,15 @@ class IndexerProcessorServer:
         )
 
         # Run DB migrations
-        logging.info("[Parser] Initializing DB tables", extra={
-            "processor_name": self.processor.name()
-        })
+        logging.info(
+            "[Parser] Initializing DB tables",
+            extra={"processor_name": self.processor.name()},
+        )
         self.init_db_tables(self.processor.schema())
-        logging.info("[Parser] DB tables initialized", extra={
-            "processor_name": self.processor.name()
-        })
+        logging.info(
+            "[Parser] DB tables initialized",
+            extra={"processor_name": self.processor.name()},
+        )
 
         self.start_health_and_monitoring_ports()
 
@@ -469,11 +517,14 @@ class IndexerProcessorServer:
 
         # Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         # and write into a channel. Each item is of type (chain_id, vec of transactions)
-        logging.info("[Parser] Starting fetcher task", extra={
-            "processor_name": processor_name,
-            "stream_address": self.config.server_config.indexer_grpc_data_service_address,
-            "start_version": starting_version
-        })
+        logging.info(
+            "[Parser] Starting fetcher task",
+            extra={
+                "processor_name": processor_name,
+                "stream_address": self.config.server_config.indexer_grpc_data_service_address,
+                "start_version": starting_version,
+            },
+        )
 
         q = queue.Queue(FETCHER_QUEUE_SIZE)
         producer_thread = threading.Thread(

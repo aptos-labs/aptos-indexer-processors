@@ -66,7 +66,9 @@ class Config(BaseSettings):
                             next_version_to_process_from_db.next_version
                         )
             except:
-                logging.warn("Config] Database error when getting NextVersionToProcess. Skipping...")
+                logging.warn(
+                    "Config] Database error when getting NextVersionToProcess. Skipping..."
+                )
 
         # By default, if nothing is set, start from 0
         starting_version = 0
