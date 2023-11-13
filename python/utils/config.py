@@ -67,7 +67,7 @@ class Config(BaseSettings):
                         )
             except:
                 logging.warn(
-                    "Config] Database error when getting NextVersionToProcess. Skipping..."
+                    "[Config] Database error when getting NextVersionToProcess. Skipping..."
                 )
 
         # By default, if nothing is set, start from 0
