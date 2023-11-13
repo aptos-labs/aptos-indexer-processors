@@ -133,10 +133,11 @@ impl CurrentDelegatedVoter {
         previous_delegated_voters: &CurrentDelegatedVoterMap,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
-        if let Some(active_balance) =
+        if let Some((_, active_balance)) =
             CurrentDelegatorBalance::get_active_share_from_write_table_item(
                 write_table_item,
                 txn_version,
+                0, // placeholder
                 active_pool_to_staking_pool,
             )
             .await?
