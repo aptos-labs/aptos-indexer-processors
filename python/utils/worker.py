@@ -385,6 +385,7 @@ class IndexerProcessorServer:
     num_concurrent_processing_tasks: int
 
     def __init__(self, config: Config):
+        self.config = config
         logging.info("[Parser] Kicking off", extra={
             "processor_name": self.config.server_config.processor_config.type
         })
