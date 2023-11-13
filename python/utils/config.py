@@ -5,7 +5,6 @@ from pydantic.env_settings import SettingsSourceCallable
 from utils.session import Session
 from typing import Any, Dict, List, Optional
 import logging
-import json
 
 
 class ProcessorConfig(BaseModel):
@@ -67,31 +66,19 @@ class Config(BaseSettings):
                             next_version_to_process_from_db.next_version
                         )
             except:
-                logging.warn(
-                    json.dumps(
-                        {
-                            "message": "Config] Database error when getting NextVersionToProcess. Skipping..."
-                        }
-                    )
-                )
+                logging.warn("Config] Database error when getting NextVersionToProcess. Skipping...")
 
         # By default, if nothing is set, start from 0
         starting_version = 0
         if self.server_config.starting_version != None:
             # Start from config's starting_version
-            logging.info(
-                json.dumps(
-                    {"message": "[Config] Starting from config starting_version"}
-                )
-            )
+            logging.info("[Config] Starting from config starting_version")
             starting_version = self.server_config.starting_version
         elif next_version_to_process != None:
             # Start from next version to process in db
-            logging.info(
-                json.dumps({"message": "[Config] Starting from version from db"})
-            )
+            logging.info("[Config] Starting from version from db")
             starting_version = next_version_to_process
         else:
-            logging.info(json.dumps({"message": "Starting from version 0"}))
+            logging.info("Starting from version 0")
 
         return starting_version
