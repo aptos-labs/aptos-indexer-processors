@@ -6,8 +6,8 @@ from utils.worker import IndexerProcessorServer
 from utils.logging import JsonFormatter, CustomLogger
 
 if __name__ == "__main__":
-   # Configure the logger
-    logger = CustomLogger('default_python_logger')
+    # Configure the logger
+    logger = CustomLogger("default_python_logger")
     logger.setLevel(logging.DEBUG)
 
     # Create a stream handler for stdout
