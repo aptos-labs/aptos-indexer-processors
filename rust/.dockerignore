@@ -1,0 +1,12 @@
+# List of files to ignore from docker's perspective
+# The more we can exclude the higher likelihood we can reuse cached layers
+
+# Exclude everything
+**/*
+
+# Explicitly include stuff we actually need via negation
+!.cargo/
+!**/*.toml
+!**/*.rs
+!**/Cargo.lock
+!service/aptos-processor-service/migrations

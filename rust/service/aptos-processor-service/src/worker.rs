@@ -44,7 +44,7 @@ pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// GRPC request metadata key for the token ID.
-const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
+const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
@@ -580,9 +580,12 @@ pub fn grpc_request_builder(
         transactions_count,
         ..GetTransactionsRequest::default()
     });
-    request
-        .metadata_mut()
-        .insert(GRPC_AUTH_TOKEN_HEADER, grpc_auth_token.parse().unwrap());
+    request.metadata_mut().insert(
+        GRPC_API_GATEWAY_API_KEY_HEADER,
+        format!("Bearer {}", grpc_auth_token.clone())
+            .parse()
+            .unwrap(),
+    );
     request
         .metadata_mut()
         .insert(GRPC_REQUEST_NAME_HEADER, processor_name.parse().unwrap());
@@ -598,11 +601,14 @@ pub async fn get_stream(
     auth_token: String,
     processor_name: String,
 ) -> Streaming<TransactionsResponse> {
+    let config = tonic::transport::channel::ClientTlsConfig::new();
     let channel = tonic::transport::Channel::from_shared(format!(
-        "http://{}",
+        "https://{}",
         indexer_grpc_data_service_address.clone()
     ))
     .expect("[Parser] Endpoint is not a valid URI")
+    .tls_config(config)
+    .expect("[Parser] Failed to create TLS config")
     .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
     .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
     info!(

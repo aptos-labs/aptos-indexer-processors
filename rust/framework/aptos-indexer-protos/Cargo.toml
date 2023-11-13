@@ -1,0 +1,19 @@
+[package]
+name = "aptos-indexer-protos"
+version = "1.0.9"
+description = "Aptos indexer stack protobuf definitions"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+pbjson = { workspace = true }
+prost = { workspace = true }
+serde = { workspace = true }
+tonic = { workspace = true }

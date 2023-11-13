@@ -15,20 +15,24 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         netcat \
         libpq-dev \
         curl
-# Create the release build for processor.
 
 COPY --link . /app
 
-RUN scripts/build.sh
+# Create the release build for aptos-processor-service.
+RUN ls /
+RUN ls /app
+RUN cargo build --locked --release -p aptos-processor-service
+RUN cp target/release/aptos-processor-service /usr/local/bin
 
 # The health check port
 EXPOSE 8080
+
 # The gRPC port
 EXPOSE 50051
 
 ENV RUST_LOG_FORMAT=json
 
-# add build info
+# Add build info
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
