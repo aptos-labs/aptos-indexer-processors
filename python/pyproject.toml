@@ -27,7 +27,8 @@ prometheus-client = "^0.17.1"
 twisted = "^22.10.0"
 grpclib = "^0.4.5"
 alembic = "^1.11.1"
-aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "af4067b6606c0c4823dbb640e8f2db4cb2a1a7f9", subdirectory = "protos/python" }
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "aee306923da1fae533a91b4015e0a58443742d45", subdirectory = "protos/python" }
+python-json-logger = "^2.0.7"
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.53.0"
