@@ -89,7 +89,7 @@ async fn insert_to_db_impl(
     Ok(())
 }
 
-async fn insert_to_db(
+pub async fn insert_tokens_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
@@ -586,8 +586,9 @@ impl ProcessorTrait for TokenProcessor {
                     &a.to_address,
                 ))
         });
+       
 
-        let tx_result = insert_to_db(
+        let tx_result = insert_tokens_to_db(
             &mut conn,
             self.name(),
             start_version,

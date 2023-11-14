@@ -1,38 +1,45 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait, token_v2_processor::parse_v2_token};
 use crate::{
-    models::default_models::{
+    models::{default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
-        move_modules::MoveModule,
-        move_resources::MoveResource,
-        move_tables::{CurrentTableItem, TableItem, TableMetadata},
+        move_tables::{CurrentTableItem, TableMetadata},
         transactions::TransactionModel,
         v2_objects::{CurrentObject, Object},
-        write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
-    },
+        write_set_changes::{WriteSetChangeDetail},
+    }, events_models::events::EventModel, token_models::{tokens::{CurrentTokenOwnershipPK, TokenDataIdHash, CurrentTokenPendingClaimPK, Token, TableMetadataForToken}, token_ownerships::CurrentTokenOwnership, token_claims::CurrentTokenPendingClaim, token_datas::CurrentTokenData, collection_datas::CurrentCollectionData, token_activities::TokenActivity, nft_points::NftPoints}, user_transactions_models::user_transactions::UserTransactionModel},
     schema,
     utils::database::{
         clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,
-    },
+    }, processors::{events_processor::insert_events_to_db, token_processor::insert_tokens_to_db, token_v2_processor::insert_token_v2_to_db, user_transaction_processor::insert_user_transactions_to_db},
 };
 use anyhow::bail;
-use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{write_set_change::Change, Transaction, transaction::TxnData};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{result::Error};
 use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
 
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DefaultProcessorConfig {
+    pub nft_points_contract: Option<String>,
+}
+
 pub struct DefaultProcessor {
     connection_pool: PgDbPool,
+    config: DefaultProcessorConfig,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, config: DefaultProcessorConfig) -> Self {
+        Self {
+            connection_pool,
+            config,
+        }
     }
 }
 
@@ -51,26 +58,9 @@ async fn insert_to_db_impl(
     conn: &mut MyDbConnection,
     txns: &[TransactionModel],
     block_metadata_transactions: &[BlockMetadataTransactionModel],
-    wscs: &[WriteSetChangeModel],
-    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        &[MoveModule],
-        &[MoveResource],
-        &[TableItem],
-        &[CurrentTableItem],
-        &[TableMetadata],
-    ),
-    (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
     insert_transactions(conn, txns).await?;
     insert_block_metadata_transactions(conn, block_metadata_transactions).await?;
-    insert_write_set_changes(conn, wscs).await?;
-    insert_move_modules(conn, move_modules).await?;
-    insert_move_resources(conn, move_resources).await?;
-    insert_table_items(conn, table_items).await?;
-    insert_current_table_items(conn, current_table_items).await?;
-    insert_table_metadata(conn, table_metadata).await?;
-    insert_objects(conn, objects).await?;
-    insert_current_objects(conn, current_objects).await?;
     Ok(())
 }
 
@@ -81,15 +71,6 @@ async fn insert_to_db(
     end_version: u64,
     txns: Vec<TransactionModel>,
     block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
-    wscs: Vec<WriteSetChangeModel>,
-    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        Vec<MoveModule>,
-        Vec<MoveResource>,
-        Vec<TableItem>,
-        Vec<CurrentTableItem>,
-        Vec<TableMetadata>,
-    ),
-    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -105,15 +86,6 @@ async fn insert_to_db(
                 pg_conn,
                 &txns,
                 &block_metadata_transactions,
-                &wscs,
-                (
-                    &move_modules,
-                    &move_resources,
-                    &table_items,
-                    &current_table_items,
-                    &table_metadata,
-                ),
-                (&objects, &current_objects),
             ))
         })
         .await
@@ -127,27 +99,10 @@ async fn insert_to_db(
                         let txns = clean_data_for_db(txns, true);
                         let block_metadata_transactions =
                             clean_data_for_db(block_metadata_transactions, true);
-                        let wscs = clean_data_for_db(wscs, true);
-                        let move_modules = clean_data_for_db(move_modules, true);
-                        let move_resources = clean_data_for_db(move_resources, true);
-                        let table_items = clean_data_for_db(table_items, true);
-                        let current_table_items = clean_data_for_db(current_table_items, true);
-                        let table_metadata = clean_data_for_db(table_metadata, true);
-                        let objects = clean_data_for_db(objects, true);
-                        let current_objects = clean_data_for_db(current_objects, true);
                         insert_to_db_impl(
                             pg_conn,
                             &txns,
                             &block_metadata_transactions,
-                            &wscs,
-                            (
-                                &move_modules,
-                                &move_resources,
-                                &table_items,
-                                &current_table_items,
-                                &table_metadata,
-                            ),
-                            (&objects, &current_objects),
                         )
                         .await
                     })
@@ -200,181 +155,6 @@ async fn insert_block_metadata_transactions(
     Ok(())
 }
 
-async fn insert_write_set_changes(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[WriteSetChangeModel],
-) -> Result<(), diesel::result::Error> {
-    use schema::write_set_changes::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), WriteSetChangeModel::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::write_set_changes::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_move_modules(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[MoveModule],
-) -> Result<(), diesel::result::Error> {
-    use schema::move_modules::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), MoveModule::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::move_modules::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_move_resources(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[MoveResource],
-) -> Result<(), diesel::result::Error> {
-    use schema::move_resources::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), MoveResource::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::move_resources::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_table_items(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[TableItem],
-) -> Result<(), diesel::result::Error> {
-    use schema::table_items::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), TableItem::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::table_items::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_current_table_items(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentTableItem],
-) -> Result<(), diesel::result::Error> {
-    use schema::current_table_items::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), CurrentTableItem::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_table_items::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((table_handle, key_hash))
-                .do_update()
-                .set((
-                    key.eq(excluded(key)),
-                    decoded_key.eq(excluded(decoded_key)),
-                    decoded_value.eq(excluded(decoded_value)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-                Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
-}
-
-async fn insert_table_metadata(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[TableMetadata],
-) -> Result<(), diesel::result::Error> {
-    use schema::table_metadatas::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), TableMetadata::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::table_metadatas::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(handle)
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_objects(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[Object],
-) -> Result<(), diesel::result::Error> {
-    use schema::objects::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), Object::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::objects::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_current_objects(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentObject],
-) -> Result<(), diesel::result::Error> {
-    use schema::current_objects::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), CurrentObject::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_objects::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(object_address)
-                .do_update()
-                .set((
-                    owner_address.eq(excluded(owner_address)),
-                    state_key_hash.eq(excluded(state_key_hash)),
-                    allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
-                    last_guid_creation_num.eq(excluded(last_guid_creation_num)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-                Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
-}
-
 #[async_trait]
 impl ProcessorTrait for DefaultProcessor {
     fn name(&self) -> &'static str {
@@ -389,7 +169,7 @@ impl ProcessorTrait for DefaultProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let mut conn = self.get_conn().await;
-        let (txns, block_metadata_txns, write_set_changes, wsc_details) =
+        let (txns, block_metadata_txns, _, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
         let mut block_metadata_transactions = vec![];
@@ -421,13 +201,37 @@ impl ProcessorTrait for DefaultProcessor {
             }
         }
 
-        // TODO, merge this loop with above
-        // Moving object handling here because we need a single object
-        // map through transactions for lookups
         let mut all_objects = vec![];
         let mut all_current_objects = HashMap::new();
+        let mut events = vec![];
+        let mut all_tokens = vec![];
+        let mut all_token_ownerships = vec![];
+        let mut all_token_datas = vec![];
+        let mut all_collection_datas = vec![];
+        let mut all_token_activities = vec![];
+
+        let mut all_current_token_ownerships: HashMap<
+            CurrentTokenOwnershipPK,
+            CurrentTokenOwnership,
+        > = HashMap::new();
+        let mut all_current_token_datas: HashMap<TokenDataIdHash, CurrentTokenData> =
+            HashMap::new();
+        let mut all_current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
+            HashMap::new();
+        let mut all_current_token_claims: HashMap<
+            CurrentTokenPendingClaimPK,
+            CurrentTokenPendingClaim,
+        > = HashMap::new();
+        let mut all_nft_points = vec![];
+
+        let mut signatures = vec![];
+        let mut user_transactions = vec![];
+
+        let table_handle_to_owner = TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
+        
         for txn in &transactions {
             let txn_version = txn.version as i64;
+            let block_height = txn.block_height as i64;
             let changes = &txn
                 .info
                 .as_ref()
@@ -471,6 +275,62 @@ impl ProcessorTrait for DefaultProcessor {
                     _ => {},
                 };
             }
+            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
+            let default = vec![];
+            let raw_events = match txn_data {
+                TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
+                TxnData::Genesis(tx_inner) => &tx_inner.events,
+                TxnData::User(tx_inner) => &tx_inner.events,
+                _ => &default,
+            };
+
+            let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
+            events.extend(txn_events);
+
+            let (
+                mut tokens,
+                mut token_ownerships,
+                mut token_datas,
+                mut collection_datas,
+                current_token_ownerships,
+                current_token_datas,
+                current_collection_datas,
+                current_token_claims,
+            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn).await;
+            all_tokens.append(&mut tokens);
+            all_token_ownerships.append(&mut token_ownerships);
+            all_token_datas.append(&mut token_datas);
+            all_collection_datas.append(&mut collection_datas);
+            // Given versions will always be increasing here (within a single batch), we can just override current values
+            all_current_token_ownerships.extend(current_token_ownerships);
+            all_current_token_datas.extend(current_token_datas);
+            all_current_collection_datas.extend(current_collection_datas);
+
+            // Track token activities
+            let mut activities = TokenActivity::from_transaction(txn);
+            all_token_activities.append(&mut activities);
+
+            // claims
+            all_current_token_claims.extend(current_token_claims);
+
+            // NFT points
+            let nft_points_txn =
+                NftPoints::from_transaction(txn, self.config.nft_points_contract.clone());
+            if let Some(nft_points) = nft_points_txn {
+                all_nft_points.push(nft_points);
+            }
+
+            if let TxnData::User(inner) = txn_data {
+                let (user_transaction, sigs) = UserTransactionModel::from_transaction(
+                    inner,
+                    &txn.timestamp.as_ref().unwrap(),
+                    block_height,
+                    txn.epoch as i64,
+                    txn_version,
+                );
+                signatures.extend(sigs);
+                user_transactions.push(user_transaction);
+            }
         }
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
         let mut current_table_items = current_table_items
@@ -486,24 +346,97 @@ impl ProcessorTrait for DefaultProcessor {
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
-        let tx_result = insert_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
-            txns,
-            block_metadata_transactions,
-            write_set_changes,
-            (
-                move_modules,
-                move_resources,
-                table_items,
-                current_table_items,
-                table_metadata,
+        let all_current_token_ownerships = all_current_token_ownerships
+            .into_values()
+            .collect::<Vec<CurrentTokenOwnership>>();
+        let all_current_token_datas = all_current_token_datas
+            .into_values()
+            .collect::<Vec<CurrentTokenData>>();
+        let all_current_collection_datas = all_current_collection_datas
+            .into_values()
+            .collect::<Vec<CurrentCollectionData>>();
+        let all_current_token_claims = all_current_token_claims
+            .into_values()
+            .collect::<Vec<CurrentTokenPendingClaim>>();
+        
+        let (
+            collections_v2,
+            token_datas_v2,
+            token_ownerships_v2,
+            current_collections_v2,
+            current_token_ownerships_v2,
+            current_token_datas_v2,
+            token_activities_v2,
+            current_token_v2_metadata,
+        ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+        
+        let mut transaction_conn = self.get_conn().await;
+        let mut events_conn = self.get_conn().await;
+        let mut tokens_conn = self.get_conn().await;
+        let mut tokens_v2_conn = self.get_conn().await;
+        let mut user_transactions_conn = self.get_conn().await;
+        let tx_result = tokio::try_join!(
+            // Transaction metadata 
+            insert_to_db(
+                &mut transaction_conn,
+                self.name(),
+                start_version,
+                end_version,
+                txns,
+                block_metadata_transactions,
             ),
-            (all_objects, all_current_objects),
-        )
-        .await;
+
+            // Events 
+            insert_events_to_db(&mut events_conn, self.name(), start_version, end_version, events),
+            
+            // Tokens
+            insert_tokens_to_db(
+                &mut tokens_conn,
+                self.name(),
+                start_version,
+                end_version,
+                (
+                    all_tokens,
+                    all_token_ownerships,
+                    all_token_datas,
+                    all_collection_datas,
+                ),
+                (
+                    all_current_token_ownerships,
+                    all_current_token_datas,
+                    all_current_collection_datas,
+                ),
+                all_token_activities,
+                all_current_token_claims,
+                all_nft_points,
+            ),
+            
+            // Tokens v2
+            insert_token_v2_to_db(
+                &mut tokens_v2_conn,
+                self.name(),
+                start_version,
+                end_version,
+                collections_v2,
+                token_datas_v2,
+                token_ownerships_v2,
+                current_collections_v2,
+                current_token_ownerships_v2,
+                current_token_datas_v2,
+                token_activities_v2,
+                current_token_v2_metadata,
+            ),
+            
+            // User transactions
+            insert_user_transactions_to_db(
+                &mut user_transactions_conn,
+                self.name(),
+                start_version,
+                end_version,
+                user_transactions,
+                signatures,
+            )
+        );
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(e) => {

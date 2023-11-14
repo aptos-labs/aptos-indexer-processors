@@ -47,7 +47,7 @@ async fn insert_to_db_impl(
     Ok(())
 }
 
-async fn insert_to_db(
+pub async fn insert_events_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
@@ -137,7 +137,7 @@ impl ProcessorTrait for EventsProcessor {
         }
 
         let tx_result =
-            insert_to_db(&mut conn, self.name(), start_version, end_version, events).await;
+            insert_events_to_db(&mut conn, self.name(), start_version, end_version, events).await;
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
             Err(e) => {

@@ -87,7 +87,7 @@ async fn insert_to_db_impl(
     Ok(())
 }
 
-async fn insert_to_db(
+pub async fn insert_token_v2_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
     start_version: u64,
@@ -424,7 +424,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_token_v2_metadata,
         ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
 
-        let tx_result = insert_to_db(
+        let tx_result = insert_token_v2_to_db(
             &mut conn,
             self.name(),
             start_version,
@@ -459,7 +459,7 @@ impl ProcessorTrait for TokenV2Processor {
     }
 }
 
-async fn parse_v2_token(
+pub async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
