@@ -72,7 +72,7 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
 
 pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     let config = AsyncDieselConnectionManager::<MyDbConnection>::new(database_url);
-    Ok(Arc::new(Pool::builder().build(config).await?))
+    Ok(Arc::new(Pool::builder().max_size(64).build(config).await?))
 }
 
 /*

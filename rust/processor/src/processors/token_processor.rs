@@ -156,7 +156,8 @@ pub async fn insert_tokens_to_db(
                         let current_token_claims = clean_data_for_db(current_token_claims, true);
                         let nft_points = clean_data_for_db(nft_points, true);
 
-                        insert_to_db_impl(
+                        tracing::info!("Executing query 2nd time ⚠️");
+                        match insert_to_db_impl(
                             pg_conn,
                             (&tokens, &token_ownerships, &token_datas, &collection_datas),
                             (
@@ -168,7 +169,13 @@ pub async fn insert_tokens_to_db(
                             &current_token_claims,
                             &nft_points,
                         )
-                        .await
+                        .await {
+                            Ok(_) => Ok(()),
+                            Err(e) => {
+                                tracing::error!("Error on 2nd time query execution! ⚠️ {:?}", e);
+                                Err(e)
+                            }
+                        }
                     })
                 })
                 .await

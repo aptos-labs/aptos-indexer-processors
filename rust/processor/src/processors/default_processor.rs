@@ -13,7 +13,6 @@ use crate::{
         PgPoolConnection,
     }, processors::{events_processor::insert_events_to_db, token_processor::insert_tokens_to_db, token_v2_processor::insert_token_v2_to_db, user_transaction_processor::insert_user_transactions_to_db},
 };
-use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction, transaction::TxnData};
 use async_trait::async_trait;
 use diesel::{result::Error};
@@ -52,6 +51,16 @@ impl Debug for DefaultProcessor {
             state.connections, state.idle_connections
         )
     }
+}
+
+fn fail(start_version: u64, end_version: u64, additional_message: &str, e: Error) {
+    error!(
+        start_version = start_version,
+        end_version = end_version,
+        processor_name = "default_processor",
+        error = ?e,
+        additional_message,
+    );
 }
 
 async fn insert_to_db_impl(
@@ -369,88 +378,86 @@ impl ProcessorTrait for DefaultProcessor {
             token_activities_v2,
             current_token_v2_metadata,
         ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
-        
-        let mut transaction_conn = self.get_conn().await;
-        let mut events_conn = self.get_conn().await;
-        let mut tokens_conn = self.get_conn().await;
-        let mut tokens_v2_conn = self.get_conn().await;
-        let mut user_transactions_conn = self.get_conn().await;
-        let tx_result = tokio::try_join!(
-            // Transaction metadata 
-            insert_to_db(
-                &mut transaction_conn,
-                self.name(),
-                start_version,
-                end_version,
-                txns,
-                block_metadata_transactions,
-            ),
 
-            // Events 
-            insert_events_to_db(&mut events_conn, self.name(), start_version, end_version, events),
-            
-            // Tokens
-            insert_tokens_to_db(
-                &mut tokens_conn,
-                self.name(),
-                start_version,
-                end_version,
-                (
-                    all_tokens,
-                    all_token_ownerships,
-                    all_token_datas,
-                    all_collection_datas,
-                ),
-                (
-                    all_current_token_ownerships,
-                    all_current_token_datas,
-                    all_current_collection_datas,
-                ),
-                all_token_activities,
-                all_current_token_claims,
-                all_nft_points,
+        // Transaction metadata 
+        match insert_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            txns,
+            block_metadata_transactions,
+        ).await {
+            Ok(_) => (),
+            Err(e) => fail(start_version, end_version, "Error on processing transaction metadata", e),
+        };
+
+        // Events 
+        match insert_events_to_db(&mut conn, self.name(), start_version, end_version, events).await {
+            Ok(_) => (),
+            Err(e) => fail(start_version, end_version, "Error on processing events", e),
+        };
+
+        // User transactions
+        match insert_user_transactions_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            user_transactions,
+            signatures,
+        ).await {
+            Ok(_) => (),
+            Err(e) => fail(start_version, end_version, "Error on processing user transactions", e),
+        };
+
+        // Tokens v2
+        match insert_token_v2_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            collections_v2,
+            token_datas_v2,
+            token_ownerships_v2,
+            current_collections_v2,
+            current_token_ownerships_v2,
+            current_token_datas_v2,
+            token_activities_v2,
+            current_token_v2_metadata,
+        ).await {
+            Ok(_) => (),
+            Err(e) => fail(start_version, end_version, "Error on processing tokens v2", e),
+        };
+        
+        // Tokens
+        match insert_tokens_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            (
+                all_tokens,
+                all_token_ownerships,
+                all_token_datas,
+                all_collection_datas,
             ),
-            
-            // Tokens v2
-            insert_token_v2_to_db(
-                &mut tokens_v2_conn,
-                self.name(),
-                start_version,
-                end_version,
-                collections_v2,
-                token_datas_v2,
-                token_ownerships_v2,
-                current_collections_v2,
-                current_token_ownerships_v2,
-                current_token_datas_v2,
-                token_activities_v2,
-                current_token_v2_metadata,
+            (
+                all_current_token_ownerships,
+                all_current_token_datas,
+                all_current_collection_datas,
             ),
-            
-            // User transactions
-            insert_user_transactions_to_db(
-                &mut user_transactions_conn,
-                self.name(),
-                start_version,
-                end_version,
-                user_transactions,
-                signatures,
-            )
-        );
-        match tx_result {
-            Ok(_) => Ok((start_version, end_version)),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+            all_token_activities,
+            all_current_token_claims,
+            all_nft_points,
+        ).await {
+            Ok(_) => (),
+            Err(e) => fail(start_version, end_version, "Error on processing tokens v1", e),
+        };
+        
+        Ok((start_version, end_version))
     }
+
 
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
