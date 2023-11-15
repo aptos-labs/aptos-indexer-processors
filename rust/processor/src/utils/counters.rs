@@ -100,16 +100,76 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "indexer_processor_latest_version",
         "Latest version a processor has fully consumed",
-        &["processor_name"]
+        &["processor_name", "step", "message"]
     )
     .unwrap()
 });
 
 /// Count of bytes processed.
-pub static TRANSMITTED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_processor_processed_bytes_count",
         "Count of bytes processed",
+        &["processor_name", "step", "message"]
+    )
+    .unwrap()
+});
+
+/// Count of transactions processed.
+pub static NUM_TRANSACTIONS_PROCESSED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_num_transactions_processed_count",
+        "Number of transactions processed",
+        &["processor_name", "step", "message"]
+    )
+    .unwrap()
+});
+
+/// Size of the channel containing transactions fetched from GRPC, waiting to be processed
+pub static FETCHER_THREAD_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_processor_fetcher_thread_channel_size",
+        "Size of the fetcher thread channel",
+        &["processor_name"]
+    )
+    .unwrap()
+});
+
+/// Overall processing time for multiple (n = number_concurrent_processing_tasks) batch of transactions
+pub static MULTI_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_multi_batch_processing_time_in_secs",
+        "Time taken to process multiple batches of transactions",
+        &["processor_name"]
+    )
+    .unwrap()
+});
+
+/// Overall processing time for a single batch of transactions
+pub static SINGLE_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_single_batch_processing_time_in_secs",
+        "Time taken to process a single batch of transactions",
+        &["processor_name"]
+    )
+    .unwrap()
+});
+
+/// Parsing time for a single batch of transactions
+pub static SINGLE_BATCH_PARSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_single_batch_parsing_time_in_secs",
+        "Time taken to parse a single batch of transactions",
+        &["processor_name"]
+    )
+    .unwrap()
+});
+
+/// DB insertion time for a single batch of transactions
+pub static SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_single_batch_db_insertion_time_in_secs",
+        "Time taken to insert to DB for a single batch of transactions",
         &["processor_name"]
     )
     .unwrap()
