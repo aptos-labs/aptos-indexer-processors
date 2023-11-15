@@ -375,7 +375,9 @@ async def consumer_impl(
 
         processor_threads = []
         for transactions in transaction_batches:
-            thread = IndexerProcessorServer.WorkerThread(processor, transactions)
+            thread = IndexerProcessorServer.WorkerThread(
+                processor, transactions=transactions, size_in_bytes=total_size
+            )
             processor_threads.append(thread)
             thread.start()
 
@@ -499,6 +501,7 @@ class IndexerProcessorServer:
             self,
             processor: TransactionsProcessor,
             transactions: List[transaction_pb2.Transaction],
+            size_in_bytes: int,
         ):
             threading.Thread.__init__(self)
             self.processor = processor
@@ -541,7 +544,7 @@ class IndexerProcessorServer:
                         "service_type": PROCESSOR_SERVICE_TYPE,
                         "num_of_transactions": num_of_transactions,
                         "duration_in_secs": db_insertion_duration_in_secs,
-                        "size_in_bytes": size_in_bytes,
+                        "size_in_bytes": str(size_in_bytes),
                     },
                 )
                 logging.info(
@@ -553,7 +556,7 @@ class IndexerProcessorServer:
                         "service_type": PROCESSOR_SERVICE_TYPE,
                         "num_of_transactions": num_of_transactions,
                         "duration_in_secs": processing_duration_in_secs,
-                        "size_in_bytes": size_in_bytes,
+                        "size_in_bytes": str(size_in_bytes),
                     },
                 )
                 logging.info(
@@ -567,7 +570,7 @@ class IndexerProcessorServer:
                         "processing_duration_in_secs": processing_duration_in_secs,
                         "db_insertion_duration_in_secs": db_insertion_duration_in_secs,
                         "duration_in_secs": duration_in_secs,
-                        "size_in_bytes": size_in_bytes,
+                        "size_in_bytes": str(size_in_bytes),
                         "step": "2",
                     },
                 )
