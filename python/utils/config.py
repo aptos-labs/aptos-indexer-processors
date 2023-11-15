@@ -27,6 +27,7 @@ class ServerConfig(BaseModel):
     indexer_grpc_http2_ping_interval_in_secs: int = 30
     # HTTP2 ping timeout in seconds to detect if the connection is still alive
     indexer_grpc_http2_ping_timeout_in_secs: int = 10
+    enable_verbose_logging: Optional[bool] = False
 
 
 class Config(BaseSettings):
