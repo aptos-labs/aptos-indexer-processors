@@ -1,0 +1,7 @@
+services:
+  index-processor:
+    image: ghcr.io/byzantion-xyz/aptos-indexer-processors:develop
+    restart: on-failure
+    volumes:
+      - ./config.yml:/config.yml
+    command: "-c /config.yml"
