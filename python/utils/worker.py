@@ -372,6 +372,12 @@ async def consumer_impl(
             last_fetched_version = transactions[-1].version
             transaction_batches.append(transactions)
 
+        size_in_bytes = sum(
+            transaction.ByteSize()
+            for transactions in transaction_batches
+            for transaction in transactions
+        )
+
         processor_threads = []
         for transactions in transaction_batches:
             thread = IndexerProcessorServer.WorkerThread(processor, transactions)
@@ -427,26 +433,26 @@ async def consumer_impl(
         LATEST_PROCESSED_VERSION.labels(processor_name=processor_name).set(
             processed_end_version
         )
-        if processor.config.server_config.enable_verbose_logging:
-            logging.info(
-                "[Parser] Finished processing multiple transaction batches",
-                extra={
-                    "processor_name": processor_name,
-                    "service_type": PROCESSOR_SERVICE_TYPE,
-                    "start_version": processed_versions[0].start_version,
-                    "end_version": processed_versions[-1].end_version,
-                    "num_of_transactions": processed_versions[-1].end_version
-                    + 1
-                    - processed_versions[0].start_version,
-                    "duration_in_secs": str(format(perf_counter() - start_time, ".8f")),
-                    "task_count": task_count,
-                    "processing_duration": str(
-                        format(perf_counter() - processing_time, ".8f")
-                    ),
-                    "service_type": PROCESSOR_SERVICE_TYPE,
-                    "step": "3",
-                },
-            )
+        logging.info(
+            "[Parser] Finished processing multiple transaction batches",
+            extra={
+                "processor_name": processor_name,
+                "service_type": PROCESSOR_SERVICE_TYPE,
+                "start_version": processed_versions[0].start_version,
+                "end_version": processed_versions[-1].end_version,
+                "num_of_transactions": processed_versions[-1].end_version
+                + 1
+                - processed_versions[0].start_version,
+                "duration_in_secs": str(format(perf_counter() - start_time, ".8f")),
+                "task_count": task_count,
+                "processing_duration": str(
+                    format(perf_counter() - processing_time, ".8f")
+                ),
+                "service_type": PROCESSOR_SERVICE_TYPE,
+                "size_in_bytes": size_in_bytes,
+                "step": "3",
+            },
+        )
 
 
 class IndexerProcessorServer:
@@ -515,10 +521,10 @@ class IndexerProcessorServer:
                 self.processing_result = self.processor.process_transactions(
                     self.transactions, start_version, end_version
                 )
-                processor_name = self.processor.name()
-                start_version = str(start_version)
-                end_version = str(end_version)
                 num_of_transactions = str(end_version - start_version + 1)
+                processor_name = self.processor.name()
+                start_version_str = str(start_version)
+                end_version_str = str(end_version)
                 processing_duration_in_secs = format(
                     self.processing_result.processing_duration_in_secs, ".8f"
                 )
@@ -530,44 +536,50 @@ class IndexerProcessorServer:
                     + self.processing_result.db_insertion_duration_in_secs,
                     ".8f",
                 )
-                if self.processor.config.server_config.enable_verbose_logging:
-                    logging.info(
-                        "[Parser] DB insertion time of one batch of transactions",
-                        extra={
-                            "processor_name": processor_name,
-                            "start_version": start_version,
-                            "end_version": end_version,
-                            "service_type": PROCESSOR_SERVICE_TYPE,
-                            "num_of_transactions": num_of_transactions,
-                            "duration_in_secs": db_insertion_duration_in_secs,
-                        },
-                    )
-                    logging.info(
-                        "[Parser] Parsing time of one batch of transactions",
-                        extra={
-                            "processor_name": processor_name,
-                            "start_version": start_version,
-                            "end_version": end_version,
-                            "service_type": PROCESSOR_SERVICE_TYPE,
-                            "num_of_transactions": num_of_transactions,
-                            "duration_in_secs": processing_duration_in_secs,
-                        },
-                    )
-                    logging.info(
-                        "[Parser] Processor finished processing one batch of transaction",
-                        extra={
-                            "processor_name": processor_name,
-                            "start_version": start_version,
-                            "end_version": end_version,
-                            "service_type": PROCESSOR_SERVICE_TYPE,
-                            "num_of_transactions": num_of_transactions,
-                            "processing_duration_in_secs": processing_duration_in_secs,
-                            "db_insertion_duration_in_secs": db_insertion_duration_in_secs,
-                            "duration_in_secs": duration_in_secs,
-                            "step": "2",
-                        },
-                    )
+                size_in_bytes = str(sum(obj.ByteSize() for obj in self.transactions))
+                logging.info(
+                    "[Parser] DB insertion time of one batch of transactions",
+                    extra={
+                        "processor_name": processor_name,
+                        "start_version": start_version_str,
+                        "end_version": end_version_str,
+                        "service_type": PROCESSOR_SERVICE_TYPE,
+                        "num_of_transactions": num_of_transactions,
+                        "duration_in_secs": db_insertion_duration_in_secs,
+                        "size_in_bytes": size_in_bytes,
+                    },
+                )
+                logging.info(
+                    "[Parser] Parsing time of one batch of transactions",
+                    extra={
+                        "processor_name": processor_name,
+                        "start_version": start_version_str,
+                        "end_version": end_version_str,
+                        "service_type": PROCESSOR_SERVICE_TYPE,
+                        "num_of_transactions": num_of_transactions,
+                        "duration_in_secs": processing_duration_in_secs,
+                        "size_in_bytes": size_in_bytes,
+                    },
+                )
+                logging.info(
+                    "[Parser] Processor finished processing one batch of transaction",
+                    extra={
+                        "processor_name": processor_name,
+                        "start_version": start_version_str,
+                        "end_version": end_version_str,
+                        "service_type": PROCESSOR_SERVICE_TYPE,
+                        "num_of_transactions": num_of_transactions,
+                        "processing_duration_in_secs": processing_duration_in_secs,
+                        "db_insertion_duration_in_secs": db_insertion_duration_in_secs,
+                        "duration_in_secs": duration_in_secs,
+                        "size_in_bytes": size_in_bytes,
+                        "step": "2",
+                    },
+                )
             except Exception as e:
+                import traceback
+
+                traceback.print_exc()
                 self.exception = e
 
     def run(self):
