@@ -55,6 +55,7 @@ from utils.models.schema_names import NFT_MARKETPLACE_V2_SCHEMA_NAME
 from utils.session import Session
 from sqlalchemy.dialects.postgresql import insert
 from utils.config import NFTMarketplaceV2Config
+from time import perf_counter
 
 
 class NFTMarketplaceV2Processor(TransactionsProcessor):
@@ -76,8 +77,10 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
         end_version: int,
     ) -> ProcessingResult:
         marketplace_contract_address = str(self.config.marketplace_contract_address)
-
+        processing_duration_in_secs = 0.0
+        db_insertion_duration_in_secs = 0.0
         for transaction in transactions:
+            start_time = perf_counter()
             user_transaction = transaction_utils.get_user_transaction(transaction)
 
             if not user_transaction:
@@ -979,15 +982,22 @@ class NFTMarketplaceV2Processor(TransactionsProcessor):
                         )
                         current_collection_offers.append(current_collection_offer)
 
+            processing_duration_in_secs += perf_counter() - start_time
+
+            start_time = perf_counter()
             self.insert_nft_activities(nft_marketplace_activities)
             self.insert_nft_listings(current_nft_marketplace_listings)
             self.insert_nft_token_offers(current_token_offers)
             self.insert_nft_collection_offers(current_collection_offers)
             self.insert_nft_auctions(current_auctions)
 
+            db_insertion_duration_in_secs += perf_counter() - start_time
+
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,
+            processing_duration_in_secs=processing_duration_in_secs,
+            db_insertion_duration_in_secs=db_insertion_duration_in_secs,
         )
 
     def insert_nft_activities(

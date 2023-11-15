@@ -16,6 +16,8 @@ from sqlalchemy.dialects.postgresql import insert
 class ProcessingResult:
     start_version: int
     end_version: int
+    processing_duration_in_secs: float
+    db_insertion_duration_in_secs: float
 
 
 class TransactionsProcessor(ABC):
