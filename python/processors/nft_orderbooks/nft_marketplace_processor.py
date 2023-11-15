@@ -35,6 +35,7 @@ from utils import event_utils, general_utils, transaction_utils, write_set_chang
 from utils.models.schema_names import NFT_MARKETPLACE_SCHEMA_NAME
 from utils.session import Session
 from utils.processor_name import ProcessorName
+from time import perf_counter
 
 
 class NFTMarketplaceProcesser(TransactionsProcessor):
@@ -51,7 +52,7 @@ class NFTMarketplaceProcesser(TransactionsProcessor):
         end_version: int,
     ) -> ProcessingResult:
         parsed_objs = []
-
+        start_time = perf_counter()
         for transaction in transactions:
             user_transaction = transaction_utils.get_user_transaction(transaction)
 
@@ -132,14 +133,18 @@ class NFTMarketplaceProcesser(TransactionsProcessor):
                             )
 
         # TODO: Sort by pk for multi threaded postgres insert
+        processing_duration_in_secs = perf_counter() - start_time
 
+        start_time = perf_counter()
         self.insert_to_db(
             parsed_objs,
         )
-
+        db_insertion_duration_in_secs = perf_counter() - start_time
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,
+            processing_duration_in_secs=processing_duration_in_secs,
+            db_insertion_duration_in_secs=db_insertion_duration_in_secs,
         )
 
     def insert_to_db(
