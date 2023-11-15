@@ -9,6 +9,7 @@ from utils.session import Session
 from utils.processor_name import ProcessorName
 import json
 from datetime import datetime
+from time import perf_counter
 
 MODULE_ADDRESS = general_utils.standardize_address(
     "0xe57752173bc7c57e9b61c84895a75e53cd7c0ef0855acd81d31cb39b0e87e1d0"
@@ -29,7 +30,7 @@ class CoinFlipProcessor(TransactionsProcessor):
         end_version: int,
     ) -> ProcessingResult:
         event_db_objs: List[CoinFlipEvent] = []
-
+        start_time = perf_counter()
         for transaction in transactions:
             # Custom filtering
             # Here we filter out all transactions that are not of type TRANSACTION_TYPE_USER
@@ -91,11 +92,16 @@ class CoinFlipProcessor(TransactionsProcessor):
                 )
                 event_db_objs.append(event_db_obj)
 
+        processing_duration_in_secs = perf_counter() - start_time
         self.insert_to_db(event_db_objs)
-
+        db_insertion_duration_in_secs = (
+            perf_counter() - start_time - processing_duration_in_secs
+        )
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,
+            processing_duration_in_secs=processing_duration_in_secs,
+            db_insertion_duration_in_secs=db_insertion_duration_in_secs,
         )
 
     def insert_to_db(self, parsed_objs: List[CoinFlipEvent]) -> None:

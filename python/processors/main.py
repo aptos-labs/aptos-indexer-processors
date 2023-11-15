@@ -8,7 +8,7 @@ from utils.logging import JsonFormatter, CustomLogger
 if __name__ == "__main__":
     # Configure the logger
     logger = CustomLogger("default_python_logger")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     # Create a stream handler for stdout
     stream_handler = logging.StreamHandler()

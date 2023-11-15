@@ -7,6 +7,7 @@ from utils.transactions_processor import TransactionsProcessor
 from utils.models.schema_names import EXAMPLE
 from utils.session import Session
 from utils.processor_name import ProcessorName
+from time import perf_counter
 
 
 class ExampleEventProcessor(TransactionsProcessor):
@@ -23,7 +24,7 @@ class ExampleEventProcessor(TransactionsProcessor):
         end_version: int,
     ) -> ProcessingResult:
         event_db_objs: List[Event] = []
-
+        start_time = perf_counter()
         for transaction in transactions:
             # Custom filtering
             # Here we filter out all transactions that are not of type TRANSACTION_TYPE_USER
@@ -61,12 +62,17 @@ class ExampleEventProcessor(TransactionsProcessor):
                     event_index=event_index,
                 )
                 event_db_objs.append(event_db_obj)
-
+        processing_duration_in_secs = perf_counter() - start_time
+        start_time = perf_counter()
         self.insert_to_db(event_db_objs)
-
+        db_insertion_duration_in_secs = (
+            perf_counter() - start_time - processing_duration_in_secs
+        )
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,
+            processing_duration_in_secs=processing_duration_in_secs,
+            db_insertion_duration_in_secs=db_insertion_duration_in_secs,
         )
 
     def insert_to_db(self, parsed_objs: List[Event]) -> None:

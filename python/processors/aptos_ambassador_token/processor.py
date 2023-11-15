@@ -11,6 +11,7 @@ from utils.config import Config
 from utils.general_utils import standardize_address
 from utils.transactions_processor import TransactionsProcessor, ProcessingResult
 from utils.models.schema_names import EXAMPLE
+from time import perf_counter
 
 qualified_module_name = (
     "0x9bfdd4efe15f4d8aa145bef5f64588c7c391bcddaf34f9e977f59bd93b498f2a::ambassador"
@@ -32,6 +33,7 @@ class AptosAmbassadorTokenProcessor(TransactionsProcessor):
         start_version: int,
         end_version: int,
     ) -> ProcessingResult:
+        start_time = perf_counter()
         for transaction in transactions:
             found = False
             if transaction.type == transaction_pb2.Transaction.TRANSACTION_TYPE_USER:
@@ -80,8 +82,11 @@ class AptosAmbassadorTokenProcessor(TransactionsProcessor):
                         ),
                     )
                     print("\n\n")
-
+        duration_in_secs = perf_counter() - start_time
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,
+            processing_duration_in_secs=duration_in_secs,
+            # No db insertion.
+            db_insertion_duration_in_secs=0,
         )
