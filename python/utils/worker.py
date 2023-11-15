@@ -164,7 +164,7 @@ def producer(
             batch_start_version = response.transactions[0].version
             batch_end_version = response.transactions[-1].version
             next_version_to_fetch = batch_end_version + 1
-
+            size_in_bytes = response.ByteSize()
             chain_id = response.chain_id
             assert chain_id is not None, "[Parser] Chain Id doesn't exist"
             logging.info(
@@ -173,7 +173,7 @@ def producer(
                     "processor_name": processor_name,
                     "start_version": str(batch_start_version),
                     "end_version": str(batch_end_version),
-                    "size_in_bytes": str(response.ByteSize()),
+                    "size_in_bytes": str(size_in_bytes),
                     "channel_size": q.qsize(),
                     "channel_recv_latency_in_secs": str(
                         format(perf_counter() - last_insertion_time, ".8f")
@@ -183,7 +183,7 @@ def producer(
                     "service_type": PROCESSOR_SERVICE_TYPE,
                 },
             )
-            q.put((chain_id, response.transactions))
+            q.put((chain_id, size_in_bytes, response.transactions))
             last_insertion_time = perf_counter()
             is_success = True
         except StopIteration:
@@ -343,20 +343,21 @@ async def consumer_impl(
         # Fetch transaction batches from channel to process
         transaction_batches = []
         last_fetched_version = batch_start_version - 1
+        total_size = 0
         for task_index in range(num_concurrent_processing_tasks):
             if task_index == 0:
                 # If we're the first task, we should wait until we get data.
-                chain_id, transactions = q.get()
+                chain_id, size_in_bytes, transactions = q.get()
             else:
                 # If we're not the first task, we should poll to see if we get any data.
                 try:
-                    chain_id, transactions = q.get_nowait()
+                    chain_id, size_in_bytes, transactions = q.get_nowait()
                 except queue.Empty:
                     # Channel is empty and send is not dropped which we definitely expect. Wait for a bit and continue polling.
                     continue
 
             # TODO: Check chain_id saved in DB
-
+            total_size += size_in_bytes
             current_fetched_version = transactions[0].version
             if last_fetched_version + 1 != current_fetched_version:
                 logging.warning(
@@ -371,12 +372,6 @@ async def consumer_impl(
                 os._exit(1)
             last_fetched_version = transactions[-1].version
             transaction_batches.append(transactions)
-
-        size_in_bytes = sum(
-            transaction.ByteSize()
-            for transactions in transaction_batches
-            for transaction in transactions
-        )
 
         processor_threads = []
         for transactions in transaction_batches:
@@ -449,7 +444,7 @@ async def consumer_impl(
                     format(perf_counter() - processing_time, ".8f")
                 ),
                 "service_type": PROCESSOR_SERVICE_TYPE,
-                "size_in_bytes": size_in_bytes,
+                "size_in_bytes": str(total_size),
                 "step": "3",
             },
         )
