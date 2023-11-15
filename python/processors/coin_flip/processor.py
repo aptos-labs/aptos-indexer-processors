@@ -93,10 +93,9 @@ class CoinFlipProcessor(TransactionsProcessor):
                 event_db_objs.append(event_db_obj)
 
         processing_duration_in_secs = perf_counter() - start_time
+        start_time = perf_counter()
         self.insert_to_db(event_db_objs)
-        db_insertion_duration_in_secs = (
-            perf_counter() - start_time - processing_duration_in_secs
-        )
+        db_insertion_duration_in_secs = perf_counter() - start_time
         return ProcessingResult(
             start_version=start_version,
             end_version=end_version,

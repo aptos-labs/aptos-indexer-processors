@@ -167,10 +167,6 @@ def producer(
 
             chain_id = response.chain_id
             assert chain_id is not None, "[Parser] Chain Id doesn't exist"
-            q.put((chain_id, response.transactions))
-
-            # This is not accurate because queue in python is unbounded thus
-            # no time is spent waiting for the queue to be available.
             logging.info(
                 "[Parser] Received transactions from GRPC. Sending transactions to channel.",
                 extra={
@@ -186,6 +182,7 @@ def producer(
                     "service_type": PROCESSOR_SERVICE_TYPE,
                 },
             )
+            q.put((chain_id, response.transactions))
             last_insertion_time = perf_counter()
             is_success = True
         except StopIteration:
@@ -517,20 +514,54 @@ class IndexerProcessorServer:
                 self.processing_result = self.processor.process_transactions(
                     self.transactions, start_version, end_version
                 )
+                processor_name = self.processor.name()
+                start_version = str(start_version)
+                end_version = str(end_version)
+                num_of_transactions = str(end_version - start_version + 1)
+                processing_duration_in_secs = format(
+                    self.processing_result.processing_duration_in_secs, ".8f"
+                )
+                db_insertion_duration_in_secs = format(
+                    self.processing_result.db_insertion_duration_in_secs, ".8f"
+                )
+                duration_in_secs = format(
+                    self.processing_result.processing_duration_in_secs
+                    + self.processing_result.db_insertion_duration_in_secs,
+                    ".8f",
+                )
+                logging.info(
+                    "[Parser] DB insertion time of one batch of transactions",
+                    extra={
+                        "processor_name": processor_name,
+                        "start_version": start_version,
+                        "end_version": end_version,
+                        "service_type": PROCESSOR_SERVICE_TYPE,
+                        "num_of_transactions": num_of_transactions,
+                        "duration_in_secs": db_insertion_duration_in_secs,
+                    },
+                )
+                logging.info(
+                    "[Parser] Parsing time of one batch of transactions",
+                    extra={
+                        "processor_name": processor_name,
+                        "start_version": start_version,
+                        "end_version": end_version,
+                        "service_type": PROCESSOR_SERVICE_TYPE,
+                        "num_of_transactions": num_of_transactions,
+                        "duration_in_secs": processing_duration_in_secs,
+                    },
+                )
                 logging.info(
                     "[Parser] Processor finished processing one batch of transaction",
                     extra={
-                        "processor_name": self.processor.name(),
-                        "start_version": str(start_version),
-                        "end_version": str(end_version),
+                        "processor_name": processor_name,
+                        "start_version": start_version,
+                        "end_version": end_version,
                         "service_type": PROCESSOR_SERVICE_TYPE,
-                        "num_of_transactions": str(end_version - start_version + 1),
-                        "processing_duration_in_secs": format(
-                            self.processing_result.processing_duration_in_secs, ".8f"
-                        ),
-                        "db_insertion_duration_in_secs": format(
-                            self.processing_result.db_insertion_duration_in_secs, ".8f"
-                        ),
+                        "num_of_transactions": num_of_transactions,
+                        "processing_duration_in_secs": processing_duration_in_secs,
+                        "db_insertion_duration_in_secs": db_insertion_duration_in_secs,
+                        "duration_in_secs": duration_in_secs,
                         "step": "2",
                     },
                 )
