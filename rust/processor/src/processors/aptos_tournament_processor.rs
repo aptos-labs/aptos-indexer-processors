@@ -4,9 +4,15 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
-        aptos_tournament_models::aptos_tournament_utils::{
-            AptosTournament, AptosTournamentAggregatedData, CurrentRound, GameOverEvent, RPSGame,
-            Refs, TournamentDirector, TournamentState, TournamentToken,
+        aptos_tournament_models::{
+            aptos_tournament_utils::{
+                AptosTournament, AptosTournamentAggregatedData, CurrentRound, GameOverEvent,
+                RPSGame, TournamentDirector, TournamentState, TournamentToken,
+            },
+            players::Player,
+            rooms::Room,
+            rounds::Round,
+            tournaments::Tournament,
         },
         token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
@@ -68,11 +74,16 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
         // TODO: Process transactions
         // I'm probably missing the DB lookup thing that you mentioned if the required transaction is outside of the batch
+        // Also need to find out how to handle the nft that represents u can play
+        let mut aptos_tournament_metadata_helper = HashMap::new();
+        let mut tournaments: HashMap<String, Tournament> = HashMap::new();
+        let mut rounds: HashMap<(String, i32), Round> = HashMap::new();
+        let mut rooms: HashMap<(String, String), Room> = HashMap::new();
+        let mut players: HashMap<(String, String), Player> = HashMap::new();
         for txn in transactions {
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
-            let mut aptos_tournament_metadata_helper = HashMap::new();
 
             if let TxnData::User(user_txn) = txn_data {
                 let user_request = user_txn
@@ -91,11 +102,12 @@ impl ProcessorTrait for AptosTournamentProcessor {
                                 AptosTournamentAggregatedData {
                                     aptos_tournament: None,
                                     current_round: None,
-                                    refs: None,
+                                    // refs: None,
                                     rps_game: None,
                                     tournament_director: None,
                                     tournament_state: None,
                                     tournament_token: None,
+                                    object,
                                 },
                             );
                         }
@@ -124,13 +136,13 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             )? {
                                 aggregated_data.current_round = Some(current_round);
                             }
-                            if let Some(refs) = Refs::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.refs = Some(refs);
-                            }
+                            // if let Some(refs) = Refs::from_write_resource(
+                            //     &self.config.contract_address,
+                            //     wr,
+                            //     txn_version,
+                            // )? {
+                            //     aggregated_data.refs = Some(refs);
+                            // }
                             if let Some(rps_game) = RPSGame::from_write_resource(
                                 &self.config.contract_address,
                                 wr,
@@ -165,24 +177,31 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     }
                 }
 
-                // 3. Pass through events for end game event (probably need this to end the game/set winner/something )
-                for (index, event) in user_txn.events.iter().enumerate() {
-                    if let Some(game_over_event) = GameOverEvent::from_event(
-                        &self.config.contract_address,
-                        event,
-                        txn_version,
-                    )? {
+                // Third pass through events for end game event (probably need this to end the game/set winner/something )
+                for wsc in user_txn.events.iter() {
+                    if let Some(game_over_event) =
+                        GameOverEvent::from_event(&self.config.contract_address, wsc, txn_version)?
+                    {
                         // TODO: Handle this
                     }
                 }
 
-                // 4. Retrieve sender/owner of each write set through mapping
+                // Fourth pass to collect all the data
+                for wsc in transaction_info.changes.iter() {
+                    if let Some(Change::WriteResource(resource)) = wsc.change.as_ref() {
+                        // TODO: Handle collection
+                    }
+                }
             }
         }
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
         // TODO: write to db
+        println!(
+            "aptos_tournament_metadata_helper: {:?}",
+            aptos_tournament_metadata_helper
+        );
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 

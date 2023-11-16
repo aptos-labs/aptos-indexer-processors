@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    schema::{self, rounds},
+    aptos_tournament_schema::aptos_tournament as schema,
+    aptos_tournament_schema::aptos_tournament::rounds,
     utils::database::{execute_with_better_error, MyDbConnection, PgPoolConnection},
 };
 use anyhow::Context;
