@@ -11,6 +11,7 @@
 #[macro_use]
 extern crate diesel;
 
+pub mod aptos_tournament_schema;
 mod config;
 pub mod models;
 pub mod processors;
