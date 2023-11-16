@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    aptos_tournament_schema::aptos_tournament as schema,
-    aptos_tournament_schema::aptos_tournament::rounds,
+    schema::{self, tournament_rounds},
     utils::database::{execute_with_better_error, MyDbConnection, PgPoolConnection},
 };
 use anyhow::Context;
@@ -14,8 +13,8 @@ use tracing::debug;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(tournament_address, number))]
-#[diesel(table_name = rounds)]
-pub struct Round {
+#[diesel(table_name = tournament_rounds)]
+pub struct TournamentRound {
     pub tournament_address: String,
     pub number: i32,
     pub address: String,
@@ -27,7 +26,7 @@ pub struct Round {
     pub matchmaker_address: String,
 }
 
-impl Round {
+impl TournamentRound {
     pub async fn upsert(
         &self,
         conn: &mut PgPoolConnection<'_>,
@@ -43,7 +42,7 @@ impl Round {
         tournament_address_pk: String,
         number_pk: i32,
     ) -> anyhow::Result<Option<Self>> {
-        rounds::table
+        tournament_rounds::table
             .find((tournament_address_pk, number_pk))
             .first::<Self>(conn)
             .await
@@ -52,9 +51,9 @@ impl Round {
     }
 
     async fn upsert_impl(&self, conn: &mut MyDbConnection) -> Result<usize, diesel::result::Error> {
-        use schema::rounds::dsl::*;
+        use schema::tournament_rounds::dsl::*;
 
-        let query = diesel::insert_into(schema::rounds::table)
+        let query = diesel::insert_into(schema::tournament_rounds::table)
             .values(self)
             .on_conflict((tournament_address, number))
             .do_update()
@@ -73,3 +72,5 @@ impl Round {
         execute_with_better_error(conn, query, None).await
     }
 }
+
+pub type TournamentRoundModel = TournamentRound;

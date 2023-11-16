@@ -1135,6 +1135,52 @@ diesel::table! {
 }
 
 diesel::table! {
+    tournament_players (address, tournament_address) {
+        address -> Varchar,
+        tournament_address -> Varchar,
+        room_address -> Nullable<Varchar>,
+        token_address -> Varchar,
+        alive -> Bool,
+        submitted -> Bool,
+    }
+}
+
+diesel::table! {
+    tournament_rooms (round_address, address) {
+        round_address -> Varchar,
+        address -> Varchar,
+        players_per_room -> Nullable<Int4>,
+    }
+}
+
+diesel::table! {
+    tournament_rounds (tournament_address, number) {
+        tournament_address -> Varchar,
+        number -> Int4,
+        address -> Varchar,
+        game_module -> Varchar,
+        matchmaking_ended -> Bool,
+        play_started -> Bool,
+        play_ended -> Bool,
+        paused -> Bool,
+        matchmaker_address -> Varchar,
+    }
+}
+
+diesel::table! {
+    tournaments (address) {
+        address -> Varchar,
+        tournament_name -> Varchar,
+        max_players -> Varchar,
+        max_num_winners -> Int4,
+        players_joined -> Int4,
+        secondary_admin_address -> Nullable<Varchar>,
+        is_joinable -> Bool,
+        has_ended -> Bool,
+    }
+}
+
+diesel::table! {
     transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -1197,6 +1243,10 @@ diesel::table! {
 }
 
 diesel::joinable!(block_metadata_transactions -> transactions (version));
+diesel::joinable!(move_modules -> transactions (transaction_version));
+diesel::joinable!(move_resources -> transactions (transaction_version));
+diesel::joinable!(table_items -> transactions (transaction_version));
+diesel::joinable!(write_set_changes -> transactions (transaction_version));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
@@ -1258,6 +1308,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships,
     token_ownerships_v2,
     tokens,
+    tournament_players,
+    tournament_rooms,
+    tournament_rounds,
+    tournaments,
     transactions,
     user_transactions,
     write_set_changes,

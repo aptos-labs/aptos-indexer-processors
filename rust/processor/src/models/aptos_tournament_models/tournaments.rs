@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    aptos_tournament_schema::aptos_tournament as schema,
-    aptos_tournament_schema::aptos_tournament::tournaments,
+    schema::{self, tournaments},
     utils::database::{execute_with_better_error, MyDbConnection, PgPoolConnection},
 };
 use anyhow::Context;
@@ -72,3 +71,5 @@ impl Tournament {
         execute_with_better_error(conn, query, None).await
     }
 }
+
+pub type TournamentModel = Tournament;
