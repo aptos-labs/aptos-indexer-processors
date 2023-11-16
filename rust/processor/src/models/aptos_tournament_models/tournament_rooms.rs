@@ -17,7 +17,7 @@ use tracing::debug;
 pub struct TournamentRoom {
     pub round_address: String,
     pub address: String,
-    pub players_per_room: Option<i32>,
+    pub players_per_room: Option<i64>,
 }
 
 impl TournamentRoom {

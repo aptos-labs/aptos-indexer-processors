@@ -1,76 +1,42 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    schema::{self, tournament_rounds},
-    utils::database::{execute_with_better_error, MyDbConnection, PgPoolConnection},
-};
-use anyhow::Context;
-use diesel::{prelude::*, result::Error, upsert::excluded};
-use diesel_async::RunQueryDsl;
+use crate::schema::tournament_rounds;
+use aptos_protos::transaction::v1::WriteResource;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+
+use super::aptos_tournament_utils::Round;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
-#[diesel(primary_key(tournament_address, number))]
+#[diesel(primary_key(address))]
 #[diesel(table_name = tournament_rounds)]
 pub struct TournamentRound {
-    pub tournament_address: String,
-    pub number: i32,
-    pub address: String,
-    pub game_module: String,
-    pub matchmaking_ended: bool,
-    pub play_started: bool,
-    pub play_ended: bool,
-    pub paused: bool,
-    pub matchmaker_address: String,
+    address: String,
+    matchmaking_ended: bool,
+    play_started: bool,
+    play_ended: bool,
+    paused: bool,
+    matchmaker_address: String,
 }
 
 impl TournamentRound {
-    pub async fn upsert(
-        &self,
-        conn: &mut PgPoolConnection<'_>,
-    ) -> Result<usize, diesel::result::Error> {
-        conn.build_transaction()
-            .read_write()
-            .run::<_, Error, _>(|pg_conn| Box::pin(self.upsert_impl(pg_conn)))
-            .await
-    }
-
-    pub async fn query(
-        conn: &mut PgPoolConnection<'_>,
-        tournament_address_pk: String,
-        number_pk: i32,
-    ) -> anyhow::Result<Option<Self>> {
-        tournament_rounds::table
-            .find((tournament_address_pk, number_pk))
-            .first::<Self>(conn)
-            .await
-            .optional()
-            .context("querying rounds")
-    }
-
-    async fn upsert_impl(&self, conn: &mut MyDbConnection) -> Result<usize, diesel::result::Error> {
-        use schema::tournament_rounds::dsl::*;
-
-        let query = diesel::insert_into(schema::tournament_rounds::table)
-            .values(self)
-            .on_conflict((tournament_address, number))
-            .do_update()
-            .set((
-                address.eq(excluded(address)),
-                game_module.eq(excluded(game_module)),
-                matchmaking_ended.eq(excluded(matchmaking_ended)),
-                play_started.eq(excluded(play_started)),
-                play_ended.eq(excluded(play_ended)),
-                paused.eq(excluded(paused)),
-                matchmaker_address.eq(excluded(matchmaker_address)),
-            ));
-
-        let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
-        debug!("Executing Query: {}", debug_query);
-        execute_with_better_error(conn, query, None).await
+    pub fn from_write_resource(
+        contract_addr: &str,
+        write_resource: &WriteResource,
+        transaction_version: i64,
+    ) -> Option<Self> {
+        if let Some(r) =
+            Round::from_write_resource(contract_addr, write_resource, transaction_version).unwrap()
+        {
+            return Some(TournamentRound {
+                address: write_resource.address.clone(),
+                matchmaking_ended: r.matchmaking_ended,
+                play_started: r.play_started,
+                play_ended: r.play_ended,
+                paused: r.paused,
+                matchmaker_address: r.get_matchmaker_address(),
+            });
+        }
+        None
     }
 }
-
-pub type TournamentRoundModel = TournamentRound;
