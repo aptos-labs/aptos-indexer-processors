@@ -406,6 +406,17 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
     current_timestamp - transaction_time
 }
 
+/// Convert the protobuf timestamp to ISO format
+pub fn timestamp_to_iso(timestamp: &Timestamp) -> String {
+    let dt = parse_timestamp(timestamp, 0);
+    dt.format("%Y-%m-%dT%H:%M:%S%.9fZ").to_string()
+}
+
+/// Convert the protobuf timestamp to unixtime
+pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
+    timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9
+}
+
 /// Get name from unwrapped move type
 /// E.g. 0x1::domain::Name will return Name
 pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {

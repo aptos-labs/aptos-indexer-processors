@@ -16,16 +16,16 @@ use crate::{
     schema::ledger_infos,
     utils::{
         counters::{
-            FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
+            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
             MULTI_BATCH_PROCESSING_TIME_IN_SECS, NUM_TRANSACTIONS_PROCESSED_COUNT,
             PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
-            SINGLE_BATCH_PROCESSING_TIME_IN_SECS,
+            SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
-        util::time_diff_since_pb_timestamp_in_secs,
+        util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
 use anyhow::{Context, Result};
@@ -327,6 +327,24 @@ impl Worker {
             let size_in_bytes = transactions_batches
                 .iter()
                 .fold(0.0, |acc, txn_batch| acc + txn_batch.size_in_bytes as f64);
+            let batch_start_txn_timestamp = transactions_batches
+                .first()
+                .unwrap()
+                .transactions
+                .as_slice()
+                .first()
+                .unwrap()
+                .timestamp
+                .clone();
+            let batch_end_txn_timestamp = transactions_batches
+                .last()
+                .unwrap()
+                .transactions
+                .as_slice()
+                .last()
+                .unwrap()
+                .timestamp
+                .clone();
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
@@ -359,6 +377,20 @@ impl Worker {
                         .last()
                         .unwrap()
                         .version;
+                    let start_txn_timestamp = transactions_pb
+                        .transactions
+                        .as_slice()
+                        .first()
+                        .unwrap()
+                        .timestamp
+                        .clone();
+                    let end_txn_timestamp = transactions_pb
+                        .transactions
+                        .as_slice()
+                        .last()
+                        .unwrap()
+                        .timestamp
+                        .clone();
                     let txn_time = transactions_pb
                         .transactions
                         .as_slice()
@@ -402,13 +434,65 @@ impl Worker {
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
 
-                    if enable_verbose_logging {
-                        if let Ok(res) = processed_result {
+                    let start_txn_timestamp_unix = start_txn_timestamp
+                        .clone()
+                        .map(|t| timestamp_to_unixtime(&t))
+                        .unwrap_or_default();
+                    let start_txn_timestamp_iso = start_txn_timestamp
+                        .map(|t| timestamp_to_iso(&t))
+                        .unwrap_or_default();
+                    let end_txn_timestamp_iso = end_txn_timestamp
+                        .map(|t| timestamp_to_iso(&t))
+                        .unwrap_or_default();
+
+                    LATEST_PROCESSED_VERSION
+                        .with_label_values(&[
+                            &processor_name,
+                            ProcessorStep::ProcessedBatch.get_step(),
+                            ProcessorStep::ProcessedBatch.get_label(),
+                        ])
+                        .set(end_version as i64);
+                    TRANSACTION_UNIX_TIMESTAMP
+                        .with_label_values(&[
+                            &processor_name,
+                            ProcessorStep::ProcessedBatch.get_step(),
+                            ProcessorStep::ProcessedBatch.get_label(),
+                        ])
+                        .set(start_txn_timestamp_unix);
+                    PROCESSED_BYTES_COUNT
+                        .with_label_values(&[
+                            &processor_name,
+                            ProcessorStep::ProcessedBatch.get_step(),
+                            ProcessorStep::ProcessedBatch.get_label(),
+                        ])
+                        .inc_by(transactions_pb.size_in_bytes);
+                    NUM_TRANSACTIONS_PROCESSED_COUNT
+                        .with_label_values(&[
+                            &processor_name,
+                            ProcessorStep::ProcessedBatch.get_step(),
+                            ProcessorStep::ProcessedBatch.get_label(),
+                        ])
+                        .inc_by(end_version - start_version + 1);
+
+                    if let Ok(res) = processed_result {
+                        SINGLE_BATCH_PROCESSING_TIME_IN_SECS
+                            .with_label_values(&[&processor_name])
+                            .set(processing_duration.elapsed().as_secs_f64());
+                        SINGLE_BATCH_PARSING_TIME_IN_SECS
+                            .with_label_values(&[&processor_name])
+                            .set(res.processing_duration_in_secs);
+                        SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
+                            .with_label_values(&[&processor_name])
+                            .set(res.db_insertion_duration_in_secs);
+
+                        if enable_verbose_logging {
                             info!(
                                 processor_name = processor_name,
                                 service_type = PROCESSOR_SERVICE_TYPE,
                                 start_version,
                                 end_version,
+                                start_txn_timestamp_iso,
+                                end_txn_timestamp_iso,
                                 size_in_bytes = transactions_pb.size_in_bytes,
                                 duration_in_secs = res.db_insertion_duration_in_secs,
                                 tps = (end_version - start_version) as f64
@@ -422,6 +506,8 @@ impl Worker {
                                 service_type = PROCESSOR_SERVICE_TYPE,
                                 start_version,
                                 end_version,
+                                start_txn_timestamp_iso,
+                                end_txn_timestamp_iso,
                                 size_in_bytes = transactions_pb.size_in_bytes,
                                 duration_in_secs = res.processing_duration_in_secs,
                                 tps = (end_version - start_version) as f64
@@ -435,21 +521,8 @@ impl Worker {
                                 service_type = PROCESSOR_SERVICE_TYPE,
                                 start_version,
                                 end_version,
-                                size_in_bytes = transactions_pb.size_in_bytes,
-                                processing_duration_in_secs = res.processing_duration_in_secs,
-                                db_insertion_duration_in_secs = res.db_insertion_duration_in_secs,
-                                duration_in_secs = processing_duration.elapsed().as_secs_f64(),
-                                tps = (end_version - start_version) as f64
-                                    / processing_duration.elapsed().as_secs_f64(),
-                                bytes_per_sec = transactions_pb.size_in_bytes as f64
-                                    / processing_duration.elapsed().as_secs_f64(),
-                                "[Parser] Overall processing time of one batch of transactions"
-                            );
-                            info!(
-                                processor_name = processor_name,
-                                service_type = PROCESSOR_SERVICE_TYPE,
-                                start_version,
-                                end_version,
+                                start_txn_timestamp_iso,
+                                end_txn_timestamp_iso,
                                 num_of_transactions = end_version - start_version + 1,
                                 size_in_bytes = transactions_pb.size_in_bytes,
                                 processing_duration_in_secs = res.processing_duration_in_secs,
@@ -459,35 +532,10 @@ impl Worker {
                                     / processing_duration.elapsed().as_secs_f64(),
                                 bytes_per_sec = transactions_pb.size_in_bytes as f64
                                     / processing_duration.elapsed().as_secs_f64(),
-                                step = 2,
-                                "[Parser] Processor finished processing one batch of transaction"
+                                step = ProcessorStep::ProcessedBatch.get_step(),
+                                "{}",
+                                ProcessorStep::ProcessedBatch.get_label(),
                             );
-                            LATEST_PROCESSED_VERSION
-                                .with_label_values(&[
-                                    &processor_name,
-                                    "2",
-                                    "[Parser] Processor finished processing one batch of transaction",
-                                ])
-                                .set(end_version as i64);
-                            PROCESSED_BYTES_COUNT
-                                .with_label_values(&[&processor_name, "2", "[Parser] Processor finished processing one batch of transaction"])
-                                .inc_by(transactions_pb.size_in_bytes);
-                            NUM_TRANSACTIONS_PROCESSED_COUNT
-                                .with_label_values(&[
-                                    &processor_name,
-                                    "2",
-                                    "[Parser] Processor finished processing one batch of transaction",
-                                ])
-                                .inc_by(end_version - start_version + 1);
-                            SINGLE_BATCH_PROCESSING_TIME_IN_SECS
-                                .with_label_values(&[&processor_name])
-                                .set(processing_duration.elapsed().as_secs_f64());
-                            SINGLE_BATCH_PARSING_TIME_IN_SECS
-                                .with_label_values(&[&processor_name])
-                                .set(res.processing_duration_in_secs);
-                            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
-                                .with_label_values(&[&processor_name])
-                                .set(res.db_insertion_duration_in_secs);
                         }
                     }
 
@@ -581,34 +629,53 @@ impl Worker {
                 service_type = PROCESSOR_SERVICE_TYPE,
                 start_version = batch_start,
                 end_version = batch_end,
+                start_txn_timestamp_iso = batch_start_txn_timestamp
+                    .clone()
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
+                end_txn_timestamp_iso = batch_end_txn_timestamp
+                    .map(|t| timestamp_to_iso(&t))
+                    .unwrap_or_default(),
                 num_of_transactions = batch_end - batch_start + 1,
                 task_count,
                 size_in_bytes,
                 duration_in_secs = processing_time.elapsed().as_secs_f64(),
                 tps = (ma.avg() * 1000.0) as u64,
                 bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
-                step = 3,
-                "[Parser] Finished processing multiple transaction batches"
+                step = ProcessorStep::ProcessedMultipleBatches.get_step(),
+                "{}",
+                ProcessorStep::ProcessedMultipleBatches.get_label(),
             );
             LATEST_PROCESSED_VERSION
                 .with_label_values(&[
                     &processor_name,
-                    "3",
-                    "[Parser] Finished processing multiple transaction batches",
+                    ProcessorStep::ProcessedMultipleBatches.get_step(),
+                    ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
                 .set(batch_end as i64);
+            TRANSACTION_UNIX_TIMESTAMP
+                .with_label_values(&[
+                    &processor_name,
+                    ProcessorStep::ProcessedMultipleBatches.get_step(),
+                    ProcessorStep::ProcessedMultipleBatches.get_label(),
+                ])
+                .set(
+                    batch_start_txn_timestamp
+                        .map(|t| timestamp_to_unixtime(&t))
+                        .unwrap_or_default(),
+                );
             PROCESSED_BYTES_COUNT
                 .with_label_values(&[
                     &processor_name,
-                    "3",
-                    "[Parser] Finished processing multiple transaction batches",
+                    ProcessorStep::ProcessedMultipleBatches.get_step(),
+                    ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
                 .inc_by(size_in_bytes as u64);
             NUM_TRANSACTIONS_PROCESSED_COUNT
                 .with_label_values(&[
                     &processor_name,
-                    "3",
-                    "[Parser] Finished processing multiple transaction batches",
+                    ProcessorStep::ProcessedMultipleBatches.get_step(),
+                    ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
                 .inc_by(batch_end - batch_start + 1);
             MULTI_BATCH_PROCESSING_TIME_IN_SECS
@@ -877,7 +944,10 @@ pub async fn create_fetcher_loop(
             Some(Ok(r)) => {
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
+                let start_txn_timestamp =
+                    r.transactions.as_slice().first().unwrap().timestamp.clone();
                 let end_version = r.transactions.as_slice().last().unwrap().version;
+                let end_txn_timestamp = r.transactions.as_slice().last().unwrap().timestamp.clone();
                 next_version_to_fetch = end_version + 1;
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
@@ -889,6 +959,13 @@ pub async fn create_fetcher_loop(
                     connection_id,
                     start_version,
                     end_version,
+                    start_txn_timestamp_iso = start_txn_timestamp
+                        .clone()
+                        .map(|t| timestamp_to_iso(&t))
+                        .unwrap_or_default(),
+                    end_txn_timestamp_iso = end_txn_timestamp
+                        .map(|t| timestamp_to_iso(&t))
+                        .unwrap_or_default(),
                     num_of_transactions = end_version - start_version + 1,
                     channel_size = BUFFER_SIZE - tx.capacity(),
                     size_in_bytes = r.encoded_len() as f64,
@@ -898,24 +975,40 @@ pub async fn create_fetcher_loop(
                         as u64,
                     bytes_per_sec =
                         r.encoded_len() as f64 / grpc_channel_recv_latency.elapsed().as_secs_f64(),
-                    step = 1,
-                    "[Parser] Received transactions from GRPC. Sending transactions to channel.",
+                    step = ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                    "{}",
+                    ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
                 );
                 LATEST_PROCESSED_VERSION
                     .with_label_values(&[
                         &processor_name,
-                        "1",
-                        "[Parser] Received transactions from GRPC. Sending transactions to channel.",
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
                     ])
                     .set(end_version as i64);
+                TRANSACTION_UNIX_TIMESTAMP
+                    .with_label_values(&[
+                        &processor_name,
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                    ])
+                    .set(
+                        start_txn_timestamp
+                            .map(|t| timestamp_to_unixtime(&t))
+                            .unwrap_or_default(),
+                    );
                 PROCESSED_BYTES_COUNT
-                    .with_label_values(&[&processor_name, "1", "[Parser] Received transactions from GRPC. Sending transactions to channel."])
+                    .with_label_values(&[
+                        &processor_name,
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                    ])
                     .inc_by(size_in_bytes);
                 NUM_TRANSACTIONS_PROCESSED_COUNT
                     .with_label_values(&[
                         &processor_name,
-                        "1",
-                        "[Parser] Received transactions from GRPC. Sending transactions to channel.",
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
                     ])
                     .inc_by(end_version - start_version + 1);
 
