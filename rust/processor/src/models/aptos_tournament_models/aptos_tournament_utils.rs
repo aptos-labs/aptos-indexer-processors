@@ -278,34 +278,6 @@ impl Round {
     pub fn get_matchmaker_address(&self) -> String {
         return standardize_address(&self.matchmaker_address);
     }
-
-    pub fn from_write_resource(
-        addr: &str,
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let AptosTournamentResource::Round(inner) = AptosTournamentResource::from_resource(
-            addr,
-            &type_str,
-            resource.data.as_ref().unwrap(),
-            txn_version,
-        )? {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
