@@ -15,25 +15,35 @@ CREATE INDEX IF NOT EXISTS tournament_has_ended ON tournaments (has_ended);
 CREATE INDEX IF NOT EXISTS tournament_current_round_number ON tournaments (current_round_number);
 CREATE TABLE IF NOT EXISTS tournament_rounds (
     address VARCHAR(66) PRIMARY KEY NOT NULL,
-    matchmaking_ended BOOLEAN NOT NULL,
     play_started BOOLEAN NOT NULL,
     play_ended BOOLEAN NOT NULL,
-    paused BOOLEAN NOT NULL,
-    matchmaker_address VARCHAR(66) NOT NULL
+    paused BOOLEAN NOT NULL
 );
 CREATE INDEX IF NOT EXISTS tournament_round_address ON tournament_rounds (address);
-CREATE TABLE IF NOT EXISTS tournament_rooms (
-    round_address VARCHAR(66) NOT NULL,
-    address VARCHAR(66) NOT NULL,
-    players_per_room BIGINT,
-    PRIMARY KEY (round_address, address)
-);
 CREATE TABLE IF NOT EXISTS tournament_players (
-    address VARCHAR(66) NOT NULL,
+    token_address VARCHAR(66) PRIMARY KEY NOT NULL,
+    user_address VARCHAR(66) NOT NULL,
     tournament_address VARCHAR(66) NOT NULL,
     room_address VARCHAR(66),
-    token_address VARCHAR(66) NOT NULL,
     alive BOOLEAN NOT NULL,
-    submitted BOOLEAN NOT NULL,
-    PRIMARY KEY (address, tournament_address)
+    submitted BOOLEAN NOT NULL
 );
+-- when user lost (we have delete resource)
+    -- token_address: delete resource w/ token address. find address from checking the db
+    -- tournament_address: lk.tournament addres
+    -- room_address: none
+    -- alive: false,
+    -- submitted: lk.submitted
+-- when user won (we have the user address)
+    -- user_address
+    -- token_address:
+    -- tournament_address: lk.tournament address
+    -- room_address: none
+    -- alive: true,
+    -- submitted: true
+-- when submitted happens
+    -- token_address:
+    -- tournament_address: lk.tournament address
+    -- room_address: none
+    -- alive: true,
+    -- submitted: true

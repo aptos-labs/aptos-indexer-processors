@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::schema::tournament_rounds;
+use super::aptos_tournament_utils::{Round, AptosTournamentResource};
+use crate::{schema::tournament_rounds, models::default_models::move_resources::MoveResource};
 use aptos_protos::transaction::v1::WriteResource;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-use super::aptos_tournament_utils::Round;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(address))]
@@ -24,19 +23,34 @@ impl TournamentRound {
         contract_addr: &str,
         write_resource: &WriteResource,
         transaction_version: i64,
-    ) -> Option<Self> {
-        if let Some(r) =
-            Round::from_write_resource(contract_addr, write_resource, transaction_version).unwrap()
-        {
-            return Some(TournamentRound {
-                address: write_resource.address.clone(),
-                matchmaking_ended: r.matchmaking_ended,
-                play_started: r.play_started,
-                play_ended: r.play_ended,
-                paused: r.paused,
-                matchmaker_address: r.get_matchmaker_address(),
-            });
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(contract_addr, type_str.as_str()) {
+            return Ok(None);
         }
-        None
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            transaction_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let AptosTournamentResource::Round(inner) = AptosTournamentResource::from_resource(
+            contract_addr,
+            &type_str,
+            resource.data.as_ref().unwrap(),
+            transaction_version,
+        )? {
+            Ok(Some(TournamentRound {
+                address: resource.address.clone(),
+                matchmaking_ended: inner.matchmaking_ended,
+                play_started: inner.play_started,
+                play_ended: inner.play_ended,
+                paused: inner.paused,
+                matchmaker_address: inner.get_matchmaker_address(),
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
