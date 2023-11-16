@@ -6,8 +6,9 @@ use crate::{
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        aptos_tournament_processor::AptosTournamentProcessor, coin_processor::CoinProcessor,
+        default_processor::DefaultProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
@@ -757,6 +758,9 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         },
         ProcessorConfig::AnsProcessor(config) => {
             Processor::from(AnsProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::AptosTournamentProcessor(config) => {
+            Processor::from(AptosTournamentProcessor::new(db_pool, config.clone()))
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
