@@ -15,23 +15,11 @@ pub type AptosTournamentAggregatedDataMapping = HashMap<String, AptosTournamentA
 pub struct AptosTournamentAggregatedData {
     pub aptos_tournament: Option<AptosTournament>,
     pub current_round: Option<CurrentRound>,
-    pub refs: Option<Refs>,
     pub rps_game: Option<RPSGame>,
     pub tournament_director: Option<TournamentDirector>,
     pub tournament_state: Option<TournamentState>,
     pub tournament_token: Option<TournamentToken>,
     pub object: ObjectWithMetadata,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RefVec {
-    vec: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RefSelf {
-    #[serde(rename = "self")]
-    self_: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -50,7 +38,7 @@ pub struct GameOverEvent {
 }
 
 impl GameOverEvent {
-    pub fn from_event(addr: &str, event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
+    pub fn from`_event(addr: &str, event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
         if let Some(AptosTournamentEvent::GameOverEvent(inner)) = AptosTournamentEvent::from_event(
             addr,
             event.type_str.as_str(),
@@ -88,67 +76,6 @@ impl AptosTournamentEvent {
             "version {} failed! failed to parse type {}, data {:?}",
             txn_version, data_type, data
         ))
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BurnRefInnerInner {
-    vec: Vec<RefSelf>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BurnRefInner {
-    #[serde(rename = "self")]
-    self_: RefVec,
-    inner: BurnRefInnerInner,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BurnRef {
-    vec: Vec<BurnRefInner>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PropertyMutatorRef {
-    vec: Vec<RefSelf>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Refs {
-    burn_ref: BurnRef,
-    property_mutator_ref: PropertyMutatorRef,
-    delete_ref: RefSelf,
-    extend_ref: RefSelf,
-    transfer_ref: RefSelf,
-}
-
-impl Refs {
-    pub fn from_write_resource(
-        addr: &str,
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let AptosTournamentResource::Refs(inner) = AptosTournamentResource::from_resource(
-            addr,
-            &type_str,
-            resource.data.as_ref().unwrap(),
-            txn_version,
-        )? {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
     }
 }
 

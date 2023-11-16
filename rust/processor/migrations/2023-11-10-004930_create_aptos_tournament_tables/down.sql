@@ -1,5 +1,4 @@
-DROP TABLE IF EXISTS aptos_tournament.players;
-DROP TABLE IF EXISTS aptos_tournament.rooms;
-DROP TABLE IF EXISTS aptos_tournament.rounds;
-DROP TABLE IF EXISTS aptos_tournament.tournaments;
-DROP SCHEMA IF EXISTS aptos_tournament;
+DROP TABLE IF EXISTS tournament_players;
+DROP TABLE IF EXISTS tournament_rooms;
+DROP TABLE IF EXISTS tournament_rounds;
+DROP TABLE IF EXISTS tournaments;

@@ -1,6 +1,5 @@
 -- Create tournaments table
-CREATE SCHEMA IF NOT EXISTS aptos_tournament;
-CREATE TABLE IF NOT EXISTS aptos_tournament.tournaments (
+CREATE TABLE IF NOT EXISTS tournaments (
     address VARCHAR PRIMARY KEY NOT NULL,
     tournament_name VARCHAR NOT NULL,
     max_players VARCHAR NOT NULL,
@@ -10,9 +9,10 @@ CREATE TABLE IF NOT EXISTS aptos_tournament.tournaments (
     is_joinable BOOLEAN NOT NULL,
     has_ended BOOLEAN NOT NULL
 );
+-- TODO add index on tournament name and other fields like is_joinable or has_ended
 
 -- Create rounds table
-CREATE TABLE IF NOT EXISTS aptos_tournament.rounds (
+CREATE TABLE IF NOT EXISTS tournament_rounds (
     tournament_address VARCHAR NOT NULL,
     number INTEGER NOT NULL,
     address VARCHAR NOT NULL,
@@ -24,9 +24,10 @@ CREATE TABLE IF NOT EXISTS aptos_tournament.rounds (
     matchmaker_address VARCHAR NOT NULL,
     PRIMARY KEY (tournament_address, number)
 );
+-- TODO: add more indices in general
 
 -- Create rooms table
-CREATE TABLE IF NOT EXISTS aptos_tournament.rooms (
+CREATE TABLE IF NOT EXISTS tournament_rooms (
     round_address VARCHAR NOT NULL,
     address VARCHAR NOT NULL,
     players_per_room INTEGER,
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS aptos_tournament.rooms (
 );
 
 -- Create players table
-CREATE TABLE IF NOT EXISTS aptos_tournament.players (
+CREATE TABLE IF NOT EXISTS tournament_players (
     address VARCHAR NOT NULL,
     tournament_address VARCHAR NOT NULL,
     room_address VARCHAR,

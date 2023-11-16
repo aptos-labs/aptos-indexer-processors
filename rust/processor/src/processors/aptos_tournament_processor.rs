@@ -16,7 +16,7 @@ use crate::{
         },
         token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
-    utils::{database::PgDbPool, util::standardize_address},
+    utils::{database::{PgDbPool, MyDbConnection}, util::standardize_address},
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -56,6 +56,73 @@ impl Debug for AptosTournamentProcessor {
         )
     }
 }
+
+// TODO: use the same format, no reason to be clever here
+// async fn insert_to_db_impl(
+//     conn: &mut MyDbConnection,
+//     events: &[EventModel],
+// ) -> Result<(), diesel::result::Error> {
+//     insert_events(conn, events).await?;
+//     Ok(())
+// }
+
+// async fn insert_to_db(
+//     conn: &mut PgPoolConnection<'_>,
+//     name: &'static str,
+//     start_version: u64,
+//     end_version: u64,
+//     events: Vec<EventModel>,
+// ) -> Result<(), diesel::result::Error> {
+//     tracing::trace!(
+//         name = name,
+//         start_version = start_version,
+//         end_version = end_version,
+//         "Inserting to db",
+//     );
+//     match conn
+//         .build_transaction()
+//         .read_write()
+//         .run::<_, Error, _>(|pg_conn| Box::pin(insert_to_db_impl(pg_conn, &events)))
+//         .await
+//     {
+//         Ok(_) => Ok(()),
+//         Err(_) => {
+//             conn.build_transaction()
+//                 .read_write()
+//                 .run::<_, Error, _>(|pg_conn| {
+//                     Box::pin(async move {
+//                         let events = clean_data_for_db(events, true);
+//                         insert_to_db_impl(pg_conn, &events).await
+//                     })
+//                 })
+//                 .await
+//         },
+//     }
+// }
+
+// async fn insert_events(
+//     conn: &mut MyDbConnection,
+//     items_to_insert: &[EventModel],
+// ) -> Result<(), diesel::result::Error> {
+//     use schema::events::dsl::*;
+//     let chunks = get_chunks(items_to_insert.len(), EventModel::field_count());
+//     for (start_ind, end_ind) in chunks {
+//         execute_with_better_error(
+//             conn,
+//             diesel::insert_into(schema::events::table)
+//                 .values(&items_to_insert[start_ind..end_ind])
+//                 .on_conflict((transaction_version, event_index))
+//                 .do_update()
+//                 .set((
+//                     inserted_at.eq(excluded(inserted_at)),
+//                     indexed_type.eq(excluded(indexed_type)),
+//                 )),
+//             None,
+//         )
+//         .await?;
+//     }
+//     Ok(())
+// }
 
 #[async_trait]
 impl ProcessorTrait for AptosTournamentProcessor {
@@ -102,7 +169,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                                 AptosTournamentAggregatedData {
                                     aptos_tournament: None,
                                     current_round: None,
-                                    refs: None,
                                     rps_game: None,
                                     tournament_director: None,
                                     tournament_state: None,
@@ -135,13 +201,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                                 txn_version,
                             )? {
                                 aggregated_data.current_round = Some(current_round);
-                            }
-                            if let Some(refs) = Refs::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.refs = Some(refs);
                             }
                             if let Some(rps_game) = RPSGame::from_write_resource(
                                 &self.config.contract_address,
