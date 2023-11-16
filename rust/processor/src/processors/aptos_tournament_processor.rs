@@ -5,21 +5,27 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         aptos_tournament_models::{
-            aptos_tournament_utils::{
-                AptosTournament, AptosTournamentAggregatedData, CurrentRound, GameOverEvent,
-                RPSGame, Refs, TournamentDirector, TournamentState, TournamentToken,
-            },
-            players::Player,
-            rooms::Room,
-            rounds::Round,
-            tournaments::Tournament,
+            aptos_tournament_utils::GameOverEvent,
+            tournament_players::{TournamentPlayer, TournamentPlayerModel},
+            tournament_rooms::{TournamentRoom, TournamentRoomModel},
+            tournament_rounds::{TournamentRound, TournamentRoundModel},
+            tournaments::{Tournament, TournamentModel},
         },
         token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
-    utils::{database::PgDbPool, util::standardize_address},
+    schema,
+    utils::{
+        database::{
+            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+            PgPoolConnection,
+        },
+        util::standardize_address,
+    },
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
+use diesel::{result::Error, upsert::excluded, ExpressionMethods};
+use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 
@@ -75,105 +81,27 @@ impl ProcessorTrait for AptosTournamentProcessor {
         // TODO: Process transactions
         // I'm probably missing the DB lookup thing that you mentioned if the required transaction is outside of the batch
         // Also need to find out how to handle the nft that represents u can play
-        let mut aptos_tournament_metadata_helper = HashMap::new();
         let mut tournaments: HashMap<String, Tournament> = HashMap::new();
-        let mut rounds: HashMap<(String, i32), Round> = HashMap::new();
-        let mut rooms: HashMap<(String, String), Room> = HashMap::new();
-        let mut players: HashMap<(String, String), Player> = HashMap::new();
+        let mut tournament_rounds: HashMap<(String, i32), TournamentRound> = HashMap::new();
+        let mut tournament_rooms: HashMap<(String, String), TournamentRoom> = HashMap::new();
+        let mut tournament_players: HashMap<(String, String), TournamentPlayer> = HashMap::new();
         for txn in transactions {
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
             if let TxnData::User(user_txn) = txn_data {
-                let user_request = user_txn
-                    .request
-                    .as_ref()
-                    .expect("Sends is not present in user txn");
-
-                // First pass: create mappings {obj_addr: obj}
-                for wsc in transaction_info.changes.iter() {
-                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        if let Some(object) =
-                            ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aptos_tournament_metadata_helper.insert(
-                                standardize_address(&wr.address.to_string()),
-                                AptosTournamentAggregatedData {
-                                    aptos_tournament: None,
-                                    current_round: None,
-                                    refs: None,
-                                    rps_game: None,
-                                    tournament_director: None,
-                                    tournament_state: None,
-                                    tournament_token: None,
-                                    object,
-                                },
-                            );
-                        }
-                    }
-                }
-
-                // Second pass: loop through write sets to get all the structs related to the object
-                // let mut aptos_tournament_metadata_helper = HashMap::new();
+                // First pass: TournamentState
                 for wsc in transaction_info.changes.iter() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                         let address = standardize_address(&wr.address.to_string());
-                        if let Some(aggregated_data) =
-                            aptos_tournament_metadata_helper.get_mut(&address)
-                        {
-                            if let Some(aptos_tournament) = AptosTournament::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.aptos_tournament = Some(aptos_tournament);
-                            }
-                            if let Some(current_round) = CurrentRound::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.current_round = Some(current_round);
-                            }
-                            if let Some(refs) = Refs::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.refs = Some(refs);
-                            }
-                            if let Some(rps_game) = RPSGame::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.rps_game = Some(rps_game);
-                            }
-                            if let Some(tournament_director) =
-                                TournamentDirector::from_write_resource(
-                                    &self.config.contract_address,
-                                    wr,
-                                    txn_version,
-                                )?
-                            {
-                                aggregated_data.tournament_director = Some(tournament_director);
-                            }
-                            if let Some(tournament_state) = TournamentState::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.tournament_state = Some(tournament_state);
-                            }
-                            if let Some(tournament_token) = TournamentToken::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            )? {
-                                aggregated_data.tournament_token = Some(tournament_token);
-                            }
-                        }
+                    }
+                }
+
+                // Second pass: TournamentDirector and everything else
+                for wsc in transaction_info.changes.iter() {
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        let address = standardize_address(&wr.address.to_string());
                     }
                 }
 
@@ -182,26 +110,25 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     if let Some(game_over_event) =
                         GameOverEvent::from_event(&self.config.contract_address, wsc, txn_version)?
                     {
-                        // TODO: Handle this
-                    }
-                }
-
-                // Fourth pass to collect all the data
-                for wsc in transaction_info.changes.iter() {
-                    if let Some(Change::WriteResource(resource)) = wsc.change.as_ref() {
-                        // TODO: Handle collection
                     }
                 }
             }
         }
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        // TODO: write to db
-        println!(
-            "aptos_tournament_metadata_helper: {:?}",
-            aptos_tournament_metadata_helper
-        );
+        insert_to_db(
+            &mut self.connection_pool.get().await?,
+            self.name(),
+            start_version,
+            end_version,
+            tournaments.values().cloned().collect(),
+            tournament_rounds.values().cloned().collect(),
+            tournament_rooms.values().cloned().collect(),
+            tournament_players.values().cloned().collect(),
+        )
+        .await?;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
@@ -216,4 +143,190 @@ impl ProcessorTrait for AptosTournamentProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
+}
+
+async fn insert_to_db(
+    conn: &mut PgPoolConnection<'_>,
+    name: &'static str,
+    start_version: u64,
+    end_version: u64,
+    tournaments_to_insert: Vec<TournamentModel>,
+    tournament_rounds_to_insert: Vec<TournamentRoundModel>,
+    tournament_rooms_to_insert: Vec<TournamentRoomModel>,
+    tournament_players_to_insert: Vec<TournamentPlayerModel>,
+) -> Result<(), diesel::result::Error> {
+    tracing::trace!(
+        name = name,
+        start_version = start_version,
+        end_version = end_version,
+        "Inserting to db",
+    );
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_to_db_impl(
+                pg_conn,
+                &tournaments_to_insert,
+                &tournament_rounds_to_insert,
+                &tournament_rooms_to_insert,
+                &tournament_players_to_insert,
+            ))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async move {
+                        let tournaments_to_insert = clean_data_for_db(tournaments_to_insert, true);
+                        let tournament_rounds_to_insert =
+                            clean_data_for_db(tournament_rounds_to_insert, true);
+                        let tournament_rooms_to_insert =
+                            clean_data_for_db(tournament_rooms_to_insert, true);
+                        let tournament_players_to_insert =
+                            clean_data_for_db(tournament_players_to_insert, true);
+                        insert_to_db_impl(
+                            pg_conn,
+                            &tournaments_to_insert,
+                            &tournament_rounds_to_insert,
+                            &tournament_rooms_to_insert,
+                            &tournament_players_to_insert,
+                        )
+                        .await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_to_db_impl(
+    conn: &mut MyDbConnection,
+    tournaments_to_insert: &[TournamentModel],
+    tournament_rounds_to_insert: &[TournamentRoundModel],
+    tournament_rooms_to_insert: &[TournamentRoomModel],
+    tournament_players_to_insert: &[TournamentPlayerModel],
+) -> Result<(), diesel::result::Error> {
+    insert_tournaments(conn, tournaments_to_insert).await?;
+    insert_tournament_rounds(conn, tournament_rounds_to_insert).await?;
+    insert_tournament_rooms(conn, tournament_rooms_to_insert).await?;
+    insert_tournament_players(conn, tournament_players_to_insert).await?;
+    Ok(())
+}
+
+async fn insert_tournaments(
+    conn: &mut MyDbConnection,
+    tournaments_to_insert: &[TournamentModel],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournaments::dsl::*;
+    let chunks = get_chunks(tournaments_to_insert.len(), TournamentModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournaments::table)
+                .values(&tournaments_to_insert[start_ind..end_ind])
+                .on_conflict(address)
+                .do_update()
+                .set((
+                    tournament_name.eq(excluded(tournament_name)),
+                    max_players.eq(excluded(max_players)),
+                    max_num_winners.eq(excluded(max_num_winners)),
+                    players_joined.eq(excluded(players_joined)),
+                    secondary_admin_address.eq(excluded(secondary_admin_address)),
+                    is_joinable.eq(excluded(is_joinable)),
+                    has_ended.eq(excluded(has_ended)),
+                )),
+            None,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn insert_tournament_rounds(
+    conn: &mut MyDbConnection,
+    tournament_rounds_to_insert: &[TournamentRoundModel],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_rounds::dsl::*;
+    let chunks = get_chunks(
+        tournament_rounds_to_insert.len(),
+        TournamentRoundModel::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_rounds::table)
+                .values(&tournament_rounds_to_insert[start_ind..end_ind])
+                .on_conflict((tournament_address, number))
+                .do_update()
+                .set((
+                    address.eq(excluded(address)),
+                    game_module.eq(excluded(game_module)),
+                    matchmaking_ended.eq(excluded(matchmaking_ended)),
+                    play_started.eq(excluded(play_started)),
+                    play_ended.eq(excluded(play_ended)),
+                    paused.eq(excluded(paused)),
+                    matchmaker_address.eq(excluded(matchmaker_address)),
+                )),
+            None,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn insert_tournament_rooms(
+    conn: &mut MyDbConnection,
+    tournament_rooms_to_insert: &[TournamentRoomModel],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_rooms::dsl::*;
+    let chunks = get_chunks(
+        tournament_rooms_to_insert.len(),
+        TournamentRoomModel::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_rooms::table)
+                .values(&tournament_rooms_to_insert[start_ind..end_ind])
+                .on_conflict((round_address, address))
+                .do_update()
+                .set((players_per_room.eq(excluded(players_per_room)),)),
+            None,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn insert_tournament_players(
+    conn: &mut MyDbConnection,
+    tournament_players_to_insert: &[TournamentPlayerModel],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_players::dsl::*;
+    let chunks = get_chunks(
+        tournament_players_to_insert.len(),
+        TournamentPlayerModel::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_players::table)
+                .values(&tournament_players_to_insert[start_ind..end_ind])
+                .on_conflict((address, tournament_address))
+                .do_update()
+                .set((
+                    room_address.eq(excluded(room_address)),
+                    token_address.eq(excluded(token_address)),
+                    alive.eq(excluded(alive)),
+                    submitted.eq(excluded(submitted)),
+                )),
+            None,
+        )
+        .await?;
+    }
+    Ok(())
 }
