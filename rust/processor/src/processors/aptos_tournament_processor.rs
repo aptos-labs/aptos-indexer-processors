@@ -7,7 +7,7 @@ use crate::{
         aptos_tournament_models::{
             aptos_tournament_utils::{
                 AptosTournament, AptosTournamentAggregatedData, CurrentRound, GameOverEvent,
-                RPSGame, TournamentDirector, TournamentState, TournamentToken,
+                RPSGame, Refs, TournamentDirector, TournamentState, TournamentToken,
             },
             players::Player,
             rooms::Room,
@@ -102,7 +102,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                                 AptosTournamentAggregatedData {
                                     aptos_tournament: None,
                                     current_round: None,
-                                    // refs: None,
+                                    refs: None,
                                     rps_game: None,
                                     tournament_director: None,
                                     tournament_state: None,
@@ -136,13 +136,13 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             )? {
                                 aggregated_data.current_round = Some(current_round);
                             }
-                            // if let Some(refs) = Refs::from_write_resource(
-                            //     &self.config.contract_address,
-                            //     wr,
-                            //     txn_version,
-                            // )? {
-                            //     aggregated_data.refs = Some(refs);
-                            // }
+                            if let Some(refs) = Refs::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.refs = Some(refs);
+                            }
                             if let Some(rps_game) = RPSGame::from_write_resource(
                                 &self.config.contract_address,
                                 wr,
