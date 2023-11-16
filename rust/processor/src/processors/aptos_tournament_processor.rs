@@ -3,15 +3,12 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
-        aptos_tournament_models::{
-            aptos_tournament_utils::GameOverEvent,
-            tournament_players::{TournamentPlayer, TournamentPlayerModel},
-            tournament_rooms::{TournamentRoom, TournamentRoomModel},
-            tournament_rounds::{TournamentRound, TournamentRoundModel},
-            tournaments::{Tournament, TournamentModel},
-        },
-        token_v2_models::v2_token_utils::ObjectWithMetadata,
+    models::aptos_tournament_models::{
+        aptos_tournament_utils::{CurrentRound, TournamentState},
+        tournament_players::TournamentPlayer,
+        tournament_rooms::TournamentRoom,
+        tournament_rounds::TournamentRound,
+        tournaments::Tournament,
     },
     schema,
     utils::{
@@ -22,7 +19,7 @@ use crate::{
         util::standardize_address,
     },
 };
-use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{result::Error, upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
@@ -81,35 +78,61 @@ impl ProcessorTrait for AptosTournamentProcessor {
         // TODO: Process transactions
         // I'm probably missing the DB lookup thing that you mentioned if the required transaction is outside of the batch
         // Also need to find out how to handle the nft that represents u can play
-        let mut tournaments: HashMap<String, Tournament> = HashMap::new();
-        let mut tournament_rounds: HashMap<(String, i32), TournamentRound> = HashMap::new();
-        let mut tournament_rooms: HashMap<(String, String), TournamentRoom> = HashMap::new();
-        let mut tournament_players: HashMap<(String, String), TournamentPlayer> = HashMap::new();
+        let mut tournament_state_mapping = HashMap::new();
+        let mut current_round_mapping = HashMap::new();
+
+        let mut tournaments: HashMap<String, (i64, Tournament)> = HashMap::new();
+        let mut tournament_rounds: HashMap<String, (i64, TournamentRound)> = HashMap::new();
+        let mut tournament_rooms: HashMap<String, (i64, TournamentRoom)> = HashMap::new();
+        let mut tournament_players: HashMap<String, (i64, TournamentPlayer)> = HashMap::new();
         for txn in transactions {
-            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
-            if let TxnData::User(user_txn) = txn_data {
-                // First pass: TournamentState
-                for wsc in transaction_info.changes.iter() {
-                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        let address = standardize_address(&wr.address.to_string());
-                    }
-                }
-
-                // Second pass: TournamentDirector and everything else
-                for wsc in transaction_info.changes.iter() {
-                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        let address = standardize_address(&wr.address.to_string());
-                    }
-                }
-
-                // Third pass through events for end game event (probably need this to end the game/set winner/something )
-                for wsc in user_txn.events.iter() {
-                    if let Some(game_over_event) =
-                        GameOverEvent::from_event(&self.config.contract_address, wsc, txn_version)?
+            // First pass: TournamentState and CurrentRound
+            for wsc in transaction_info.changes.iter() {
+                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                    let address = standardize_address(&wr.address.to_string());
+                    if let Some(state) = TournamentState::from_write_resource(
+                        &self.config.contract_address,
+                        wr,
+                        txn_version,
+                    )
+                    .unwrap()
                     {
+                        tournament_state_mapping.insert(address.clone(), state);
+                    }
+                    if let Some(state) = CurrentRound::from_write_resource(
+                        &self.config.contract_address,
+                        wr,
+                        txn_version,
+                    )
+                    .unwrap()
+                    {
+                        current_round_mapping.insert(address.clone(), state);
+                    }
+                }
+            }
+
+            // Second pass: everything else
+            for wsc in transaction_info.changes.iter() {
+                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                    let address = standardize_address(&wr.address.to_string());
+                    if let Some(tournament) = Tournament::from_write_resource(
+                        &self.config.contract_address,
+                        wr,
+                        txn_version,
+                        tournament_state_mapping.clone(),
+                        current_round_mapping.clone(),
+                    ) {
+                        tournaments.insert(address.clone(), (txn_version, tournament));
+                    }
+                    if let Some(round) = TournamentRound::from_write_resource(
+                        &self.config.contract_address,
+                        wr,
+                        txn_version,
+                    ) {
+                        tournament_rounds.insert(address.clone(), (txn_version, round));
                     }
                 }
             }
@@ -118,15 +141,25 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
+        let mut tournaments = tournaments.values().cloned().collect::<Vec<_>>();
+        let mut tournament_rounds = tournament_rounds.values().cloned().collect::<Vec<_>>();
+        let mut tournament_rooms = tournament_rooms.values().cloned().collect::<Vec<_>>();
+        let mut tournament_players = tournament_players.values().cloned().collect::<Vec<_>>();
+
+        tournaments.sort_by(|a, b| a.0.cmp(&b.0));
+        tournament_rounds.sort_by(|a, b| a.0.cmp(&b.0));
+        tournament_rooms.sort_by(|a, b| a.0.cmp(&b.0));
+        tournament_players.sort_by(|a, b| a.0.cmp(&b.0));
+
         insert_to_db(
             &mut self.connection_pool.get().await?,
             self.name(),
             start_version,
             end_version,
-            tournaments.values().cloned().collect(),
-            tournament_rounds.values().cloned().collect(),
-            tournament_rooms.values().cloned().collect(),
-            tournament_players.values().cloned().collect(),
+            tournaments.into_iter().map(|(_, s)| s).collect(),
+            tournament_rounds.into_iter().map(|(_, s)| s).collect(),
+            tournament_rooms.into_iter().map(|(_, s)| s).collect(),
+            tournament_players.into_iter().map(|(_, s)| s).collect(),
         )
         .await?;
 
@@ -150,10 +183,10 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    tournaments_to_insert: Vec<TournamentModel>,
-    tournament_rounds_to_insert: Vec<TournamentRoundModel>,
-    tournament_rooms_to_insert: Vec<TournamentRoomModel>,
-    tournament_players_to_insert: Vec<TournamentPlayerModel>,
+    tournaments_to_insert: Vec<Tournament>,
+    tournament_rounds_to_insert: Vec<TournamentRound>,
+    tournament_rooms_to_insert: Vec<TournamentRoom>,
+    tournament_players_to_insert: Vec<TournamentPlayer>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -205,10 +238,10 @@ async fn insert_to_db(
 
 async fn insert_to_db_impl(
     conn: &mut MyDbConnection,
-    tournaments_to_insert: &[TournamentModel],
-    tournament_rounds_to_insert: &[TournamentRoundModel],
-    tournament_rooms_to_insert: &[TournamentRoomModel],
-    tournament_players_to_insert: &[TournamentPlayerModel],
+    tournaments_to_insert: &[Tournament],
+    tournament_rounds_to_insert: &[TournamentRound],
+    tournament_rooms_to_insert: &[TournamentRoom],
+    tournament_players_to_insert: &[TournamentPlayer],
 ) -> Result<(), diesel::result::Error> {
     insert_tournaments(conn, tournaments_to_insert).await?;
     insert_tournament_rounds(conn, tournament_rounds_to_insert).await?;
@@ -219,10 +252,10 @@ async fn insert_to_db_impl(
 
 async fn insert_tournaments(
     conn: &mut MyDbConnection,
-    tournaments_to_insert: &[TournamentModel],
+    tournaments_to_insert: &[Tournament],
 ) -> Result<(), diesel::result::Error> {
     use schema::tournaments::dsl::*;
-    let chunks = get_chunks(tournaments_to_insert.len(), TournamentModel::field_count());
+    let chunks = get_chunks(tournaments_to_insert.len(), Tournament::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
@@ -235,9 +268,11 @@ async fn insert_tournaments(
                     max_players.eq(excluded(max_players)),
                     max_num_winners.eq(excluded(max_num_winners)),
                     players_joined.eq(excluded(players_joined)),
-                    secondary_admin_address.eq(excluded(secondary_admin_address)),
                     is_joinable.eq(excluded(is_joinable)),
                     has_ended.eq(excluded(has_ended)),
+                    current_round_address.eq(excluded(current_round_address)),
+                    current_round_number.eq(excluded(current_round_number)),
+                    current_game_module.eq(excluded(current_game_module)),
                 )),
             None,
         )
@@ -248,23 +283,21 @@ async fn insert_tournaments(
 
 async fn insert_tournament_rounds(
     conn: &mut MyDbConnection,
-    tournament_rounds_to_insert: &[TournamentRoundModel],
+    tournament_rounds_to_insert: &[TournamentRound],
 ) -> Result<(), diesel::result::Error> {
     use schema::tournament_rounds::dsl::*;
     let chunks = get_chunks(
         tournament_rounds_to_insert.len(),
-        TournamentRoundModel::field_count(),
+        TournamentRound::field_count(),
     );
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
             diesel::insert_into(schema::tournament_rounds::table)
                 .values(&tournament_rounds_to_insert[start_ind..end_ind])
-                .on_conflict((tournament_address, number))
+                .on_conflict(address)
                 .do_update()
                 .set((
-                    address.eq(excluded(address)),
-                    game_module.eq(excluded(game_module)),
                     matchmaking_ended.eq(excluded(matchmaking_ended)),
                     play_started.eq(excluded(play_started)),
                     play_ended.eq(excluded(play_ended)),
@@ -280,12 +313,12 @@ async fn insert_tournament_rounds(
 
 async fn insert_tournament_rooms(
     conn: &mut MyDbConnection,
-    tournament_rooms_to_insert: &[TournamentRoomModel],
+    tournament_rooms_to_insert: &[TournamentRoom],
 ) -> Result<(), diesel::result::Error> {
     use schema::tournament_rooms::dsl::*;
     let chunks = get_chunks(
         tournament_rooms_to_insert.len(),
-        TournamentRoomModel::field_count(),
+        TournamentRoom::field_count(),
     );
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
@@ -304,12 +337,12 @@ async fn insert_tournament_rooms(
 
 async fn insert_tournament_players(
     conn: &mut MyDbConnection,
-    tournament_players_to_insert: &[TournamentPlayerModel],
+    tournament_players_to_insert: &[TournamentPlayer],
 ) -> Result<(), diesel::result::Error> {
     use schema::tournament_players::dsl::*;
     let chunks = get_chunks(
         tournament_players_to_insert.len(),
-        TournamentPlayerModel::field_count(),
+        TournamentPlayer::field_count(),
     );
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(

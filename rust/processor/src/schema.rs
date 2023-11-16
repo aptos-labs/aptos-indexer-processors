@@ -1136,9 +1136,13 @@ diesel::table! {
 
 diesel::table! {
     tournament_players (address, tournament_address) {
+        #[max_length = 66]
         address -> Varchar,
+        #[max_length = 66]
         tournament_address -> Varchar,
+        #[max_length = 66]
         room_address -> Nullable<Varchar>,
+        #[max_length = 66]
         token_address -> Varchar,
         alive -> Bool,
         submitted -> Bool,
@@ -1147,36 +1151,41 @@ diesel::table! {
 
 diesel::table! {
     tournament_rooms (round_address, address) {
+        #[max_length = 66]
         round_address -> Varchar,
+        #[max_length = 66]
         address -> Varchar,
-        players_per_room -> Nullable<Int4>,
+        players_per_room -> Nullable<Int8>,
     }
 }
 
 diesel::table! {
-    tournament_rounds (tournament_address, number) {
-        tournament_address -> Varchar,
-        number -> Int4,
+    tournament_rounds (address) {
+        #[max_length = 66]
         address -> Varchar,
-        game_module -> Varchar,
         matchmaking_ended -> Bool,
         play_started -> Bool,
         play_ended -> Bool,
         paused -> Bool,
+        #[max_length = 66]
         matchmaker_address -> Varchar,
     }
 }
 
 diesel::table! {
     tournaments (address) {
+        #[max_length = 66]
         address -> Varchar,
         tournament_name -> Varchar,
-        max_players -> Varchar,
-        max_num_winners -> Int4,
-        players_joined -> Int4,
-        secondary_admin_address -> Nullable<Varchar>,
+        max_players -> Int8,
+        max_num_winners -> Int8,
+        players_joined -> Int8,
         is_joinable -> Bool,
         has_ended -> Bool,
+        #[max_length = 66]
+        current_round_address -> Nullable<Varchar>,
+        current_round_number -> Int8,
+        current_game_module -> Nullable<Varchar>,
     }
 }
 

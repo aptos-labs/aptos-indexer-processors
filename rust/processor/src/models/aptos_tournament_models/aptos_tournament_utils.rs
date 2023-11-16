@@ -1,111 +1,24 @@
-use crate::models::{
-    ans_models::ans_utils::OptionalString, default_models::move_resources::MoveResource,
+use crate::{
+    models::default_models::move_resources::MoveResource,
+    utils::util::{deserialize_from_string, standardize_address},
 };
 use anyhow::Context;
-use aptos_protos::transaction::v1::{Event, WriteResource};
+use aptos_protos::transaction::v1::WriteResource;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RPSPlayer {
-    address: String,
-    committed_action: OptionalString,
-    token_address: String,
-    verified_action: OptionalString,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GameOverEvent {
-    game_address: String,
-    winners: Vec<String>,
-    losers: Vec<String>,
-}
-
-impl GameOverEvent {
-    pub fn from_event(addr: &str, event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
-        if let Some(AptosTournamentEvent::GameOverEvent(inner)) = AptosTournamentEvent::from_event(
-            addr,
-            event.type_str.as_str(),
-            &event.data,
-            txn_version,
-        )
-        .unwrap()
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum AptosTournamentEvent {
-    GameOverEvent(GameOverEvent),
-}
-
-impl AptosTournamentEvent {
-    pub fn from_event(
-        addr: &str,
-        data_type: &str,
-        data: &str,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        match data_type {
-            x if x == format!("{}::object::GameOverEvent", addr) => {
-                serde_json::from_str(data).map(|inner| Some(Self::GameOverEvent(inner)))
-            },
-            _ => Ok(None),
-        }
-        .context(format!(
-            "version {} failed! failed to parse type {}, data {:?}",
-            txn_version, data_type, data
-        ))
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RPSGame {
-    player1: RPSPlayer,
-    player2: RPSPlayer,
-}
-
-impl RPSGame {
-    pub fn from_write_resource(
-        addr: &str,
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let AptosTournamentResource::RPSGame(inner) = AptosTournamentResource::from_resource(
-            addr,
-            &type_str,
-            resource.data.as_ref().unwrap(),
-            txn_version,
-        )? {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurrentRound {
-    game_module: String,
-    number: String,
+    pub game_module: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub number: i64,
     round_address: String,
 }
 
 impl CurrentRound {
+    pub fn get_round_address(&self) -> String {
+        standardize_address(&self.round_address)
+    }
+
     pub fn from_write_resource(
         addr: &str,
         write_resource: &WriteResource,
@@ -139,11 +52,13 @@ impl CurrentRound {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TournamentDirector {
-    max_num_winners: String,
-    max_players: String,
-    players_joined: String,
-    secondary_admin_address: OptionalString,
-    tournament_name: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub max_num_winners: i64,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub max_players: i64,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub players_joined: i64,
+    pub tournament_name: String,
 }
 
 impl TournamentDirector {
@@ -180,8 +95,8 @@ impl TournamentDirector {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TournamentState {
-    has_ended: bool,
-    is_joinable: bool,
+    pub has_ended: bool,
+    pub is_joinable: bool,
 }
 
 impl TournamentState {
@@ -218,12 +133,21 @@ impl TournamentState {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TournamentToken {
-    last_recorded_round: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub last_recorded_round: String,
     room_address: String,
     tournament_address: String,
 }
 
 impl TournamentToken {
+    pub fn get_room_address(&self) -> String {
+        return standardize_address(&self.room_address);
+    }
+
+    pub fn get_tournament_address(&self) -> String {
+        return standardize_address(&self.tournament_address);
+    }
+
     pub fn from_write_resource(
         addr: &str,
         write_resource: &WriteResource,
@@ -256,11 +180,15 @@ impl TournamentToken {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AptosTournament {
-    admin_address: OptionalString,
+pub struct MatchMaker {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub min_players_per_room: i64,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub max_players_per_room: i64,
+    pub joining_allowed: bool,
 }
 
-impl AptosTournament {
+impl MatchMaker {
     pub fn from_write_resource(
         addr: &str,
         write_resource: &WriteResource,
@@ -277,14 +205,102 @@ impl AptosTournament {
             0, // Placeholder, this isn't used anyway
         );
 
-        if let AptosTournamentResource::AptosTournament(inner) =
-            AptosTournamentResource::from_resource(
-                addr,
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                txn_version,
-            )?
-        {
+        if let AptosTournamentResource::MatchMaker(inner) = AptosTournamentResource::from_resource(
+            addr,
+            &type_str,
+            resource.data.as_ref().unwrap(),
+            txn_version,
+        )? {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Player {
+    pub inner: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RoomPlayers {
+    pub vec: Vec<Vec<Player>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Room {
+    pub players: RoomPlayers,
+}
+
+impl Room {
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let AptosTournamentResource::Room(inner) = AptosTournamentResource::from_resource(
+            addr,
+            &type_str,
+            resource.data.as_ref().unwrap(),
+            txn_version,
+        )? {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Round {
+    pub matchmaking_ended: bool,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub number: i64,
+    pub paused: bool,
+    pub play_ended: bool,
+    pub play_started: bool,
+    matchmaker_address: String,
+}
+
+impl Round {
+    pub fn get_matchmaker_address(&self) -> String {
+        return standardize_address(&self.matchmaker_address);
+    }
+
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let AptosTournamentResource::Round(inner) = AptosTournamentResource::from_resource(
+            addr,
+            &type_str,
+            resource.data.as_ref().unwrap(),
+            txn_version,
+        )? {
             Ok(Some(inner))
         } else {
             Ok(None)
@@ -294,59 +310,59 @@ impl AptosTournament {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AptosTournamentResource {
-    AptosTournament(AptosTournament),
     CurrentRound(CurrentRound),
-    // MatchMaker(MatchMaker), // TODO: Figure out how to handle multiple game types
-    // Room(Room),       // TODO: Figure out how to handle multiple game types
-    // Round(Round), // TODO: Figure out how to handle multiple game types
-    RPSGame(RPSGame),
+    MatchMaker(MatchMaker),
+    Room(Room),
+    Round(Round),
     TournamentDirector(TournamentDirector),
     TournamentState(TournamentState),
     TournamentToken(TournamentToken),
 }
 
 impl AptosTournamentResource {
-    pub fn is_resource_supported(addr: &str, data_type: &str) -> bool {
+    pub fn is_resource_supported(contract_addr: &str, data_type: &str) -> bool {
+        let data_type = remove_type_from_resource(data_type);
         [
-            // format!("{}::matchmaker::MatchMaker", addr), // TODO: Figure out how to handle multiple game types
-            // format!("{}::round::Round", addr), // TODO: Figure out how to handle multiple game types
-            // format!("{}::room::Room", addr),   // TODO: Figure out how to handle multiple game types
-            format!("{}::aptos_tournament::AptosTournament", addr),
-            format!("{}::events::GameOverEvent", addr),
-            format!("{}::rock_paper_scissor::Game", addr),
-            format!("{}::token_manager::TournamentToken", addr),
-            format!("{}::tournament_manager::CurrentRound", addr),
-            format!("{}::tournament_manager::TournamentDirector", addr),
-            format!("{}::tournament_manager::TournamentState", addr),
+            format!("{}::matchmaker::MatchMaker", contract_addr),
+            format!("{}::round::Round", contract_addr),
+            format!("{}::room::Room", contract_addr),
+            format!("{}::token_manager::TournamentToken", contract_addr),
+            format!("{}::tournament_manager::CurrentRound", contract_addr),
+            format!("{}::tournament_manager::TournamentDirector", contract_addr),
+            format!("{}::tournament_manager::TournamentState", contract_addr),
         ]
         .contains(&data_type.to_string())
     }
 
     pub fn from_resource(
-        addr: &str,
+        contract_addr: &str,
         data_type: &str,
         data: &serde_json::Value,
         txn_version: i64,
     ) -> anyhow::Result<Self> {
-        match data_type {
-            x if x == format!("{}::aptos_tournament::AptosTournament", addr) => {
-                serde_json::from_value(data.clone()).map(|inner| Some(Self::AptosTournament(inner)))
-            },
-            x if x == format!("{}::rock_paper_scissor::Game", addr) => {
-                serde_json::from_value(data.clone()).map(|inner| Some(Self::RPSGame(inner)))
-            },
-            x if x == format!("{}::token_manager::TournamentToken", addr) => {
+        let data_type = remove_type_from_resource(data_type);
+        match data_type.clone() {
+            x if x == format!("{}::token_manager::TournamentToken", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::TournamentToken(inner)))
             },
-            x if x == format!("{}::tournament_manager::CurrentRound", addr) => {
+            x if x == format!("{}::tournament_manager::CurrentRound", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::CurrentRound(inner)))
             },
-            x if x == format!("{}::tournament_manager::TournamentDirector", addr) => {
+            x if x == format!("{}::tournament_manager::TournamentDirector", contract_addr) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::TournamentDirector(inner)))
             },
-            x if x == format!("{}::tournament_manager::TournamentState", addr) => {
+            x if x == format!("{}::tournament_manager::TournamentState", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::TournamentState(inner)))
+            },
+            x if x == format!("{}::room::Room", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::Room(inner)))
+            },
+            x if x == format!("{}::matchmaker::MatchMaker", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::MatchMaker(inner)))
+            },
+            x if x == format!("{}::round::Round", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::Round(inner)))
             },
             _ => Ok(None),
         }
@@ -359,4 +375,9 @@ impl AptosTournamentResource {
             txn_version, data_type
         ))
     }
+}
+
+fn remove_type_from_resource(data_type: &str) -> String {
+    let split: Vec<&str> = data_type.split("<").collect();
+    split[0].to_string()
 }
