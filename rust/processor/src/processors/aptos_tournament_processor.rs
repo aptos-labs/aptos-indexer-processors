@@ -2,11 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
-use crate::utils::database::PgDbPool;
-use aptos_protos::transaction::v1::Transaction;
+use crate::{
+    models::{
+        aptos_tournament_models::aptos_tournament_utils::{
+            AptosTournament, AptosTournamentAggregatedData, CurrentRound, GameOverEvent, RPSGame,
+            Refs, TournamentDirector, TournamentState, TournamentToken,
+        },
+        token_v2_models::v2_token_utils::ObjectWithMetadata,
+    },
+    utils::{database::PgDbPool, util::standardize_address},
+};
+use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -58,10 +67,118 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let processing_start = std::time::Instant::now();
 
         // TODO: Process transactions
-        // 1. Create mappings {obj_addr: obj}
-        // 2. Loop through write sets, update models
-        // 3. Retrieve sender/owner of each write set through mapping
+        // I'm probably missing the DB lookup thing that you mentioned if the required transaction is outside of the batch
+        for txn in transactions {
+            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
+            let txn_version = txn.version as i64;
+            let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
+            let mut aptos_tournament_metadata_helper = HashMap::new();
 
+            if let TxnData::User(user_txn) = txn_data {
+                let user_request = user_txn
+                    .request
+                    .as_ref()
+                    .expect("Sends is not present in user txn");
+
+                // First pass: create mappings {obj_addr: obj}
+                for wsc in transaction_info.changes.iter() {
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        if let Some(object) =
+                            ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
+                        {
+                            aptos_tournament_metadata_helper.insert(
+                                standardize_address(&wr.address.to_string()),
+                                AptosTournamentAggregatedData {
+                                    aptos_tournament: None,
+                                    current_round: None,
+                                    refs: None,
+                                    rps_game: None,
+                                    tournament_director: None,
+                                    tournament_state: None,
+                                    tournament_token: None,
+                                },
+                            );
+                        }
+                    }
+                }
+
+                // Second pass: loop through write sets to get all the structs related to the object
+                // let mut aptos_tournament_metadata_helper = HashMap::new();
+                for wsc in transaction_info.changes.iter() {
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        let address = standardize_address(&wr.address.to_string());
+                        if let Some(aggregated_data) =
+                            aptos_tournament_metadata_helper.get_mut(&address)
+                        {
+                            if let Some(aptos_tournament) = AptosTournament::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.aptos_tournament = Some(aptos_tournament);
+                            }
+                            if let Some(current_round) = CurrentRound::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.current_round = Some(current_round);
+                            }
+                            if let Some(refs) = Refs::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.refs = Some(refs);
+                            }
+                            if let Some(rps_game) = RPSGame::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.rps_game = Some(rps_game);
+                            }
+                            if let Some(tournament_director) =
+                                TournamentDirector::from_write_resource(
+                                    &self.config.contract_address,
+                                    wr,
+                                    txn_version,
+                                )?
+                            {
+                                aggregated_data.tournament_director = Some(tournament_director);
+                            }
+                            if let Some(tournament_state) = TournamentState::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.tournament_state = Some(tournament_state);
+                            }
+                            if let Some(tournament_token) = TournamentToken::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )? {
+                                aggregated_data.tournament_token = Some(tournament_token);
+                            }
+                        }
+                    }
+                }
+
+                // 3. Pass through events for end game event (probably need this to end the game/set winner/something )
+                for (index, event) in user_txn.events.iter().enumerate() {
+                    if let Some(game_over_event) = GameOverEvent::from_event(
+                        &self.config.contract_address,
+                        event,
+                        txn_version,
+                    )? {
+                        // TODO: Handle this
+                    }
+                }
+
+                // 4. Retrieve sender/owner of each write set through mapping
+            }
+        }
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
