@@ -6,7 +6,6 @@ use crate::{
     models::aptos_tournament_models::{
         aptos_tournament_utils::{CurrentRound, TournamentState},
         tournament_players::TournamentPlayer,
-        tournament_rooms::TournamentRoom,
         tournament_rounds::TournamentRound,
         tournaments::Tournament,
     },
@@ -83,7 +82,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
         let mut tournaments: HashMap<String, (i64, Tournament)> = HashMap::new();
         let mut tournament_rounds: HashMap<String, (i64, TournamentRound)> = HashMap::new();
-        let mut tournament_rooms: HashMap<String, (i64, TournamentRoom)> = HashMap::new();
         let mut tournament_players: HashMap<String, (i64, TournamentPlayer)> = HashMap::new();
         for txn in transactions {
             let txn_version = txn.version as i64;
@@ -143,12 +141,10 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
         let mut tournaments = tournaments.values().cloned().collect::<Vec<_>>();
         let mut tournament_rounds = tournament_rounds.values().cloned().collect::<Vec<_>>();
-        let mut tournament_rooms = tournament_rooms.values().cloned().collect::<Vec<_>>();
         let mut tournament_players = tournament_players.values().cloned().collect::<Vec<_>>();
 
         tournaments.sort_by(|a, b| a.0.cmp(&b.0));
         tournament_rounds.sort_by(|a, b| a.0.cmp(&b.0));
-        tournament_rooms.sort_by(|a, b| a.0.cmp(&b.0));
         tournament_players.sort_by(|a, b| a.0.cmp(&b.0));
 
         insert_to_db(
@@ -158,7 +154,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
             end_version,
             tournaments.into_iter().map(|(_, s)| s).collect(),
             tournament_rounds.into_iter().map(|(_, s)| s).collect(),
-            tournament_rooms.into_iter().map(|(_, s)| s).collect(),
             tournament_players.into_iter().map(|(_, s)| s).collect(),
         )
         .await?;
@@ -185,7 +180,6 @@ async fn insert_to_db(
     end_version: u64,
     tournaments_to_insert: Vec<Tournament>,
     tournament_rounds_to_insert: Vec<TournamentRound>,
-    tournament_rooms_to_insert: Vec<TournamentRoom>,
     tournament_players_to_insert: Vec<TournamentPlayer>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -202,7 +196,6 @@ async fn insert_to_db(
                 pg_conn,
                 &tournaments_to_insert,
                 &tournament_rounds_to_insert,
-                &tournament_rooms_to_insert,
                 &tournament_players_to_insert,
             ))
         })
@@ -217,15 +210,12 @@ async fn insert_to_db(
                         let tournaments_to_insert = clean_data_for_db(tournaments_to_insert, true);
                         let tournament_rounds_to_insert =
                             clean_data_for_db(tournament_rounds_to_insert, true);
-                        let tournament_rooms_to_insert =
-                            clean_data_for_db(tournament_rooms_to_insert, true);
                         let tournament_players_to_insert =
                             clean_data_for_db(tournament_players_to_insert, true);
                         insert_to_db_impl(
                             pg_conn,
                             &tournaments_to_insert,
                             &tournament_rounds_to_insert,
-                            &tournament_rooms_to_insert,
                             &tournament_players_to_insert,
                         )
                         .await
@@ -240,12 +230,10 @@ async fn insert_to_db_impl(
     conn: &mut MyDbConnection,
     tournaments_to_insert: &[Tournament],
     tournament_rounds_to_insert: &[TournamentRound],
-    tournament_rooms_to_insert: &[TournamentRoom],
     tournament_players_to_insert: &[TournamentPlayer],
 ) -> Result<(), diesel::result::Error> {
     insert_tournaments(conn, tournaments_to_insert).await?;
     insert_tournament_rounds(conn, tournament_rounds_to_insert).await?;
-    insert_tournament_rooms(conn, tournament_rooms_to_insert).await?;
     insert_tournament_players(conn, tournament_players_to_insert).await?;
     Ok(())
 }
@@ -298,36 +286,10 @@ async fn insert_tournament_rounds(
                 .on_conflict(address)
                 .do_update()
                 .set((
-                    matchmaking_ended.eq(excluded(matchmaking_ended)),
                     play_started.eq(excluded(play_started)),
                     play_ended.eq(excluded(play_ended)),
                     paused.eq(excluded(paused)),
-                    matchmaker_address.eq(excluded(matchmaker_address)),
                 )),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_tournament_rooms(
-    conn: &mut MyDbConnection,
-    tournament_rooms_to_insert: &[TournamentRoom],
-) -> Result<(), diesel::result::Error> {
-    use schema::tournament_rooms::dsl::*;
-    let chunks = get_chunks(
-        tournament_rooms_to_insert.len(),
-        TournamentRoom::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_rooms::table)
-                .values(&tournament_rooms_to_insert[start_ind..end_ind])
-                .on_conflict((round_address, address))
-                .do_update()
-                .set((players_per_room.eq(excluded(players_per_room)),)),
             None,
         )
         .await?;
@@ -349,11 +311,12 @@ async fn insert_tournament_players(
             conn,
             diesel::insert_into(schema::tournament_players::table)
                 .values(&tournament_players_to_insert[start_ind..end_ind])
-                .on_conflict((address, tournament_address))
+                .on_conflict(token_address)
                 .do_update()
                 .set((
+                    user_address.eq(excluded(user_address)),
+                    tournament_address.eq(excluded(tournament_address)),
                     room_address.eq(excluded(room_address)),
-                    token_address.eq(excluded(token_address)),
                     alive.eq(excluded(alive)),
                     submitted.eq(excluded(submitted)),
                 )),

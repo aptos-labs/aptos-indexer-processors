@@ -1135,27 +1135,17 @@ diesel::table! {
 }
 
 diesel::table! {
-    tournament_players (address, tournament_address) {
+    tournament_players (token_address) {
         #[max_length = 66]
-        address -> Varchar,
+        token_address -> Varchar,
+        #[max_length = 66]
+        user_address -> Varchar,
         #[max_length = 66]
         tournament_address -> Varchar,
         #[max_length = 66]
         room_address -> Nullable<Varchar>,
-        #[max_length = 66]
-        token_address -> Varchar,
         alive -> Bool,
         submitted -> Bool,
-    }
-}
-
-diesel::table! {
-    tournament_rooms (round_address, address) {
-        #[max_length = 66]
-        round_address -> Varchar,
-        #[max_length = 66]
-        address -> Varchar,
-        players_per_room -> Nullable<Int8>,
     }
 }
 
@@ -1163,12 +1153,9 @@ diesel::table! {
     tournament_rounds (address) {
         #[max_length = 66]
         address -> Varchar,
-        matchmaking_ended -> Bool,
         play_started -> Bool,
         play_ended -> Bool,
         paused -> Bool,
-        #[max_length = 66]
-        matchmaker_address -> Varchar,
     }
 }
 
@@ -1318,7 +1305,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships_v2,
     tokens,
     tournament_players,
-    tournament_rooms,
     tournament_rounds,
     tournaments,
     transactions,
