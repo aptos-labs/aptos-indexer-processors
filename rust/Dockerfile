@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 RUN cargo build --locked --release -p processor
 RUN cp target/release/processor /usr/local/bin
 RUN cargo build --locked --release -p post-processor
+RUN cargo build --locked --release -p metrics-helper
 RUN cp target/release/post-processor /usr/local/bin
 
 # add build info
