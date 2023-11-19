@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "metrics-helper",
     "moving-average",
     "post-processor",
     "processor",
