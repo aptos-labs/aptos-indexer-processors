@@ -1,5 +1,5 @@
 [package]
-name = "metrics-helper"
+name = "indexer-metrics"
 version = "1.0.0"
 
 # Workspace inherited keys

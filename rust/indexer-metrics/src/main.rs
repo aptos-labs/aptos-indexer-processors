@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use metrics_helper::{
+use indexer_metrics::{
     metrics::{PFN_LEDGER_TIMESTAMP, PFN_LEDGER_VERSION, TASK_FAILURE_COUNT},
     util::{deserialize_from_string, fetch_url_with_timeout},
 };

@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 RUN cargo build --locked --release -p processor
 RUN cp target/release/processor /usr/local/bin
 RUN cargo build --locked --release -p post-processor
-RUN cargo build --locked --release -p metrics-helper
+RUN cargo build --locked --release -p indexer-metrics
 RUN cp target/release/post-processor /usr/local/bin
+RUN cp target/release/indexer-metrics /usr/local/bin
 
 # add build info
 ARG GIT_TAG
