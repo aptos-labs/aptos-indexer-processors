@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS tournaments (
     has_ended BOOLEAN NOT NULL,
     current_round_address VARCHAR(66),
     current_round_number BIGINT NOT NULL,
-    current_game_module VARCHAR
+    current_game_module VARCHAR,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+    
 );
 CREATE INDEX IF NOT EXISTS tournament_is_joinable ON tournaments (is_joinable);
 CREATE INDEX IF NOT EXISTS tournament_has_ended ON tournaments (has_ended);
@@ -17,7 +19,8 @@ CREATE TABLE IF NOT EXISTS tournament_rounds (
     address VARCHAR(66) PRIMARY KEY NOT NULL,
     play_started BOOLEAN NOT NULL,
     play_ended BOOLEAN NOT NULL,
-    paused BOOLEAN NOT NULL
+    paused BOOLEAN NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS tournament_round_address ON tournament_rounds (address);
 CREATE TABLE IF NOT EXISTS tournament_players (
@@ -26,8 +29,17 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     tournament_address VARCHAR(66) NOT NULL,
     room_address VARCHAR(66),
     alive BOOLEAN NOT NULL,
-    submitted BOOLEAN NOT NULL
+    submitted BOOLEAN NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS tournament_token_owners(
+    token_address VARCHAR(66) PRIMARY KEY NOT NULL,
+    user_address VARCHAR(66) NOT NULL,
+    tournament_address VARCHAR(66) NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS tournament_token_owners_user_address ON tournament_token_owners (user_address);
+CREATE INDEX IF NOT EXISTS tournament_token_owners_tournament_address ON tournament_token_owners (tournament_address);
 -- when user lost (we have delete resource)
     -- token_address: delete resource w/ token address. find address from checking the db
     -- tournament_address: lk.tournament addres

@@ -1146,6 +1146,7 @@ diesel::table! {
         room_address -> Nullable<Varchar>,
         alive -> Bool,
         submitted -> Bool,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1156,6 +1157,19 @@ diesel::table! {
         play_started -> Bool,
         play_ended -> Bool,
         paused -> Bool,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournament_token_owners (token_address) {
+        #[max_length = 66]
+        token_address -> Varchar,
+        #[max_length = 66]
+        user_address -> Varchar,
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1173,6 +1187,7 @@ diesel::table! {
         current_round_address -> Nullable<Varchar>,
         current_round_number -> Int8,
         current_game_module -> Nullable<Varchar>,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1306,6 +1321,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     tokens,
     tournament_players,
     tournament_rounds,
+    tournament_token_owners,
     tournaments,
     transactions,
     user_transactions,
