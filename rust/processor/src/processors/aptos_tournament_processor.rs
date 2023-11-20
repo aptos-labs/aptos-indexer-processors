@@ -3,11 +3,15 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::aptos_tournament_models::{
-        aptos_tournament_utils::{CurrentRound, TournamentState},
-        tournament_players::TournamentPlayer,
-        tournament_rounds::TournamentRound,
-        tournaments::Tournament,
+    models::{
+        aptos_tournament_models::{
+            aptos_tournament_utils::{CurrentRound, TournamentState},
+            tournament_players::TournamentPlayer,
+            tournament_rounds::TournamentRound,
+            tournament_token_owners::TournamentTokenOwner,
+            tournaments::Tournament,
+        },
+        token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
     schema,
     utils::{
@@ -77,6 +81,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
         // TODO: Process transactions
         // I'm probably missing the DB lookup thing that you mentioned if the required transaction is outside of the batch
         // Also need to find out how to handle the nft that represents u can play
+        let mut token_to_owner = HashMap::new();
         let mut tournament_state_mapping = HashMap::new();
         let mut current_round_mapping = HashMap::new();
 
@@ -109,8 +114,22 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     {
                         current_round_mapping.insert(address.clone(), state);
                     }
+                    if let Some(object) =
+                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
+                    {
+                        token_to_owner.insert(
+                            wr.address.clone(),
+                            (object.object_core.get_owner_address(), address),
+                        );
+                    }
                 }
             }
+
+            insert_lookup_to_db(
+                &mut self.connection_pool.get().await?,
+                token_to_owner.clone(),
+            )
+            .await?;
 
             // Second pass: everything else
             for wsc in transaction_info.changes.iter() {
@@ -131,6 +150,14 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         txn_version,
                     ) {
                         tournament_rounds.insert(address.clone(), (txn_version, round));
+                    }
+                    if let Some(player) = TournamentPlayer::from_write_resource(
+                        &self.config.contract_address,
+                        wr,
+                        txn_version,
+                        token_to_owner.clone(),
+                    ) {
+                        tournament_players.insert(address.clone(), (txn_version, player));
                     }
                 }
             }
@@ -224,6 +251,41 @@ async fn insert_to_db(
                 .await
         },
     }
+}
+
+async fn insert_lookup_to_db(
+    conn: &mut PgPoolConnection<'_>,
+    token_to_owner: HashMap<String, (String, String)>,
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_token_owners::dsl::*;
+    let chunks = get_chunks(token_to_owner.len(), TournamentTokenOwner::field_count());
+
+    let mut to_insert = Vec::new();
+    for token in token_to_owner.keys() {
+        to_insert.push(TournamentTokenOwner {
+            token_address: token.clone(),
+            user_address: token_to_owner.get(token).unwrap().0.clone(),
+            tournament_address: token_to_owner.get(token).unwrap().1.clone(),
+        });
+    }
+
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_token_owners::table)
+                .values(&to_insert[start_ind..end_ind])
+                .on_conflict(token_address)
+                .do_update()
+                .set((
+                    user_address.eq(excluded(user_address)),
+                    tournament_address.eq(excluded(tournament_address)),
+                )),
+            None,
+        )
+        .await?;
+    }
+
+    Ok(())
 }
 
 async fn insert_to_db_impl(

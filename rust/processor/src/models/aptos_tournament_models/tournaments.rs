@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
-use std::collections::HashMap;
-
 use super::aptos_tournament_utils::{CurrentRound, TournamentDirector, TournamentState};
 use crate::schema::tournaments;
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
@@ -40,7 +39,6 @@ impl Tournament {
             transaction_version,
         )
         .unwrap()
-        // Can I just unwrap here?
         {
             let tournament_address = write_resource.address.to_string();
             let state = tournament_state_mapping
