@@ -28,6 +28,7 @@ struct FullnodeResponse {
 pub struct PostProcessorConfig {
     pub hasura_rest_api_endpoint: Option<String>,
     pub fullnode_rest_api_endpoint: Option<String>,
+    pub chain_name: String,
 }
 
 #[async_trait::async_trait]
@@ -36,10 +37,11 @@ impl RunnableConfig for PostProcessorConfig {
         let mut tasks = vec![];
         let _hasura_rest_api_endpoint = self.hasura_rest_api_endpoint.clone();
         let fullnode_rest_api_endpoint = self.fullnode_rest_api_endpoint.clone();
+        let chain_name = self.chain_name.clone();
 
         // if let Some(hasura) = hasura_rest_api_endpoint {}
         if let Some(fullnode) = fullnode_rest_api_endpoint {
-            tasks.push(tokio::spawn(start_fn_fetch(fullnode)));
+            tasks.push(tokio::spawn(start_fn_fetch(fullnode, chain_name)));
         }
 
         let _ = futures::future::join_all(tasks).await;
@@ -58,7 +60,7 @@ async fn main() -> Result<()> {
         .await
 }
 
-async fn start_fn_fetch(url: String) {
+async fn start_fn_fetch(url: String, chain_name: String) {
     loop {
         let result = fetch_url_with_timeout(&url, QUERY_TIMEOUT_MS).await;
 
@@ -67,24 +69,33 @@ async fn start_fn_fetch(url: String) {
             Ok(Ok(response)) => match response.json::<FullnodeResponse>().await {
                 Ok(resp) => {
                     tracing::info!(url = &url, response = ?resp, "Request succeeded");
-                    PFN_LEDGER_VERSION.set(resp.ledger_version as i64);
+                    PFN_LEDGER_VERSION
+                        .with_label_values(&[&chain_name])
+                        .set(resp.ledger_version as i64);
                     PFN_LEDGER_TIMESTAMP
+                        .with_label_values(&[&chain_name])
                         .set(resp.ledger_timestamp as f64 / MICROSECONDS_MULTIPLIER);
                 },
                 Err(err) => {
                     tracing::error!(url = &url, error = ?err, "Parsing error");
-                    TASK_FAILURE_COUNT.with_label_values(&["fullnode"]).inc();
+                    TASK_FAILURE_COUNT
+                        .with_label_values(&["fullnode", &chain_name])
+                        .inc();
                 },
             },
             Ok(Err(err)) => {
                 // Request encountered an error within the timeout
                 tracing::error!(url = &url, error = ?err, "Request error");
-                TASK_FAILURE_COUNT.with_label_values(&["fullnode"]).inc();
+                TASK_FAILURE_COUNT
+                    .with_label_values(&["fullnode", &chain_name])
+                    .inc();
             },
             Err(_) => {
                 // Request timed out
                 tracing::error!(url = &url, "Request timed out");
-                TASK_FAILURE_COUNT.with_label_values(&["fullnode"]).inc();
+                TASK_FAILURE_COUNT
+                    .with_label_values(&["fullnode", &chain_name])
+                    .inc();
             },
         }
 
