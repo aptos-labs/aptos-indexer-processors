@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 #[diesel(table_name = tournament_rounds)]
 pub struct TournamentRound {
     address: String,
+    number: i64,
     play_started: bool,
     play_ended: bool,
     paused: bool,
@@ -43,6 +44,7 @@ impl TournamentRound {
         {
             return Some(TournamentRound {
                 address: resource.address.clone(),
+                number: inner.number,
                 play_started: inner.play_started,
                 play_ended: inner.play_ended,
                 paused: inner.paused,
