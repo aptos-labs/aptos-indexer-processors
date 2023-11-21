@@ -9,7 +9,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::error;
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
+pub type TournamentMapping = HashMap<String, Tournament>;
+
+#[derive(
+    Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, PartialEq, Eq,
+)]
 #[diesel(primary_key(address))]
 #[diesel(table_name = tournaments)]
 pub struct Tournament {
@@ -23,9 +27,14 @@ pub struct Tournament {
     current_round_address: Option<String>,
     current_round_number: i64,
     current_game_module: Option<String>,
+    last_transaction_version: i64,
 }
 
 impl Tournament {
+    pub fn pk(&self) -> String {
+        self.address.clone()
+    }
+
     pub fn from_write_resource(
         contract_addr: &str,
         write_resource: &WriteResource,
@@ -76,8 +85,21 @@ impl Tournament {
                 current_round_address: Some(current_round.get_round_address()),
                 current_round_number: current_round.number,
                 current_game_module: Some(current_round.game_module.clone()),
+                last_transaction_version: transaction_version,
             });
         }
         None
+    }
+}
+
+impl Ord for Tournament {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.address.cmp(&other.address)
+    }
+}
+
+impl PartialOrd for Tournament {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
