@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     submitted BOOLEAN NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE TABLE IF NOT EXISTS tournament_token_owners(
+CREATE TABLE IF NOT EXISTS tournament_token_owners( -- haven't used this yet? probably don't need it actually
     token_address VARCHAR(66) PRIMARY KEY NOT NULL,
     user_address VARCHAR(66) NOT NULL,
     tournament_address VARCHAR(66) NOT NULL,
