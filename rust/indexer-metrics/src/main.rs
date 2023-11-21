@@ -12,7 +12,7 @@ use server_framework::{RunnableConfig, ServerArgs};
 use tokio::time::Duration;
 
 const QUERY_TIMEOUT_MS: u64 = 500;
-const TIMEOUT_BETWEEN_QUERIES_MS: u64 = 500;
+const MIN_TIME_QUERIES_MS: u64 = 500;
 const MICROSECONDS_MULTIPLIER: f64 = 1_000_000.0;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -63,6 +63,7 @@ async fn main() -> Result<()> {
 async fn start_fn_fetch(url: String, chain_name: String) {
     loop {
         let result = fetch_url_with_timeout(&url, QUERY_TIMEOUT_MS).await;
+        let time_now = tokio::time::Instant::now();
 
         // Handle the result
         match result {
@@ -98,8 +99,10 @@ async fn start_fn_fetch(url: String, chain_name: String) {
                     .inc();
             },
         }
-
-        // Sleep for 500 ms before making the next request
-        tokio::time::sleep(Duration::from_millis(TIMEOUT_BETWEEN_QUERIES_MS)).await;
+        let elapsed = time_now.elapsed().as_millis() as u64;
+        // Sleep for a max of 500ms between queries
+        if elapsed < MIN_TIME_QUERIES_MS {
+            tokio::time::sleep(Duration::from_millis(MIN_TIME_QUERIES_MS - elapsed)).await;
+        }
     }
 }
