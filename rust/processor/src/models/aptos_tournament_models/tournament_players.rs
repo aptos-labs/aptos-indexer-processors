@@ -1,14 +1,12 @@
 // Copyright © Aptos Foundation
 
 use super::aptos_tournament_utils::{Room, TournamentToken};
-use crate::{schema::tournament_players, utils::database::PgPoolConnection};
+use crate::schema::tournament_players;
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_address))]
@@ -20,19 +18,6 @@ pub struct TournamentPlayer {
     pub room_address: Option<String>,
     pub alive: bool,
     pub submitted: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(primary_key(token_address))]
-#[diesel(table_name = tournament_players)]
-pub struct TournamentPlayerQuery {
-    pub token_address: String,
-    pub user_address: String,
-    pub tournament_address: String,
-    pub room_address: Option<String>,
-    pub alive: bool,
-    pub submitted: bool,
-    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl TournamentPlayer {
@@ -83,23 +68,5 @@ impl TournamentPlayer {
             }
         }
         players
-    }
-}
-
-impl TournamentPlayerQuery {
-    pub async fn query(conn: &mut PgPoolConnection<'_>, token_address: &str) -> Option<Self> {
-        tournament_players::table
-            .find(token_address)
-            .first::<TournamentPlayerQuery>(conn)
-            .await
-            .optional()
-            .unwrap_or_else(|e| {
-                error!(
-                    token_address = token_address,
-                    error = ?e,
-                    "Error querying tournament player"
-                );
-                panic!();
-            })
     }
 }
