@@ -17,6 +17,7 @@ CREATE INDEX IF NOT EXISTS tournament_has_ended ON tournaments (has_ended);
 CREATE INDEX IF NOT EXISTS tournament_current_round_number ON tournaments (current_round_number);
 CREATE TABLE IF NOT EXISTS tournament_rounds (
     address VARCHAR(66) PRIMARY KEY NOT NULL,
+    number BIGINT NOT NULL,
     play_started BOOLEAN NOT NULL,
     play_ended BOOLEAN NOT NULL,
     paused BOOLEAN NOT NULL,

@@ -1154,6 +1154,7 @@ diesel::table! {
     tournament_rounds (address) {
         #[max_length = 66]
         address -> Varchar,
+        number -> Int8,
         play_started -> Bool,
         play_ended -> Bool,
         paused -> Bool,
