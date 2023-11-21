@@ -5,6 +5,7 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_address))]
@@ -47,10 +48,12 @@ impl TournamentTokenOwnerQuery {
             .await
             .optional()
             .unwrap_or_else(|e| {
-                panic!(
-                    "Error querying tournament token owner with token address {}: {}",
-                    token_address, e
-                )
+                error!(
+                    token_address = token_address,
+                    error = ?e,
+                    "Error querying tournament token owner"
+                );
+                panic!();
             })
     }
 }
