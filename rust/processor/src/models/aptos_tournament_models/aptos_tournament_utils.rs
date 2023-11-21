@@ -5,6 +5,10 @@ use crate::{
 use anyhow::Context;
 use aptos_protos::transaction::v1::WriteResource;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+pub type TournamentStateMapping = HashMap<String, TournamentState>;
+pub type CurrentRoundMapping = HashMap<String, CurrentRound>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurrentRound {
@@ -135,15 +139,10 @@ impl TournamentState {
 pub struct TournamentToken {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub last_recorded_round: String,
-    room_address: String,
     tournament_address: String,
 }
 
 impl TournamentToken {
-    pub fn get_room_address(&self) -> String {
-        return standardize_address(&self.room_address);
-    }
-
     pub fn get_tournament_address(&self) -> String {
         return standardize_address(&self.tournament_address);
     }
@@ -219,18 +218,37 @@ impl MatchMaker {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Player {
-    pub inner: String,
+struct Player {
+    inner: String,
+}
+
+impl Player {
+    fn get_address(&self) -> String {
+        return standardize_address(&self.inner);
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RoomPlayers {
-    pub vec: Vec<Vec<Player>>,
+struct RoomPlayers {
+    vec: Vec<Vec<Player>>,
 }
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Room {
-    pub players: RoomPlayers,
+    players: RoomPlayers,
+}
+
+impl Room {
+    pub fn get_players(&self) -> Vec<String> {
+        let mut players = vec![];
+        for player_vec in &self.players.vec {
+            for player in player_vec {
+                players.push(player.get_address());
+            }
+        }
+        players
+    }
 }
 
 impl Room {

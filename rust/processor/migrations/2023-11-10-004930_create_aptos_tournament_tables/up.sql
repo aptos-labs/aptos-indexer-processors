@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS tournaments (
     current_round_address VARCHAR(66),
     current_round_number BIGINT NOT NULL,
     current_game_module VARCHAR,
+    last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
-    
 );
 CREATE INDEX IF NOT EXISTS tournament_is_joinable ON tournaments (is_joinable);
 CREATE INDEX IF NOT EXISTS tournament_has_ended ON tournaments (has_ended);
@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS tournament_rounds (
     play_started BOOLEAN NOT NULL,
     play_ended BOOLEAN NOT NULL,
     paused BOOLEAN NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS tournament_round_address ON tournament_rounds (address);
@@ -30,33 +31,25 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     tournament_address VARCHAR(66) NOT NULL,
     room_address VARCHAR(66),
     alive BOOLEAN NOT NULL,
-    submitted BOOLEAN NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE TABLE IF NOT EXISTS tournament_token_owners( -- haven't used this yet? probably don't need it actually
-    token_address VARCHAR(66) PRIMARY KEY NOT NULL,
-    user_address VARCHAR(66) NOT NULL,
-    tournament_address VARCHAR(66) NOT NULL,
-    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS tournament_token_owners_user_address ON tournament_token_owners (user_address);
-CREATE INDEX IF NOT EXISTS tournament_token_owners_tournament_address ON tournament_token_owners (tournament_address);
 -- when user lost (we have delete resource)
-    -- token_address: delete resource w/ token address. find address from checking the db
-    -- tournament_address: lk.tournament addres
-    -- room_address: none
-    -- alive: false,
-    -- submitted: lk.submitted
+-- token_address: delete resource w/ token address. find address from checking the db
+-- tournament_address: lk.tournament addres
+-- room_address: none
+-- alive: false,
+-- submitted: lk.submitted
 -- when user won (we have the user address)
-    -- user_address
-    -- token_address:
-    -- tournament_address: lk.tournament address
-    -- room_address: none
-    -- alive: true,
-    -- submitted: true
+-- user_address
+-- token_address:
+-- tournament_address: lk.tournament address
+-- room_address: none
+-- alive: true,
+-- submitted: true
 -- when submitted happens
-    -- token_address:
-    -- tournament_address: lk.tournament address
-    -- room_address: none
-    -- alive: true,
-    -- submitted: true
+-- token_address:
+-- tournament_address: lk.tournament address
+-- room_address: none
+-- alive: true,
+-- submitted: true
