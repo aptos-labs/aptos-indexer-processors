@@ -31,7 +31,7 @@ impl TournamentPlayer {
             TournamentToken::from_write_resource(contract_addr, write_resource, transaction_version)
                 .unwrap()
         {
-            Some(TournamentPlayer {
+            return Some(TournamentPlayer {
                 token_address: write_resource.address.clone(),
                 user_address: token_to_owner
                     .get(&write_resource.address)
