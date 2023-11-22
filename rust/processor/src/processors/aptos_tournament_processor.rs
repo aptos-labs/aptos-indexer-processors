@@ -12,7 +12,7 @@ use crate::{
             tournament_rounds::{TournamentRound, TournamentRoundsMapping},
             tournaments::{Tournament, TournamentMapping},
         },
-        token_v2_models::v2_token_utils::ObjectWithMetadata,
+        token_v2_models::v2_token_utils::{BurnEvent, ObjectWithMetadata, TokenV2Burned},
     },
     schema,
     utils::{
@@ -23,12 +23,15 @@ use crate::{
         util::standardize_address,
     },
 };
-use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{result::Error, upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -46,6 +49,8 @@ pub struct AptosTournamentProcessor {
 impl AptosTournamentProcessor {
     pub fn new(connection_pool: PgDbPool, config: AptosTournamentProcessorConfig) -> Self {
         tracing::info!("init AptosTournamentProcessor");
+        let mut config = config;
+        config.contract_address = standardize_address(&config.contract_address);
         Self {
             connection_pool,
             config,
@@ -184,7 +189,6 @@ async fn insert_tournament_rounds(
                     play_started.eq(excluded(play_started)),
                     play_ended.eq(excluded(play_ended)),
                     paused.eq(excluded(paused)),
-                    is_deleted.eq(excluded(is_deleted)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
@@ -243,11 +247,8 @@ impl ProcessorTrait for AptosTournamentProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        let conn = &mut self.connection_pool.get().await?;
         let processing_start = std::time::Instant::now();
-
-        // TODO: Process transactions
-        // I'm probably missing the DB lookup thing that you mentioned if the required transaction is outside of the batch
-        // Also need to find out how to handle the nft that represents u can play
 
         let mut tournaments: TournamentMapping = HashMap::new();
         let mut tournament_rounds: TournamentRoundsMapping = HashMap::new();
@@ -257,88 +258,119 @@ impl ProcessorTrait for AptosTournamentProcessor {
             let mut tournament_state_mapping: TournamentStateMapping = HashMap::new();
             let mut current_round_mapping: CurrentRoundMapping = HashMap::new();
             let mut object_to_owner = HashMap::new();
+            let mut tokens_burned: TokenV2Burned = HashSet::new();
 
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
+            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
 
-            // First pass: TournamentState and CurrentRound
-            for wsc in transaction_info.changes.iter() {
-                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    let address = standardize_address(&wr.address.to_string());
-                    if let Some(state) = TournamentState::from_write_resource(
-                        &self.config.contract_address,
-                        wr,
-                        txn_version,
-                    )
-                    .unwrap()
-                    {
-                        tournament_state_mapping.insert(address.clone(), state);
-                    }
+            if let TxnData::User(user_txn) = txn_data {
+                // First pass: TournamentState and CurrentRound
+                for wsc in transaction_info.changes.iter() {
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        let address = standardize_address(&wr.address.to_string());
+                        if let Some(state) = TournamentState::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
+                            tournament_state_mapping.insert(address.clone(), state);
+                        }
 
-                    if let Some(state) = CurrentRound::from_write_resource(
-                        &self.config.contract_address,
-                        wr,
-                        txn_version,
-                    )
-                    .unwrap()
-                    {
-                        current_round_mapping.insert(address.clone(), state);
-                    }
+                        if let Some(state) = CurrentRound::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
+                            current_round_mapping.insert(address.clone(), state);
+                        }
 
-                    if let Some(object) =
-                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                    {
-                        object_to_owner
-                            .insert(address.clone(), object.object_core.get_owner_address());
-                    }
-                }
-            }
-
-            // Second pass: get tournament players metadata
-            for wsc in transaction_info.changes.iter() {
-                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    let address = standardize_address(&wr.address.to_string());
-
-                    if let Some(tournament_player) = TournamentPlayer::from_tournament_token(
-                        &self.config.contract_address,
-                        wr,
-                        txn_version,
-                        &object_to_owner,
-                        &tournament_players,
-                    ) {
-                        tournament_players.insert(address.clone(), tournament_player);
+                        if let Some(object) =
+                            ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
+                        {
+                            object_to_owner
+                                .insert(address.clone(), object.object_core.get_owner_address());
+                        }
                     }
                 }
-            }
 
-            // Third pass: everything else
-            for wsc in transaction_info.changes.iter() {
-                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    let address = standardize_address(&wr.address.to_string());
-                    if let Some(tournament) = Tournament::from_write_resource(
-                        &self.config.contract_address,
-                        wr,
-                        txn_version,
-                        tournament_state_mapping.clone(),
-                        current_round_mapping.clone(),
-                    ) {
-                        tournaments.insert(address.clone(), tournament);
+                for (_, event) in user_txn.events.iter().enumerate() {
+                    if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
+                        tokens_burned.insert(burn_event.get_token_address());
                     }
-                    if let Some(round) = TournamentRound::from_write_resource(
-                        &self.config.contract_address,
-                        wr,
-                        txn_version,
-                    ) {
-                        tournament_rounds.insert(address.clone(), round);
-                    }
+                }
 
-                    let players = TournamentPlayer::from_room(
-                        &self.config.contract_address,
-                        wr,
-                        txn_version,
-                        &tournament_players,
-                    );
-                    tournament_players.extend(players);
+                // Second pass: get tournament players metadata
+                for wsc in transaction_info.changes.iter() {
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        let address = standardize_address(&wr.address.to_string());
+                        if let Some(tournament_player) = TournamentPlayer::from_tournament_token(
+                            conn,
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                            &object_to_owner,
+                            &tournament_players,
+                        )
+                        .await
+                        {
+                            tournament_players.insert(address.clone(), tournament_player);
+                        }
+                    }
+                }
+
+                // Third pass: everything else
+                for wsc in transaction_info.changes.iter() {
+                    match wsc.change.as_ref().unwrap() {
+                        Change::WriteResource(wr) => {
+                            let address = standardize_address(&wr.address.to_string());
+                            if let Some(tournament) = Tournament::from_write_resource(
+                                &self.config.contract_address,
+                                &wr,
+                                txn_version,
+                                tournament_state_mapping.clone(),
+                                current_round_mapping.clone(),
+                            ) {
+                                tournaments.insert(address.clone(), tournament);
+                            }
+                            if let Some(round) = TournamentRound::from_write_resource(
+                                &self.config.contract_address,
+                                &wr,
+                                txn_version,
+                            ) {
+                                tournament_rounds.insert(address.clone(), round);
+                            }
+
+                            let players = TournamentPlayer::from_room(
+                                conn,
+                                &self.config.contract_address,
+                                &wr,
+                                txn_version,
+                                &tournament_players,
+                            )
+                            .await;
+                            tournament_players.extend(players);
+                        },
+                        Change::DeleteResource(dr) => {
+                            // Add burned NFT handling
+                            if let Some(player) = TournamentPlayer::delete_player(
+                                conn,
+                                dr,
+                                txn_version,
+                                &tokens_burned,
+                                &tournament_players,
+                            )
+                            .await
+                            {
+                                tournament_players.insert(player.token_address.clone(), player);
+                            }
+                        },
+                        _ => {},
+                    }
                 }
             }
         }
@@ -355,7 +387,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
         tournament_players.sort();
 
         insert_to_db(
-            &mut self.connection_pool.get().await?,
+            conn,
             self.name(),
             start_version,
             end_version,
