@@ -298,7 +298,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     }
                 }
 
-                for (_, event) in user_txn.events.iter().enumerate() {
+                for event in user_txn.events.iter() {
                     if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
                         tokens_burned.insert(burn_event.get_token_address());
                     }
