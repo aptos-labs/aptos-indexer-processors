@@ -86,7 +86,7 @@ impl TournamentPlayer {
         {
             let room_address = &standardize_address(&write_resource.address);
             for player in room.get_players().iter() {
-                let token_address = standardize_address(&player);
+                let token_address = standardize_address(player);
                 let room_player = Self::from_room_player(
                     conn,
                     &token_address,
@@ -211,7 +211,7 @@ impl TournamentPlayerQuery {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            if let Some(player) = Self::get_by_token_address(conn, token_address).await.ok() {
+            if let Ok(player) = Self::get_by_token_address(conn, token_address).await {
                 return player;
             }
             std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));

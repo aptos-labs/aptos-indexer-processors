@@ -144,7 +144,7 @@ pub struct TournamentToken {
 
 impl TournamentToken {
     pub fn get_tournament_address(&self) -> String {
-        return standardize_address(&self.tournament_address);
+        standardize_address(&self.tournament_address)
     }
 
     pub fn from_write_resource(
@@ -224,7 +224,7 @@ struct Player {
 
 impl Player {
     fn get_address(&self) -> String {
-        return standardize_address(&self.inner);
+        standardize_address(&self.inner)
     }
 }
 
@@ -232,7 +232,6 @@ impl Player {
 struct RoomPlayers {
     vec: Vec<Vec<Player>>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Room {
@@ -294,7 +293,7 @@ pub struct Round {
 
 impl Round {
     pub fn get_matchmaker_address(&self) -> String {
-        return standardize_address(&self.matchmaker_address);
+        standardize_address(&self.matchmaker_address)
     }
 }
 
@@ -368,6 +367,6 @@ impl AptosTournamentResource {
 }
 
 fn remove_type_from_resource(data_type: &str) -> String {
-    let split: Vec<&str> = data_type.split("<").collect();
+    let split: Vec<&str> = data_type.split('<').collect();
     split[0].to_string()
 }

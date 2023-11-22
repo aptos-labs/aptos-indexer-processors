@@ -330,7 +330,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             let address = standardize_address(&wr.address.to_string());
                             if let Some(tournament) = Tournament::from_write_resource(
                                 &self.config.contract_address,
-                                &wr,
+                                wr,
                                 txn_version,
                                 tournament_state_mapping.clone(),
                                 current_round_mapping.clone(),
@@ -339,7 +339,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             }
                             if let Some(round) = TournamentRound::from_write_resource(
                                 &self.config.contract_address,
-                                &wr,
+                                wr,
                                 txn_version,
                             ) {
                                 tournament_rounds.insert(address.clone(), round);
@@ -348,7 +348,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             let players = TournamentPlayer::from_room(
                                 conn,
                                 &self.config.contract_address,
-                                &wr,
+                                wr,
                                 txn_version,
                                 &tournament_players,
                             )
