@@ -1,12 +1,21 @@
 // Copyright © Aptos Foundation
 
 use super::aptos_tournament_utils::{Room, TournamentToken};
-use crate::{schema::tournament_players, utils::util::standardize_address};
-use aptos_protos::transaction::v1::WriteResource;
+use crate::{
+    models::{
+        token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+        token_v2_models::v2_token_utils::TokenV2Burned,
+    },
+    schema::tournament_players,
+    utils::{database::PgPoolConnection, util::standardize_address},
+};
+use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::error;
 
 type TokenAddress = String;
 pub type TournamentPlayerMapping = HashMap<TokenAddress, TournamentPlayer>;
@@ -30,7 +39,8 @@ impl TournamentPlayer {
         self.token_address.clone()
     }
 
-    pub fn from_tournament_token(
+    pub async fn from_tournament_token(
+        conn: &mut PgPoolConnection<'_>,
         contract_addr: &str,
         write_resource: &WriteResource,
         transaction_version: i64,
@@ -44,9 +54,11 @@ impl TournamentPlayer {
             let token_address = standardize_address(&write_resource.address);
             let room_address = match previous_tournament_token.get(&token_address) {
                 Some(player) => player.room_address.clone(),
-                None => {
-                    // look it up in the db. If can't find, then do nothing
-                    None
+                None => match TournamentPlayerQuery::query_by_token_address(conn, &token_address)
+                    .await
+                {
+                    Some(player) => player.room_address,
+                    None => None,
                 },
             };
             return Some(TournamentPlayer {
@@ -61,7 +73,8 @@ impl TournamentPlayer {
         None
     }
 
-    pub fn from_room(
+    pub async fn from_room(
+        conn: &mut PgPoolConnection<'_>,
         contract_addr: &str,
         write_resource: &WriteResource,
         transaction_version: i64,
@@ -75,18 +88,21 @@ impl TournamentPlayer {
             for player in room.get_players().iter() {
                 let token_address = standardize_address(&player);
                 let room_player = Self::from_room_player(
+                    conn,
                     &token_address,
                     transaction_version,
                     room_address,
                     previous_tournament_token,
-                );
+                )
+                .await;
                 players.insert(room_player.token_address.clone(), room_player);
             }
         }
         players
     }
 
-    fn from_room_player(
+    async fn from_room_player(
+        conn: &mut PgPoolConnection<'_>,
         token_address: &str,
         transaction_version: i64,
         room_address: &str,
@@ -102,10 +118,63 @@ impl TournamentPlayer {
                 last_transaction_version: transaction_version,
             },
             None => {
-                // look it up in the db. If can't find, then do crash
-                panic!("Tournament token must be present")
+                let player = TournamentPlayerQuery::query_by_token_address(conn, token_address)
+                    .await
+                    .unwrap_or_else(|| {
+                        error!("Tournament player not found in database");
+                        panic!();
+                    });
+
+                TournamentPlayer {
+                    token_address: player.token_address,
+                    user_address: player.user_address,
+                    tournament_address: player.tournament_address,
+                    room_address: Some(room_address.to_string()),
+                    alive: true,
+                    last_transaction_version: transaction_version,
+                }
             },
         }
+    }
+
+    pub async fn delete_player(
+        conn: &mut PgPoolConnection<'_>,
+        delete_resource: &DeleteResource,
+        transaction_version: i64,
+        tokens_burned: &TokenV2Burned,
+        previous_tournament_token: &TournamentPlayerMapping,
+    ) -> Option<Self> {
+        if let Some(token_address) =
+            tokens_burned.get(&standardize_address(&delete_resource.address.to_string()))
+        {
+            match previous_tournament_token.get(token_address) {
+                Some(player) => {
+                    return Some(TournamentPlayer {
+                        token_address: token_address.to_string(),
+                        user_address: player.user_address.clone(),
+                        tournament_address: player.tournament_address.clone(),
+                        room_address: player.room_address.clone(),
+                        alive: false,
+                        last_transaction_version: transaction_version,
+                    });
+                },
+                None => {
+                    if let Some(player) =
+                        TournamentPlayerQuery::query_by_token_address(conn, token_address).await
+                    {
+                        return Some(TournamentPlayer {
+                            token_address: player.token_address,
+                            user_address: player.user_address,
+                            tournament_address: player.tournament_address,
+                            room_address: player.room_address,
+                            alive: false,
+                            last_transaction_version: transaction_version,
+                        });
+                    }
+                },
+            }
+        }
+        None
     }
 }
 
@@ -118,5 +187,46 @@ impl Ord for TournamentPlayer {
 impl PartialOrd for TournamentPlayer {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[derive(Queryable, Identifiable, Debug, Clone)]
+#[diesel(primary_key(token_address))]
+#[diesel(table_name = tournament_players)]
+pub struct TournamentPlayerQuery {
+    pub token_address: String,
+    pub user_address: String,
+    pub tournament_address: String,
+    pub room_address: Option<String>,
+    pub alive: bool,
+    pub last_transaction_version: i64,
+    pub inserted_at: chrono::NaiveDateTime,
+}
+
+impl TournamentPlayerQuery {
+    pub async fn query_by_token_address(
+        conn: &mut PgPoolConnection<'_>,
+        token_address: &str,
+    ) -> Option<Self> {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            if let Some(player) = Self::get_by_token_address(conn, token_address).await.ok() {
+                return player;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+        }
+        None
+    }
+
+    async fn get_by_token_address(
+        conn: &mut PgPoolConnection<'_>,
+        token_address: &str,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        tournament_players::table
+            .find(token_address)
+            .first::<Self>(conn)
+            .await
+            .optional()
     }
 }
