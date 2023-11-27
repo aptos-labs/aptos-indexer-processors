@@ -12,7 +12,7 @@ use crate::{
             tournament_rounds::{TournamentRound, TournamentRoundsMapping},
             tournaments::{Tournament, TournamentMapping},
         },
-        token_v2_models::v2_token_utils::{BurnEvent, ObjectWithMetadata, TokenV2Burned},
+        token_v2_models::v2_token_utils::ObjectWithMetadata,
     },
     schema,
     utils::{
@@ -28,10 +28,7 @@ use async_trait::async_trait;
 use diesel::{result::Error, upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::{collections::HashMap, fmt::Debug};
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -258,7 +255,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
             let mut tournament_state_mapping: TournamentStateMapping = HashMap::new();
             let mut current_round_mapping: CurrentRoundMapping = HashMap::new();
             let mut object_to_owner = HashMap::new();
-            let mut tokens_burned: TokenV2Burned = HashSet::new();
 
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
@@ -278,7 +274,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         {
                             tournament_state_mapping.insert(address.clone(), state);
                         }
-
                         if let Some(state) = CurrentRound::from_write_resource(
                             &self.config.contract_address,
                             wr,
@@ -288,19 +283,12 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         {
                             current_round_mapping.insert(address.clone(), state);
                         }
-
                         if let Some(object) =
                             ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
                         {
                             object_to_owner
                                 .insert(address.clone(), object.object_core.get_owner_address());
                         }
-                    }
-                }
-
-                for event in user_txn.events.iter() {
-                    if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
-                        tokens_burned.insert(burn_event.get_token_address());
                     }
                 }
 
@@ -355,22 +343,32 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             .await;
                             tournament_players.extend(players);
                         },
-                        Change::DeleteResource(dr) => {
-                            // Add burned NFT handling
-                            if let Some(player) = TournamentPlayer::delete_player(
-                                conn,
-                                dr,
-                                txn_version,
-                                &tokens_burned,
-                                &tournament_players,
-                            )
-                            .await
-                            {
-                                tournament_players.insert(player.token_address.clone(), player);
-                            }
-                        },
                         _ => {},
                     }
+                }
+
+                // Pass through events for player and room burning
+                for event in user_txn.events.iter() {
+                    if let Some(player) = TournamentPlayer::delete_player(
+                        conn,
+                        &self.config.contract_address,
+                        event,
+                        txn_version,
+                        &tournament_players,
+                    )
+                    .await
+                    {
+                        tournament_players.insert(player.token_address.clone(), player);
+                    }
+
+                    let players = TournamentPlayer::delete_room(
+                        conn,
+                        &self.config.contract_address,
+                        event,
+                        txn_version,
+                    )
+                    .await;
+                    tournament_players.extend(players);
                 }
             }
         }
