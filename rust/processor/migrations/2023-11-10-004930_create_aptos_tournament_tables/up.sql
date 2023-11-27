@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS tournament_player_room_address ON tournament_players (room_address);
 -- when user lost (we have delete resource)
 -- token_address: delete resource w/ token address. find address from checking the db
 -- tournament_address: lk.tournament addres
