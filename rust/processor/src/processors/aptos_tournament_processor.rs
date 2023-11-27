@@ -313,37 +313,34 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
                 // Third pass: everything else
                 for wsc in transaction_info.changes.iter() {
-                    match wsc.change.as_ref().unwrap() {
-                        Change::WriteResource(wr) => {
-                            let address = standardize_address(&wr.address.to_string());
-                            if let Some(tournament) = Tournament::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                                tournament_state_mapping.clone(),
-                                current_round_mapping.clone(),
-                            ) {
-                                tournaments.insert(address.clone(), tournament);
-                            }
-                            if let Some(round) = TournamentRound::from_write_resource(
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                            ) {
-                                tournament_rounds.insert(address.clone(), round);
-                            }
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        let address = standardize_address(&wr.address.to_string());
+                        if let Some(tournament) = Tournament::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                            tournament_state_mapping.clone(),
+                            current_round_mapping.clone(),
+                        ) {
+                            tournaments.insert(address.clone(), tournament);
+                        }
+                        if let Some(round) = TournamentRound::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                        ) {
+                            tournament_rounds.insert(address.clone(), round);
+                        }
 
-                            let players = TournamentPlayer::from_room(
-                                conn,
-                                &self.config.contract_address,
-                                wr,
-                                txn_version,
-                                &tournament_players,
-                            )
-                            .await;
-                            tournament_players.extend(players);
-                        },
-                        _ => {},
+                        let players = TournamentPlayer::from_room(
+                            conn,
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                            &tournament_players,
+                        )
+                        .await;
+                        tournament_players.extend(players);
                     }
                 }
 
