@@ -389,7 +389,7 @@ impl BurnPlayerTokenEvent {
         if let Some(AptosTournamentEvent::BurnPlayerTokenEvent(inner)) =
             AptosTournamentEvent::from_event(
                 contract_addr,
-                &event.type_str.as_str(),
+                event.type_str.as_str(),
                 &event.data,
                 txn_version,
             )
@@ -419,7 +419,7 @@ impl BurnRoomEvent {
     ) -> anyhow::Result<Option<Self>> {
         if let Some(AptosTournamentEvent::BurnRoomEvent(inner)) = AptosTournamentEvent::from_event(
             contract_addr,
-            &event.type_str.as_str(),
+            event.type_str.as_str(),
             &event.data,
             txn_version,
         )
