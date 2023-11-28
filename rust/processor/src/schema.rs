@@ -1145,6 +1145,7 @@ diesel::table! {
         #[max_length = 66]
         room_address -> Nullable<Varchar>,
         alive -> Bool,
+        token_uri -> Varchar,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }

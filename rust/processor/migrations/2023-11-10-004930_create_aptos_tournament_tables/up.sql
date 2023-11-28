@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     tournament_address VARCHAR(66) NOT NULL,
     room_address VARCHAR(66),
     alive BOOLEAN NOT NULL,
+    token_uri VARCHAR NOT NULL,
     last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
