@@ -138,6 +138,7 @@ impl TournamentState {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TournamentPlayerToken {
     pub player_name: String,
+    pub token_uri: String,
     tournament_address: String,
 }
 

@@ -28,6 +28,7 @@ pub struct TournamentPlayer {
     pub tournament_address: String,
     pub room_address: Option<String>,
     pub alive: bool,
+    pub token_uri: String,
     pub last_transaction_version: i64,
 }
 
@@ -67,6 +68,7 @@ impl TournamentPlayer {
                 tournament_address: tournament_token.get_tournament_address(),
                 room_address,
                 alive: true,
+                token_uri: tournament_token.token_uri,
                 last_transaction_version: transaction_version,
             });
         }
@@ -115,6 +117,7 @@ impl TournamentPlayer {
                 tournament_address: player.tournament_address.clone(),
                 room_address: Some(room_address.to_string()),
                 alive: true,
+                token_uri: player.token_uri.clone(),
                 last_transaction_version: transaction_version,
             },
             None => {
@@ -135,6 +138,7 @@ impl TournamentPlayer {
                     tournament_address: player.tournament_address,
                     room_address: Some(room_address.to_string()),
                     alive: true,
+                    token_uri: player.token_uri.clone(),
                     last_transaction_version: transaction_version,
                 }
             },
@@ -160,6 +164,7 @@ impl TournamentPlayer {
                         tournament_address: player.tournament_address.clone(),
                         room_address: player.room_address.clone(),
                         alive: false,
+                        token_uri: player.token_uri.clone(),
                         last_transaction_version: transaction_version,
                     });
                 },
@@ -173,6 +178,7 @@ impl TournamentPlayer {
                             tournament_address: player.tournament_address,
                             room_address: player.room_address,
                             alive: false,
+                            token_uri: player.token_uri,
                             last_transaction_version: transaction_version,
                         });
                     }
@@ -200,6 +206,7 @@ impl TournamentPlayer {
                     tournament_address: player.tournament_address,
                     room_address: None,
                     alive: player.alive,
+                    token_uri: player.token_uri,
                     last_transaction_version: transaction_version,
                 };
                 players.insert(player.token_address.clone(), player);
@@ -230,6 +237,7 @@ pub struct TournamentPlayerQuery {
     pub tournament_address: String,
     pub room_address: Option<String>,
     pub alive: bool,
+    pub token_uri: String,
     pub last_transaction_version: i64,
     pub inserted_at: chrono::NaiveDateTime,
 }
