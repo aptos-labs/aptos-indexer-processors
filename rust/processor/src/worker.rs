@@ -61,7 +61,7 @@ const MIN_SEC_BETWEEN_GRPC_RECONNECTS: u64 = 15;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
 const RECONNECTION_MAX_RETRIES: u64 = 5;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
-const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 15;
+const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60;
 const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
