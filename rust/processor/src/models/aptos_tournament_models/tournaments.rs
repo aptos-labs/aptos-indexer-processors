@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use super::aptos_tournament_utils::{CurrentRound, TournamentDirector, TournamentState};
-use crate::schema::tournaments;
+use crate::{schema::tournaments, utils::util::standardize_address};
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::prelude::*;
 use field_count::FieldCount;
@@ -31,10 +31,6 @@ pub struct Tournament {
 }
 
 impl Tournament {
-    pub fn pk(&self) -> String {
-        self.address.clone()
-    }
-
     pub fn from_write_resource(
         contract_addr: &str,
         write_resource: &WriteResource,
@@ -49,7 +45,7 @@ impl Tournament {
         )
         .unwrap()
         {
-            let tournament_address = write_resource.address.to_string();
+            let tournament_address = standardize_address(&write_resource.address);
             let state = tournament_state_mapping
                 .get(&tournament_address)
                 .unwrap_or_else(|| {
