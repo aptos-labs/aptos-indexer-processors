@@ -11,7 +11,6 @@ pub mod account_transactions_processor;
 pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
-pub mod default_processor2;
 pub mod events_processor;
 pub mod fungible_asset_processor;
 pub mod nft_metadata_processor;
@@ -19,13 +18,15 @@ pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
 pub mod user_transaction_processor;
+pub mod events_processor_v2;
+pub mod transactions_processor_v2;
+pub mod wsc_processor_v2;
 
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
     ans_processor::{AnsProcessor, AnsProcessorConfig},
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
-    default_processor2::DefaultProcessor2,
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
@@ -33,6 +34,9 @@ use self::{
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
     user_transaction_processor::UserTransactionProcessor,
+    events_processor_v2::EventsProcessorV2,
+    transactions_processor_v2::TransactionsProcessorV2,
+    wsc_processor_v2::WscProcessorV2,
 };
 use crate::{
     models::processor_status::ProcessorStatus,
@@ -108,10 +112,11 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     /// versions are successful because any gap would cause the processor to panic
     async fn update_last_processed_version(&self, version: u64) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await;
-        let status = ProcessorStatus {
-            processor: self.name().to_string(),
-            last_success_version: version as i64,
-        };
+        let status =
+            ProcessorStatus {
+                processor: self.name().to_string(),
+                last_success_version: version as i64,
+            };
         execute_with_better_error(
             &mut conn,
             diesel::insert_into(processor_status::table)
@@ -166,7 +171,9 @@ pub enum ProcessorConfig {
     AnsProcessor(AnsProcessorConfig),
     CoinProcessor,
     DefaultProcessor,
-    DefaultProcessor2,
+    TransactionsProcessorV2,
+    EventsProcessorV2,
+    WscProcessorV2,
     EventsProcessor,
     FungibleAssetProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
@@ -206,7 +213,9 @@ pub enum Processor {
     AnsProcessor,
     CoinProcessor,
     DefaultProcessor,
-    DefaultProcessor2,
+    TransactionsProcessorV2,
+    EventsProcessorV2,
+    WscProcessorV2,
     EventsProcessor,
     FungibleAssetProcessor,
     NftMetadataProcessor,

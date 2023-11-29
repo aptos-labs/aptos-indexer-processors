@@ -18,6 +18,7 @@ use diesel_async::{
     RunQueryDsl,
 };
 use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
+use migration::sea_orm::{Database, DatabaseConnection, DbErr};
 use once_cell::sync::Lazy;
 use std::{cmp::min, sync::Arc};
 
@@ -73,6 +74,14 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
 pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     let config = AsyncDieselConnectionManager::<MyDbConnection>::new(database_url);
     Ok(Arc::new(Pool::builder().build(config).await?))
+}
+
+pub async fn new_db_pool_v2(database_url: &str) -> Result<DatabaseConnection, DbErr> {
+    let db: DatabaseConnection = Arc::new(Database::connect(database_url).await.as_ref())
+        .expect("Failed to setup the database for db pool v2.")
+        .clone();
+
+    Ok(db.clone())
 }
 
 /*

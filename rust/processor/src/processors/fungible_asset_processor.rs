@@ -277,17 +277,18 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
-            fungible_asset_activities,
-            fungible_asset_metadata,
-            fungible_asset_balances,
-            current_fungible_asset_balances,
-        )
-        .await;
+        let tx_result =
+            insert_to_db(
+                &mut conn,
+                self.name(),
+                start_version,
+                end_version,
+                fungible_asset_activities,
+                fungible_asset_metadata,
+                fungible_asset_balances,
+                current_fungible_asset_balances,
+            )
+            .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {

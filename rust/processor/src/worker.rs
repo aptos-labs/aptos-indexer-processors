@@ -7,12 +7,13 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        default_processor2::DefaultProcessor2, events_processor::EventsProcessor,
+        events_processor::EventsProcessor, events_processor_v2::EventsProcessorV2,
         fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        transactions_processor_v2::TransactionsProcessorV2,
+        user_transaction_processor::UserTransactionProcessor, wsc_processor_v2::WscProcessorV2,
+        ProcessingResult, Processor, ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
@@ -25,7 +26,10 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
-        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{
+            execute_with_better_error, new_db_pool, new_db_pool_v2, run_pending_migrations,
+            PgDbPool,
+        },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -36,6 +40,7 @@ use aptos_protos::{
     transaction::v1::Transaction,
 };
 use futures::StreamExt;
+use migration::sea_orm::DatabaseConnection;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
@@ -81,6 +86,8 @@ pub struct Worker {
     pub number_concurrent_processing_tasks: usize,
     pub enable_verbose_logging: Option<bool>,
     pub cockroach_db: Option<String>,
+    pub postgres_connection_string_v2: Option<String>,
+    pub db_pool_v2: Option<DatabaseConnection>,
 }
 
 impl Worker {
@@ -95,6 +102,7 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         enable_verbose_logging: Option<bool>,
         cockroach_db: Option<String>,
+        postgres_connection_string_v2: Option<String>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -107,6 +115,16 @@ impl Worker {
         let conn_pool = new_db_pool(&postgres_connection_string)
             .await
             .context("Failed to create connection pool")?;
+
+        let db_pool_v2 = match &postgres_connection_string_v2 {
+            Some(connection_string) => Some(
+                new_db_pool_v2(connection_string)
+                    .await
+                    .context("Failed to create connection pool v2")?,
+            ),
+            None => None,
+        };
+
         info!(
             processor_name = processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
@@ -125,6 +143,8 @@ impl Worker {
             number_concurrent_processing_tasks,
             enable_verbose_logging,
             cockroach_db,
+            postgres_connection_string_v2,
+            db_pool_v2,
         })
     }
 
@@ -151,23 +171,24 @@ impl Worker {
             "[Parser] Finished migrations"
         );
 
-        let starting_version_from_db = self
-            .get_start_version()
-            .await
-            .expect("[Parser] Database error when getting starting version")
-            .unwrap_or_else(|| {
-                info!(
-                    processor_name = processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    "[Parser] No starting version from db so starting from version 0"
-                );
-                0
-            });
+        let starting_version_from_db =
+            self.get_start_version()
+                .await
+                .expect("[Parser] Database error when getting starting version")
+                .unwrap_or_else(|| {
+                    info!(
+                        processor_name = processor_name,
+                        service_type = PROCESSOR_SERVICE_TYPE,
+                        "[Parser] No starting version from db so starting from version 0"
+                    );
+                    0
+                });
 
-        let starting_version = match self.starting_version {
-            None => starting_version_from_db,
-            Some(version) => version,
-        };
+        let starting_version =
+            match self.starting_version {
+                None => starting_version_from_db,
+                Some(version) => version,
+            };
 
         info!(
             processor_name = processor_name,
@@ -185,7 +206,7 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.db_pool.clone(),
-            self.cockroach_db.clone(),
+            self.db_pool_v2.clone(),
         );
         let processor = Arc::new(processor);
 
@@ -366,8 +387,7 @@ impl Worker {
 
             // Process the transactions in parallel
             let mut tasks = vec![];
-            for transactions in transactions_batches {
-                let transactions = transactions.to_vec();
+            for transactions_pb in transactions_batches {
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
@@ -407,11 +427,9 @@ impl Worker {
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS
                             .with_label_values(&[auth_token.as_str(), processor_name])
-                            .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
                     PROCESSOR_INVOCATIONS_COUNT
-                        .with_label_values(&[processor_name])
                         .with_label_values(&[processor_name])
                         .inc();
 
@@ -438,7 +456,6 @@ impl Worker {
                         .await;
                     if let Some(ref t) = txn_time {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
-                            .with_label_values(&[auth_token.as_str(), processor_name])
                             .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
@@ -566,7 +583,6 @@ impl Worker {
                     Ok(versions) => {
                         PROCESSOR_SUCCESSES_COUNT
                             .with_label_values(&[processor_name])
-                            .with_label_values(&[processor_name])
                             .inc();
                         versions
                     },
@@ -578,7 +594,6 @@ impl Worker {
                             "[Parser] Error processing transactions"
                         );
                         PROCESSOR_ERRORS_COUNT
-                            .with_label_values(&[processor_name])
                             .with_label_values(&[processor_name])
                             .inc();
                         panic!();
@@ -770,7 +785,7 @@ impl Worker {
 pub fn build_processor(
     config: &ProcessorConfig,
     db_pool: PgDbPool,
-    cockroach_db: Option<String>,
+    db_pool_v2: Option<DatabaseConnection>,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
@@ -781,11 +796,26 @@ pub fn build_processor(
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
-        ProcessorConfig::DefaultProcessor2 => {
-            let cockroach_db = cockroach_db
+        ProcessorConfig::TransactionsProcessorV2 => {
+            let db_pool_v2 = db_pool_v2
                 .clone()
-                .expect("cockroach_db is required for DefaultProcessor2");
-            Processor::from(DefaultProcessor2::new(db_pool, cockroach_db))
+                .expect("db_pool_v2 is required for TransactionsProcessorV2");
+
+            Processor::from(TransactionsProcessorV2::new(db_pool, db_pool_v2))
+        },
+        ProcessorConfig::EventsProcessorV2 => {
+            let db_pool_v2 = db_pool_v2
+                .clone()
+                .expect("db_pool_v2 is required for EventsProcessorV2");
+
+            Processor::from(EventsProcessorV2::new(db_pool, db_pool_v2))
+        },
+        ProcessorConfig::WscProcessorV2 => {
+            let db_pool_v2 = db_pool_v2
+                .clone()
+                .expect("db_pool_v2 is required for WscProcessorV2");
+
+            Processor::from(WscProcessorV2::new(db_pool, db_pool_v2))
         },
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
@@ -937,16 +967,17 @@ pub async fn create_fetcher_loop(
         end_version = request_ending_version,
         "[Parser] Connecting to GRPC stream",
     );
-    let mut response = get_stream(
-        indexer_grpc_data_service_address.clone(),
-        indexer_grpc_http2_ping_interval,
-        indexer_grpc_http2_ping_timeout,
-        starting_version,
-        request_ending_version,
-        auth_token.clone(),
-        processor_name.to_string(),
-    )
-    .await;
+    let mut response =
+        get_stream(
+            indexer_grpc_data_service_address.clone(),
+            indexer_grpc_http2_ping_interval,
+            indexer_grpc_http2_ping_timeout,
+            starting_version,
+            request_ending_version,
+            auth_token.clone(),
+            processor_name.to_string(),
+        )
+        .await;
     let mut connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
         Some(connection_id) => connection_id.to_str().unwrap().to_string(),
         None => "".to_string(),
@@ -1173,20 +1204,22 @@ pub async fn create_fetcher_loop(
                 reconnection_retries = reconnection_retries,
                 "[Parser] Reconnecting to GRPC stream"
             );
-            response = get_stream(
-                indexer_grpc_data_service_address.clone(),
-                indexer_grpc_http2_ping_interval,
-                indexer_grpc_http2_ping_timeout,
-                next_version_to_fetch,
-                request_ending_version,
-                auth_token.clone(),
-                processor_name.to_string(),
-            )
-            .await;
-            connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
-                Some(connection_id) => connection_id.to_str().unwrap().to_string(),
-                None => "".to_string(),
-            };
+            response =
+                get_stream(
+                    indexer_grpc_data_service_address.clone(),
+                    indexer_grpc_http2_ping_interval,
+                    indexer_grpc_http2_ping_timeout,
+                    next_version_to_fetch,
+                    request_ending_version,
+                    auth_token.clone(),
+                    processor_name.to_string(),
+                )
+                .await;
+            connection_id =
+                match response.metadata().get(GRPC_CONNECTION_ID) {
+                    Some(connection_id) => connection_id.to_str().unwrap().to_string(),
+                    None => "".to_string(),
+                };
             resp_stream = response.into_inner();
             info!(
                 processor_name = processor_name,
