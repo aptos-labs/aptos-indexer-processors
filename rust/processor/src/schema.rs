@@ -1144,6 +1144,7 @@ diesel::table! {
         tournament_address -> Varchar,
         #[max_length = 66]
         room_address -> Nullable<Varchar>,
+        player_name -> Varchar,
         alive -> Bool,
         token_uri -> Varchar,
         last_transaction_version -> Int8,
