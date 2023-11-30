@@ -72,7 +72,7 @@ impl TournamentRoom {
                             panic!("Can't find current round address");
                         }),
                     ),
-                    None => match TournamentQuery::query_by_address(conn, &owner_address).await {
+                    None => match TournamentQuery::query_by_address(conn, owner_address).await {
                         Some(tournament) => (
                             tournament.address,
                             tournament.current_round_address.unwrap_or_else(|| {
