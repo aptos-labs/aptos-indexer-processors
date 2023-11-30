@@ -1153,6 +1153,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    tournament_rooms (address) {
+        #[max_length = 66]
+        address -> Varchar,
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        #[max_length = 66]
+        round_address -> Varchar,
+        in_progress -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     tournament_rounds (address) {
         #[max_length = 66]
         address -> Varchar,
@@ -1313,6 +1327,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships_v2,
     tokens,
     tournament_players,
+    tournament_rooms,
     tournament_rounds,
     tournaments,
     transactions,

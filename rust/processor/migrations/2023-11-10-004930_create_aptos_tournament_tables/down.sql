@@ -1,9 +1,9 @@
-DROP INDEX IF EXISTS tournament_round_address;
 DROP INDEX IF EXISTS tournament_is_joinable;
 DROP INDEX IF EXISTS tournament_has_ended;
+DROP INDEX IF EXISTS tournament_current_round_number;
 DROP INDEX IF EXISTS tournament_round_address;
-DROP INDEX IF EXISTS tournament_token_owners_user_address;
-DROP INDEX IF EXISTS tournament_token_owners_tournament_address;
+DROP INDEX IF EXISTS tournament_room_round_address;
+DROP INDEX IF EXISTS tournament_room_in_progress;
 DROP INDEX IF EXISTS tournament_player_room_address;
 DROP TABLE IF EXISTS tournament_token_owners;
 DROP TABLE IF EXISTS tournament_players;

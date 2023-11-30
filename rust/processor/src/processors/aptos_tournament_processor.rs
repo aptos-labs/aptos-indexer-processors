@@ -9,6 +9,7 @@ use crate::{
                 CurrentRound, CurrentRoundMapping, TournamentState, TournamentStateMapping,
             },
             tournament_players::{TournamentPlayer, TournamentPlayerMapping},
+            tournament_rooms::{TournamentRoom, TournamentRoomsMapping},
             tournament_rounds::{TournamentRound, TournamentRoundsMapping},
             tournaments::{Tournament, TournamentMapping},
         },
@@ -73,6 +74,7 @@ async fn insert_to_db(
     end_version: u64,
     tournaments_to_insert: Vec<Tournament>,
     tournament_rounds_to_insert: Vec<TournamentRound>,
+    tournament_rooms_to_insert: Vec<TournamentRoom>,
     tournament_players_to_insert: Vec<TournamentPlayer>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -89,6 +91,7 @@ async fn insert_to_db(
                 pg_conn,
                 &tournaments_to_insert,
                 &tournament_rounds_to_insert,
+                &tournament_rooms_to_insert,
                 &tournament_players_to_insert,
             ))
         })
@@ -109,6 +112,7 @@ async fn insert_to_db(
                             pg_conn,
                             &tournaments_to_insert,
                             &tournament_rounds_to_insert,
+                            &tournament_rooms_to_insert,
                             &tournament_players_to_insert,
                         )
                         .await
@@ -123,10 +127,12 @@ async fn insert_to_db_impl(
     conn: &mut MyDbConnection,
     tournaments_to_insert: &[Tournament],
     tournament_rounds_to_insert: &[TournamentRound],
+    tournament_rooms_to_insert: &[TournamentRoom],
     tournament_players_to_insert: &[TournamentPlayer],
 ) -> Result<(), diesel::result::Error> {
     insert_tournaments(conn, tournaments_to_insert).await?;
     insert_tournament_rounds(conn, tournament_rounds_to_insert).await?;
+    insert_tournament_rooms(conn, tournament_rooms_to_insert).await?;
     insert_tournament_players(conn, tournament_players_to_insert).await?;
     Ok(())
 }
@@ -198,6 +204,38 @@ async fn insert_tournament_rounds(
     Ok(())
 }
 
+async fn insert_tournament_rooms(
+    conn: &mut MyDbConnection,
+    tournament_rooms_to_insert: &[TournamentRoom],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_rooms::dsl::*;
+    let chunks = get_chunks(
+        tournament_rooms_to_insert.len(),
+        TournamentRoom::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_rooms::table)
+                .values(&tournament_rooms_to_insert[start_ind..end_ind])
+                .on_conflict(address)
+                .do_update()
+                .set((
+                    tournament_address.eq(excluded(tournament_address)),
+                    round_address.eq(excluded(round_address)),
+                    in_progress.eq(excluded(in_progress)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(
+                " WHERE tournament_rooms.last_transaction_version <= excluded.last_transaction_version ",
+            ),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 async fn insert_tournament_players(
     conn: &mut MyDbConnection,
     tournament_players_to_insert: &[TournamentPlayer],
@@ -249,6 +287,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
         let mut tournaments: TournamentMapping = HashMap::new();
         let mut tournament_rounds: TournamentRoundsMapping = HashMap::new();
+        let mut tournament_rooms: TournamentRoomsMapping = HashMap::new();
         let mut tournament_players: TournamentPlayerMapping = HashMap::new();
 
         for txn in transactions {
@@ -292,7 +331,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     }
                 }
 
-                // Second pass: get tournament players metadata
+                // Second pass: get tournament and players metadata
                 for wsc in transaction_info.changes.iter() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                         let address = standardize_address(&wr.address.to_string());
@@ -308,13 +347,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         {
                             tournament_players.insert(address.clone(), tournament_player);
                         }
-                    }
-                }
-
-                // Third pass: everything else
-                for wsc in transaction_info.changes.iter() {
-                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        let address = standardize_address(&wr.address.to_string());
                         if let Some(tournament) = Tournament::from_write_resource(
                             &self.config.contract_address,
                             wr,
@@ -324,12 +356,31 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         ) {
                             tournaments.insert(address.clone(), tournament);
                         }
+                    }
+                }
+
+                // Third pass: everything else
+                for wsc in transaction_info.changes.iter() {
+                    if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                        let address = standardize_address(&wr.address.to_string());
                         if let Some(round) = TournamentRound::from_write_resource(
                             &self.config.contract_address,
                             wr,
                             txn_version,
                         ) {
                             tournament_rounds.insert(address.clone(), round);
+                        }
+                        if let Some(room) = TournamentRoom::from_write_resource(
+                            conn,
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                            &object_to_owner,
+                            &tournaments,
+                        )
+                        .await
+                        {
+                            tournament_rooms.insert(address.clone(), room);
                         }
 
                         let players = TournamentPlayer::from_room(
@@ -357,6 +408,17 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     {
                         tournament_players.insert(player.token_address.clone(), player);
                     }
+                    if let Some(room) = TournamentRoom::delete_room(
+                        conn,
+                        &self.config.contract_address,
+                        event,
+                        txn_version,
+                        &tournament_rooms,
+                    )
+                    .await
+                    {
+                        tournament_rooms.insert(room.address.clone(), room);
+                    }
 
                     let players = TournamentPlayer::delete_room(
                         conn,
@@ -375,10 +437,12 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
         let mut tournaments = tournaments.values().cloned().collect::<Vec<_>>();
         let mut tournament_rounds = tournament_rounds.values().cloned().collect::<Vec<_>>();
+        let mut tournament_rooms = tournament_rooms.values().cloned().collect::<Vec<_>>();
         let mut tournament_players = tournament_players.values().cloned().collect::<Vec<_>>();
 
         tournaments.sort();
         tournament_rounds.sort();
+        tournament_rooms.sort();
         tournament_players.sort();
 
         insert_to_db(
@@ -388,6 +452,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
             end_version,
             tournaments,
             tournament_rounds,
+            tournament_rooms,
             tournament_players,
         )
         .await?;

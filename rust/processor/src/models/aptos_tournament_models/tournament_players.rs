@@ -43,7 +43,7 @@ impl TournamentPlayer {
         contract_addr: &str,
         write_resource: &WriteResource,
         transaction_version: i64,
-        token_to_owner: &HashMap<String, String>,
+        object_to_owner: &HashMap<String, String>,
         previous_tournament_token: &TournamentPlayerMapping,
     ) -> Option<Self> {
         if let Some(tournament_token) = TournamentPlayerToken::from_write_resource(
@@ -65,7 +65,7 @@ impl TournamentPlayer {
             };
             return Some(TournamentPlayer {
                 token_address: token_address.clone(),
-                user_address: token_to_owner.get(&token_address).unwrap().clone(),
+                user_address: object_to_owner.get(&token_address).unwrap().clone(),
                 tournament_address: tournament_token.get_tournament_address(),
                 room_address,
                 player_name: tournament_token.player_name.clone(),

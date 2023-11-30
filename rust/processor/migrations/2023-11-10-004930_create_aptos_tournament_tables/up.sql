@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS tournament_rounds (
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS tournament_round_address ON tournament_rounds (address);
+CREATE TABLE IF NOT EXISTS tournament_rooms (
+    address VARCHAR(66) PRIMARY KEY NOT NULL,
+    tournament_address VARCHAR(66) NOT NULL,
+    round_address VARCHAR(66) NOT NULL,
+    in_progress BOOLEAN NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS tournament_room_round_address ON tournament_rooms (round_address);
+CREATE INDEX IF NOT EXISTS tournament_room_in_progress ON tournament_rooms (in_progress);
 CREATE TABLE IF NOT EXISTS tournament_players (
     token_address VARCHAR(66) PRIMARY KEY NOT NULL,
     user_address VARCHAR(66) NOT NULL,
