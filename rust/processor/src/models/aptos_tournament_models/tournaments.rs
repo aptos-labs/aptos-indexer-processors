@@ -1,9 +1,14 @@
 // Copyright © Aptos Foundation
 
 use super::aptos_tournament_utils::{CurrentRound, TournamentDirector, TournamentState};
-use crate::{schema::tournaments, utils::util::standardize_address};
+use crate::{
+    models::token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+    schema::tournaments,
+    utils::{database::PgPoolConnection, util::standardize_address},
+};
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,17 +22,17 @@ pub type TournamentMapping = HashMap<String, Tournament>;
 #[diesel(primary_key(address))]
 #[diesel(table_name = tournaments)]
 pub struct Tournament {
-    address: String,
-    tournament_name: String,
-    max_players: i64,
-    max_num_winners: i64,
-    players_joined: i64,
-    is_joinable: bool,
-    has_ended: bool,
-    current_round_address: Option<String>,
-    current_round_number: i64,
-    current_game_module: Option<String>,
-    last_transaction_version: i64,
+    pub address: String,
+    pub tournament_name: String,
+    pub max_players: i64,
+    pub max_num_winners: i64,
+    pub players_joined: i64,
+    pub is_joinable: bool,
+    pub has_ended: bool,
+    pub current_round_address: Option<String>,
+    pub current_round_number: i64,
+    pub current_game_module: Option<String>,
+    pub last_transaction_version: i64,
 }
 
 impl Tournament {
@@ -97,5 +102,48 @@ impl Ord for Tournament {
 impl PartialOrd for Tournament {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[derive(Queryable, Identifiable, Debug, Clone)]
+#[diesel(primary_key(address))]
+#[diesel(table_name = tournaments)]
+pub struct TournamentQuery {
+    pub address: String,
+    pub tournament_name: String,
+    pub max_players: i64,
+    pub max_num_winners: i64,
+    pub players_joined: i64,
+    pub is_joinable: bool,
+    pub has_ended: bool,
+    pub current_round_address: Option<String>,
+    pub current_round_number: i64,
+    pub current_game_module: Option<String>,
+    pub last_transaction_version: i64,
+    pub inserted_at: chrono::NaiveDateTime,
+}
+
+impl TournamentQuery {
+    pub async fn query_by_address(conn: &mut PgPoolConnection<'_>, address: &str) -> Option<Self> {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            if let Ok(player) = Self::get_by_address(conn, address).await {
+                return player;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+        }
+        None
+    }
+
+    async fn get_by_address(
+        conn: &mut PgPoolConnection<'_>,
+        address: &str,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        tournaments::table
+            .find(address)
+            .first::<Self>(conn)
+            .await
+            .optional()
     }
 }
