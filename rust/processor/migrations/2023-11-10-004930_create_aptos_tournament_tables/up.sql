@@ -47,22 +47,3 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS tournament_player_room_address ON tournament_players (room_address);
--- when user lost (we have delete resource)
--- token_address: delete resource w/ token address. find address from checking the db
--- tournament_address: lk.tournament addres
--- room_address: none
--- alive: false,
--- submitted: lk.submitted
--- when user won (we have the user address)
--- user_address
--- token_address:
--- tournament_address: lk.tournament address
--- room_address: none
--- alive: true,
--- submitted: true
--- when submitted happens
--- token_address:
--- tournament_address: lk.tournament address
--- room_address: none
--- alive: true,
--- submitted: true

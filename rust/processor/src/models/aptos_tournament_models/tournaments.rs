@@ -80,7 +80,7 @@ impl Tournament {
                 tournament_name: td.tournament_name,
                 max_players: td.max_players,
                 max_num_winners: td.max_num_winners,
-                players_joined: 0,
+                players_joined: td.players_joined,
                 is_joinable: state.is_joinable,
                 has_ended: state.has_ended,
                 current_round_address: Some(current_round.get_round_address()),
