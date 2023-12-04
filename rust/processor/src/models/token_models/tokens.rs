@@ -13,13 +13,10 @@ use super::{
     token_utils::{TokenResource, TokenWriteSet},
 };
 use crate::{
-    models::default_models::move_resources::MoveResource,
-    schema::tokens,
-    utils::{
-        database::PgPoolConnection,
-        util::{ensure_not_negative, parse_timestamp, standardize_address},
-    },
+    models::default_models::move_resources::MoveResource, schema::tokens,
+    utils::database::PgPoolConnection,
 };
+use aptos_processor_sdk::utils::{ensure_not_negative, parse_timestamp, standardize_address};
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, DeleteTableItem,
     Transaction, WriteResource, WriteTableItem,

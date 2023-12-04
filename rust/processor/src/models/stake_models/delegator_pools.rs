@@ -5,13 +5,11 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::stake_utils::{StakeResource, StakeTableItem};
-use crate::{
-    schema::{
-        current_delegated_staking_pool_balances, delegated_staking_pool_balances,
-        delegated_staking_pools,
-    },
-    utils::util::standardize_address,
+use crate::schema::{
+    current_delegated_staking_pool_balances, delegated_staking_pool_balances,
+    delegated_staking_pools,
 };
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, Transaction, WriteResource, WriteTableItem,
 };

@@ -22,12 +22,10 @@ use crate::{
         },
     },
     schema::{current_token_ownerships_v2, token_ownerships_v2},
-    utils::{
-        database::PgPoolConnection,
-        util::{ensure_not_negative, standardize_address},
-    },
+    utils::database::PgPoolConnection,
 };
 use anyhow::Context;
+use aptos_processor_sdk::utils::{ensure_not_negative, standardize_address};
 use aptos_protos::transaction::v1::{
     DeleteResource, DeleteTableItem, WriteResource, WriteTableItem,
 };

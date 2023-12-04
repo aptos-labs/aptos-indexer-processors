@@ -24,7 +24,9 @@ use crate::{
     },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
-    utils::util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
+};
+use aptos_processor_sdk::utils::{
+    get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal,
 };
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, Event as EventPB,

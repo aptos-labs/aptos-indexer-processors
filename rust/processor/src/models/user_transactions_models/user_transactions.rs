@@ -8,12 +8,9 @@
 #![allow(clippy::unused_unit)]
 
 use super::signatures::Signature;
-use crate::{
-    schema::user_transactions,
-    utils::util::{
-        get_entry_function_from_user_request, parse_timestamp, standardize_address,
-        u64_to_bigdecimal,
-    },
+use crate::schema::user_transactions;
+use aptos_processor_sdk::utils::{
+    get_entry_function_from_user_request, parse_timestamp, standardize_address, u64_to_bigdecimal,
 };
 use aptos_protos::{
     transaction::v1::{UserTransaction as UserTransactionPB, UserTransactionRequest},

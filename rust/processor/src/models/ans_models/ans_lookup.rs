@@ -6,10 +6,8 @@
 #![allow(clippy::unused_unit)]
 
 use super::ans_utils::AnsTableItem;
-use crate::{
-    schema::{ans_lookup, ans_primary_name, current_ans_lookup, current_ans_primary_name},
-    utils::util::{get_name_from_unnested_move_type, standardize_address},
-};
+use crate::schema::{ans_lookup, ans_primary_name, current_ans_lookup, current_ans_primary_name};
+use aptos_processor_sdk::utils::{get_name_from_unnested_move_type, standardize_address};
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use diesel::prelude::*;
 use field_count::FieldCount;

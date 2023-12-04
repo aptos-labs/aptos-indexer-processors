@@ -18,15 +18,13 @@ use crate::{
         token_v2_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
     },
     schema,
-    utils::{
-        database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
-        },
-        util::{get_entry_function_from_user_request, standardize_address},
+    utils::database::{
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
+use aptos_processor_sdk::utils::{get_entry_function_from_user_request, standardize_address};
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;

@@ -16,9 +16,10 @@ use crate::{
         },
     },
     schema::{collections_v2, current_collections_v2},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::database::PgPoolConnection,
 };
 use anyhow::Context;
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use diesel::{prelude::*, sql_query, sql_types::Text};

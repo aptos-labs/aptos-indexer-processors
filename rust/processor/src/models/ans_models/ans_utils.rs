@@ -4,14 +4,12 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{
-    models::default_models::move_resources::MoveResource,
-    utils::util::{
-        bigdecimal_to_u64, deserialize_from_string, parse_timestamp_secs, standardize_address,
-        truncate_str,
-    },
-};
+use crate::models::default_models::move_resources::MoveResource;
 use anyhow::Context;
+use aptos_processor_sdk::utils::{
+    bigdecimal_to_u64, deserialize_from_string, parse_timestamp_secs, standardize_address,
+    truncate_str,
+};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};

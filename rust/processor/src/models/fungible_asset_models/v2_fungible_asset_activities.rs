@@ -20,9 +20,10 @@ use crate::{
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_activities,
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::database::PgPoolConnection,
 };
 use anyhow::Context;
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;

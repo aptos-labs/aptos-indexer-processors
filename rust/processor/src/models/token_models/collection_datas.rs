@@ -11,8 +11,9 @@ use super::{
 };
 use crate::{
     schema::{collection_datas, current_collection_datas},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::database::PgPoolConnection,
 };
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};

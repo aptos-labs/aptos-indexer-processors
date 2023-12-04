@@ -14,8 +14,8 @@ use crate::{
     schema::{
         ans_lookup_v2, ans_primary_name_v2, current_ans_lookup_v2, current_ans_primary_name_v2,
     },
-    utils::util::standardize_address,
 };
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use diesel::prelude::*;
 use field_count::FieldCount;

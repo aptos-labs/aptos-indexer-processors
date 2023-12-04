@@ -16,8 +16,9 @@ use crate::{
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::{current_fungible_asset_balances, fungible_asset_balances},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::database::PgPoolConnection,
 };
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;

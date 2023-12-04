@@ -3,13 +3,15 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::Transaction;
-use crate::{schema::move_resources, utils::util::standardize_address};
+use crate::schema::move_resources;
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{
     DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]

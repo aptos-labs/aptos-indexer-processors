@@ -4,11 +4,11 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{
-    models::default_models::move_resources::MoveResource,
-    utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
-};
+use crate::models::default_models::move_resources::MoveResource;
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::{
+    deserialize_from_string, hash_str, standardize_address, truncate_str,
+};
 use aptos_protos::transaction::v1::{move_type::Content, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use regex::Regex;

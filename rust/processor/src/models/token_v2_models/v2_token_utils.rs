@@ -13,12 +13,10 @@ use crate::{
         },
         token_models::token_utils::{NAME_LENGTH, URI_LENGTH},
     },
-    utils::util::{
-        deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,
-        standardize_address, truncate_str,
-    },
+    utils::util::deserialize_token_object_property_map_from_bcs_hexstring,
 };
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::{deserialize_from_string, standardize_address, truncate_str};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};

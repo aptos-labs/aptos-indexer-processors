@@ -11,15 +11,13 @@ use crate::{
         ans_utils::{RenewNameEvent, SubdomainExtV2},
     },
     schema,
-    utils::{
-        database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
-        },
-        util::standardize_address,
+    utils::database::{
+        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        PgPoolConnection,
     },
 };
 use anyhow::bail;
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };

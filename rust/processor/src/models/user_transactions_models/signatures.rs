@@ -3,11 +3,9 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{
-    schema::signatures::{self},
-    utils::util::standardize_address,
-};
+use crate::schema::signatures::{self};
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum,
     any_signature::Type as AnySignatureTypeEnumPb, signature::Signature as SignatureEnum,

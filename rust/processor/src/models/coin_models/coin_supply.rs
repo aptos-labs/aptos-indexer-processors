@@ -7,9 +7,10 @@
 
 use crate::{
     models::default_models::move_tables::TableItem,
-    processors::coin_processor::APTOS_COIN_TYPE_STR, schema::coin_supply, utils::util::hash_str,
+    processors::coin_processor::APTOS_COIN_TYPE_STR, schema::coin_supply,
 };
 use anyhow::Context;
+use aptos_processor_sdk::utils::hash_str;
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;

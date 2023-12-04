@@ -11,8 +11,9 @@ use super::{
 use crate::{
     models::token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     schema::current_delegated_voter,
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::database::PgPoolConnection,
 };
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::WriteTableItem;
 use diesel::{prelude::*, ExpressionMethods};
 use diesel_async::RunQueryDsl;

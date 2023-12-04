@@ -10,9 +10,10 @@ use crate::{
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     },
     schema::{current_delegator_balances, delegator_balances},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::database::PgPoolConnection,
 };
 use anyhow::Context;
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{
     write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
 };

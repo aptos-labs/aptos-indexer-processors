@@ -9,9 +9,9 @@ use super::{
     block_metadata_transactions::BlockMetadataTransaction,
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
-use crate::{
-    schema::transactions,
-    utils::util::{get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal},
+use crate::schema::transactions;
+use aptos_processor_sdk::utils::{
+    get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal,
 };
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},

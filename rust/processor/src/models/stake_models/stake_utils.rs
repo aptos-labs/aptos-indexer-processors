@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    models::{default_models::move_resources::MoveResource, token_models::token_utils::Table},
-    utils::util::{deserialize_from_string, standardize_address},
+use crate::models::{
+    default_models::move_resources::MoveResource, token_models::token_utils::Table,
 };
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::{deserialize_from_string, standardize_address};
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};

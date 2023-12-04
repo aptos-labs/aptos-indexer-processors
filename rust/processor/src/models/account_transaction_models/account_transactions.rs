@@ -11,8 +11,8 @@ use crate::{
         user_transactions_models::user_transactions::UserTransaction,
     },
     schema::account_transactions,
-    utils::util::standardize_address,
 };
+use aptos_processor_sdk::utils::standardize_address;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, DeleteResource, Event, Transaction,
     WriteResource,

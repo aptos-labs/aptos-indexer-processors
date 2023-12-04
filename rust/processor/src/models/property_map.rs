@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::util;
+use aptos_processor_sdk::utils;
 use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ pub struct PropertyValue {
 
 pub fn create_property_value(typ: String, value: String) -> Result<PropertyValue> {
     Ok(PropertyValue {
-        value: util::convert_bcs_hex(typ.clone(), value.clone()).unwrap_or(value),
+        value: utils::convert_bcs_hex(typ.clone(), value.clone()).unwrap_or(value),
         typ,
     })
 }
@@ -64,7 +64,7 @@ pub fn create_token_object_property_value(
     value: String,
 ) -> Result<TokenObjectPropertyValue> {
     Ok(TokenObjectPropertyValue {
-        value: util::convert_bcs_hex_new(typ, value.clone()).unwrap_or(value),
+        value: utils::convert_bcs_hex_new(typ, value.clone()).unwrap_or(value),
         typ,
     })
 }

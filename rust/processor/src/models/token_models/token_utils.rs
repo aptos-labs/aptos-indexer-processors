@@ -4,11 +4,12 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::utils::util::{
-    deserialize_from_string, deserialize_property_map_from_bcs_hexstring,
-    deserialize_string_from_hexstring, hash_str, standardize_address, truncate_str,
-};
+use crate::utils::util::deserialize_property_map_from_bcs_hexstring;
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::{
+    deserialize_from_string, deserialize_string_from_hexstring, hash_str, standardize_address,
+    truncate_str,
+};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
