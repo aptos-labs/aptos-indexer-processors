@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    models::{
+        ledger_info::LedgerInfo,
+        processor_status::{update_last_processed_version, ProcessorStatusQuery},
+    },
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
@@ -589,8 +592,8 @@ impl Worker {
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
 
-            processor
-                .update_last_processed_version(batch_end)
+            let conn = processor.get_conn().await;
+            update_last_processed_version(conn, processor_name.to_string(), batch_end)
                 .await
                 .unwrap();
 
