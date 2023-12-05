@@ -192,7 +192,7 @@ pub fn get_clean_writeset(writeset: &WriteSet, version: i64) -> Option<Value> {
 }
 
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
-fn get_clean_entry_function_payload(
+pub fn get_clean_entry_function_payload(
     payload: &EntryFunctionPayload,
     version: i64,
 ) -> EntryFunctionPayloadClean {
@@ -213,7 +213,7 @@ fn get_clean_entry_function_payload(
 }
 
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
-fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayloadClean {
+pub fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayloadClean {
     ScriptPayloadClean {
         code: payload.code.clone(),
         type_arguments: payload.type_arguments.clone(),

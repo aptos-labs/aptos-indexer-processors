@@ -60,15 +60,6 @@ pub struct GrpcStreamSubscriberConfig {
 
     /// If set, the processor will stop processing at this version.
     pub ending_version: Option<u64>,
-
-    #[serde(default = "GrpcStreamSubscriberConfig::default_num_concurrent_processing_tasks")]
-    pub num_concurrent_processing_tasks: usize,
-}
-
-impl GrpcStreamSubscriberConfig {
-    const fn default_num_concurrent_processing_tasks() -> usize {
-        10
-    }
 }
 
 #[derive(Debug)]
