@@ -29,23 +29,28 @@ use url::Url;
 /// Used for logging purposes to identify the source of the logging.
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
-/// The consumer thread will wait X seconds before panicking if it doesn't receive any
-/// data.
-const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
-
 /// Necessary configuration for the dispatcher. We keep this separate so it can be
 /// included in a struct for config parsing if the dev wishes.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DispatcherConfig {
-    #[serde(default = "DispatcherConfig::default_number_concurrent_processing_tasks")]
+    /// The number of concurrent tasks that will process transactions.
     pub number_concurrent_processing_tasks: usize,
-    #[serde(default)]
+
+    /// Whether to enable verbose logging.
     pub enable_verbose_logging: bool,
+
+    /// The number of seconds to wait before panicking if we don't receive any data.
+    pub consumer_thread_timeout_in_secs: u64,
 }
 
-impl DispatcherConfig {
-    const fn default_number_concurrent_processing_tasks() -> usize {
-        10
+impl Default for DispatcherConfig {
+    fn default() -> Self {
+        Self {
+            number_concurrent_processing_tasks: 10,
+            enable_verbose_logging: false,
+            consumer_thread_timeout_in_secs: 60 * 5,
+        }
     }
 }
 
@@ -75,6 +80,7 @@ impl<PS: ProgressStorageTrait> Dispatcher<PS> {
         let processor_name = self.processor.name();
 
         let concurrent_tasks = self.config.number_concurrent_processing_tasks;
+        let consume_thread_timeout_in_secs = self.config.consumer_thread_timeout_in_secs;
 
         // This is the moving average that we use to calculate TPS
         let mut ma = MovingAverage::new(10);
@@ -102,7 +108,7 @@ impl<PS: ProgressStorageTrait> Dispatcher<PS> {
                     0 => {
                         // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
                         match timeout(
-                            Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
+                            Duration::from_secs(consume_thread_timeout_in_secs),
                             self.receiver.recv(),
                         )
                         .await

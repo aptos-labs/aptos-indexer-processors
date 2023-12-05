@@ -167,6 +167,7 @@ impl Worker {
             config: DispatcherConfig {
                 number_concurrent_processing_tasks: self.number_concurrent_processing_tasks,
                 enable_verbose_logging: self.enable_verbose_logging.unwrap_or(false),
+                ..Default::default()
             },
             progress_storage,
             processor,
