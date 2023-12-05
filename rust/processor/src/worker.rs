@@ -57,8 +57,8 @@ const BUFFER_SIZE: usize = 50;
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
 const RECONNECTION_MAX_RETRIES: u64 = 100;
-// Consumer thread will wait X seconds before panicking if it doesn't receive any data
-const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
+// Fetcher thread will wait X seconds before timing out if it doesn't receive any data
+const GRPC_RESPONSE_FETCH_TIMEOUT_IN_SECS: u64 = 60 * 5;
 const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
@@ -240,28 +240,7 @@ impl Worker {
                 let receive_status = match task_index {
                     0 => {
                         // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
-                        match timeout(
-                            Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
-                            receiver.recv(),
-                        )
-                        .await
-                        {
-                            Ok(result) => result.ok_or(TryRecvError::Disconnected),
-                            Err(_) => {
-                                error!(
-                                    processor_name = processor_name,
-                                    service_type = PROCESSOR_SERVICE_TYPE,
-                                    stream_address =
-                                        self.indexer_grpc_data_service_address.as_str(),
-                                    "[Parser] Consumer thread timed out waiting for transactions",
-                                );
-                                panic!(
-                                    "[Parser] Consumer thread timed out waiting for transactions"
-                                );
-                            },
-                        }
-                        // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
-                        // receiver.recv().await.ok_or(TryRecvError::Disconnected)
+                        receiver.recv().await.ok_or(TryRecvError::Disconnected)
                     },
                     _ => {
                         // If we're not the first task, we should poll to see if we get any data.
@@ -936,8 +915,13 @@ pub async fn create_fetcher_loop(
     );
 
     loop {
-        let is_success = match resp_stream.next().await {
-            Some(Ok(r)) => {
+        let is_success = match timeout(
+            Duration::from_secs(GRPC_RESPONSE_FETCH_TIMEOUT_IN_SECS),
+            resp_stream.next(),
+        )
+        .await
+        {
+            Ok(Some(Ok(r))) => {
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
                 let start_txn_timestamp =
@@ -1051,7 +1035,7 @@ pub async fn create_fetcher_loop(
                 grpc_channel_recv_latency = std::time::Instant::now();
                 true
             },
-            Some(Err(rpc_error)) => {
+            Ok(Some(Err(rpc_error))) => {
                 tracing::warn!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
@@ -1064,7 +1048,7 @@ pub async fn create_fetcher_loop(
                 );
                 false
             },
-            None => {
+            Ok(None) => {
                 tracing::warn!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
@@ -1076,7 +1060,20 @@ pub async fn create_fetcher_loop(
                 );
                 false
             },
+            Err(_) => {
+                error!(
+                    processor_name = processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
+                    start_version = starting_version,
+                    end_version = request_ending_version,
+                    "[Parser] Fetcher thread timed out waiting for transactions",
+                );
+                false
+            },
         };
+
         // Check if we're at the end of the stream
         let is_end = if let Some(ending_version) = request_ending_version {
             next_version_to_fetch > ending_version
