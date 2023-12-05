@@ -115,6 +115,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "duration-str",
+ "enum_dispatch",
  "futures",
  "hex",
  "once_cell",

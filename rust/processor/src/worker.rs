@@ -2,15 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    processors::{
-        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-        nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
-        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
-    },
+    processors::{build_processor, ProcessorConfig},
     utils::{
         counters::{
             MULTI_BATCH_PROCESSING_TIME_IN_SECS, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
@@ -30,6 +22,7 @@ use aptos_processor_sdk::{
         ProcessorStep, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_PROCESSED_COUNT,
         PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
+    processor::ProcessingResult,
     progress_storage::ProgressStorageTrait,
     stream_subscriber::{
         ChannelHandle, GrpcStreamSubscriber, GrpcStreamSubscriberConfig, IndexerGrpcHttp2Config,
@@ -38,7 +31,7 @@ use aptos_processor_sdk::{
     utils::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
 };
 use aptos_protos::transaction::v1::Transaction;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 use tracing::{error, info};
 use url::Url;
@@ -168,7 +161,6 @@ impl Worker {
 
         // Build the processor based on the config.
         let processor = build_processor(&self.processor_config, self.db_pool.clone());
-        let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
         let mut ma = MovingAverage::new(10);
@@ -704,37 +696,5 @@ impl Worker {
                 Ok(grpc_chain_id)
             },
         }
-    }
-}
-
-/// Given a config and a db pool, build a concrete instance of a processor.
-// As time goes on there might be other things that we need to provide to certain
-// processors. As that happens we can revist whether this function (which tends to
-// couple processors together based on their args) makes sense.
-pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
-    match config {
-        ProcessorConfig::AccountTransactionsProcessor => {
-            Processor::from(AccountTransactionsProcessor::new(db_pool))
-        },
-        ProcessorConfig::AnsProcessor(config) => {
-            Processor::from(AnsProcessor::new(db_pool, config.clone()))
-        },
-        ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
-        ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
-        ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
-        ProcessorConfig::FungibleAssetProcessor => {
-            Processor::from(FungibleAssetProcessor::new(db_pool))
-        },
-        ProcessorConfig::NftMetadataProcessor(config) => {
-            Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
-        },
-        ProcessorConfig::StakeProcessor => Processor::from(StakeProcessor::new(db_pool)),
-        ProcessorConfig::TokenProcessor(config) => {
-            Processor::from(TokenProcessor::new(db_pool, config.clone()))
-        },
-        ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
-        ProcessorConfig::UserTransactionProcessor => {
-            Processor::from(UserTransactionProcessor::new(db_pool))
-        },
     }
 }

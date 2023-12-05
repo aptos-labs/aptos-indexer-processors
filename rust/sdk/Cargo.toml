@@ -24,6 +24,7 @@ bcs = { workspace = true }
 bigdecimal = { workspace = true }
 chrono = { workspace = true }
 duration-str = { workspace = true }
+enum_dispatch = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 once_cell = { workspace = true }

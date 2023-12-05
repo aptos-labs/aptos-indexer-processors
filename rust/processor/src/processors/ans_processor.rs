@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{ProcessorName, ProcessorStorageTrait};
 use crate::{
     models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
@@ -17,7 +17,10 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_processor_sdk::utils::standardize_address;
+use aptos_processor_sdk::{
+    processor::{ProcessingResult, ProcessorTrait},
+    utils::standardize_address,
+};
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
@@ -459,7 +462,10 @@ impl ProcessorTrait for AnsProcessor {
             },
         }
     }
+}
 
+#[async_trait]
+impl ProcessorStorageTrait for AnsProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }

@@ -36,37 +36,17 @@ use crate::utils::{
     counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
     database::{PgDbPool, PgPoolConnection},
 };
-use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
+use aptos_processor_sdk::processor::ProcessorTrait;
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
-type StartVersion = u64;
-type EndVersion = u64;
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub struct ProcessingResult {
-    pub start_version: StartVersion,
-    pub end_version: EndVersion,
-    pub processing_duration_in_secs: f64,
-    pub db_insertion_duration_in_secs: f64,
-}
-
-/// Base trait for all processors
+/// This is an extension for all the processors included in this codebase that allows
+/// them to access a DB connection.
 #[async_trait]
 #[enum_dispatch]
-pub trait ProcessorTrait: Send + Sync + Debug {
-    fn name(&self) -> &'static str;
-
-    /// Process all transactions including writing to the database
-    async fn process_transactions(
-        &self,
-        transactions: Vec<ProtoTransaction>,
-        start_version: u64,
-        end_version: u64,
-        db_chain_id: Option<u8>,
-    ) -> anyhow::Result<ProcessingResult>;
-
+pub trait ProcessorStorageTrait: Send + Sync + Debug {
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below
     fn connection_pool(&self) -> &PgDbPool;
@@ -151,47 +131,33 @@ impl ProcessorConfig {
     }
 }
 
-/// This enum contains all the processors defined in this crate. We use enum_dispatch
-/// as it is more efficient than using dynamic dispatch (Box<dyn ProcessorTrait>) and
-/// it enables nice safety checks like in we do in `test_processor_names_complete`.
-#[enum_dispatch(ProcessorTrait)]
-#[derive(Debug)]
-// To ensure that the variants of ProcessorConfig and Processor line up, in the testing
-// build path we derive EnumDiscriminants on this enum as well and make sure the two
-// sets of variants match up in `test_processor_names_complete`.
-#[cfg_attr(
-    test,
-    derive(strum::EnumDiscriminants),
-    strum_discriminants(
-        derive(strum::EnumVariantNames),
-        name(ProcessorDiscriminants),
-        strum(serialize_all = "snake_case")
-    )
-)]
-pub enum Processor {
-    AccountTransactionsProcessor,
-    AnsProcessor,
-    CoinProcessor,
-    DefaultProcessor,
-    EventsProcessor,
-    FungibleAssetProcessor,
-    NftMetadataProcessor,
-    StakeProcessor,
-    TokenProcessor,
-    TokenV2Processor,
-    UserTransactionProcessor,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use strum::VariantNames;
-
-    /// This test exists to make sure that when a new processor is added, it is added
-    /// to both Processor and ProcessorConfig. To make sure this passes, make sure the
-    /// variants are in the same order (lexicographical) and the names match.
-    #[test]
-    fn test_processor_names_complete() {
-        assert_eq!(ProcessorName::VARIANTS, ProcessorDiscriminants::VARIANTS);
+/// Given a config and a db pool, build a Arc<dyn ProcessorTrait>.
+//
+// As time goes on there might be other things that we need to provide to certain
+// processors. As that happens we can revist whether this function (which tends to
+// couple processors together based on their args) makes sense.
+pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Arc<dyn ProcessorTrait> {
+    match config {
+        ProcessorConfig::AccountTransactionsProcessor => {
+            Arc::new(AccountTransactionsProcessor::new(db_pool))
+        },
+        ProcessorConfig::AnsProcessor(config) => {
+            Arc::new(AnsProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::CoinProcessor => Arc::new(CoinProcessor::new(db_pool)),
+        ProcessorConfig::DefaultProcessor => Arc::new(DefaultProcessor::new(db_pool)),
+        ProcessorConfig::EventsProcessor => Arc::new(EventsProcessor::new(db_pool)),
+        ProcessorConfig::FungibleAssetProcessor => Arc::new(FungibleAssetProcessor::new(db_pool)),
+        ProcessorConfig::NftMetadataProcessor(config) => {
+            Arc::new(NftMetadataProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::StakeProcessor => Arc::new(StakeProcessor::new(db_pool)),
+        ProcessorConfig::TokenProcessor(config) => {
+            Arc::new(TokenProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::TokenV2Processor => Arc::new(TokenV2Processor::new(db_pool)),
+        ProcessorConfig::UserTransactionProcessor => {
+            Arc::new(UserTransactionProcessor::new(db_pool))
+        },
     }
 }
