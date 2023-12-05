@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::{
-        ledger_info::LedgerInfo,
-        processor_status::{update_last_processed_version, ProcessorStatusQuery},
-    },
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
@@ -15,7 +11,6 @@ use crate::{
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
     },
-    schema::ledger_infos,
     utils::{
         counters::{
             MULTI_BATCH_PROCESSING_TIME_IN_SECS, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
@@ -24,7 +19,8 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS,
         },
-        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{new_db_pool, run_pending_migrations, PgDbPool},
+        progress_storage::DieselProgressStorage,
     },
 };
 use anyhow::{Context, Result};
@@ -34,6 +30,7 @@ use aptos_processor_sdk::{
         ProcessorStep, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_PROCESSED_COUNT,
         PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
+    progress_storage::ProgressStorageTrait,
     stream_subscriber::{
         ChannelHandle, GrpcStreamSubscriber, GrpcStreamSubscriberConfig, IndexerGrpcHttp2Config,
         StreamSubscriberTrait,
@@ -136,10 +133,13 @@ impl Worker {
             "[Parser] Finished migrations"
         );
 
-        let starting_version_from_db = self
-            .get_start_version()
+        let progress_storage = DieselProgressStorage::new(self.db_pool.clone());
+
+        let starting_version_from_db = progress_storage
+            .read_last_processed_version(processor_name)
             .await
             .expect("[Parser] Database error when getting starting version")
+            .map(|v| v + 1)
             .unwrap_or_else(|| {
                 info!(
                     processor_name = processor_name,
@@ -248,7 +248,7 @@ impl Worker {
                 match receive_status {
                     Ok(txn_pb) => {
                         if let Some(existing_id) = db_chain_id {
-                            if txn_pb.chain_id != existing_id {
+                            if (txn_pb.chain_id as u8) != existing_id {
                                 error!(
                                     processor_name = processor_name,
                                     stream_address =
@@ -261,9 +261,12 @@ impl Worker {
                             }
                         } else {
                             db_chain_id = Some(
-                                self.check_or_update_chain_id(txn_pb.chain_id as i64)
-                                    .await
-                                    .unwrap(),
+                                self.check_or_update_chain_id(
+                                    &progress_storage,
+                                    txn_pb.chain_id as u8,
+                                )
+                                .await
+                                .unwrap(),
                             );
                         }
                         let current_fetched_version =
@@ -592,8 +595,8 @@ impl Worker {
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
 
-            let conn = processor.get_conn().await;
-            update_last_processed_version(conn, processor_name.to_string(), batch_end)
+            progress_storage
+                .write_last_processed_version(processor_name, batch_end)
                 .await
                 .unwrap();
 
@@ -667,28 +670,19 @@ impl Worker {
         run_pending_migrations(&mut conn).await;
     }
 
-    /// Gets the start version for the processor. If not found, start from 0.
-    pub async fn get_start_version(&self) -> Result<Option<u64>> {
-        let mut conn = self.db_pool.get().await?;
-
-        match ProcessorStatusQuery::get_by_processor(self.processor_config.name(), &mut conn)
-            .await?
-        {
-            Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
-            None => Ok(None),
-        }
-    }
-
     /// Verify the chain id from GRPC against the database.
-    pub async fn check_or_update_chain_id(&self, grpc_chain_id: i64) -> Result<u64> {
+    pub async fn check_or_update_chain_id(
+        &self,
+        progress_storage: &impl ProgressStorageTrait,
+        grpc_chain_id: u8,
+    ) -> Result<u8> {
         let processor_name = self.processor_config.name();
         info!(
             processor_name = processor_name,
             "[Parser] Checking if chain id is correct"
         );
-        let mut conn = self.db_pool.get().await?;
 
-        let maybe_existing_chain_id = LedgerInfo::get(&mut conn).await?.map(|li| li.chain_id);
+        let maybe_existing_chain_id = progress_storage.read_chain_id().await?;
 
         match maybe_existing_chain_id {
             Some(chain_id) => {
@@ -698,7 +692,7 @@ impl Worker {
                     chain_id = chain_id,
                     "[Parser] Chain id matches! Continue to index...",
                 );
-                Ok(chain_id as u64)
+                Ok(chain_id)
             },
             None => {
                 info!(
@@ -706,18 +700,8 @@ impl Worker {
                     chain_id = grpc_chain_id,
                     "[Parser] Adding chain id to db, continue to index..."
                 );
-                execute_with_better_error(
-                    &mut conn,
-                    diesel::insert_into(ledger_infos::table)
-                        .values(LedgerInfo {
-                            chain_id: grpc_chain_id,
-                        })
-                        .on_conflict_do_nothing(),
-                    None,
-                )
-                .await
-                .context("[Parser] Error updating chain_id!")
-                .map(|_| grpc_chain_id as u64)
+                progress_storage.write_chain_id(grpc_chain_id).await?;
+                Ok(grpc_chain_id)
             },
         }
     }

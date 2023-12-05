@@ -64,7 +64,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         transactions: Vec<ProtoTransaction>,
         start_version: u64,
         end_version: u64,
-        db_chain_id: Option<u64>,
+        db_chain_id: Option<u8>,
     ) -> anyhow::Result<ProcessingResult>;
 
     /// Gets a reference to the connection pool
