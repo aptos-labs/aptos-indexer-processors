@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{ProcessorName, ProcessorStorageTrait};
 use crate::{
     models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
@@ -18,6 +18,7 @@ use crate::{
     },
 };
 use anyhow::bail;
+use aptos_processor_sdk::processor::{ProcessingResult, ProcessorTrait};
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
@@ -420,7 +421,10 @@ impl ProcessorTrait for DefaultProcessor {
             },
         }
     }
+}
 
+#[async_trait]
+impl ProcessorStorageTrait for DefaultProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }

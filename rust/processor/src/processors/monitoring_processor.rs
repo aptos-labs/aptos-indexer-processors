@@ -62,7 +62,10 @@ impl ProcessorTrait for MonitoringProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         Ok((end_version, transactions.len() as u64))
     }
+}
 
+#[async_trait]
+impl ProcessorStorageTrait for MonitoringProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }

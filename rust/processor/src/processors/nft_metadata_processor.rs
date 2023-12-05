@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{ProcessorName, ProcessorStorageTrait};
 use crate::{
     models::{
         object_models::v2_object_utils::{
@@ -18,7 +18,10 @@ use crate::{
         util::standardize_address,
     },
 };
-use aptos_processor_sdk::utils::parse_timestamp;
+use aptos_processor_sdk::{
+    processor::{ProcessingResult, ProcessorTrait},
+    utils::parse_timestamp,
+};
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use futures_util::future::try_join_all;
@@ -181,7 +184,10 @@ impl ProcessorTrait for NftMetadataProcessor {
             db_insertion_duration_in_secs,
         })
     }
+}
 
+#[async_trait]
+impl ProcessorStorageTrait for NftMetadataProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
