@@ -8,10 +8,7 @@
 use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping};
 use crate::{
     models::{
-        fungible_asset_models::{
-            v2_fungible_asset_activities::FungibleAssetActivity,
-            v2_fungible_metadata::FungibleAssetMetadataModel,
-        },
+        fungible_asset_models::v2_fungible_metadata::FungibleAssetMetadataModel,
         token_models::{
             collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
             token_utils::TokenWriteSet,
@@ -264,18 +261,15 @@ impl TokenDataV2 {
         while retried < QUERY_RETRIES {
             retried += 1;
             match Self::get_by_token_data_id(conn, address).await {
-                Ok(_) => {
-                    // TODO: this'll unblock very short term but we should clean this up
-                    match FungibleAssetMetadataModel::get_by_asset_type(conn, address).await {
-                        Ok(_) => return true,
-                        Err(_) => {
-                            std::thread::sleep(std::time::Duration::from_millis(
-                                QUERY_RETRY_DELAY_MS,
-                            ));
-                        },
-                    }
-                },
+                Ok(_) => return true,
                 Err(_) => {
+                    // TODO: this'll unblock very short term but we should clean this up
+                    if FungibleAssetMetadataModel::get_by_asset_type(conn, address)
+                        .await
+                        .is_ok()
+                    {
+                        return false;
+                    }
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
                 },
             }
