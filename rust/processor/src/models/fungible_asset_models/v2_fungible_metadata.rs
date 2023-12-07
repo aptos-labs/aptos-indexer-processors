@@ -149,7 +149,7 @@ impl FungibleAssetMetadataModel {
     }
 
     /// Try to see if an address is a fungible asset (not a token). We'll try a few times in case there is a race condition,
-    /// and if we can't find after 3 times, we'll assume that it's not a fungible asset.
+    /// and if we can't find after N times, we'll assume that it's not a fungible asset.
     /// TODO: An improvement is to combine this with is_address_token. To do this well we need
     /// a k-v store
     async fn query_is_address_fungible_asset(
@@ -170,7 +170,7 @@ impl FungibleAssetMetadataModel {
     }
 
     /// TODO: Change this to a KV store
-    async fn get_by_asset_type(
+    pub async fn get_by_asset_type(
         conn: &mut PgPoolConnection<'_>,
         address: &str,
     ) -> anyhow::Result<String> {
