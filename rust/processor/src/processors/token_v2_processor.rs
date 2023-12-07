@@ -505,6 +505,12 @@ async fn parse_v2_token(
     // Basically token properties
     let mut current_token_v2_metadata: HashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
         HashMap::new();
+    // This map contains addresses where we have already looked up whether it is
+    // a fungible token or not (true if yes, false if no). If it isn't present
+    // then we don't know yet and might have to do a lookup.
+    // TODO: We should do something more generic than have all these separate
+    // batch-level caches that come from drilling into the same data multiple times.
+    let mut fungible_token_data: HashMap<String, bool> = HashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
@@ -650,6 +656,7 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
+                    &mut fungible_token_data,
                     conn,
                 )
                 .await
