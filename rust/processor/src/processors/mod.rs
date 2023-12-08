@@ -14,6 +14,7 @@ pub mod default_processor;
 pub mod events_processor;
 pub mod fungible_asset_processor;
 pub mod nft_metadata_processor;
+pub mod objects_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
@@ -27,6 +28,7 @@ use self::{
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
+    objects_processor::ObjectsProcessor,
     stake_processor::StakeProcessor,
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
@@ -167,6 +169,7 @@ pub enum ProcessorConfig {
     EventsProcessor,
     FungibleAssetProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
+    ObjectsProcessor,
     StakeProcessor,
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor,
@@ -206,6 +209,7 @@ pub enum Processor {
     EventsProcessor,
     FungibleAssetProcessor,
     NftMetadataProcessor,
+    ObjectsProcessor,
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,

@@ -141,6 +141,30 @@ impl Collection {
     pub fn get_name_trunc(&self) -> String {
         truncate_str(&self.name, NAME_LENGTH)
     }
+
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2TokenResource::Collection(inner) =
+            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

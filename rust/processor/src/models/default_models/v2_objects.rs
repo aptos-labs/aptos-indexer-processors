@@ -8,8 +8,9 @@
 use super::move_resources::MoveResource;
 use crate::{
     models::{
+        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-        token_v2_models::v2_token_utils::ObjectWithMetadata,
+        token_v2_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
     },
     schema::{current_objects, objects},
     utils::database::PgPoolConnection,
@@ -25,6 +26,16 @@ use std::collections::HashMap;
 // PK of current_objects, i.e. object_address
 pub type CurrentObjectPK = String;
 
+/// Tracks all object related metadata in a hashmap for quick access (keyed on address of the object)
+pub type ObjectAggregatedDataMapping = HashMap<CurrentObjectPK, ObjectAggregatedData>;
+
+/// This contains metadata for the object
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ObjectAggregatedData {
+    pub fungible_asset_store: Option<FungibleAssetStore>,
+    pub token: Option<TokenV2>,
+}
+
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = objects)]
@@ -36,6 +47,8 @@ pub struct Object {
     pub state_key_hash: String,
     pub guid_creation_num: BigDecimal,
     pub allow_ungated_transfer: bool,
+    pub is_token: bool,
+    pub is_fungible_asset: bool,
     pub is_deleted: bool,
 }
 
@@ -49,6 +62,8 @@ pub struct CurrentObject {
     pub allow_ungated_transfer: bool,
     pub last_guid_creation_num: BigDecimal,
     pub last_transaction_version: i64,
+    pub is_token: bool,
+    pub is_fungible_asset: bool,
     pub is_deleted: bool,
 }
 
@@ -64,6 +79,8 @@ pub struct CurrentObjectQuery {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
     pub inserted_at: chrono::NaiveDateTime,
+    pub is_token: bool,
+    pub is_fungible_asset: bool,
 }
 
 impl Object {
@@ -71,6 +88,7 @@ impl Object {
         write_resource: &WriteResource,
         txn_version: i64,
         write_set_change_index: i64,
+        object_metadata_mapping: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
         if let Some(inner) = ObjectWithMetadata::from_write_resource(write_resource, txn_version)? {
             let resource = MoveResource::from_write_resource(
@@ -80,6 +98,7 @@ impl Object {
                 0, // Placeholder, this isn't used anyway
             );
             let object_core = &inner.object_core;
+            let object_metadata = object_metadata_mapping.get(&resource.address);
             Ok(Some((
                 Self {
                     transaction_version: txn_version,
@@ -89,6 +108,10 @@ impl Object {
                     state_key_hash: resource.state_key_hash.clone(),
                     guid_creation_num: object_core.guid_creation_num.clone(),
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
+                    is_token: object_metadata.map(|x| x.token.is_some()).unwrap_or(false),
+                    is_fungible_asset: object_metadata
+                        .map(|x| x.fungible_asset_store.is_some())
+                        .unwrap_or(false),
                     is_deleted: false,
                 },
                 CurrentObject {
@@ -98,6 +121,10 @@ impl Object {
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     last_guid_creation_num: object_core.guid_creation_num.clone(),
                     last_transaction_version: txn_version,
+                    is_token: object_metadata.map(|x| x.token.is_some()).unwrap_or(false),
+                    is_fungible_asset: object_metadata
+                        .map(|x| x.fungible_asset_store.is_some())
+                        .unwrap_or(false),
                     is_deleted: false,
                 },
             )))
@@ -147,6 +174,8 @@ impl Object {
                     state_key_hash: resource.state_key_hash.clone(),
                     guid_creation_num: previous_object.last_guid_creation_num.clone(),
                     allow_ungated_transfer: previous_object.allow_ungated_transfer,
+                    is_token: previous_object.is_token,
+                    is_fungible_asset: previous_object.is_fungible_asset,
                     is_deleted: true,
                 },
                 CurrentObject {
@@ -156,6 +185,8 @@ impl Object {
                     last_guid_creation_num: previous_object.last_guid_creation_num.clone(),
                     allow_ungated_transfer: previous_object.allow_ungated_transfer,
                     last_transaction_version: txn_version,
+                    is_token: previous_object.is_token,
+                    is_fungible_asset: previous_object.is_fungible_asset,
                     is_deleted: true,
                 },
             )))
@@ -181,6 +212,8 @@ impl Object {
                         allow_ungated_transfer: res.allow_ungated_transfer,
                         last_guid_creation_num: res.last_guid_creation_num,
                         last_transaction_version: res.last_transaction_version,
+                        is_token: res.is_token,
+                        is_fungible_asset: res.is_fungible_asset,
                         is_deleted: res.is_deleted,
                     })
                 },
