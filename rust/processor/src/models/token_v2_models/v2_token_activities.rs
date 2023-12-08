@@ -94,8 +94,13 @@ impl TokenActivityV2 {
                 let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
                 let token_data_id = fungible_asset.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
-                    .await
+                if !TokenDataV2::is_address_fungible_token(
+                    conn,
+                    &token_data_id,
+                    token_v2_metadata,
+                    txn_version,
+                )
+                .await
                 {
                     return Ok(None);
                 }

@@ -89,6 +89,7 @@ impl FungibleAssetActivity {
                     conn,
                     &asset_type,
                     fungible_asset_metadata,
+                    txn_version,
                 )
                 .await
                 {

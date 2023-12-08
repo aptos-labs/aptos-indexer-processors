@@ -394,8 +394,13 @@ impl TokenOwnershipV2 {
                 let object_core = &metadata.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
-                    .await
+                if !TokenDataV2::is_address_fungible_token(
+                    conn,
+                    &token_data_id,
+                    token_v2_metadata,
+                    txn_version,
+                )
+                .await
                 {
                     return Ok(None);
                 }
