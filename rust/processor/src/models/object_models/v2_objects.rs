@@ -5,15 +5,14 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::move_resources::MoveResource;
+use super::v2_object_utils::{CurrentObjectPK, ObjectAggregatedDataMapping};
 use crate::{
     models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
+        default_models::move_resources::MoveResource,
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-        token_v2_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
     },
     schema::{current_objects, objects},
-    utils::database::PgPoolConnection,
+    utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
@@ -22,19 +21,6 @@ use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-// PK of current_objects, i.e. object_address
-pub type CurrentObjectPK = String;
-
-/// Tracks all object related metadata in a hashmap for quick access (keyed on address of the object)
-pub type ObjectAggregatedDataMapping = HashMap<CurrentObjectPK, ObjectAggregatedData>;
-
-/// This contains metadata for the object
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ObjectAggregatedData {
-    pub fungible_asset_store: Option<FungibleAssetStore>,
-    pub token: Option<TokenV2>,
-}
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -90,41 +76,33 @@ impl Object {
         write_set_change_index: i64,
         object_metadata_mapping: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
-        if let Some(inner) = ObjectWithMetadata::from_write_resource(write_resource, txn_version)? {
-            let resource = MoveResource::from_write_resource(
-                write_resource,
-                0, // Placeholder, this isn't used anyway
-                txn_version,
-                0, // Placeholder, this isn't used anyway
-            );
-            let object_core = &inner.object_core;
-            let object_metadata = object_metadata_mapping.get(&resource.address);
+        let address = standardize_address(&write_resource.address.to_string());
+        if let Some(object_aggregated_metadata) = object_metadata_mapping.get(&address) {
+            // do something
+            let object_with_metadata = object_aggregated_metadata.object.clone();
+            let object_core = object_with_metadata.object_core;
             Ok(Some((
                 Self {
                     transaction_version: txn_version,
                     write_set_change_index,
-                    object_address: resource.address.clone(),
+                    object_address: address.clone(),
                     owner_address: object_core.get_owner_address(),
-                    state_key_hash: resource.state_key_hash.clone(),
+                    state_key_hash: object_with_metadata.state_key_hash.clone(),
                     guid_creation_num: object_core.guid_creation_num.clone(),
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
-                    is_token: object_metadata.map(|x| x.token.is_some()).unwrap_or(false),
-                    is_fungible_asset: object_metadata
-                        .map(|x| x.fungible_asset_store.is_some())
-                        .unwrap_or(false),
+                    is_token: object_aggregated_metadata.token.is_some(),
+                    is_fungible_asset: object_aggregated_metadata.fungible_asset_store.is_some(),
                     is_deleted: false,
                 },
                 CurrentObject {
-                    object_address: resource.address,
+                    object_address: address,
                     owner_address: object_core.get_owner_address(),
-                    state_key_hash: resource.state_key_hash,
+                    state_key_hash: object_with_metadata.state_key_hash,
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     last_guid_creation_num: object_core.guid_creation_num.clone(),
                     last_transaction_version: txn_version,
-                    is_token: object_metadata.map(|x| x.token.is_some()).unwrap_or(false),
-                    is_fungible_asset: object_metadata
-                        .map(|x| x.fungible_asset_store.is_some())
-                        .unwrap_or(false),
+                    is_token: object_aggregated_metadata.token.is_some(),
+                    is_fungible_asset: object_aggregated_metadata.fungible_asset_store.is_some(),
                     is_deleted: false,
                 },
             )))

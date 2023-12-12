@@ -6,10 +6,8 @@
 
 use crate::{
     models::{
-        coin_models::coin_utils::COIN_ADDR,
-        default_models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
-        token_models::token_utils::URI_LENGTH,
-        token_v2_models::v2_token_utils::{ObjectWithMetadata, ResourceReference, TokenV2},
+        coin_models::coin_utils::COIN_ADDR, default_models::move_resources::MoveResource,
+        token_models::token_utils::URI_LENGTH, token_v2_models::v2_token_utils::ResourceReference,
     },
     utils::util::{deserialize_from_string, truncate_str},
 };
@@ -17,13 +15,9 @@ use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 const FUNGIBLE_ASSET_LENGTH: usize = 32;
 const FUNGIBLE_ASSET_SYMBOL: usize = 10;
-
-/// Tracks all fungible asset related data in a hashmap for quick access (keyed on address of the object core)
-pub type FungibleAssetAggregatedDataMapping = HashMap<CurrentObjectPK, FungibleAssetAggregatedData>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FeeStatement {
@@ -47,15 +41,6 @@ impl FeeStatement {
             None
         }
     }
-}
-
-/// This contains objects used by fungible assets
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FungibleAssetAggregatedData {
-    pub object: ObjectWithMetadata,
-    pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
-    pub fungible_asset_store: Option<FungibleAssetStore>,
-    pub token: Option<TokenV2>,
 }
 
 /* Section on fungible assets resources */

@@ -7,11 +7,12 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
+    v2_token_utils::{TokenStandard, V2TokenEvent},
 };
 use crate::{
     models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::token_utils::{TokenDataIdType, TokenEvent},
     },
     schema::token_activities_v2,
@@ -74,7 +75,7 @@ impl TokenActivityV2 {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
@@ -143,7 +144,7 @@ impl TokenActivityV2 {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) =

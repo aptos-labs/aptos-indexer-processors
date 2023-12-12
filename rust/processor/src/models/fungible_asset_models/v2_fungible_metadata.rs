@@ -5,10 +5,11 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, FungibleAssetMetadata};
+use super::v2_fungible_asset_utils::FungibleAssetMetadata;
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
         token_v2_models::v2_token_utils::TokenStandard,
     },
@@ -58,7 +59,7 @@ impl FungibleAssetMetadataModel {
         write_resource: &WriteResource,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        fungible_asset_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
         if let Some(inner) =
             &FungibleAssetMetadata::from_write_resource(write_resource, txn_version)?
@@ -138,7 +139,7 @@ impl FungibleAssetMetadataModel {
     pub async fn is_address_fungible_asset(
         conn: &mut PgPoolConnection<'_>,
         address: &str,
-        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        fungible_asset_metadata: &ObjectAggregatedDataMapping,
     ) -> bool {
         if let Some(metadata) = fungible_asset_metadata.get(address) {
             metadata.token.is_none()

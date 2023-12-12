@@ -4,13 +4,13 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
+        object_models::v2_object_utils::{
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        },
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
             v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
-            v2_token_utils::{
-                ObjectWithMetadata, TokenV2AggregatedData, TokenV2AggregatedDataMapping,
-            },
         },
     },
     utils::{
@@ -202,7 +202,7 @@ async fn parse_v2_token(
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
-        let mut token_v2_metadata_helper: TokenV2AggregatedDataMapping = HashMap::new();
+        let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
         for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                 if let Some(object) =
@@ -210,7 +210,7 @@ async fn parse_v2_token(
                 {
                     token_v2_metadata_helper.insert(
                         standardize_address(&wr.address.to_string()),
-                        TokenV2AggregatedData {
+                        ObjectAggregatedData {
                             aptos_collection: None,
                             fixed_supply: None,
                             object,

@@ -7,10 +7,8 @@
 use crate::{
     models::{
         coin_models::coin_utils::COIN_ADDR,
-        default_models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
-        fungible_asset_models::v2_fungible_asset_utils::{
-            FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
-        },
+        default_models::move_resources::MoveResource,
+        object_models::v2_object_utils::{CurrentObjectPK, ObjectCore},
         token_models::token_utils::{NAME_LENGTH, URI_LENGTH},
     },
     utils::util::{
@@ -23,7 +21,7 @@ use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fmt::{self, Formatter},
 };
 
@@ -31,26 +29,7 @@ pub const TOKEN_V2_ADDR: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000004";
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
-pub type TokenV2AggregatedDataMapping = HashMap<CurrentObjectPK, TokenV2AggregatedData>;
-/// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 pub type TokenV2Burned = HashSet<CurrentObjectPK>;
-/// Index of the event so that we can write its inverse to the db as primary key (to avoid collisiona)
-pub type EventIndex = i64;
-
-/// This contains both metadata for fungible assets and fungible tokens
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenV2AggregatedData {
-    pub aptos_collection: Option<AptosCollection>,
-    pub fixed_supply: Option<FixedSupply>,
-    pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
-    pub fungible_asset_supply: Option<FungibleAssetSupply>,
-    pub fungible_asset_store: Option<FungibleAssetStore>,
-    pub object: ObjectWithMetadata,
-    pub property_map: Option<PropertyMapModel>,
-    pub token: Option<TokenV2>,
-    pub transfer_event: Option<(EventIndex, TransferEvent)>,
-    pub unlimited_supply: Option<UnlimitedSupply>,
-}
 
 /// Tracks which token standard a token / collection is built upon
 #[derive(Serialize)]
@@ -66,56 +45,6 @@ impl fmt::Display for TokenStandard {
             TokenStandard::V2 => "v2",
         };
         write!(f, "{}", res)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ObjectCore {
-    pub allow_ungated_transfer: bool,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub guid_creation_num: BigDecimal,
-    owner: String,
-}
-
-impl ObjectCore {
-    pub fn get_owner_address(&self) -> String {
-        standardize_address(&self.owner)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ObjectWithMetadata {
-    pub object_core: ObjectCore,
-    state_key_hash: String,
-}
-
-impl ObjectWithMetadata {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        if let V2TokenResource::ObjectCore(inner) = V2TokenResource::from_resource(
-            &type_str,
-            &serde_json::from_str(write_resource.data.as_str()).unwrap(),
-            txn_version,
-        )? {
-            Ok(Some(Self {
-                object_core: inner,
-                state_key_hash: standardize_address(
-                    hex::encode(write_resource.state_key_hash.as_slice()).as_str(),
-                ),
-            }))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn get_state_key_hash(&self) -> String {
-        standardize_address(&self.state_key_hash)
     }
 }
 
@@ -140,30 +69,6 @@ impl Collection {
 
     pub fn get_name_trunc(&self) -> String {
         truncate_str(&self.name, NAME_LENGTH)
-    }
-
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let V2TokenResource::Collection(inner) =
-            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
     }
 }
 
@@ -436,6 +341,7 @@ impl PropertyMapModel {
     }
 }
 
+// TODO: Split out ObjectCore into V2ObjectResource
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2TokenResource {
     AptosCollection(AptosCollection),

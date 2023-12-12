@@ -6,13 +6,13 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    v2_fungible_asset_activities::EventToCoinType,
-    v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, FungibleAssetStore},
+    v2_fungible_asset_activities::EventToCoinType, v2_fungible_asset_utils::FungibleAssetStore,
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::{current_fungible_asset_balances, fungible_asset_balances},
@@ -70,7 +70,7 @@ impl FungibleAssetBalance {
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        fungible_asset_metadata: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?

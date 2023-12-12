@@ -6,9 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    v2_fungible_asset_utils::{
-        FeeStatement, FungibleAssetAggregatedDataMapping, FungibleAssetEvent,
-    },
+    v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
@@ -17,6 +15,7 @@ use crate::{
             coin_activities::CoinActivity,
             coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
         },
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_activities,
@@ -70,7 +69,7 @@ impl FungibleAssetActivity {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        fungible_asset_metadata: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
