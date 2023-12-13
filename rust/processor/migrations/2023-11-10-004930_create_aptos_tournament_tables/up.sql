@@ -46,4 +46,6 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS tournament_player_user_address ON tournament_players (user_address);
+CREATE INDEX IF NOT EXISTS tournament_player_tournament_address ON tournament_players (tournament_address);
 CREATE INDEX IF NOT EXISTS tournament_player_room_address ON tournament_players (room_address);
