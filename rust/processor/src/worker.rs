@@ -55,13 +55,10 @@ const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 const BUFFER_SIZE: usize = 50;
 // 20MB
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20;
-// We will try to reconnect to GRPC once every X seconds if we get disconnected, before crashing
-// We define short connection issue as < 10 seconds so adding a bit of a buffer here
-const MIN_SEC_BETWEEN_GRPC_RECONNECTS: u64 = 15;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
-const RECONNECTION_MAX_RETRIES: u64 = 5;
+const RECONNECTION_MAX_RETRIES: u64 = 100;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
-const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 15;
+const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
@@ -904,7 +901,6 @@ pub async fn create_fetcher_loop(
 ) {
     let mut grpc_channel_recv_latency = std::time::Instant::now();
     let mut next_version_to_fetch = batch_start_version;
-    let mut last_reconnection_time: Option<std::time::Instant> = None;
     let mut reconnection_retries = 0;
     info!(
         processor_name = processor_name,
@@ -1126,23 +1122,21 @@ pub async fn create_fetcher_loop(
             if is_success {
                 continue;
             }
-            if let Some(lrt) = last_reconnection_time {
-                let elapsed: u64 = lrt.elapsed().as_secs();
-                if reconnection_retries >= RECONNECTION_MAX_RETRIES
-                    && elapsed < MIN_SEC_BETWEEN_GRPC_RECONNECTS
-                {
-                    error!(
-                        processor_name = processor_name,
-                        service_type = PROCESSOR_SERVICE_TYPE,
-                        stream_address = indexer_grpc_data_service_address.to_string(),
-                        seconds_since_last_retry = elapsed,
-                        "[Parser] Recently reconnected. Will not retry.",
-                    );
-                    panic!("[Parser] Recently reconnected. Will not retry.")
-                }
+
+            // Sleep for 100ms between reconnect tries
+            // TODO: Turn this into exponential backoff
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+            if reconnection_retries >= RECONNECTION_MAX_RETRIES {
+                error!(
+                    processor_name = processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    "[Parser] Reconnected more than 100 times. Will not retry.",
+                );
+                panic!("[Parser] Reconnected more than 100 times. Will not retry.")
             }
             reconnection_retries += 1;
-            last_reconnection_time = Some(std::time::Instant::now());
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
