@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use tracing::error;
 
 type RoomAddress = String;
-pub type TournamentRoomsMapping = HashMap<RoomAddress, TournamentRoom>;
+pub type TournamentRoomMapping = HashMap<RoomAddress, TournamentRoom>;
 
 #[derive(
     Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Eq, PartialEq,
@@ -110,7 +110,7 @@ impl TournamentRoom {
         contract_addr: &str,
         event: &Event,
         transaction_version: i64,
-        previous_tournament_rooms: &TournamentRoomsMapping,
+        previous_tournament_rooms: &TournamentRoomMapping,
     ) -> Option<Self> {
         if let Some(burn_player_token_event) =
             BurnRoomEvent::from_event(contract_addr, event, transaction_version).unwrap()

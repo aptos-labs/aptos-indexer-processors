@@ -1,5 +1,8 @@
 use crate::{
-    models::default_models::move_resources::MoveResource,
+    models::{
+        coin_models::coin_utils::Coin, default_models::move_resources::MoveResource,
+        token_models::token_utils::TokenType,
+    },
     utils::util::{deserialize_from_string, standardize_address},
 };
 use anyhow::Context;
@@ -298,6 +301,28 @@ impl Round {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CoinRewardPool {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub coin_reward_amount: i64,
+    pub coins: Coin,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenRewardVec {
+    pub vec: Vec<TokenType>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenReward {
+    pub big_vec: TokenRewardVec,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenV1RewardPool {
+    pub tokens: TokenReward,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AptosTournamentResource {
     CurrentRound(CurrentRound),
     MatchMaker(MatchMaker),
@@ -306,6 +331,8 @@ pub enum AptosTournamentResource {
     TournamentDirector(TournamentDirector),
     TournamentState(TournamentState),
     TournamentPlayerToken(TournamentPlayerToken),
+    CoinRewardPool(CoinRewardPool),
+    TokenV1RewardPool(TokenV1RewardPool),
 }
 
 impl AptosTournamentResource {
@@ -319,6 +346,8 @@ impl AptosTournamentResource {
             format!("{}::tournament_manager::CurrentRound", contract_addr),
             format!("{}::tournament_manager::TournamentDirector", contract_addr),
             format!("{}::tournament_manager::TournamentState", contract_addr),
+            format!("{}::rewards::CoinRewardPool", contract_addr),
+            format!("{}::rewards::TokenV1RewardPool", contract_addr),
         ]
         .contains(&data_type.to_string())
     }
@@ -353,6 +382,13 @@ impl AptosTournamentResource {
             },
             x if x == format!("{}::round::Round", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::Round(inner)))
+            },
+            x if x == format!("{}::rewards::CoinRewardPool", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::CoinRewardPool(inner)))
+            },
+            x if x == format!("{}::rewards::TokenV1RewardPool", contract_addr) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::TokenV1RewardPool(inner)))
             },
             _ => Ok(None),
         }

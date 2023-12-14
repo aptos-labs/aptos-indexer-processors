@@ -1,5 +1,8 @@
 DROP INDEX IF EXISTS tournament_is_joinable;
 DROP INDEX IF EXISTS tournament_has_ended;
+DROP INDEX IF EXISTS tournament_coin_rewards_coin_type;
+DROP INDEX IF EXISTS tournament_coin_rewards_coin_amount;
+DROP INDEX IF EXISTS tournament_token_rewards_tokens;
 DROP INDEX IF EXISTS tournament_current_round_number;
 DROP INDEX IF EXISTS tournament_round_address;
 DROP INDEX IF EXISTS tournament_room_round_address;
@@ -9,4 +12,6 @@ DROP TABLE IF EXISTS tournament_token_owners;
 DROP TABLE IF EXISTS tournament_players;
 DROP TABLE IF EXISTS tournament_rooms;
 DROP TABLE IF EXISTS tournament_rounds;
+DROP TABLE IF EXISTS tournament_coin_rewards;
+DROP TABLE IF EXISTS tournament_token_rewards;
 DROP TABLE IF EXISTS tournaments;
