@@ -62,9 +62,8 @@ impl TournamentCoinReward {
                 coin_reward_amount: inner.coin_reward_amount,
                 last_transaction_version: transaction_version,
             });
-        } else {
-            return None;
         }
+        None
     }
 }
 

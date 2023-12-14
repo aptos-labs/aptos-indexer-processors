@@ -63,9 +63,8 @@ impl TournamentTokenReward {
                     .collect(),
                 last_transaction_version: transaction_version,
             });
-        } else {
-            return None;
         }
+        None
     }
 }
 
