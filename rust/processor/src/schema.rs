@@ -1135,6 +1135,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    tournament_coin_rewards (tournament_address, coin_type) {
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        #[max_length = 66]
+        coin_type -> Varchar,
+        coins -> Numeric,
+        coin_reward_amount -> Int8,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     tournament_players (token_address) {
         #[max_length = 66]
         token_address -> Varchar,
@@ -1174,6 +1187,16 @@ diesel::table! {
         play_started -> Bool,
         play_ended -> Bool,
         paused -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournament_token_rewards (tournament_address) {
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        tokens -> Array<Nullable<Text>>,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
@@ -1326,9 +1349,11 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships,
     token_ownerships_v2,
     tokens,
+    tournament_coin_rewards,
     tournament_players,
     tournament_rooms,
     tournament_rounds,
+    tournament_token_rewards,
     tournaments,
     transactions,
     user_transactions,

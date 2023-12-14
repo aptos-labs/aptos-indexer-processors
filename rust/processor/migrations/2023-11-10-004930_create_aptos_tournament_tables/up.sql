@@ -15,6 +15,24 @@ CREATE TABLE IF NOT EXISTS tournaments (
 CREATE INDEX IF NOT EXISTS tournament_is_joinable ON tournaments (is_joinable);
 CREATE INDEX IF NOT EXISTS tournament_has_ended ON tournaments (has_ended);
 CREATE INDEX IF NOT EXISTS tournament_current_round_number ON tournaments (current_round_number);
+CREATE TABLE IF NOT EXISTS tournament_coin_rewards (
+    tournament_address VARCHAR(66) NOT NULL,
+    coin_type VARCHAR(66) NOT NULL,
+    coins NUMERIC NOT NULL,
+    coin_reward_amount BIGINT NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (tournament_address, coin_type)
+);
+CREATE INDEX IF NOT EXISTS tournament_coin_rewards_coins ON tournament_coin_rewards (coins);
+CREATE INDEX IF NOT EXISTS tournament_coin_rewards_coin_reward_amount ON tournament_coin_rewards (coin_reward_amount);
+CREATE TABLE IF NOT EXISTS tournament_token_rewards (
+    tournament_address VARCHAR(66) PRIMARY KEY NOT NULL,
+    tokens TEXT[] NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS tournament_token_rewards_tokens ON tournament_token_rewards (tokens);
 CREATE TABLE IF NOT EXISTS tournament_rounds (
     address VARCHAR(66) PRIMARY KEY NOT NULL,
     number BIGINT NOT NULL,

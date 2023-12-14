@@ -8,9 +8,11 @@ use crate::{
             aptos_tournament_utils::{
                 CurrentRound, CurrentRoundMapping, TournamentState, TournamentStateMapping,
             },
+            tournament_coin_rewards::{TournamentCoinReward, TournamentCoinRewardMapping},
             tournament_players::{TournamentPlayer, TournamentPlayerMapping},
-            tournament_rooms::{TournamentRoom, TournamentRoomsMapping},
-            tournament_rounds::{TournamentRound, TournamentRoundsMapping},
+            tournament_rooms::{TournamentRoom, TournamentRoomMapping},
+            tournament_rounds::{TournamentRound, TournamentRoundMapping},
+            tournament_token_rewards::{TournamentTokenReward, TournamentTokenRewardMapping},
             tournaments::{Tournament, TournamentMapping},
         },
         token_v2_models::v2_token_utils::ObjectWithMetadata,
@@ -73,6 +75,8 @@ async fn insert_to_db(
     start_version: u64,
     end_version: u64,
     tournaments_to_insert: Vec<Tournament>,
+    tournament_coin_rewards_to_insert: Vec<TournamentCoinReward>,
+    tournament_token_rewards_to_insert: Vec<TournamentTokenReward>,
     tournament_rounds_to_insert: Vec<TournamentRound>,
     tournament_rooms_to_insert: Vec<TournamentRoom>,
     tournament_players_to_insert: Vec<TournamentPlayer>,
@@ -90,6 +94,8 @@ async fn insert_to_db(
             Box::pin(insert_to_db_impl(
                 pg_conn,
                 &tournaments_to_insert,
+                &tournament_coin_rewards_to_insert,
+                &tournament_token_rewards_to_insert,
                 &tournament_rounds_to_insert,
                 &tournament_rooms_to_insert,
                 &tournament_players_to_insert,
@@ -104,6 +110,10 @@ async fn insert_to_db(
                 .run::<_, Error, _>(|pg_conn| {
                     Box::pin(async move {
                         let tournaments_to_insert = clean_data_for_db(tournaments_to_insert, true);
+                        let tournament_coin_rewards_to_insert =
+                            clean_data_for_db(tournament_coin_rewards_to_insert, true);
+                        let tournament_token_rewards_to_insert =
+                            clean_data_for_db(tournament_token_rewards_to_insert, true);
                         let tournament_rounds_to_insert =
                             clean_data_for_db(tournament_rounds_to_insert, true);
                         let tournament_players_to_insert =
@@ -111,6 +121,8 @@ async fn insert_to_db(
                         insert_to_db_impl(
                             pg_conn,
                             &tournaments_to_insert,
+                            &tournament_coin_rewards_to_insert,
+                            &tournament_token_rewards_to_insert,
                             &tournament_rounds_to_insert,
                             &tournament_rooms_to_insert,
                             &tournament_players_to_insert,
@@ -126,11 +138,15 @@ async fn insert_to_db(
 async fn insert_to_db_impl(
     conn: &mut MyDbConnection,
     tournaments_to_insert: &[Tournament],
+    tournament_coin_rewards_to_insert: &[TournamentCoinReward],
+    tournament_token_rewards_to_insert: &[TournamentTokenReward],
     tournament_rounds_to_insert: &[TournamentRound],
     tournament_rooms_to_insert: &[TournamentRoom],
     tournament_players_to_insert: &[TournamentPlayer],
 ) -> Result<(), diesel::result::Error> {
     insert_tournaments(conn, tournaments_to_insert).await?;
+    insert_tournament_coin_rewards(conn, tournament_coin_rewards_to_insert).await?;
+    insert_tournament_token_rewards(conn, tournament_token_rewards_to_insert).await?;
     insert_tournament_rounds(conn, tournament_rounds_to_insert).await?;
     insert_tournament_rooms(conn, tournament_rooms_to_insert).await?;
     insert_tournament_players(conn, tournament_players_to_insert).await?;
@@ -165,6 +181,67 @@ async fn insert_tournaments(
                 )),
             Some(
                 " WHERE tournaments.last_transaction_version <= excluded.last_transaction_version ",
+            ),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn insert_tournament_coin_rewards(
+    conn: &mut MyDbConnection,
+    tournament_coin_rewards_to_insert: &[TournamentCoinReward],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_coin_rewards::dsl::*;
+    let chunks = get_chunks(
+        tournament_coin_rewards_to_insert.len(),
+        TournamentCoinReward::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_coin_rewards::table)
+                .values(&tournament_coin_rewards_to_insert[start_ind..end_ind])
+                .on_conflict((tournament_address, coin_type))
+                .do_update()
+                .set((
+                    coins.eq(excluded(coins)),
+                    coin_reward_amount.eq(excluded(coin_reward_amount)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(
+                " WHERE tournament_coin_rewards.last_transaction_version <= excluded.last_transaction_version ",
+            ),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn insert_tournament_token_rewards(
+    conn: &mut MyDbConnection,
+    tournament_token_rewards_to_insert: &[TournamentTokenReward],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_token_rewards::dsl::*;
+    let chunks = get_chunks(
+        tournament_token_rewards_to_insert.len(),
+        TournamentTokenReward::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_token_rewards::table)
+                .values(&tournament_token_rewards_to_insert[start_ind..end_ind])
+                .on_conflict(tournament_address)
+                .do_update()
+                .set((
+                    tokens.eq(excluded(tokens)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(
+                " WHERE tournament_token_rewards.last_transaction_version <= excluded.last_transaction_version ",
             ),
         )
         .await?;
@@ -286,8 +363,10 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let processing_start = std::time::Instant::now();
 
         let mut tournaments: TournamentMapping = HashMap::new();
-        let mut tournament_rounds: TournamentRoundsMapping = HashMap::new();
-        let mut tournament_rooms: TournamentRoomsMapping = HashMap::new();
+        let mut tournament_coin_rewards: TournamentCoinRewardMapping = HashMap::new();
+        let mut tournament_token_rewards: TournamentTokenRewardMapping = HashMap::new();
+        let mut tournament_rounds: TournamentRoundMapping = HashMap::new();
+        let mut tournament_rooms: TournamentRoomMapping = HashMap::new();
         let mut tournament_players: TournamentPlayerMapping = HashMap::new();
 
         for txn in transactions {
@@ -382,6 +461,20 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         {
                             tournament_rooms.insert(address.clone(), room);
                         }
+                        if let Some(coin_reward) = TournamentCoinReward::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                        ) {
+                            tournament_coin_rewards.insert(address.clone(), coin_reward);
+                        }
+                        if let Some(token_reward) = TournamentTokenReward::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                        ) {
+                            tournament_token_rewards.insert(address.clone(), token_reward);
+                        }
 
                         let players = TournamentPlayer::from_room(
                             conn,
@@ -436,11 +529,21 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let mut tournaments = tournaments.values().cloned().collect::<Vec<_>>();
+        let mut tournament_coin_rewards = tournament_coin_rewards
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut tournament_token_rewards = tournament_token_rewards
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
         let mut tournament_rounds = tournament_rounds.values().cloned().collect::<Vec<_>>();
         let mut tournament_rooms = tournament_rooms.values().cloned().collect::<Vec<_>>();
         let mut tournament_players = tournament_players.values().cloned().collect::<Vec<_>>();
 
         tournaments.sort();
+        tournament_coin_rewards.sort();
+        tournament_token_rewards.sort();
         tournament_rounds.sort();
         tournament_rooms.sort();
         tournament_players.sort();
@@ -451,6 +554,8 @@ impl ProcessorTrait for AptosTournamentProcessor {
             start_version,
             end_version,
             tournaments,
+            tournament_coin_rewards,
+            tournament_token_rewards,
             tournament_rounds,
             tournament_rooms,
             tournament_players,
