@@ -11,7 +11,10 @@ use super::{
 };
 use crate::{
     schema::transactions,
-    utils::util::{get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal},
+    utils::util::{
+        get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
+        u64_to_bigdecimal,
+    },
 };
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
@@ -40,12 +43,14 @@ pub struct Transaction {
     pub num_events: i64,
     pub num_write_set_changes: i64,
     pub epoch: i64,
+    pub payload_type: Option<String>,
 }
 
 impl Transaction {
     fn from_transaction_info(
         info: &TransactionInfo,
         payload: Option<serde_json::Value>,
+        payload_type: Option<String>,
         version: i64,
         type_: String,
         num_events: i64,
@@ -77,6 +82,7 @@ impl Transaction {
             num_events,
             num_write_set_changes: info.changes.len() as i64,
             epoch,
+            payload_type,
         }
     }
 
@@ -122,11 +128,13 @@ impl Transaction {
                     .as_ref()
                     .expect("Getting payload failed.");
                 let payload_cleaned = get_clean_payload(payload, version);
+                let payload_type = get_payload_type(payload);
 
                 (
                     Self::from_transaction_info(
                         transaction_info,
                         payload_cleaned,
+                        Some(payload_type),
                         version,
                         transaction_type,
                         user_txn.events.len() as i64,
@@ -146,10 +154,13 @@ impl Transaction {
                 );
                 let payload = genesis_txn.payload.as_ref().unwrap();
                 let payload_cleaned = get_clean_writeset(payload, version);
+                // It's genesis so no big deal
+                let payload_type = None;
                 (
                     Self::from_transaction_info(
                         transaction_info,
                         payload_cleaned,
+                        payload_type,
                         version,
                         transaction_type,
                         genesis_txn.events.len() as i64,
@@ -171,6 +182,7 @@ impl Transaction {
                     Self::from_transaction_info(
                         transaction_info,
                         None,
+                        None,
                         version,
                         transaction_type,
                         block_metadata_txn.events.len() as i64,
@@ -191,6 +203,7 @@ impl Transaction {
             TxnData::StateCheckpoint(_state_checkpoint_txn) => (
                 Self::from_transaction_info(
                     transaction_info,
+                    None,
                     None,
                     version,
                     transaction_type,

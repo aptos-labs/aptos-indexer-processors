@@ -169,7 +169,11 @@ async fn insert_transactions(
             diesel::insert_into(schema::transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    payload_type.eq(excluded(payload_type)),
+                )),
             None,
         )
         .await?;

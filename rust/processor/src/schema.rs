@@ -1158,6 +1158,8 @@ diesel::table! {
         num_write_set_changes -> Int8,
         inserted_at -> Timestamp,
         epoch -> Int8,
+        #[max_length = 50]
+        payload_type -> Nullable<Varchar>,
     }
 }
 
