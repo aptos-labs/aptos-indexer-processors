@@ -106,9 +106,7 @@ pub fn get_entry_function_from_user_request(
     ))
 }
 
-pub fn get_payload_type(
-    payload: &TransactionPayload,
-) -> String {
+pub fn get_payload_type(payload: &TransactionPayload) -> String {
     payload.r#type().as_str_name().to_string()
 }
 
