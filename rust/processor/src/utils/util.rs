@@ -106,6 +106,12 @@ pub fn get_entry_function_from_user_request(
     ))
 }
 
+pub fn get_payload_type(
+    payload: &TransactionPayload,
+) -> String {
+    payload.r#type().as_str_name().to_string()
+}
+
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
 /// This function converts the string into json recursively and lets the diesel ORM handles
 /// the escaping.
