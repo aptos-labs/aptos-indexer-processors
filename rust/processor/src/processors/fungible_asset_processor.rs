@@ -265,7 +265,6 @@ impl ProcessorTrait for FungibleAssetProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
         let (
             fungible_asset_activities,
@@ -274,8 +273,6 @@ impl ProcessorTrait for FungibleAssetProcessor {
             current_fungible_asset_balances,
         ) = parse_v2_coin(&transactions, &mut conn).await;
 
-        let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
-        let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
             &mut conn,
@@ -288,13 +285,10 @@ impl ProcessorTrait for FungibleAssetProcessor {
             current_fungible_asset_balances,
         )
         .await;
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
             }),
             Err(err) => {
                 error!(

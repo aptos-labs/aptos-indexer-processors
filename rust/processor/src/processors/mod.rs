@@ -53,8 +53,6 @@ type EndVersion = u64;
 pub struct ProcessingResult {
     pub start_version: StartVersion,
     pub end_version: EndVersion,
-    pub processing_duration_in_secs: f64,
-    pub db_insertion_duration_in_secs: f64,
 }
 
 /// Base trait for all processors

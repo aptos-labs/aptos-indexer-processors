@@ -21,7 +21,6 @@ use crate::{
             PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
-            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
@@ -471,16 +470,10 @@ impl Worker {
                         ])
                         .inc_by(end_version - start_version + 1);
 
-                    if let Ok(res) = processed_result {
+                    if let Ok(_res) = processed_result {
                         SINGLE_BATCH_PROCESSING_TIME_IN_SECS
                             .with_label_values(&[&processor_name])
                             .set(processing_duration.elapsed().as_secs_f64());
-                        SINGLE_BATCH_PARSING_TIME_IN_SECS
-                            .with_label_values(&[&processor_name])
-                            .set(res.processing_duration_in_secs);
-                        SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
-                            .with_label_values(&[&processor_name])
-                            .set(res.db_insertion_duration_in_secs);
 
                         if enable_verbose_logging {
                             info!(
@@ -491,7 +484,6 @@ impl Worker {
                                 start_txn_timestamp_iso,
                                 end_txn_timestamp_iso,
                                 size_in_bytes = transactions_pb.size_in_bytes,
-                                duration_in_secs = res.db_insertion_duration_in_secs,
                                 tps = (end_version - start_version) as f64
                                     / processing_duration.elapsed().as_secs_f64(),
                                 bytes_per_sec = transactions_pb.size_in_bytes as f64
@@ -506,7 +498,6 @@ impl Worker {
                                 start_txn_timestamp_iso,
                                 end_txn_timestamp_iso,
                                 size_in_bytes = transactions_pb.size_in_bytes,
-                                duration_in_secs = res.processing_duration_in_secs,
                                 tps = (end_version - start_version) as f64
                                     / processing_duration.elapsed().as_secs_f64(),
                                 bytes_per_sec = transactions_pb.size_in_bytes as f64
@@ -522,8 +513,6 @@ impl Worker {
                                 end_txn_timestamp_iso,
                                 num_of_transactions = end_version - start_version + 1,
                                 size_in_bytes = transactions_pb.size_in_bytes,
-                                processing_duration_in_secs = res.processing_duration_in_secs,
-                                db_insertion_duration_in_secs = res.db_insertion_duration_in_secs,
                                 duration_in_secs = processing_duration.elapsed().as_secs_f64(),
                                 tps = (end_version - start_version) as f64
                                     / processing_duration.elapsed().as_secs_f64(),
@@ -577,16 +566,10 @@ impl Worker {
             processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
             let mut prev_start = None;
             let mut prev_end = None;
-            let mut max_processing_duration_in_secs: f64 = 0.0;
-            let mut max_db_insertion_duration_in_secs: f64 = 0.0;
             let processed_versions_sorted = processed_versions.clone();
             for processing_result in processed_versions {
                 let start = processing_result.start_version;
                 let end = processing_result.end_version;
-                max_processing_duration_in_secs = max_processing_duration_in_secs
-                    .max(processing_result.processing_duration_in_secs);
-                max_db_insertion_duration_in_secs = max_db_insertion_duration_in_secs
-                    .max(processing_result.db_insertion_duration_in_secs);
                 if prev_start.is_none() {
                     prev_start = Some(start);
                     prev_end = Some(end);

@@ -177,7 +177,6 @@ impl ProcessorTrait for DefaultProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
         let (txns, block_metadata_txns, _, wsc_details) =
             TransactionModel::from_transactions(&transactions);
@@ -456,7 +455,10 @@ impl ProcessorTrait for DefaultProcessor {
             Err(e) => fail(start_version, end_version, "Error on processing tokens v1", e),
         };
         
-        Ok((start_version, end_version))
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+        })
     }
 
 

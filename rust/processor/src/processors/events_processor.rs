@@ -118,7 +118,6 @@ impl ProcessorTrait for EventsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
         let mut events = vec![];
         for txn in &transactions {
@@ -137,8 +136,6 @@ impl ProcessorTrait for EventsProcessor {
             events.extend(txn_events);
         }
 
-        let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
-        let db_insertion_start = std::time::Instant::now();
 
         let tx_result =
             insert_events_to_db(&mut conn, self.name(), start_version, end_version, events).await;
@@ -146,8 +143,6 @@ impl ProcessorTrait for EventsProcessor {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
             }),
             Err(e) => {
                 error!(

@@ -401,7 +401,6 @@ impl ProcessorTrait for AnsProcessor {
         end_version: u64,
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
 
         let (
@@ -420,8 +419,6 @@ impl ProcessorTrait for AnsProcessor {
             self.config.ans_v2_contract_address.clone(),
         );
 
-        let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
-        let db_insertion_start = std::time::Instant::now();
 
         // Insert values to db
         let tx_result = insert_to_db(
@@ -440,14 +437,11 @@ impl ProcessorTrait for AnsProcessor {
         )
         .await;
 
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
             }),
             Err(e) => {
                 error!(
