@@ -318,8 +318,8 @@ impl TournamentPlayer {
         )
         .unwrap()
         {
-            let event_key = event.clone().key.unwrap();
-            if let Some(object_address) = receiver_to_object.get(&event_key.account_address) {
+            let recv_addr = standardize_address(&event.clone().key.unwrap().account_address);
+            if let Some(object_address) = receiver_to_object.get(&recv_addr) {
                 let token_hash = deposit_event.id.token_data_id.to_hash();
                 match previous_tournament_token.get(object_address) {
                     Some(player) => {
