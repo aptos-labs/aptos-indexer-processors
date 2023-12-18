@@ -152,6 +152,7 @@ impl ProcessorTrait for UserTransactionProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
         let mut signatures = vec![];
         let mut user_transactions = vec![];
@@ -180,8 +181,14 @@ impl ProcessorTrait for UserTransactionProcessor {
             signatures,
         )
         .await;
+        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
-            Ok(_) => Ok((start_version, end_version)),
+            Ok(_) => Ok(ProcessingResult {
+                start_version,
+                end_version,
+                processing_duration_in_secs,
+                db_insertion_duration_in_secs,
+            }),
             Err(e) => {
                 error!(
                     start_version = start_version,

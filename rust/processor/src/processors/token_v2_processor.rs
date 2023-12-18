@@ -405,6 +405,7 @@ impl ProcessorTrait for TokenV2Processor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
 
         // First get all token related table metadata from the batch of transactions. This is in case
@@ -439,8 +440,14 @@ impl ProcessorTrait for TokenV2Processor {
             current_token_v2_metadata,
         )
         .await;
+        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
-            Ok(_) => Ok((start_version, end_version)),
+            Ok(_) => Ok(ProcessingResult {
+                start_version,
+                end_version,
+                processing_duration_in_secs,
+                db_insertion_duration_in_secs,
+            }),
             Err(e) => {
                 error!(
                     start_version = start_version,

@@ -49,7 +49,13 @@ use std::fmt::Debug;
 
 type StartVersion = u64;
 type EndVersion = u64;
-pub type ProcessingResult = (StartVersion, EndVersion);
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct ProcessingResult {
+    pub start_version: StartVersion,
+    pub end_version: EndVersion,
+    pub processing_duration_in_secs: f64,
+    pub db_insertion_duration_in_secs: f64,
+}
 
 /// Base trait for all processors
 #[async_trait]

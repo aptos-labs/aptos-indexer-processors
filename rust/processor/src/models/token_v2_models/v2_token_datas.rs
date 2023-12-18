@@ -7,9 +7,12 @@
 
 use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping};
 use crate::{
-    models::token_models::{
-        collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-        token_utils::TokenWriteSet,
+    models::{
+        fungible_asset_models::v2_fungible_metadata::FungibleAssetMetadataModel,
+        token_models::{
+            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            token_utils::TokenWriteSet,
+        },
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
@@ -250,7 +253,7 @@ impl TokenDataV2 {
     }
 
     /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
-    /// and if we can't find after 3 times, we'll assume that it's not a token.
+    /// and if we can't find after N times, we'll assume that it's not a token.
     /// TODO: An improvement is to combine this with is_address_coin. To do this well we need
     /// a k-v store
     async fn query_is_address_token(conn: &mut PgPoolConnection<'_>, address: &str) -> bool {
@@ -260,6 +263,13 @@ impl TokenDataV2 {
             match Self::get_by_token_data_id(conn, address).await {
                 Ok(_) => return true,
                 Err(_) => {
+                    // TODO: this'll unblock very short term but we should clean this up
+                    if FungibleAssetMetadataModel::get_by_asset_type(conn, address)
+                        .await
+                        .is_ok()
+                    {
+                        return false;
+                    }
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
                 },
             }
