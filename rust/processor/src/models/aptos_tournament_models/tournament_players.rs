@@ -1,8 +1,13 @@
 // Copyright © Aptos Foundation
 
-use super::aptos_tournament_utils::{BurnPlayerTokenEvent, Room, TournamentPlayerToken};
+use super::aptos_tournament_utils::{
+    BurnPlayerTokenEvent, CoinRewardClaimed, Room, TournamentPlayerToken,
+};
 use crate::{
-    models::token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+    models::token_models::{
+        collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+        token_utils::TokenEvent,
+    },
     schema::tournament_players,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
@@ -30,6 +35,9 @@ pub struct TournamentPlayer {
     pub player_name: String,
     pub alive: bool,
     pub token_uri: String,
+    pub coin_reward_claimed_type: Option<String>,
+    pub coin_reward_claimed_amount: Option<i64>,
+    pub token_reward_claimed: Vec<Option<String>>,
     pub last_transaction_version: i64,
 }
 
@@ -71,6 +79,9 @@ impl TournamentPlayer {
                 player_name: tournament_token.player_name.clone(),
                 alive: true,
                 token_uri: tournament_token.token_uri,
+                coin_reward_claimed_type: None,
+                coin_reward_claimed_amount: None,
+                token_reward_claimed: vec![],
                 last_transaction_version: transaction_version,
             });
         }
@@ -121,6 +132,9 @@ impl TournamentPlayer {
                 player_name: player.player_name.clone(),
                 alive: true,
                 token_uri: player.token_uri.clone(),
+                coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                token_reward_claimed: player.token_reward_claimed.clone(),
                 last_transaction_version: transaction_version,
             },
             None => {
@@ -143,6 +157,9 @@ impl TournamentPlayer {
                     player_name: player.player_name,
                     alive: true,
                     token_uri: player.token_uri.clone(),
+                    coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                    coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                    token_reward_claimed: player.token_reward_claimed.clone(),
                     last_transaction_version: transaction_version,
                 }
             },
@@ -170,6 +187,9 @@ impl TournamentPlayer {
                         player_name: player.player_name.clone(),
                         alive: false,
                         token_uri: player.token_uri.clone(),
+                        coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                        coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                        token_reward_claimed: player.token_reward_claimed.clone(),
                         last_transaction_version: transaction_version,
                     });
                 },
@@ -185,6 +205,9 @@ impl TournamentPlayer {
                             player_name: player.player_name,
                             alive: false,
                             token_uri: player.token_uri,
+                            coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                            coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                            token_reward_claimed: player.token_reward_claimed.clone(),
                             last_transaction_version: transaction_version,
                         });
                     }
@@ -214,12 +237,134 @@ impl TournamentPlayer {
                     player_name: player.player_name,
                     alive: player.alive,
                     token_uri: player.token_uri,
+                    coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                    coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                    token_reward_claimed: player.token_reward_claimed.clone(),
                     last_transaction_version: transaction_version,
                 };
                 players.insert(player.token_address.clone(), player);
             }
         }
         players
+    }
+
+    pub async fn claim_coin_reward(
+        conn: &mut PgPoolConnection<'_>,
+        contract_addr: &str,
+        write_resource: &WriteResource,
+        transaction_version: i64,
+        previous_tournament_token: &TournamentPlayerMapping,
+    ) -> Option<Self> {
+        if let Some(coin_reward) = CoinRewardClaimed::from_write_resource(
+            contract_addr,
+            write_resource,
+            transaction_version,
+        )
+        .unwrap()
+        {
+            let object_address = standardize_address(&write_resource.address);
+            let type_arg = write_resource.type_str.clone();
+            match previous_tournament_token.get(&object_address) {
+                Some(player) => {
+                    return Some(TournamentPlayer {
+                        token_address: player.token_address.clone(),
+                        user_address: player.user_address.clone(),
+                        tournament_address: player.tournament_address.clone(),
+                        room_address: player.room_address.clone(),
+                        player_name: player.player_name.clone(),
+                        alive: player.alive,
+                        token_uri: player.token_uri.clone(),
+                        coin_reward_claimed_type: Some(type_arg),
+                        coin_reward_claimed_amount: Some(coin_reward.amount),
+                        token_reward_claimed: player.token_reward_claimed.clone(),
+                        last_transaction_version: transaction_version,
+                    });
+                },
+                None => {
+                    if let Some(player) =
+                        TournamentPlayerQuery::query_by_token_address(conn, &object_address).await
+                    {
+                        return Some(TournamentPlayer {
+                            token_address: player.token_address,
+                            user_address: player.user_address,
+                            tournament_address: player.tournament_address,
+                            room_address: player.room_address,
+                            player_name: player.player_name,
+                            alive: player.alive,
+                            token_uri: player.token_uri,
+                            coin_reward_claimed_type: Some(type_arg),
+                            coin_reward_claimed_amount: Some(coin_reward.amount),
+                            token_reward_claimed: player.token_reward_claimed,
+                            last_transaction_version: transaction_version,
+                        });
+                    }
+                },
+            }
+        }
+        None
+    }
+
+    pub async fn claim_token_reward(
+        conn: &mut PgPoolConnection<'_>,
+        event: &Event,
+        transaction_version: i64,
+        receiver_to_object: &HashMap<String, String>,
+        previous_tournament_token: &TournamentPlayerMapping,
+    ) -> Option<Self> {
+        if let Some(TokenEvent::DepositTokenEvent(deposit_event)) = TokenEvent::from_event(
+            event.type_str.as_str(),
+            event.data.as_str(),
+            transaction_version,
+        )
+        .unwrap()
+        {
+            let event_key = event.clone().key.unwrap();
+            if let Some(object_address) = receiver_to_object.get(&event_key.account_address) {
+                let token_hash = deposit_event.id.token_data_id.to_hash();
+                match previous_tournament_token.get(object_address) {
+                    Some(player) => {
+                        let mut tokens = player.token_reward_claimed.clone();
+                        tokens.push(Some(token_hash));
+                        return Some(TournamentPlayer {
+                            token_address: object_address.to_string(),
+                            user_address: player.user_address.clone(),
+                            tournament_address: player.tournament_address.clone(),
+                            room_address: player.room_address.clone(),
+                            player_name: player.player_name.clone(),
+                            alive: player.alive,
+                            token_uri: player.token_uri.clone(),
+                            coin_reward_claimed_type: None,
+                            coin_reward_claimed_amount: None,
+                            token_reward_claimed: tokens,
+                            last_transaction_version: transaction_version,
+                        });
+                    },
+                    None => {
+                        if let Some(player) =
+                            TournamentPlayerQuery::query_by_token_address(conn, &object_address)
+                                .await
+                        {
+                            let mut tokens = player.token_reward_claimed;
+                            tokens.push(Some(token_hash));
+                            return Some(TournamentPlayer {
+                                token_address: player.token_address,
+                                user_address: player.user_address,
+                                tournament_address: player.tournament_address,
+                                room_address: player.room_address,
+                                player_name: player.player_name,
+                                alive: player.alive,
+                                token_uri: player.token_uri,
+                                coin_reward_claimed_type: None,
+                                coin_reward_claimed_amount: None,
+                                token_reward_claimed: tokens,
+                                last_transaction_version: transaction_version,
+                            });
+                        }
+                    },
+                }
+            }
+        }
+        None
     }
 }
 
@@ -246,6 +391,9 @@ pub struct TournamentPlayerQuery {
     pub player_name: String,
     pub alive: bool,
     pub token_uri: String,
+    pub coin_reward_claimed_type: Option<String>,
+    pub coin_reward_claimed_amount: Option<i64>,
+    pub token_reward_claimed: Vec<Option<String>>,
     pub last_transaction_version: i64,
     pub inserted_at: chrono::NaiveDateTime,
 }

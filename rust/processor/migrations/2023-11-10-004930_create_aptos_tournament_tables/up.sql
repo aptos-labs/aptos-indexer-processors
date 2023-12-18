@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS tournament_players (
     player_name VARCHAR NOT NULL,
     alive BOOLEAN NOT NULL,
     token_uri VARCHAR NOT NULL,
+    coin_reward_claimed_type VARCHAR,
+    coin_reward_claimed_amount BIGINT,
+    token_reward_claimed TEXT[] NOT NULL,
     last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

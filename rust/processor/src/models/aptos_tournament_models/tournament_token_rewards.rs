@@ -56,10 +56,9 @@ impl TournamentTokenReward {
                 tournament_address: resource.address.clone(),
                 tokens: inner
                     .tokens
-                    .big_vec
-                    .vec
+                    .inline_vec
                     .iter()
-                    .map(|token| token.id.token_data_id.to_id())
+                    .map(|token| token.id.token_data_id.to_hash())
                     .collect(),
                 last_transaction_version: transaction_version,
             });

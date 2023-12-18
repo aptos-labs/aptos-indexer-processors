@@ -308,18 +308,94 @@ pub struct CoinRewardPool {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenRewardVec {
-    pub vec: Vec<TokenType>,
+pub struct CoinRewardClaimed {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: i64,
+}
+
+impl CoinRewardClaimed {
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let AptosTournamentResource::CoinRewardClaimed(inner) =
+            AptosTournamentResource::from_resource(
+                addr,
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenReward {
-    pub big_vec: TokenRewardVec,
+    pub inline_vec: Vec<TokenType>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenV1RewardPool {
     pub tokens: TokenReward,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenV1RewardClaimed {
+    reciever_address: String,
+}
+
+impl TokenV1RewardClaimed {
+    pub fn get_reciever_address(&self) -> String {
+        standardize_address(&self.reciever_address)
+    }
+}
+
+impl TokenV1RewardClaimed {
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let AptosTournamentResource::TokenV1RewardClaimed(inner) =
+            AptosTournamentResource::from_resource(
+                addr,
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -332,7 +408,9 @@ pub enum AptosTournamentResource {
     TournamentState(TournamentState),
     TournamentPlayerToken(TournamentPlayerToken),
     CoinRewardPool(CoinRewardPool),
+    CoinRewardClaimed(CoinRewardClaimed),
     TokenV1RewardPool(TokenV1RewardPool),
+    TokenV1RewardClaimed(TokenV1RewardClaimed),
 }
 
 impl AptosTournamentResource {
@@ -347,7 +425,9 @@ impl AptosTournamentResource {
             format!("{}::tournament_manager::TournamentDirector", contract_addr),
             format!("{}::tournament_manager::TournamentState", contract_addr),
             format!("{}::rewards::CoinRewardPool", contract_addr),
+            format!("{}::rewards::CoinRewardClaimed", contract_addr),
             format!("{}::rewards::TokenV1RewardPool", contract_addr),
+            format!("{}::rewards::TokenV1RewardClaimed", contract_addr),
         ]
         .contains(&data_type.to_string())
     }
@@ -386,9 +466,17 @@ impl AptosTournamentResource {
             x if x == format!("{}::rewards::CoinRewardPool", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::CoinRewardPool(inner)))
             },
+            x if x == format!("{}::rewards::CoinRewardClaimed", contract_addr) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::CoinRewardClaimed(inner)))
+            },
             x if x == format!("{}::rewards::TokenV1RewardPool", contract_addr) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::TokenV1RewardPool(inner)))
+            },
+            x if x == format!("{}::rewards::TokenV1RewardClaimed", contract_addr) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::TokenV1RewardClaimed(inner)))
             },
             _ => Ok(None),
         }
