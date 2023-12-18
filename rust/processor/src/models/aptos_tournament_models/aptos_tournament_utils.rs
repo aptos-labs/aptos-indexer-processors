@@ -357,12 +357,12 @@ pub struct TokenV1RewardPool {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenV1RewardClaimed {
-    reciever_address: String,
+    receiver_address: String,
 }
 
 impl TokenV1RewardClaimed {
-    pub fn get_reciever_address(&self) -> String {
-        standardize_address(&self.reciever_address)
+    pub fn get_receiver_address(&self) -> String {
+        standardize_address(&self.receiver_address)
     }
 }
 

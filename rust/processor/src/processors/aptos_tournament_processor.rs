@@ -419,7 +419,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             .unwrap()
                         {
                             tournament_token_reward_claims
-                                .insert(token_reward_claimed.get_reciever_address(), address);
+                                .insert(token_reward_claimed.get_receiver_address(), address);
                         }
                     }
                 }
