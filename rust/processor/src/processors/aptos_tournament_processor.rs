@@ -6,7 +6,8 @@ use crate::{
     models::{
         aptos_tournament_models::{
             aptos_tournament_utils::{
-                CurrentRound, CurrentRoundMapping, TournamentState, TournamentStateMapping,
+                CurrentRound, CurrentRoundMapping, TokenV1RewardClaimed, TournamentState,
+                TournamentStateMapping,
             },
             tournament_coin_rewards::{TournamentCoinReward, TournamentCoinRewardMapping},
             tournament_players::{TournamentPlayer, TournamentPlayerMapping},
@@ -362,6 +363,8 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let conn = &mut self.connection_pool.get().await?;
         let processing_start = std::time::Instant::now();
 
+        let mut tournament_token_reward_claims = HashMap::new();
+
         let mut tournaments: TournamentMapping = HashMap::new();
         let mut tournament_coin_rewards: TournamentCoinRewardMapping = HashMap::new();
         let mut tournament_token_rewards: TournamentTokenRewardMapping = HashMap::new();
@@ -406,6 +409,17 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         {
                             object_to_owner
                                 .insert(address.clone(), object.object_core.get_owner_address());
+                        }
+                        if let Some(token_reward_claimed) =
+                            TokenV1RewardClaimed::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                txn_version,
+                            )
+                            .unwrap()
+                        {
+                            tournament_token_reward_claims
+                                .insert(token_reward_claimed.get_reciever_address(), address);
                         }
                     }
                 }
@@ -475,6 +489,17 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         ) {
                             tournament_token_rewards.insert(address.clone(), token_reward);
                         }
+                        if let Some(player) = TournamentPlayer::claim_coin_reward(
+                            conn,
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                            &tournament_players,
+                        )
+                        .await
+                        {
+                            tournament_players.insert(address.clone(), player);
+                        }
 
                         let players = TournamentPlayer::from_room(
                             conn,
@@ -488,7 +513,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     }
                 }
 
-                // Pass through events for player and room burning
+                // Pass through events for player, room burning, and token claiming
                 for event in user_txn.events.iter() {
                     if let Some(player) = TournamentPlayer::delete_player(
                         conn,
@@ -511,6 +536,17 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     .await
                     {
                         tournament_rooms.insert(room.address.clone(), room);
+                    }
+                    if let Some(player) = TournamentPlayer::claim_token_reward(
+                        conn,
+                        event,
+                        txn_version,
+                        &tournament_token_reward_claims,
+                        &tournament_players,
+                    )
+                    .await
+                    {
+                        tournament_players.insert(player.token_address.clone(), player);
                     }
 
                     let players = TournamentPlayer::delete_room(

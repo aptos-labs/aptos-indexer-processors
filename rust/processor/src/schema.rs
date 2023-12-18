@@ -1160,6 +1160,9 @@ diesel::table! {
         player_name -> Varchar,
         alive -> Bool,
         token_uri -> Varchar,
+        coin_reward_claimed_type -> Nullable<Varchar>,
+        coin_reward_claimed_amount -> Nullable<Int8>,
+        token_reward_claimed -> Array<Nullable<Text>>,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
