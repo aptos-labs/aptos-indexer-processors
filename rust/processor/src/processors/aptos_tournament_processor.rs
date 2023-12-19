@@ -206,6 +206,7 @@ async fn insert_tournament_coin_rewards(
                 .on_conflict((tournament_address, coin_type))
                 .do_update()
                 .set((
+                    coin_type.eq(excluded(coin_type)),
                     coins.eq(excluded(coins)),
                     coin_reward_amount.eq(excluded(coin_reward_amount)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
@@ -267,6 +268,7 @@ async fn insert_tournament_rounds(
                 .on_conflict(address)
                 .do_update()
                 .set((
+                    number.eq(excluded(number)),
                     play_started.eq(excluded(play_started)),
                     play_ended.eq(excluded(play_ended)),
                     paused.eq(excluded(paused)),
@@ -334,7 +336,12 @@ async fn insert_tournament_players(
                     user_address.eq(excluded(user_address)),
                     tournament_address.eq(excluded(tournament_address)),
                     room_address.eq(excluded(room_address)),
+                    player_name.eq(excluded(player_name)),
                     alive.eq(excluded(alive)),
+                    token_uri.eq(excluded(token_uri)),
+                    coin_reward_claimed_type.eq(excluded(coin_reward_claimed_type)),
+                    coin_reward_claimed_amount.eq(excluded(coin_reward_claimed_amount)),
+                    token_reward_claimed.eq(excluded(token_reward_claimed)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
@@ -481,7 +488,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             txn_version,
                         ) {
                             tournament_coin_rewards.insert(address.clone(), coin_reward);
-                            // std::process::exit(0);
                         }
                         if let Some(token_reward) = TournamentTokenReward::from_write_resource(
                             &self.config.contract_address,
