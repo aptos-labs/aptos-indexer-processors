@@ -133,7 +133,7 @@ impl TournamentPlayer {
                 alive: true,
                 token_uri: player.token_uri.clone(),
                 coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                 token_reward_claimed: player.token_reward_claimed.clone(),
                 last_transaction_version: transaction_version,
             },
@@ -158,7 +158,7 @@ impl TournamentPlayer {
                     alive: true,
                     token_uri: player.token_uri.clone(),
                     coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                    coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                    coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                     token_reward_claimed: player.token_reward_claimed.clone(),
                     last_transaction_version: transaction_version,
                 }
@@ -188,7 +188,7 @@ impl TournamentPlayer {
                         alive: false,
                         token_uri: player.token_uri.clone(),
                         coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                        coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                        coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                         token_reward_claimed: player.token_reward_claimed.clone(),
                         last_transaction_version: transaction_version,
                     });
@@ -206,7 +206,7 @@ impl TournamentPlayer {
                             alive: false,
                             token_uri: player.token_uri,
                             coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                            coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                            coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                             token_reward_claimed: player.token_reward_claimed.clone(),
                             last_transaction_version: transaction_version,
                         });
@@ -238,7 +238,7 @@ impl TournamentPlayer {
                     alive: player.alive,
                     token_uri: player.token_uri,
                     coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                    coin_reward_claimed_amount: player.coin_reward_claimed_amount.clone(),
+                    coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                     token_reward_claimed: player.token_reward_claimed.clone(),
                     last_transaction_version: transaction_version,
                 };
@@ -263,7 +263,8 @@ impl TournamentPlayer {
         .unwrap()
         {
             let object_address = standardize_address(&write_resource.address);
-            let type_arg = write_resource.type_str.clone();
+            let type_ = write_resource.type_str.clone();
+            let type_arg = &type_[type_.find('<').unwrap() + 1..type_.find('>').unwrap()];
             match previous_tournament_token.get(&object_address) {
                 Some(player) => {
                     return Some(TournamentPlayer {
@@ -274,7 +275,7 @@ impl TournamentPlayer {
                         player_name: player.player_name.clone(),
                         alive: player.alive,
                         token_uri: player.token_uri.clone(),
-                        coin_reward_claimed_type: Some(type_arg),
+                        coin_reward_claimed_type: Some(type_arg.to_string()),
                         coin_reward_claimed_amount: Some(coin_reward.amount),
                         token_reward_claimed: player.token_reward_claimed.clone(),
                         last_transaction_version: transaction_version,
@@ -292,7 +293,7 @@ impl TournamentPlayer {
                             player_name: player.player_name,
                             alive: player.alive,
                             token_uri: player.token_uri,
-                            coin_reward_claimed_type: Some(type_arg),
+                            coin_reward_claimed_type: Some(type_arg.to_string()),
                             coin_reward_claimed_amount: Some(coin_reward.amount),
                             token_reward_claimed: player.token_reward_claimed,
                             last_transaction_version: transaction_version,
@@ -333,15 +334,15 @@ impl TournamentPlayer {
                             player_name: player.player_name.clone(),
                             alive: player.alive,
                             token_uri: player.token_uri.clone(),
-                            coin_reward_claimed_type: None,
-                            coin_reward_claimed_amount: None,
+                            coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                            coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                             token_reward_claimed: tokens,
                             last_transaction_version: transaction_version,
                         });
                     },
                     None => {
                         if let Some(player) =
-                            TournamentPlayerQuery::query_by_token_address(conn, &object_address)
+                            TournamentPlayerQuery::query_by_token_address(conn, object_address)
                                 .await
                         {
                             let mut tokens = player.token_reward_claimed;
@@ -354,8 +355,8 @@ impl TournamentPlayer {
                                 player_name: player.player_name,
                                 alive: player.alive,
                                 token_uri: player.token_uri,
-                                coin_reward_claimed_type: None,
-                                coin_reward_claimed_amount: None,
+                                coin_reward_claimed_type: player.coin_reward_claimed_type,
+                                coin_reward_claimed_amount: player.coin_reward_claimed_amount,
                                 token_reward_claimed: tokens,
                                 last_transaction_version: transaction_version,
                             });
