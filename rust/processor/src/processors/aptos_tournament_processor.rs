@@ -382,7 +382,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
 
             if let TxnData::User(user_txn) = txn_data {
-                // First pass: TournamentState and CurrentRound
+                // First pass: TournamentState, CurrentRound, object mapping, token reward claim mapping
                 for wsc in transaction_info.changes.iter() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                         let address = standardize_address(&wr.address.to_string());
@@ -481,6 +481,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             txn_version,
                         ) {
                             tournament_coin_rewards.insert(address.clone(), coin_reward);
+                            // std::process::exit(0);
                         }
                         if let Some(token_reward) = TournamentTokenReward::from_write_resource(
                             &self.config.contract_address,
