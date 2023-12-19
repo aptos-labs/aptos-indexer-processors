@@ -9,7 +9,8 @@ use super::v2_fungible_asset_utils::FungibleAssetMetadata;
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
-        object_models::v2_object_utils::{Object, ObjectAggregatedDataMapping},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        object_models::v2_objects::Object,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,

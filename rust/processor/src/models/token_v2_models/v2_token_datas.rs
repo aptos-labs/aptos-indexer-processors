@@ -8,8 +8,8 @@
 use super::v2_token_utils::{TokenStandard, TokenV2};
 use crate::{
     models::{
-        object_models::v2_object_utils::{Object, ObjectAggregatedDataMapping},
-        token_models::token_utils::TokenWriteSet,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        object_models::v2_objects::Object, token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
