@@ -69,3 +69,42 @@ CREATE TABLE IF NOT EXISTS tournament_players (
 CREATE INDEX IF NOT EXISTS tournament_player_user_address ON tournament_players (user_address);
 CREATE INDEX IF NOT EXISTS tournament_player_tournament_address ON tournament_players (tournament_address);
 CREATE INDEX IF NOT EXISTS tournament_player_room_address ON tournament_players (room_address);
+-- MANUAL GAME INDEXING
+CREATE TABLE IF NOT EXISTS rock_paper_scissors_games (
+    room_address VARCHAR(66) PRIMARY KEY NOT NULL,
+    player1_token_address VARCHAR(66) NOT NULL,
+    player2_token_address VARCHAR(66) NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS rock_paper_scissors_game_player1_token_address ON rock_paper_scissors_game (player1_token_address);
+CREATE INDEX IF NOT EXISTS rock_paper_scissors_game_player2_token_address ON rock_paper_scissors_game (player2_token_address);
+CREATE TABLE IF NOT EXISTS rock_paper_scissors_players (
+    token_address VARCHAR(66) NOT NULL,
+    room_address VARCHAR(66) NOT NULL,
+    user_address VARCHAR(66) NOT NULL,
+    committed_action TEXT[],
+    verified_action TEXT[],
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (room_address, token_address)
+);
+CREATE TABLE IF NOT EXISTS trivia_questions (
+    round_address VARCHAR(66) PRIMARY KEY NOT NULL,
+    question VARCHAR NOT NULL,
+    possible_answers TEXT[] NOT NULL,
+    revealed_answer_index BIGINT NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS trivia_question_question ON trivia_question (question);
+CREATE INDEX IF NOT EXISTS trivia_question_revealed_answer_index ON trivia_question (revealed_answer_index);
+CREATE TABLE IF NOT EXISTS trivia_answers (
+    token_address VARCHAR(66) NOT NULL,
+    round_address VARCHAR(66) NOT NULL,
+    answer_index BIGINT NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (token_address, round_address)
+);
+CREATE INDEX IF NOT EXISTS trivia_answer_answer_index ON trivia_answer (answer_index);
