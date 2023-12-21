@@ -1,5 +1,4 @@
 DROP INDEX IF EXISTS tournament_is_joinable;
-DROP INDEX IF EXISTS tournament_has_ended;
 DROP INDEX IF EXISTS tournament_coin_rewards_coin_type;
 DROP INDEX IF EXISTS tournament_coin_rewards_coin_amount;
 DROP INDEX IF EXISTS tournament_token_rewards_tokens;

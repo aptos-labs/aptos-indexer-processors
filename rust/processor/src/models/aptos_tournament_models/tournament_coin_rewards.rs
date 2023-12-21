@@ -10,7 +10,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub type TournamentCoinRewardMapping = HashMap<String, TournamentCoinReward>;
+pub type TournamentCoinRewardMapping = HashMap<(String, String), TournamentCoinReward>;
 
 #[derive(
     Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Eq, PartialEq,

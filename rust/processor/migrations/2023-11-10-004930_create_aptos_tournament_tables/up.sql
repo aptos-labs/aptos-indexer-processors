@@ -5,15 +5,14 @@ CREATE TABLE IF NOT EXISTS tournaments (
     max_num_winners BIGINT NOT NULL,
     players_joined BIGINT NOT NULL,
     is_joinable BOOLEAN NOT NULL,
-    has_ended BOOLEAN NOT NULL,
     current_round_address VARCHAR(66),
     current_round_number BIGINT NOT NULL,
     current_game_module VARCHAR,
     last_transaction_version BIGINT NOT NULL,
+    tournament_ended_at TIMESTAMP,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS tournament_is_joinable ON tournaments (is_joinable);
-CREATE INDEX IF NOT EXISTS tournament_has_ended ON tournaments (has_ended);
 CREATE INDEX IF NOT EXISTS tournament_current_round_number ON tournaments (current_round_number);
 CREATE TABLE IF NOT EXISTS tournament_coin_rewards (
     tournament_address VARCHAR(66) NOT NULL,

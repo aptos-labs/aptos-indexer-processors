@@ -17,7 +17,6 @@ use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::error;
 
 type TokenAddress = String;
 pub type TournamentPlayerMapping = HashMap<TokenAddress, TournamentPlayer>;
@@ -44,6 +43,35 @@ pub struct TournamentPlayer {
 impl TournamentPlayer {
     pub fn pk(&self) -> String {
         self.token_address.clone()
+    }
+
+    async fn lookup(
+        conn: &mut PgPoolConnection<'_>,
+        token_address: &str,
+        previous_tournament_token: &TournamentPlayerMapping,
+    ) -> Self {
+        match previous_tournament_token.get(token_address) {
+            Some(player) => player.clone(),
+            None => {
+                let player = TournamentPlayerQuery::query_by_token_address(conn, token_address)
+                    .await
+                    .unwrap();
+
+                TournamentPlayer {
+                    token_address: player.token_address,
+                    user_address: player.user_address,
+                    tournament_address: player.tournament_address,
+                    room_address: player.room_address,
+                    player_name: player.player_name,
+                    alive: player.alive,
+                    token_uri: player.token_uri.clone(),
+                    coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
+                    coin_reward_claimed_amount: player.coin_reward_claimed_amount,
+                    token_reward_claimed: player.token_reward_claimed.clone(),
+                    last_transaction_version: player.last_transaction_version,
+                }
+            },
+        }
     }
 
     pub async fn from_tournament_token(
@@ -102,68 +130,14 @@ impl TournamentPlayer {
             let room_address = &standardize_address(&write_resource.address);
             for player in room.get_players().iter() {
                 let token_address = standardize_address(player);
-                let room_player = Self::from_room_player(
-                    conn,
-                    &token_address,
-                    transaction_version,
-                    room_address,
-                    previous_tournament_token,
-                )
-                .await;
-                players.insert(room_player.token_address.clone(), room_player);
+                let mut player =
+                    Self::lookup(conn, &token_address, previous_tournament_token).await;
+                player.room_address = Some(room_address.to_string());
+                player.last_transaction_version = transaction_version;
+                players.insert(player.token_address.clone(), player);
             }
         }
         players
-    }
-
-    async fn from_room_player(
-        conn: &mut PgPoolConnection<'_>,
-        token_address: &str,
-        transaction_version: i64,
-        room_address: &str,
-        previous_tournament_token: &TournamentPlayerMapping,
-    ) -> Self {
-        match previous_tournament_token.get(token_address) {
-            Some(player) => TournamentPlayer {
-                token_address: token_address.to_string(),
-                user_address: player.user_address.clone(),
-                tournament_address: player.tournament_address.clone(),
-                room_address: Some(room_address.to_string()),
-                player_name: player.player_name.clone(),
-                alive: true,
-                token_uri: player.token_uri.clone(),
-                coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                coin_reward_claimed_amount: player.coin_reward_claimed_amount,
-                token_reward_claimed: player.token_reward_claimed.clone(),
-                last_transaction_version: transaction_version,
-            },
-            None => {
-                let player = TournamentPlayerQuery::query_by_token_address(conn, token_address)
-                    .await
-                    .unwrap_or_else(|| {
-                        error!(
-                            token_address = token_address,
-                            transaction_version = transaction_version,
-                            "Tournament player not found in database"
-                        );
-                        panic!();
-                    });
-
-                TournamentPlayer {
-                    token_address: player.token_address,
-                    user_address: player.user_address,
-                    tournament_address: player.tournament_address,
-                    room_address: Some(room_address.to_string()),
-                    player_name: player.player_name,
-                    alive: true,
-                    token_uri: player.token_uri.clone(),
-                    coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                    coin_reward_claimed_amount: player.coin_reward_claimed_amount,
-                    token_reward_claimed: player.token_reward_claimed.clone(),
-                    last_transaction_version: transaction_version,
-                }
-            },
-        }
     }
 
     pub async fn delete_player(
@@ -177,42 +151,10 @@ impl TournamentPlayer {
             BurnPlayerTokenEvent::from_event(contract_addr, event, transaction_version).unwrap()
         {
             let object_address = burn_player_token_event.get_object_address();
-            match previous_tournament_token.get(&object_address) {
-                Some(player) => {
-                    return Some(TournamentPlayer {
-                        token_address: object_address.to_string(),
-                        user_address: player.user_address.clone(),
-                        tournament_address: player.tournament_address.clone(),
-                        room_address: player.room_address.clone(),
-                        player_name: player.player_name.clone(),
-                        alive: false,
-                        token_uri: player.token_uri.clone(),
-                        coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                        coin_reward_claimed_amount: player.coin_reward_claimed_amount,
-                        token_reward_claimed: player.token_reward_claimed.clone(),
-                        last_transaction_version: transaction_version,
-                    });
-                },
-                None => {
-                    if let Some(player) =
-                        TournamentPlayerQuery::query_by_token_address(conn, &object_address).await
-                    {
-                        return Some(TournamentPlayer {
-                            token_address: player.token_address,
-                            user_address: player.user_address,
-                            tournament_address: player.tournament_address,
-                            room_address: player.room_address,
-                            player_name: player.player_name,
-                            alive: false,
-                            token_uri: player.token_uri,
-                            coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                            coin_reward_claimed_amount: player.coin_reward_claimed_amount,
-                            token_reward_claimed: player.token_reward_claimed.clone(),
-                            last_transaction_version: transaction_version,
-                        });
-                    }
-                },
-            }
+            let mut player = Self::lookup(conn, &object_address, previous_tournament_token).await;
+            player.alive = false;
+            player.last_transaction_version = transaction_version;
+            return Some(player);
         }
         None
     }
@@ -265,42 +207,11 @@ impl TournamentPlayer {
             let object_address = standardize_address(&write_resource.address);
             let type_ = write_resource.type_str.clone();
             let type_arg = &type_[type_.find('<').unwrap() + 1..type_.find('>').unwrap()];
-            match previous_tournament_token.get(&object_address) {
-                Some(player) => {
-                    return Some(TournamentPlayer {
-                        token_address: player.token_address.clone(),
-                        user_address: player.user_address.clone(),
-                        tournament_address: player.tournament_address.clone(),
-                        room_address: player.room_address.clone(),
-                        player_name: player.player_name.clone(),
-                        alive: player.alive,
-                        token_uri: player.token_uri.clone(),
-                        coin_reward_claimed_type: Some(type_arg.to_string()),
-                        coin_reward_claimed_amount: Some(coin_reward.amount),
-                        token_reward_claimed: player.token_reward_claimed.clone(),
-                        last_transaction_version: transaction_version,
-                    });
-                },
-                None => {
-                    if let Some(player) =
-                        TournamentPlayerQuery::query_by_token_address(conn, &object_address).await
-                    {
-                        return Some(TournamentPlayer {
-                            token_address: player.token_address,
-                            user_address: player.user_address,
-                            tournament_address: player.tournament_address,
-                            room_address: player.room_address,
-                            player_name: player.player_name,
-                            alive: player.alive,
-                            token_uri: player.token_uri,
-                            coin_reward_claimed_type: Some(type_arg.to_string()),
-                            coin_reward_claimed_amount: Some(coin_reward.amount),
-                            token_reward_claimed: player.token_reward_claimed,
-                            last_transaction_version: transaction_version,
-                        });
-                    }
-                },
-            }
+            let mut player = Self::lookup(conn, &object_address, previous_tournament_token).await;
+            player.coin_reward_claimed_type = Some(type_arg.to_string());
+            player.coin_reward_claimed_amount = Some(coin_reward.amount);
+            player.last_transaction_version = transaction_version;
+            return Some(player);
         }
         None
     }
@@ -322,47 +233,11 @@ impl TournamentPlayer {
             let recv_addr = standardize_address(&event.clone().key.unwrap().account_address);
             if let Some(object_address) = receiver_to_object.get(&recv_addr) {
                 let token_hash = deposit_event.id.token_data_id.to_hash();
-                match previous_tournament_token.get(object_address) {
-                    Some(player) => {
-                        let mut tokens = player.token_reward_claimed.clone();
-                        tokens.push(Some(token_hash));
-                        return Some(TournamentPlayer {
-                            token_address: object_address.to_string(),
-                            user_address: player.user_address.clone(),
-                            tournament_address: player.tournament_address.clone(),
-                            room_address: player.room_address.clone(),
-                            player_name: player.player_name.clone(),
-                            alive: player.alive,
-                            token_uri: player.token_uri.clone(),
-                            coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
-                            coin_reward_claimed_amount: player.coin_reward_claimed_amount,
-                            token_reward_claimed: tokens,
-                            last_transaction_version: transaction_version,
-                        });
-                    },
-                    None => {
-                        if let Some(player) =
-                            TournamentPlayerQuery::query_by_token_address(conn, object_address)
-                                .await
-                        {
-                            let mut tokens = player.token_reward_claimed;
-                            tokens.push(Some(token_hash));
-                            return Some(TournamentPlayer {
-                                token_address: player.token_address,
-                                user_address: player.user_address,
-                                tournament_address: player.tournament_address,
-                                room_address: player.room_address,
-                                player_name: player.player_name,
-                                alive: player.alive,
-                                token_uri: player.token_uri,
-                                coin_reward_claimed_type: player.coin_reward_claimed_type,
-                                coin_reward_claimed_amount: player.coin_reward_claimed_amount,
-                                token_reward_claimed: tokens,
-                                last_transaction_version: transaction_version,
-                            });
-                        }
-                    },
-                }
+                let mut player =
+                    Self::lookup(conn, object_address, previous_tournament_token).await;
+                player.token_reward_claimed.push(Some(token_hash));
+                player.last_transaction_version = transaction_version;
+                return Some(player);
             }
         }
         None

@@ -173,11 +173,11 @@ async fn insert_tournaments(
                     max_num_winners.eq(excluded(max_num_winners)),
                     players_joined.eq(excluded(players_joined)),
                     is_joinable.eq(excluded(is_joinable)),
-                    has_ended.eq(excluded(has_ended)),
                     current_round_address.eq(excluded(current_round_address)),
                     current_round_number.eq(excluded(current_round_number)),
                     current_game_module.eq(excluded(current_game_module)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    tournament_ended_at.eq(excluded(tournament_ended_at)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
             Some(
@@ -434,7 +434,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                 // Second pass: get tournament and players metadata
                 for wsc in transaction_info.changes.iter() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        let address = standardize_address(&wr.address.to_string());
                         if let Some(tournament_player) = TournamentPlayer::from_tournament_token(
                             conn,
                             &self.config.contract_address,
@@ -445,7 +444,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         )
                         .await
                         {
-                            tournament_players.insert(address.clone(), tournament_player);
+                            tournament_players.insert(tournament_player.pk(), tournament_player);
                         }
                         if let Some(tournament) = Tournament::from_write_resource(
                             &self.config.contract_address,
@@ -454,7 +453,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             tournament_state_mapping.clone(),
                             current_round_mapping.clone(),
                         ) {
-                            tournaments.insert(address.clone(), tournament);
+                            tournaments.insert(tournament.pk(), tournament);
                         }
                     }
                 }
@@ -462,13 +461,12 @@ impl ProcessorTrait for AptosTournamentProcessor {
                 // Third pass: everything else
                 for wsc in transaction_info.changes.iter() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        let address = standardize_address(&wr.address.to_string());
                         if let Some(round) = TournamentRound::from_write_resource(
                             &self.config.contract_address,
                             wr,
                             txn_version,
                         ) {
-                            tournament_rounds.insert(address.clone(), round);
+                            tournament_rounds.insert(round.pk(), round);
                         }
                         if let Some(room) = TournamentRoom::from_write_resource(
                             conn,
@@ -480,21 +478,21 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         )
                         .await
                         {
-                            tournament_rooms.insert(address.clone(), room);
+                            tournament_rooms.insert(room.pk(), room);
                         }
                         if let Some(coin_reward) = TournamentCoinReward::from_write_resource(
                             &self.config.contract_address,
                             wr,
                             txn_version,
                         ) {
-                            tournament_coin_rewards.insert(address.clone(), coin_reward);
+                            tournament_coin_rewards.insert(coin_reward.pk(), coin_reward);
                         }
                         if let Some(token_reward) = TournamentTokenReward::from_write_resource(
                             &self.config.contract_address,
                             wr,
                             txn_version,
                         ) {
-                            tournament_token_rewards.insert(address.clone(), token_reward);
+                            tournament_token_rewards.insert(token_reward.pk(), token_reward);
                         }
                         if let Some(player) = TournamentPlayer::claim_coin_reward(
                             conn,
@@ -505,7 +503,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         )
                         .await
                         {
-                            tournament_players.insert(address.clone(), player);
+                            tournament_players.insert(player.pk(), player);
                         }
 
                         let players = TournamentPlayer::from_room(
@@ -531,7 +529,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     )
                     .await
                     {
-                        tournament_players.insert(player.token_address.clone(), player);
+                        tournament_players.insert(player.pk(), player);
                     }
                     if let Some(room) = TournamentRoom::delete_room(
                         conn,
@@ -542,7 +540,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     )
                     .await
                     {
-                        tournament_rooms.insert(room.address.clone(), room);
+                        tournament_rooms.insert(room.pk(), room);
                     }
                     if let Some(player) = TournamentPlayer::claim_token_reward(
                         conn,
@@ -553,7 +551,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     )
                     .await
                     {
-                        tournament_players.insert(player.token_address.clone(), player);
+                        tournament_players.insert(player.pk(), player);
                     }
 
                     let players = TournamentPlayer::delete_room(
