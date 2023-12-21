@@ -670,7 +670,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             wr,
                             txn_version,
                         ) {
-                            rock_paper_scissors_games.insert(address.clone(), game);
+                            rock_paper_scissors_games.insert(game.pk(), game);
                         }
                         if let Some(players) = RockPaperScissorsPlayer::from_write_resource(
                             &self.config.contract_address,
@@ -679,31 +679,22 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         ) {
                             let player1 = players.0;
                             let player2 = players.1;
-                            rock_paper_scissors_players.insert(
-                                (player1.token_address.clone(), player1.room_address.clone()),
-                                player1,
-                            );
-                            rock_paper_scissors_players.insert(
-                                (player2.token_address.clone(), player2.room_address.clone()),
-                                player2,
-                            );
+                            rock_paper_scissors_players.insert(player1.pk(), player1);
+                            rock_paper_scissors_players.insert(player2.pk(), player2);
                         }
                         if let Some(question) = TriviaQuestion::from_write_resource(
                             &self.config.contract_address,
                             wr,
                             txn_version,
                         ) {
-                            trivia_questions.insert(address.clone(), question);
+                            trivia_questions.insert(question.pk(), question);
                         }
                         if let Some(answer) = TriviaAnswer::from_write_resource(
                             &self.config.contract_address,
                             wr,
                             txn_version,
                         ) {
-                            trivia_answers.insert(
-                                (answer.token_address.clone(), answer.round_address.clone()),
-                                answer,
-                            );
+                            trivia_answers.insert(answer.pk(), answer);
                         }
 
                         let players = TournamentPlayer::from_room(

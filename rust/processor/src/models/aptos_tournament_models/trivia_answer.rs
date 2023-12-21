@@ -22,8 +22,8 @@ pub struct TriviaAnswer {
 }
 
 impl TriviaAnswer {
-    pub fn pk(&self) -> String {
-        self.token_address.clone()
+    pub fn pk(&self) -> (String, String) {
+        (self.token_address.clone(), self.round_address.clone())
     }
 
     pub fn from_write_resource(

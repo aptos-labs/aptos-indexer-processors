@@ -26,8 +26,8 @@ pub struct RockPaperScissorsPlayer {
 }
 
 impl RockPaperScissorsPlayer {
-    pub fn pk(&self) -> String {
-        self.room_address.clone()
+    pub fn pk(&self) -> (String, String) {
+        (self.token_address.clone(), self.room_address.clone())
     }
 
     pub fn from_write_resource(
