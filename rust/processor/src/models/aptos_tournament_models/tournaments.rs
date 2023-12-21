@@ -12,7 +12,6 @@ use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::error;
 
 pub type TournamentMapping = HashMap<String, Tournament>;
 
@@ -28,14 +27,46 @@ pub struct Tournament {
     pub max_num_winners: i64,
     pub players_joined: i64,
     pub is_joinable: bool,
-    pub has_ended: bool,
     pub current_round_address: Option<String>,
     pub current_round_number: i64,
     pub current_game_module: Option<String>,
     pub last_transaction_version: i64,
+    pub tournament_ended_at: Option<chrono::NaiveDateTime>,
 }
 
 impl Tournament {
+    pub fn pk(&self) -> String {
+        self.address.clone()
+    }
+
+    pub async fn lookup(
+        conn: &mut PgPoolConnection<'_>,
+        address: &str,
+        tournament_mapping: &TournamentMapping,
+    ) -> Self {
+        match tournament_mapping.get(address) {
+            Some(tournament) => tournament.clone(),
+            None => {
+                let tournament = TournamentQuery::query_by_address(conn, address)
+                    .await
+                    .unwrap();
+                Tournament {
+                    address: tournament.address.clone(),
+                    tournament_name: tournament.tournament_name.clone(),
+                    max_players: tournament.max_players,
+                    max_num_winners: tournament.max_num_winners,
+                    players_joined: tournament.players_joined,
+                    is_joinable: tournament.is_joinable,
+                    current_round_address: tournament.current_round_address.clone(),
+                    current_round_number: tournament.current_round_number,
+                    current_game_module: tournament.current_game_module.clone(),
+                    last_transaction_version: tournament.last_transaction_version,
+                    tournament_ended_at: tournament.tournament_ended_at,
+                }
+            },
+        }
+    }
+
     pub fn from_write_resource(
         contract_addr: &str,
         write_resource: &WriteResource,
@@ -51,29 +82,12 @@ impl Tournament {
         .unwrap()
         {
             let tournament_address = standardize_address(&write_resource.address);
-            let state = tournament_state_mapping
-                .get(&tournament_address)
-                .unwrap_or_else(|| {
-                    error!(
-                        transaction_version = transaction_version,
-                        tournament_state_mapping = ?tournament_state_mapping,
-                        tournament_address = tournament_address,
-                        "Can't find tournament state mapping"
-                    );
-                    panic!("Can't find tournament state mapping");
-                });
-
-            let current_round = current_round_mapping
-                .get(&tournament_address)
-                .unwrap_or_else(|| {
-                    error!(
-                        transaction_version = transaction_version,
-                        current_round_mapping = ?current_round_mapping,
-                        tournament_address = tournament_address,
-                        "Can't find current round mapping"
-                    );
-                    panic!("Can't find current round mapping");
-                });
+            let state = tournament_state_mapping.get(&tournament_address).unwrap();
+            let current_round = current_round_mapping.get(&tournament_address).unwrap();
+            let mut tournament_ended_at = None;
+            if state.has_ended {
+                tournament_ended_at = Some(chrono::Utc::now().naive_utc());
+            }
 
             return Some(Tournament {
                 address: tournament_address,
@@ -82,11 +96,11 @@ impl Tournament {
                 max_num_winners: td.max_num_winners,
                 players_joined: td.players_joined,
                 is_joinable: state.is_joinable,
-                has_ended: state.has_ended,
                 current_round_address: Some(current_round.get_round_address()),
                 current_round_number: current_round.number,
                 current_game_module: Some(current_round.game_module.clone()),
                 last_transaction_version: transaction_version,
+                tournament_ended_at,
             });
         }
         None
@@ -115,11 +129,11 @@ pub struct TournamentQuery {
     pub max_num_winners: i64,
     pub players_joined: i64,
     pub is_joinable: bool,
-    pub has_ended: bool,
     pub current_round_address: Option<String>,
     pub current_round_number: i64,
     pub current_game_module: Option<String>,
     pub last_transaction_version: i64,
+    pub tournament_ended_at: Option<chrono::NaiveDateTime>,
     pub inserted_at: chrono::NaiveDateTime,
 }
 

@@ -2,7 +2,7 @@
 
 use super::{
     aptos_tournament_utils::{BurnRoomEvent, Room},
-    tournaments::{TournamentMapping, TournamentQuery},
+    tournaments::{Tournament, TournamentMapping},
 };
 use crate::{
     models::token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
@@ -15,7 +15,6 @@ use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::error;
 
 type RoomAddress = String;
 pub type TournamentRoomMapping = HashMap<RoomAddress, TournamentRoom>;
@@ -44,60 +43,19 @@ impl TournamentRoom {
         write_resource: &WriteResource,
         transaction_version: i64,
         object_to_owner: &HashMap<String, String>,
-        previous_tournament_token: &TournamentMapping,
+        previous_tournaments: &TournamentMapping,
     ) -> Option<Self> {
         if Room::from_write_resource(contract_addr, write_resource, transaction_version)
             .unwrap()
             .is_some()
         {
             let address = standardize_address(&write_resource.address);
-            let owner_address = object_to_owner.get(&address).unwrap_or_else(|| {
-                error!(
-                    address = address,
-                    transaction_version = transaction_version,
-                    "Can't find owner address"
-                );
-                panic!("Can't find owner address");
-            });
-            let (tournament_address, current_round_address) =
-                match previous_tournament_token.get(&owner_address.clone()) {
-                    Some(tournament) => (
-                        tournament.address.clone(),
-                        tournament.current_round_address.clone().unwrap_or_else(|| {
-                            error!(
-                                address = address,
-                                transaction_version = transaction_version,
-                                "Can't find current round address"
-                            );
-                            panic!("Can't find current round address");
-                        }),
-                    ),
-                    None => match TournamentQuery::query_by_address(conn, owner_address).await {
-                        Some(tournament) => (
-                            tournament.address,
-                            tournament.current_round_address.unwrap_or_else(|| {
-                                error!(
-                                    address = address,
-                                    transaction_version = transaction_version,
-                                    "Can't find current round address"
-                                );
-                                panic!("Can't find current round address");
-                            }),
-                        ),
-                        None => {
-                            error!(
-                                address = address,
-                                transaction_version = transaction_version,
-                                "Tournament not found in database"
-                            );
-                            panic!();
-                        },
-                    },
-                };
+            let owner_address = object_to_owner.get(&address).unwrap();
+            let tournament = Tournament::lookup(conn, owner_address, previous_tournaments).await;
             return Some(TournamentRoom {
                 address: address.clone(),
-                tournament_address,
-                round_address: current_round_address,
+                tournament_address: tournament.pk(),
+                round_address: tournament.current_round_address.unwrap(),
                 in_progress: true,
                 last_transaction_version: transaction_version,
             });

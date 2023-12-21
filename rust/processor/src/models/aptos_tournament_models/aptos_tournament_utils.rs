@@ -182,45 +182,6 @@ impl TournamentPlayerToken {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct MatchMaker {
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub min_players_per_room: i64,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub max_players_per_room: i64,
-    pub joining_allowed: bool,
-}
-
-impl MatchMaker {
-    pub fn from_write_resource(
-        addr: &str,
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let AptosTournamentResource::MatchMaker(inner) = AptosTournamentResource::from_resource(
-            addr,
-            &type_str,
-            resource.data.as_ref().unwrap(),
-            txn_version,
-        )? {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Player {
     inner: String,
 }
@@ -401,7 +362,6 @@ impl TokenV1RewardClaimed {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AptosTournamentResource {
     CurrentRound(CurrentRound),
-    MatchMaker(MatchMaker),
     Room(Room),
     Round(Round),
     TournamentDirector(TournamentDirector),
@@ -417,7 +377,6 @@ impl AptosTournamentResource {
     pub fn is_resource_supported(contract_addr: &str, data_type: &str) -> bool {
         let data_type = remove_type_from_resource(data_type);
         [
-            format!("{}::matchmaker::MatchMaker", contract_addr),
             format!("{}::round::Round", contract_addr),
             format!("{}::room::Room", contract_addr),
             format!("{}::token_manager::TournamentPlayerToken", contract_addr),
@@ -456,9 +415,6 @@ impl AptosTournamentResource {
             },
             x if x == format!("{}::room::Room", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::Room(inner)))
-            },
-            x if x == format!("{}::matchmaker::MatchMaker", contract_addr) => {
-                serde_json::from_value(data.clone()).map(|inner| Some(Self::MatchMaker(inner)))
             },
             x if x == format!("{}::round::Round", contract_addr) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::Round(inner)))
