@@ -410,7 +410,7 @@ async fn insert_rock_paper_scissors_games(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
-                    " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
+                    " WHERE rock_paper_scissors_games.last_transaction_version <= excluded.last_transaction_version ",
                 ),
             )
         .await?;
@@ -442,7 +442,7 @@ async fn insert_rock_paper_scissors_players(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
-                    " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
+                    " WHERE rock_paper_scissors_players.last_transaction_version <= excluded.last_transaction_version ",
                 ),
             )
         .await?;
@@ -474,7 +474,7 @@ async fn insert_trivia_questions(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
-                    " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
+                    " WHERE trivia_questions.last_transaction_version <= excluded.last_transaction_version ",
                 ),
             )
         .await?;
@@ -501,7 +501,7 @@ async fn insert_trivia_answers(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
-                    " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
+                    " WHERE trivia_answeres.last_transaction_version <= excluded.last_transaction_version ",
                 ),
             )
         .await?;
