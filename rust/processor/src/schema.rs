@@ -889,19 +889,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    rock_paper_scissors_game (room_address) {
-        #[max_length = 66]
-        room_address -> Varchar,
-        #[max_length = 66]
-        player1_token_address -> Varchar,
-        #[max_length = 66]
-        player2_token_address -> Varchar,
-        last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     rock_paper_scissors_games (room_address) {
         #[max_length = 66]
         room_address -> Varchar,
@@ -915,21 +902,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    rock_paper_scissors_player (room_address, token_address) {
-        #[max_length = 66]
-        token_address -> Varchar,
-        #[max_length = 66]
-        room_address -> Varchar,
-        #[max_length = 66]
-        address -> Varchar,
-        committed_action -> Nullable<Array<Nullable<Text>>>,
-        verified_action -> Nullable<Array<Nullable<Text>>>,
-        last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     rock_paper_scissors_players (room_address, token_address) {
         #[max_length = 66]
         token_address -> Varchar,
@@ -937,21 +909,6 @@ diesel::table! {
         room_address -> Varchar,
         #[max_length = 66]
         user_address -> Varchar,
-        committed_action -> Nullable<Array<Nullable<Text>>>,
-        verified_action -> Nullable<Array<Nullable<Text>>>,
-        last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    rock_paper_scissors_playes (room_address, token_address) {
-        #[max_length = 66]
-        token_address -> Varchar,
-        #[max_length = 66]
-        room_address -> Varchar,
-        #[max_length = 66]
-        address -> Varchar,
         committed_action -> Nullable<Array<Nullable<Text>>>,
         verified_action -> Nullable<Array<Nullable<Text>>>,
         last_transaction_version -> Int8,
@@ -1323,36 +1280,12 @@ diesel::table! {
 }
 
 diesel::table! {
-    trivia_answer (token_address, round_address) {
-        #[max_length = 66]
-        token_address -> Varchar,
-        #[max_length = 66]
-        round_address -> Varchar,
-        answer_index -> Int8,
-        last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     trivia_answers (token_address, round_address) {
         #[max_length = 66]
         token_address -> Varchar,
         #[max_length = 66]
         round_address -> Varchar,
         answer_index -> Int8,
-        last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    trivia_question (round_address) {
-        #[max_length = 66]
-        round_address -> Varchar,
-        question -> Varchar,
-        possible_answers -> Array<Nullable<Text>>,
-        revealed_answer_index -> Int8,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
     }
@@ -1460,11 +1393,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     objects,
     processor_status,
     proposal_votes,
-    rock_paper_scissors_game,
     rock_paper_scissors_games,
-    rock_paper_scissors_player,
     rock_paper_scissors_players,
-    rock_paper_scissors_playes,
     signatures,
     spam_assets,
     table_items,
@@ -1483,9 +1413,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     tournament_token_rewards,
     tournaments,
     transactions,
-    trivia_answer,
     trivia_answers,
-    trivia_question,
     trivia_questions,
     user_transactions,
     write_set_changes,
