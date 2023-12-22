@@ -6,7 +6,7 @@ use crate::{
     schema::tournaments,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use aptos_protos::transaction::v1::WriteResource;
+use aptos_protos::{transaction::v1::WriteResource, util::timestamp::Timestamp};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
@@ -73,6 +73,7 @@ impl Tournament {
         transaction_version: i64,
         tournament_state_mapping: HashMap<String, TournamentState>,
         current_round_mapping: HashMap<String, CurrentRound>,
+        timestamp: Timestamp,
     ) -> Option<Self> {
         if let Some(td) = TournamentDirector::from_write_resource(
             contract_addr,
@@ -86,7 +87,8 @@ impl Tournament {
             let current_round = current_round_mapping.get(&tournament_address).unwrap();
             let mut tournament_ended_at = None;
             if state.has_ended {
-                tournament_ended_at = Some(chrono::Utc::now().naive_utc());
+                tournament_ended_at =
+                    chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, 0);
             }
 
             return Some(Tournament {

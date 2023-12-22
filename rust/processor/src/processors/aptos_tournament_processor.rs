@@ -452,6 +452,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             txn_version,
                             tournament_state_mapping.clone(),
                             current_round_mapping.clone(),
+                            txn.timestamp.clone().unwrap(),
                         ) {
                             tournaments.insert(tournament.pk(), tournament);
                         }
