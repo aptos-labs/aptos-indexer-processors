@@ -77,8 +77,8 @@ CREATE TABLE IF NOT EXISTS rock_paper_scissors_games (
     last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS rock_paper_scissors_game_player1_token_address ON rock_paper_scissors_game (player1_token_address);
-CREATE INDEX IF NOT EXISTS rock_paper_scissors_game_player2_token_address ON rock_paper_scissors_game (player2_token_address);
+CREATE INDEX IF NOT EXISTS rock_paper_scissors_games_player1_token_address ON rock_paper_scissors_games (player1_token_address);
+CREATE INDEX IF NOT EXISTS rock_paper_scissors_games_player2_token_address ON rock_paper_scissors_games (player2_token_address);
 CREATE TABLE IF NOT EXISTS rock_paper_scissors_players (
     token_address VARCHAR(66) NOT NULL,
     room_address VARCHAR(66) NOT NULL,
@@ -97,8 +97,8 @@ CREATE TABLE IF NOT EXISTS trivia_questions (
     last_transaction_version BIGINT NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS trivia_question_question ON trivia_question (question);
-CREATE INDEX IF NOT EXISTS trivia_question_revealed_answer_index ON trivia_question (revealed_answer_index);
+CREATE INDEX IF NOT EXISTS trivia_questions_question ON trivia_questions (question);
+CREATE INDEX IF NOT EXISTS trivia_questions_revealed_answer_index ON trivia_questions (revealed_answer_index);
 CREATE TABLE IF NOT EXISTS trivia_answers (
     token_address VARCHAR(66) NOT NULL,
     round_address VARCHAR(66) NOT NULL,
@@ -107,4 +107,4 @@ CREATE TABLE IF NOT EXISTS trivia_answers (
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
     PRIMARY KEY (token_address, round_address)
 );
-CREATE INDEX IF NOT EXISTS trivia_answer_answer_index ON trivia_answer (answer_index);
+CREATE INDEX IF NOT EXISTS trivia_answers_answer_index ON trivia_answers (answer_index);
