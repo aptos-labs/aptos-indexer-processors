@@ -1,4 +1,4 @@
-use super::{ProcessingResult, ProcessorName, ProcessorTrait, token_v2_processor::parse_v2_token};
+use super::{ProcessingResult, ProcessorName, ProcessorTrait/*, token_v2_processor::parse_v2_token*/};
 use crate::{
     models::{default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
@@ -11,7 +11,7 @@ use crate::{
     utils::database::{
         clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,
-    }, processors::{events_processor::insert_events_to_db, token_processor::insert_tokens_to_db, token_v2_processor::insert_token_v2_to_db, user_transaction_processor::insert_user_transactions_to_db},
+    }, processors::{events_processor::insert_events_to_db, /*token_processor::insert_tokens_to_db, token_v2_processor::insert_token_v2_to_db,*/ user_transaction_processor::insert_user_transactions_to_db},
 };
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction, transaction::TxnData};
 use async_trait::async_trait;
@@ -213,7 +213,7 @@ impl ProcessorTrait for DefaultProcessor {
         let mut all_objects = vec![];
         let mut all_current_objects = HashMap::new();
         let mut events = vec![];
-        let mut all_tokens = vec![];
+        /*let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];
         let mut all_token_datas = vec![];
         let mut all_collection_datas = vec![];
@@ -231,12 +231,12 @@ impl ProcessorTrait for DefaultProcessor {
             CurrentTokenPendingClaimPK,
             CurrentTokenPendingClaim,
         > = HashMap::new();
-        let mut all_nft_points = vec![];
+        let mut all_nft_points = vec![]; */
 
         let mut signatures = vec![];
         let mut user_transactions = vec![];
 
-        let table_handle_to_owner = TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
+        //let table_handle_to_owner = TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
         
         for txn in &transactions {
             let txn_version = txn.version as i64;
@@ -296,7 +296,7 @@ impl ProcessorTrait for DefaultProcessor {
             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
             events.extend(txn_events);
 
-            let (
+            /*let (
                 mut tokens,
                 mut token_ownerships,
                 mut token_datas,
@@ -313,21 +313,21 @@ impl ProcessorTrait for DefaultProcessor {
             // Given versions will always be increasing here (within a single batch), we can just override current values
             all_current_token_ownerships.extend(current_token_ownerships);
             all_current_token_datas.extend(current_token_datas);
-            all_current_collection_datas.extend(current_collection_datas);
+            all_current_collection_datas.extend(current_collection_datas);*/
 
             // Track token activities
-            let mut activities = TokenActivity::from_transaction(txn);
-            all_token_activities.append(&mut activities);
+            //let mut activities = TokenActivity::from_transaction(txn);
+            //all_token_activities.append(&mut activities);
 
             // claims
-            all_current_token_claims.extend(current_token_claims);
+            //all_current_token_claims.extend(current_token_claims);
 
             // NFT points
-            let nft_points_txn =
+            /*let nft_points_txn =
                 NftPoints::from_transaction(txn, self.config.nft_points_contract.clone());
             if let Some(nft_points) = nft_points_txn {
                 all_nft_points.push(nft_points);
-            }
+            }*/
 
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
@@ -355,7 +355,7 @@ impl ProcessorTrait for DefaultProcessor {
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
-        let all_current_token_ownerships = all_current_token_ownerships
+        /*let all_current_token_ownerships = all_current_token_ownerships
             .into_values()
             .collect::<Vec<CurrentTokenOwnership>>();
         let all_current_token_datas = all_current_token_datas
@@ -377,7 +377,7 @@ impl ProcessorTrait for DefaultProcessor {
             current_token_datas_v2,
             token_activities_v2,
             current_token_v2_metadata,
-        ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+        ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await; */
 
         // Transaction metadata 
         match insert_to_db(
@@ -412,7 +412,7 @@ impl ProcessorTrait for DefaultProcessor {
         };
 
         // Tokens v2
-        match insert_token_v2_to_db(
+        /*match insert_token_v2_to_db(
             &mut conn,
             self.name(),
             start_version,
@@ -453,7 +453,7 @@ impl ProcessorTrait for DefaultProcessor {
         ).await {
             Ok(_) => (),
             Err(e) => fail(start_version, end_version, "Error on processing tokens v1", e),
-        };
+        };*/
         
         Ok(ProcessingResult {
             start_version,
