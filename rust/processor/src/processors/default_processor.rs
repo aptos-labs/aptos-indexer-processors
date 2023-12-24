@@ -2,11 +2,9 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait/*, token_v2_processo
 use crate::{
     models::{default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
-        move_tables::{CurrentTableItem, TableMetadata},
         transactions::TransactionModel,
-        v2_objects::{CurrentObject, Object},
         write_set_changes::{WriteSetChangeDetail},
-    }, events_models::events::EventModel, token_models::{tokens::{CurrentTokenOwnershipPK, TokenDataIdHash, CurrentTokenPendingClaimPK, Token, TableMetadataForToken}, token_ownerships::CurrentTokenOwnership, token_claims::CurrentTokenPendingClaim, token_datas::CurrentTokenData, collection_datas::CurrentCollectionData, token_activities::TokenActivity, nft_points::NftPoints}, user_transactions_models::user_transactions::UserTransactionModel},
+    }, events_models::events::EventModel, user_transactions_models::user_transactions::UserTransactionModel},
     schema,
     utils::database::{
         clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
@@ -210,8 +208,8 @@ impl ProcessorTrait for DefaultProcessor {
             }
         }
 
-        let mut all_objects = vec![];
-        let mut all_current_objects = HashMap::new();
+        //let mut all_objects = vec![];
+        //let mut all_current_objects = HashMap::new();
         let mut events = vec![];
         /*let mut all_tokens = vec![];
         let mut all_token_ownerships = vec![];
@@ -241,7 +239,7 @@ impl ProcessorTrait for DefaultProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
-            let changes = &txn
+           /* let changes = &txn
                 .info
                 .as_ref()
                 .unwrap_or_else(|| {
@@ -283,7 +281,7 @@ impl ProcessorTrait for DefaultProcessor {
                     },
                     _ => {},
                 };
-            }
+            }*/
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
             let default = vec![];
             let raw_events = match txn_data {
@@ -342,7 +340,7 @@ impl ProcessorTrait for DefaultProcessor {
             }
         }
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
-        let mut current_table_items = current_table_items
+        /*let mut current_table_items = current_table_items
             .into_values()
             .collect::<Vec<CurrentTableItem>>();
         let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
@@ -354,6 +352,7 @@ impl ProcessorTrait for DefaultProcessor {
             .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
+        */
 
         /*let all_current_token_ownerships = all_current_token_ownerships
             .into_values()
