@@ -11,7 +11,7 @@ use crate::{
         PgPoolConnection,
     }, processors::{events_processor::insert_events_to_db, /*token_processor::insert_tokens_to_db, token_v2_processor::insert_token_v2_to_db,*/ user_transaction_processor::insert_user_transactions_to_db},
 };
-use aptos_protos::transaction::v1::{write_set_change::Change, Transaction, transaction::TxnData};
+use aptos_protos::transaction::v1::{Transaction, transaction::TxnData};
 use async_trait::async_trait;
 use diesel::{result::Error};
 use field_count::FieldCount;
@@ -28,14 +28,12 @@ pub struct DefaultProcessorConfig {
 
 pub struct DefaultProcessor {
     connection_pool: PgDbPool,
-    config: DefaultProcessorConfig,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool, config: DefaultProcessorConfig) -> Self {
+    pub fn new(connection_pool: PgDbPool) -> Self {
         Self {
             connection_pool,
-            config,
         }
     }
 }

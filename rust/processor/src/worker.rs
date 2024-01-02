@@ -742,7 +742,7 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
             Processor::from(AnsProcessor::new(db_pool, config.clone()))
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
-        ProcessorConfig::DefaultProcessor(config) => Processor::from(DefaultProcessor::new(db_pool, config.clone())),
+        ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
