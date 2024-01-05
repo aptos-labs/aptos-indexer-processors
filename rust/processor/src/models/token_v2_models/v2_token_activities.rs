@@ -7,7 +7,8 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, V2TokenEvent},
+    v2_token_ownerships::CurrentTokenOwnershipV2Query,
+    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
 };
 use crate::{
     models::{
@@ -138,13 +139,15 @@ impl TokenActivityV2 {
         Ok(None)
     }
 
-    pub fn get_nft_v2_from_parsed_event(
+    pub async fn get_nft_v2_from_parsed_event(
         event: &Event,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
         token_v2_metadata: &ObjectAggregatedDataMapping,
+        // needed to find owner of the burnt nft
+        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) =
@@ -204,6 +207,43 @@ impl TokenActivityV2 {
                     token_amount: token_activity_helper.token_amount,
                     before_value: token_activity_helper.before_value,
                     after_value: token_activity_helper.after_value,
+                    entry_function_id_str: entry_function_id_str.clone(),
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: Some(false),
+                    transaction_timestamp: txn_timestamp,
+                }));
+            } else {
+                // This should only happen in the case where we have a burn event where the token is gone
+                // and the previous instance of the token wasn't in the batch. We need to look up in the db
+                let latest_nft_ownership =
+                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
+                        conn,
+                        &token_data_id,
+                    )
+                    .await
+                    {
+                        Ok(nft) => nft,
+                        Err(_) => {
+                            tracing::error!(
+                            transaction_version = txn_version,
+                            lookup_key = &token_data_id,
+                            "Failed to find NFT for burned token. You probably should backfill db."
+                        );
+                            return Ok(None);
+                        },
+                    };
+                return Ok(Some(Self {
+                    transaction_version: txn_version,
+                    event_index,
+                    event_account_address,
+                    token_data_id,
+                    property_version_v1: BigDecimal::zero(),
+                    type_: event_type,
+                    from_address: Some(latest_nft_ownership.owner_address),
+                    to_address: None,
+                    token_amount: BigDecimal::one(),
+                    before_value: None,
+                    after_value: None,
                     entry_function_id_str: entry_function_id_str.clone(),
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2: Some(false),
