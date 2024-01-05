@@ -105,8 +105,9 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.2"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c#af0dcea7144225a709e4f595e58f8026b99e901c"
+version = "1.1.2-a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79a99ec72b1ea1bcc2183bcf483c0aaacdf6777d3e3572779ef9c172782c5062"
 dependencies = [
  "futures-core",
  "pbjson",

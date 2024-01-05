@@ -25,7 +25,7 @@ aptos-moving-average = { path = "moving-average" }
 
 anyhow = "1.0.62"
 async-trait = "0.1.53"
-aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "af0dcea7144225a709e4f595e58f8026b99e901c" }
+aptos-protos = "1.1.2-a"
 backtrace = "0.3.58"
 base64 = "0.13.0"
 bb8 = "0.8.1"

@@ -18,4 +18,6 @@ pub mod schema;
 pub mod utils;
 pub mod worker;
 
+// Re-export crates downstream devs might need.
+pub use aptos_protos;
 pub use config::IndexerGrpcProcessorConfig;
