@@ -19,3 +19,6 @@ pub mod utils;
 pub mod worker;
 
 pub use config::IndexerGrpcProcessorConfig;
+
+// Re-export other crates devs will need to write processors.
+pub use aptos_protos;
