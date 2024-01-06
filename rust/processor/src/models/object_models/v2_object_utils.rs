@@ -20,7 +20,6 @@ use crate::{
 };
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

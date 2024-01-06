@@ -5,10 +5,12 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        object_models::{
+            v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            },
+            v2_objects::{CurrentObject, Object},
         },
-        object_models::v2_objects::{CurrentObject, Object},
         token_v2_models::v2_token_utils::TokenV2,
     },
     schema,
@@ -185,22 +187,19 @@ impl ProcessorTrait for ObjectsProcessor {
                         ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
                     {
                         // Object core is the first struct that we need to get
-                        object_metadata_helper.insert(
-                            address.clone(),
-                            ObjectAggregatedData {
-                                object: object_with_metadata,
-                                token: None,
-                                fungible_asset_store: None,
-                                // The following structs are unused in this processor
-                                fungible_asset_metadata: None,
-                                aptos_collection: None,
-                                fixed_supply: None,
-                                unlimited_supply: None,
-                                property_map: None,
-                                transfer_event: None,
-                                fungible_asset_supply: None,
-                            },
-                        );
+                        object_metadata_helper.insert(address.clone(), ObjectAggregatedData {
+                            object: object_with_metadata,
+                            token: None,
+                            fungible_asset_store: None,
+                            // The following structs are unused in this processor
+                            fungible_asset_metadata: None,
+                            aptos_collection: None,
+                            fixed_supply: None,
+                            unlimited_supply: None,
+                            property_map: None,
+                            transfer_event: None,
+                            fungible_asset_supply: None,
+                        });
                     }
                 }
             }
