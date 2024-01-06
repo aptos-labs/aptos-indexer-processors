@@ -83,7 +83,7 @@ impl CollectionV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &ObjectAggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
@@ -104,10 +104,10 @@ impl CollectionV2 {
             let (mut current_supply, mut max_supply, mut total_minted_v2) =
                 (BigDecimal::zero(), None, None);
             let (mut mutable_description, mut mutable_uri) = (None, None);
-            if let Some(metadata) = token_v2_metadata.get(&resource.address) {
+            if let Some(object_data) = object_metadatas.get(&resource.address) {
                 // Getting supply data (prefer fixed supply over unlimited supply although they should never appear at the same time anyway)
-                let fixed_supply = metadata.fixed_supply.as_ref();
-                let unlimited_supply = metadata.unlimited_supply.as_ref();
+                let fixed_supply = object_data.fixed_supply.as_ref();
+                let unlimited_supply = object_data.unlimited_supply.as_ref();
                 if let Some(supply) = unlimited_supply {
                     (current_supply, max_supply, total_minted_v2) = (
                         supply.current_supply.clone(),
@@ -138,7 +138,7 @@ impl CollectionV2 {
                 }
 
                 // Getting collection mutability config from AptosCollection
-                let collection = metadata.aptos_collection.as_ref();
+                let collection = object_data.aptos_collection.as_ref();
                 if let Some(collection) = collection {
                     mutable_description = Some(collection.mutable_description);
                     mutable_uri = Some(collection.mutable_uri);

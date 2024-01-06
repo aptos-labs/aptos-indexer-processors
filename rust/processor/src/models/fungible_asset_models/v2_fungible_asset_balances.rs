@@ -70,22 +70,22 @@ impl FungibleAssetBalance {
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        fungible_asset_metadata: &ObjectAggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
         {
             let storage_id = standardize_address(write_resource.address.as_str());
             // Need to get the object of the store
-            if let Some(store_metadata) = fungible_asset_metadata.get(&storage_id) {
-                let object = &store_metadata.object.object_core;
+            if let Some(object_data) = object_metadatas.get(&storage_id) {
+                let object = &object_data.object.object_core;
                 let owner_address = object.get_owner_address();
                 let asset_type = inner.metadata.get_reference_address();
                 // If it's a fungible token, return early
                 if !FungibleAssetMetadataModel::is_address_fungible_asset(
                     conn,
-                    &asset_type,
-                    fungible_asset_metadata,
+                    &storage_id,
+                    object_metadatas,
                     txn_version,
                 )
                 .await

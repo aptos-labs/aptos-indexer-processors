@@ -69,7 +69,7 @@ impl FungibleAssetActivity {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        fungible_asset_metadata: &ObjectAggregatedDataMapping,
+        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
@@ -80,15 +80,15 @@ impl FungibleAssetActivity {
 
             // The event account address will also help us find fungible store which tells us where to find
             // the metadata
-            if let Some(metadata) = fungible_asset_metadata.get(&storage_id) {
-                let object_core = &metadata.object.object_core;
-                let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
+            if let Some(object_metadata) = object_aggregated_data_mapping.get(&storage_id) {
+                let object_core = &object_metadata.object.object_core;
+                let fungible_asset = object_metadata.fungible_asset_store.as_ref().unwrap();
                 let asset_type = fungible_asset.metadata.get_reference_address();
                 // If it's a fungible token, return early
                 if !FungibleAssetMetadataModel::is_address_fungible_asset(
                     conn,
                     &asset_type,
-                    fungible_asset_metadata,
+                    object_aggregated_data_mapping,
                     txn_version,
                 )
                 .await

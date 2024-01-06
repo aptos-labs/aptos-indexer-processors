@@ -136,7 +136,7 @@ impl Object {
             let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
                 object.clone()
             } else {
-                Self::get_object(conn, &resource.address, txn_version).await
+                Self::get_current_object(conn, &resource.address, txn_version).await
             };
             Ok(Some((
                 Self {
@@ -170,13 +170,14 @@ impl Object {
 
     /// This is actually not great because object owner can change. The best we can do now though.
     /// This will loop forever until we get the object from the db
-    pub async fn get_object(
+    pub async fn get_current_object(
         conn: &mut PgPoolConnection<'_>,
         object_address: &str,
         transaction_version: i64,
     ) -> CurrentObject {
-        let retries = 0;
+        let mut retries = 0;
         while retries < QUERY_RETRIES {
+            retries += 1;
             match CurrentObjectQuery::get_by_address(object_address, conn).await {
                 Ok(res) => {
                     return CurrentObject {
@@ -195,6 +196,8 @@ impl Object {
                     warn!(
                         transaction_version,
                         error = ?e,
+                        object_address,
+                        retry_ms = QUERY_RETRY_DELAY_MS,
                         "Failed to get object from current_objects table for object_address: {}, retrying in {} ms. ",
                         object_address,
                         QUERY_RETRY_DELAY_MS,
