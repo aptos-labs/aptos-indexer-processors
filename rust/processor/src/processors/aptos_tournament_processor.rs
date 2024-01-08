@@ -501,7 +501,7 @@ async fn insert_trivia_answers(
                     inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
-                    " WHERE trivia_answeres.last_transaction_version <= excluded.last_transaction_version ",
+                    " WHERE trivia_answers.last_transaction_version <= excluded.last_transaction_version ",
                 ),
             )
         .await?;
