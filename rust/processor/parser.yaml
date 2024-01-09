@@ -4,7 +4,9 @@
 health_check_port: 8084
 server_config:
   processor_config:
-    type: default_processor
-  postgres_connection_string: postgresql://postgres:@localhost:5432/default_processor
-  indexer_grpc_data_service_address: http://127.0.0.1:50051
-  auth_token: AUTH_TOKEN
+    type: nft_marketplaces_processor
+  postgres_connection_string: postgresql://localhost:5432/postgres_local
+  indexer_grpc_data_service_address: https://grpc.testnet.aptoslabs.com:443
+  auth_token: aptoslabs_6yGZuFwHUuH_8W8RyVjcZ8mWB2LSm4HWNgsYM2o12WKYs
+  starting_version: 836783618
+  ending_version: 836783619
