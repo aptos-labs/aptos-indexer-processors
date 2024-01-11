@@ -430,23 +430,51 @@ impl ProcessorTrait for TokenV2Processor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
+        let token_result = insert_to_db(
             &mut conn,
             self.name(),
             start_version,
             end_version,
-            collections_v2,
+            vec![],
             token_datas_v2,
             token_ownerships_v2,
-            current_collections_v2,
+            vec![],
             current_token_ownerships_v2,
             current_token_datas_v2,
             token_activities_v2,
             current_token_v2_metadata,
         )
         .await;
+
+        if let Err(e) = token_result {
+            error!(
+                start_version = start_version,
+                end_version = end_version,
+                processor_name = self.name(),
+                error = ?e,
+                "[Parser] Error inserting transactions to db",
+            );
+            bail!(e)
+        }
+
+        let collection_result = insert_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            collections_v2,
+            vec![],
+            vec![],
+            current_collections_v2,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )
+        .await;
+
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
+        match collection_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
