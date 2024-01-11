@@ -243,14 +243,16 @@ impl TokenDataV2 {
     pub async fn is_address_fungible_token(
         conn: &mut PgPoolConnection<'_>,
         address: &str,
-        token_v2_metadata: &ObjectAggregatedDataMapping,
+        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
     ) -> bool {
-        if let Some(metadata) = token_v2_metadata.get(address) {
-            metadata.token.is_some()
-        } else {
-            // Look up in the db
-            Self::query_is_address_token(conn, address).await
+        // 1. If metadata is present, the object is a token iff token struct is also present in the object
+        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
+            if object_data.fungible_asset_metadata.is_some() {
+                return object_data.token.is_some();
+            }
         }
+        // 2. If metadata is not present, we will do a lookup in the db.
+        Self::query_is_address_token(conn, address).await
     }
 
     /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
