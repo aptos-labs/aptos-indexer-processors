@@ -75,15 +75,15 @@ impl ActiveModel {
                     index: sea_orm::ActiveValue::Set(index),
                     is_deleted: sea_orm::ActiveValue::Set(move_module.is_deleted),
                     bytecode: sea_orm::ActiveValue::Set(move_module.bytecode.clone()),
-                    friends: sea_orm::ActiveValue::Set(
-                        Some(serde_json::to_value(&move_module.friends).unwrap())
-                    ),
-                    exposed_functions: sea_orm::ActiveValue::Set(
-                        Some(serde_json::to_value(&move_module.exposed_functions).unwrap())
-                    ),
-                    structs: sea_orm::ActiveValue::Set(
-                        Some(serde_json::to_value(&move_module.structs).unwrap())
-                    ),
+                    friends: sea_orm::ActiveValue::Set(Some(
+                        serde_json::to_value(&move_module.friends).unwrap(),
+                    )),
+                    exposed_functions: sea_orm::ActiveValue::Set(Some(
+                        serde_json::to_value(&move_module.exposed_functions).unwrap(),
+                    )),
+                    structs: sea_orm::ActiveValue::Set(Some(
+                        serde_json::to_value(&move_module.structs).unwrap(),
+                    )),
                 })
             },
             WriteSetChangeDetail::Resource(move_resource) => {
@@ -97,12 +97,12 @@ impl ActiveModel {
                     is_deleted: sea_orm::ActiveValue::Set(move_resource.is_deleted),
                     name: sea_orm::ActiveValue::Set(move_resource.name.clone()),
                     module: sea_orm::ActiveValue::Set(move_resource.module.clone()),
-                    generic_type_params: sea_orm::ActiveValue::Set(
-                        Some(serde_json::to_value(&move_resource.generic_type_params).unwrap())
-                    ),
-                    data: sea_orm::ActiveValue::Set(
-                        Some(serde_json::to_value(&move_resource.data).unwrap())
-                    ),
+                    generic_type_params: sea_orm::ActiveValue::Set(Some(
+                        serde_json::to_value(&move_resource.generic_type_params).unwrap(),
+                    )),
+                    data: sea_orm::ActiveValue::Set(Some(
+                        serde_json::to_value(&move_resource.data).unwrap(),
+                    )),
                     state_key_hash: sea_orm::ActiveValue::Set(move_resource.state_key_hash.clone()),
                     data_type: sea_orm::ActiveValue::Set(Some(truncate_str(
                         &move_resource.type_.clone(),

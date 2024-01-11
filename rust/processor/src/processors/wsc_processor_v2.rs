@@ -25,15 +25,15 @@ use tracing::error;
 
 pub struct WscProcessorV2 {
     connection_pool: PgDbPool,
-    cockroach_connection_pool: DatabaseConnection,
+    connection_pool_v2: DatabaseConnection,
 }
 
 impl WscProcessorV2 {
-    pub fn new(connection_pool: PgDbPool, cockroach_connection_pool: DatabaseConnection) -> Self {
+    pub fn new(connection_pool: PgDbPool, connection_pool_v2: DatabaseConnection) -> Self {
         tracing::info!("init WscProcessorV2");
         Self {
             connection_pool,
-            cockroach_connection_pool,
+            connection_pool_v2,
         }
     }
 }
@@ -92,7 +92,7 @@ impl ProcessorTrait for WscProcessorV2 {
                     .to_owned(),
                 )
                 .do_nothing()
-                .exec(&self.cockroach_connection_pool.clone())
+                .exec(&self.connection_pool_v2.clone())
                 .await
             {
                 let _ = log_and_bail(
@@ -116,7 +116,7 @@ impl ProcessorTrait for WscProcessorV2 {
                     .to_owned(),
                 )
                 .do_nothing()
-                .exec(&self.cockroach_connection_pool.clone())
+                .exec(&self.connection_pool_v2.clone())
                 .await
             {
                 let _ = log_and_bail(
@@ -140,7 +140,7 @@ impl ProcessorTrait for WscProcessorV2 {
                     .to_owned(),
                 )
                 .do_nothing()
-                .exec(&self.cockroach_connection_pool.clone())
+                .exec(&self.connection_pool_v2.clone())
                 .await
             {
                 let _ = log_and_bail(

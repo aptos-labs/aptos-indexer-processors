@@ -18,8 +18,12 @@ use diesel_async::{
     RunQueryDsl,
 };
 use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
-use migration::sea_orm::{Database, DatabaseConnection, DbErr};
+use migration::{
+    sea_orm::{Database, DatabaseConnection, DbErr},
+    Migrator,
+};
 use once_cell::sync::Lazy;
+use sea_orm_migration::prelude::*;
 use std::{cmp::min, sync::Arc};
 
 pub type MyDbConnection = AsyncPgConnection;
@@ -123,6 +127,12 @@ pub async fn run_pending_migrations(conn: &mut MyDbConnection) {
         .run_pending_migrations(conn)
         .await
         .expect("[Parser] Migrations failed!");
+}
+
+pub async fn run_pending_migrations_v2(conn: &DatabaseConnection) {
+    Migrator::fresh(conn)
+        .await
+        .expect("[Parser] Migrations for db v2 failed!");
 }
 
 /// Section below is required to modify the query.

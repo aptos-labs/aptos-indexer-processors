@@ -22,8 +22,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
     pub enable_verbose_logging: Option<bool>,
-    pub cockroach_db: Option<String>,
-    pub postgres_connection_string_v2: Option<String>,
+    pub db_connection_string_v2: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -39,8 +38,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.ending_version,
             self.number_concurrent_processing_tasks,
             self.enable_verbose_logging,
-            self.cockroach_db.clone(),
-            self.postgres_connection_string_v2.clone(),
+            self.db_connection_string_v2.clone(),
         )
         .await
         .context("Failed to build worker")?;

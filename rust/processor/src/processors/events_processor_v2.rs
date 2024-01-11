@@ -18,19 +18,17 @@ use tracing::error;
 
 pub struct EventsProcessorV2 {
     connection_pool: PgDbPool,
-    cockroach_connection_pool: DatabaseConnection,
+    connection_pool_v2: DatabaseConnection,
 }
 
 impl EventsProcessorV2 {
-    pub fn new(connection_pool: PgDbPool, cockroach_connection_pool: DatabaseConnection) -> Self {
+    pub fn new(connection_pool: PgDbPool, connection_pool_v2: DatabaseConnection) -> Self {
         tracing::info!("init EventsProcessorV2");
         Self {
             connection_pool,
-            cockroach_connection_pool,
+            connection_pool_v2,
         }
     }
-
-    // Additional methods specific to event processing...
 }
 
 impl Debug for EventsProcessorV2 {
@@ -86,7 +84,7 @@ impl ProcessorTrait for EventsProcessorV2 {
                 .to_owned(),
             )
             .do_nothing()
-            .exec(&self.cockroach_connection_pool.clone())
+            .exec(&self.connection_pool_v2.clone())
             .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         if let Err(err) = insert_result {

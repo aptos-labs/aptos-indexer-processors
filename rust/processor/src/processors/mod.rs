@@ -12,14 +12,14 @@ pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
 pub mod events_processor;
+pub mod events_processor_v2;
 pub mod fungible_asset_processor;
 pub mod nft_metadata_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
-pub mod user_transaction_processor;
-pub mod events_processor_v2;
 pub mod transactions_processor_v2;
+pub mod user_transaction_processor;
 pub mod wsc_processor_v2;
 
 use self::{
@@ -28,14 +28,14 @@ use self::{
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
     events_processor::EventsProcessor,
+    events_processor_v2::EventsProcessorV2,
     fungible_asset_processor::FungibleAssetProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
     stake_processor::StakeProcessor,
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
-    user_transaction_processor::UserTransactionProcessor,
-    events_processor_v2::EventsProcessorV2,
     transactions_processor_v2::TransactionsProcessorV2,
+    user_transaction_processor::UserTransactionProcessor,
     wsc_processor_v2::WscProcessorV2,
 };
 use crate::{
@@ -112,11 +112,10 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     /// versions are successful because any gap would cause the processor to panic
     async fn update_last_processed_version(&self, version: u64) -> anyhow::Result<()> {
         let mut conn = self.get_conn().await;
-        let status =
-            ProcessorStatus {
-                processor: self.name().to_string(),
-                last_success_version: version as i64,
-            };
+        let status = ProcessorStatus {
+            processor: self.name().to_string(),
+            last_success_version: version as i64,
+        };
         execute_with_better_error(
             &mut conn,
             diesel::insert_into(processor_status::table)

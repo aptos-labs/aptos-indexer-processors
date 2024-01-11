@@ -21,15 +21,15 @@ pub const CHUNK_SIZE: usize = 1000;
 
 pub struct TransactionsProcessorV2 {
     connection_pool: PgDbPool,
-    cockroach_connection_pool: DatabaseConnection,
+    connection_pool_v2: DatabaseConnection,
 }
 
 impl TransactionsProcessorV2 {
-    pub fn new(connection_pool: PgDbPool, cockroach_connection_pool: DatabaseConnection) -> Self {
+    pub fn new(connection_pool: PgDbPool, connection_pool_v2: DatabaseConnection) -> Self {
         tracing::info!("init TransactionsProcessorV2");
         Self {
             connection_pool,
-            cockroach_connection_pool,
+            connection_pool_v2,
         }
     }
 }
@@ -67,9 +67,9 @@ impl ProcessorTrait for TransactionsProcessorV2 {
                 sea_query::OnConflict::columns([transactions::Column::TransactionVersion])
                     .do_nothing()
                     .to_owned(),
-                )
+            )
             .do_nothing()
-            .exec(&self.cockroach_connection_pool.clone())
+            .exec(&self.connection_pool_v2.clone())
             .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 

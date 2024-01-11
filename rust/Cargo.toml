@@ -31,8 +31,8 @@ backtrace = "0.3.58"
 base64 = "0.13.0"
 bb8 = "0.8.1"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
-bigdecimal = { version = "0.3.0", features = ["serde"] }
-chrono = { version = "0.4.30", features = ["clock", "serde"] }
+bigdecimal = { version = "0.4.0", features = ["serde"] }
+chrono = { version = "0.4.19", features = ["clock", "serde"] }
 clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
 diesel = { version = "2.1", features = [
     "chrono",
@@ -67,6 +67,7 @@ reqwest = { version = "0.11.20", features = [
     "json",
     "stream",
 ] }
+rust_decimal = { version = "1.32.0", features = ["db-tokio-postgres"] }
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_yaml = "0.8.24"
@@ -90,3 +91,4 @@ unescape = "0.1.0"
 url = { version = "2.4.0", features = ["serde"] }
 warp = { version = "0.3.5", features = ["tls"] }
 sea-orm = { version = "0.12" }
+sea-orm-migration = { version = "0.12.10" }

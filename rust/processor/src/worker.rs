@@ -28,7 +28,7 @@ use crate::{
         },
         database::{
             execute_with_better_error, new_db_pool, new_db_pool_v2, run_pending_migrations,
-            PgDbPool,
+            run_pending_migrations_v2, PgDbPool,
         },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
@@ -85,8 +85,7 @@ pub struct Worker {
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub enable_verbose_logging: Option<bool>,
-    pub cockroach_db: Option<String>,
-    pub postgres_connection_string_v2: Option<String>,
+    pub db_connection_string_v2: Option<String>,
     pub db_pool_v2: Option<DatabaseConnection>,
 }
 
@@ -101,8 +100,7 @@ impl Worker {
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         enable_verbose_logging: Option<bool>,
-        cockroach_db: Option<String>,
-        postgres_connection_string_v2: Option<String>,
+        db_connection_string_v2: Option<String>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -116,7 +114,7 @@ impl Worker {
             .await
             .context("Failed to create connection pool")?;
 
-        let db_pool_v2 = match &postgres_connection_string_v2 {
+        let db_pool_v2 = match &db_connection_string_v2 {
             Some(connection_string) => Some(
                 new_db_pool_v2(connection_string)
                     .await
@@ -142,8 +140,7 @@ impl Worker {
             auth_token,
             number_concurrent_processing_tasks,
             enable_verbose_logging,
-            cockroach_db,
-            postgres_connection_string_v2,
+            db_connection_string_v2,
             db_pool_v2,
         })
     }
@@ -171,24 +168,23 @@ impl Worker {
             "[Parser] Finished migrations"
         );
 
-        let starting_version_from_db =
-            self.get_start_version()
-                .await
-                .expect("[Parser] Database error when getting starting version")
-                .unwrap_or_else(|| {
-                    info!(
-                        processor_name = processor_name,
-                        service_type = PROCESSOR_SERVICE_TYPE,
-                        "[Parser] No starting version from db so starting from version 0"
-                    );
-                    0
-                });
+        let starting_version_from_db = self
+            .get_start_version()
+            .await
+            .expect("[Parser] Database error when getting starting version")
+            .unwrap_or_else(|| {
+                info!(
+                    processor_name = processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    "[Parser] No starting version from db so starting from version 0"
+                );
+                0
+            });
 
-        let starting_version =
-            match self.starting_version {
-                None => starting_version_from_db,
-                Some(version) => version,
-            };
+        let starting_version = match self.starting_version {
+            None => starting_version_from_db,
+            Some(version) => version,
+        };
 
         info!(
             processor_name = processor_name,
@@ -644,9 +640,6 @@ impl Worker {
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
 
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[processor_name])
-                .set(batch_end as i64);
             processor
                 .update_last_processed_version(batch_end)
                 .await
@@ -714,6 +707,10 @@ impl Worker {
     }
 
     async fn run_migrations(&self) {
+        if self.db_pool_v2.is_some() {
+            run_pending_migrations_v2(self.db_pool_v2.as_ref().unwrap()).await;
+            return;
+        }
         let mut conn = self
             .db_pool
             .get()
@@ -967,17 +964,16 @@ pub async fn create_fetcher_loop(
         end_version = request_ending_version,
         "[Parser] Connecting to GRPC stream",
     );
-    let mut response =
-        get_stream(
-            indexer_grpc_data_service_address.clone(),
-            indexer_grpc_http2_ping_interval,
-            indexer_grpc_http2_ping_timeout,
-            starting_version,
-            request_ending_version,
-            auth_token.clone(),
-            processor_name.to_string(),
-        )
-        .await;
+    let mut response = get_stream(
+        indexer_grpc_data_service_address.clone(),
+        indexer_grpc_http2_ping_interval,
+        indexer_grpc_http2_ping_timeout,
+        starting_version,
+        request_ending_version,
+        auth_token.clone(),
+        processor_name.to_string(),
+    )
+    .await;
     let mut connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
         Some(connection_id) => connection_id.to_str().unwrap().to_string(),
         None => "".to_string(),
@@ -1204,22 +1200,20 @@ pub async fn create_fetcher_loop(
                 reconnection_retries = reconnection_retries,
                 "[Parser] Reconnecting to GRPC stream"
             );
-            response =
-                get_stream(
-                    indexer_grpc_data_service_address.clone(),
-                    indexer_grpc_http2_ping_interval,
-                    indexer_grpc_http2_ping_timeout,
-                    next_version_to_fetch,
-                    request_ending_version,
-                    auth_token.clone(),
-                    processor_name.to_string(),
-                )
-                .await;
-            connection_id =
-                match response.metadata().get(GRPC_CONNECTION_ID) {
-                    Some(connection_id) => connection_id.to_str().unwrap().to_string(),
-                    None => "".to_string(),
-                };
+            response = get_stream(
+                indexer_grpc_data_service_address.clone(),
+                indexer_grpc_http2_ping_interval,
+                indexer_grpc_http2_ping_timeout,
+                next_version_to_fetch,
+                request_ending_version,
+                auth_token.clone(),
+                processor_name.to_string(),
+            )
+            .await;
+            connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
+                Some(connection_id) => connection_id.to_str().unwrap().to_string(),
+                None => "".to_string(),
+            };
             resp_stream = response.into_inner();
             info!(
                 processor_name = processor_name,

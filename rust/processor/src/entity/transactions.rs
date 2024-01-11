@@ -72,8 +72,12 @@ impl ActiveModel {
                 .as_ref()
                 .expect("Txn Data doesn't exit!");
             let timestamp = &transaction.timestamp.as_ref().unwrap();
-            transactions_to_return
-                .push(Self::transaction_to_insert(txn, txn_data, blockmetadata_txn, timestamp));
+            transactions_to_return.push(Self::transaction_to_insert(
+                txn,
+                txn_data,
+                blockmetadata_txn,
+                timestamp,
+            ));
         }
         transactions_to_return
     }
@@ -153,9 +157,9 @@ impl ActiveModel {
                 let previous_block_votes_bitvec =
                     serde_json::to_string(&blockmetadata_txn.previous_block_votes_bitvec)
                         .unwrap_or_default();
-                transaction.previous_block_votes_bitvec = sea_orm::ActiveValue::Set(
-                    Some(serde_json::Value::String(previous_block_votes_bitvec))
-                );
+                transaction.previous_block_votes_bitvec = sea_orm::ActiveValue::Set(Some(
+                    serde_json::Value::String(previous_block_votes_bitvec),
+                ));
                 transaction.proposer = sea_orm::ActiveValue::Set(Some(blockmetadata_txn.proposer));
             },
             TxnData::Genesis(inner) => {
