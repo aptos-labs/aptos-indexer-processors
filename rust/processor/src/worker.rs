@@ -22,7 +22,8 @@ use crate::{
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
-            SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
+            SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_LATENCY_IN_SECONDS,
+            TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
@@ -319,6 +320,33 @@ impl Worker {
                         panic!("[Parser] Channel closed");
                     },
                 }
+            }
+
+            let last_fetched_transaction_timestamp = transactions_batches
+                .last()
+                .unwrap()
+                .transactions
+                .as_slice()
+                .last()
+                .unwrap()
+                .timestamp
+                .clone();
+            if let Some(ref t) = last_fetched_transaction_timestamp {
+                let time_now = std::time::SystemTime::now();
+                let block_timestamp_in_seconds =
+                    t.seconds as f64 + t.nanos as f64 / 1_000_000_000.0;
+                let transaction_recv_latency = time_now
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs_f64()
+                    - block_timestamp_in_seconds;
+                TRANSACTION_LATENCY_IN_SECONDS
+                    .with_label_values(&[
+                        &processor_name,
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                    ])
+                    .set(transaction_recv_latency);
             }
 
             let size_in_bytes = transactions_batches
@@ -619,6 +647,24 @@ impl Worker {
                 .update_last_processed_version(batch_end)
                 .await
                 .unwrap();
+
+            if let Some(ref t) = last_fetched_transaction_timestamp {
+                let time_now = std::time::SystemTime::now();
+                let block_timestamp_in_seconds =
+                    t.seconds as f64 + t.nanos as f64 / 1_000_000_000.0;
+                let transaction_recv_latency = time_now
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs_f64()
+                    - block_timestamp_in_seconds;
+                TRANSACTION_LATENCY_IN_SECONDS
+                    .with_label_values(&[
+                        &processor_name,
+                        ProcessorStep::ProcessedMultipleBatches.get_step(),
+                        ProcessorStep::ProcessedMultipleBatches.get_label(),
+                    ])
+                    .set(transaction_recv_latency);
+            }
 
             ma.tick_now(batch_end - batch_start + 1);
             info!(
