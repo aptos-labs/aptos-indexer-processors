@@ -356,6 +356,19 @@ impl Worker {
                 "[Parser] Successfully fetched transaction batches from channel."
             );
 
+            let last_transaction_pb_timestamp = transactions_batches
+                .last()
+                .unwrap()
+                .transactions
+                .as_slice()
+                .last()
+                .unwrap()
+                .timestamp
+                .clone();
+            let last_transaction_timestamp = last_transaction_pb_timestamp.map(|t| {
+                chrono::NaiveDateTime::from_timestamp_opt(t.seconds, t.nanos as u32).unwrap()
+            });
+
             // Process the transactions in parallel
             let mut tasks = vec![];
             for transactions_pb in transactions_batches {
@@ -616,7 +629,7 @@ impl Worker {
             batch_start_version = batch_end + 1;
 
             processor
-                .update_last_processed_version(batch_end)
+                .update_last_processed_version(batch_end, last_transaction_timestamp)
                 .await
                 .unwrap();
 

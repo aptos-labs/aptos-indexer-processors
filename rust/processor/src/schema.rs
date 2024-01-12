@@ -870,6 +870,7 @@ diesel::table! {
         processor -> Varchar,
         last_success_version -> Int8,
         last_updated -> Timestamp,
+        last_transaction_timestamp -> Nullable<Timestamp>,
     }
 }
 
@@ -1197,6 +1198,10 @@ diesel::table! {
 }
 
 diesel::joinable!(block_metadata_transactions -> transactions (version));
+diesel::joinable!(move_modules -> transactions (transaction_version));
+diesel::joinable!(move_resources -> transactions (transaction_version));
+diesel::joinable!(table_items -> transactions (transaction_version));
+diesel::joinable!(write_set_changes -> transactions (transaction_version));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,

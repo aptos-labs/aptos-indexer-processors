@@ -17,6 +17,15 @@ pub static TASK_FAILURE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static HASURA_API_LATEST_TRANSACTION_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_metrics_hasura_latest_transaction_timestamp_secs",
+        "Processor latest transaction timestamp (unix timestamp) measured from indexer metrics service",
+        &["processor_name", "chain_name"],
+    )
+    .unwrap()
+});
+
 pub static HASURA_API_LATEST_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "indexer_metrics_hasura_latest_version",
@@ -30,6 +39,15 @@ pub static HASURA_API_LATEST_VERSION_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
         "indexer_metrics_hasura_latest_version_timestamp_secs",
         "Processor latest timestamp (unix timestamp) measured from indexer metrics service",
+        &["processor_name", "chain_name"],
+    )
+    .unwrap()
+});
+
+pub static INDEXER_PROCESSED_LATENCY: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_metrics_processed_latency_secs",
+        "Latency between transaction timestamp and indexer processed timestamp (unix timestamp) measured from indexer metrics service",
         &["processor_name", "chain_name"],
     )
     .unwrap()
