@@ -111,6 +111,7 @@ async fn insert_objects(
                 .on_conflict((transaction_version, write_set_change_index))
                 .do_update()
                 .set((
+                    inserted_at.eq(excluded(inserted_at)),
                     is_token.eq(excluded(is_token)),
                     is_fungible_asset.eq(excluded(is_fungible_asset)),
                 )),
@@ -135,6 +136,13 @@ async fn insert_current_objects(
                 .on_conflict(object_address)
                 .do_update()
                 .set((
+                    owner_address.eq(excluded(owner_address)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                    allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
+                    last_guid_creation_num.eq(excluded(last_guid_creation_num)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
                     is_token.eq(excluded(is_token)),
                     is_fungible_asset.eq(excluded(is_fungible_asset)),
                 )),
