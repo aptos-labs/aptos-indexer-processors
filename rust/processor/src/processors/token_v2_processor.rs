@@ -67,28 +67,6 @@ impl Debug for TokenV2Processor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    collections_v2: &[CollectionV2],
-    token_datas_v2: &[TokenDataV2],
-    token_ownerships_v2: &[TokenOwnershipV2],
-    current_collections_v2: &[CurrentCollectionV2],
-    current_token_datas_v2: &[CurrentTokenDataV2],
-    current_token_ownerships_v2: &[CurrentTokenOwnershipV2],
-    token_activities_v2: &[TokenActivityV2],
-    current_token_v2_metadata: &[CurrentTokenV2Metadata],
-) -> Result<(), diesel::result::Error> {
-    insert_collections_v2(conn, collections_v2).await?;
-    insert_token_datas_v2(conn, token_datas_v2).await?;
-    insert_token_ownerships_v2(conn, token_ownerships_v2).await?;
-    insert_current_collections_v2(conn, current_collections_v2).await?;
-    insert_current_token_datas_v2(conn, current_token_datas_v2).await?;
-    insert_current_token_ownerships_v2(conn, current_token_ownerships_v2).await?;
-    insert_token_activities_v2(conn, token_activities_v2).await?;
-    insert_current_token_v2_metadatas(conn, current_token_v2_metadata).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
@@ -109,21 +87,27 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
+
+    insert_collections_v2(conn, collections_v2).await?;
+    insert_token_datas_v2(conn, token_datas_v2).await?;
+    insert_token_ownerships_v2(conn, token_ownerships_v2).await?;
+    insert_current_collections_v2(conn, current_collections_v2).await?;
+    insert_current_token_datas_v2(conn, current_token_datas_v2).await?;
+    insert_current_token_ownerships_v2(conn, current_token_ownerships_v2).await?;
+    insert_token_activities_v2(conn, token_activities_v2).await?;
+    insert_current_token_v2_metadatas(conn, current_token_v2_metadata).await?;
+    Ok(())
+}
+
+async fn insert_collections_v2(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<CollectionV2>,
+) -> Result<(), diesel::result::Error> {
     match conn
         .build_transaction()
         .read_write()
         .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                &collections_v2,
-                &token_datas_v2,
-                &token_ownerships_v2,
-                &current_collections_v2,
-                &current_token_datas_v2,
-                &current_token_ownerships_v2,
-                &token_activities_v2,
-                &current_token_v2_metadata,
-            ))
+            Box::pin(insert_collections_v2_impl(pg_conn, &items_to_insert))
         })
         .await
     {
@@ -133,31 +117,9 @@ async fn insert_to_db(
                 .read_write()
                 .run::<_, Error, _>(|pg_conn| {
                     Box::pin(async {
-                        let collections_v2 = clean_data_for_db(collections_v2, true);
-                        let token_datas_v2 = clean_data_for_db(token_datas_v2, true);
-                        let token_ownerships_v2 = clean_data_for_db(token_ownerships_v2, true);
-                        let current_collections_v2 =
-                            clean_data_for_db(current_collections_v2, true);
-                        let current_token_datas_v2 =
-                            clean_data_for_db(current_token_datas_v2, true);
-                        let current_token_ownerships_v2 =
-                            clean_data_for_db(current_token_ownerships_v2, true);
-                        let token_activities_v2 = clean_data_for_db(token_activities_v2, true);
-                        let current_token_v2_metadata =
-                            clean_data_for_db(current_token_v2_metadata, true);
+                        let collections_v2 = clean_data_for_db(items_to_insert, true);
 
-                        insert_to_db_impl(
-                            pg_conn,
-                            &collections_v2,
-                            &token_datas_v2,
-                            &token_ownerships_v2,
-                            &current_collections_v2,
-                            &current_token_datas_v2,
-                            &current_token_ownerships_v2,
-                            &token_activities_v2,
-                            &current_token_v2_metadata,
-                        )
-                        .await
+                        insert_collections_v2_impl(pg_conn, &collections_v2).await
                     })
                 })
                 .await
@@ -165,7 +127,7 @@ async fn insert_to_db(
     }
 }
 
-async fn insert_collections_v2(
+async fn insert_collections_v2_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[CollectionV2],
 ) -> Result<(), diesel::result::Error> {
@@ -189,6 +151,34 @@ async fn insert_collections_v2(
 
 async fn insert_token_datas_v2(
     conn: &mut MyDbConnection,
+    items_to_insert: Vec<TokenDataV2>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_token_datas_v2_impl(pg_conn, &items_to_insert))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let token_datas_v2 = clean_data_for_db(items_to_insert, true);
+
+                        insert_token_datas_v2_impl(pg_conn, &token_datas_v2).await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_token_datas_v2_impl(
+    conn: &mut MyDbConnection,
     items_to_insert: &[TokenDataV2],
 ) -> Result<(), diesel::result::Error> {
     use schema::token_datas_v2::dsl::*;
@@ -210,6 +200,34 @@ async fn insert_token_datas_v2(
 }
 
 async fn insert_token_ownerships_v2(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<TokenOwnershipV2>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_token_ownerships_v2_impl(pg_conn, &items_to_insert))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let token_ownerships_v2 = clean_data_for_db(items_to_insert, true);
+
+                        insert_token_ownerships_v2_impl(pg_conn, &token_ownerships_v2).await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_token_ownerships_v2_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[TokenOwnershipV2],
 ) -> Result<(), diesel::result::Error> {
@@ -232,6 +250,37 @@ async fn insert_token_ownerships_v2(
 }
 
 async fn insert_current_collections_v2(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<CurrentCollectionV2>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_current_collections_v2_impl(
+                pg_conn,
+                &items_to_insert,
+            ))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let current_collections_v2 = clean_data_for_db(items_to_insert, true);
+
+                        insert_current_collections_v2_impl(pg_conn, &current_collections_v2).await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_current_collections_v2_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[CurrentCollectionV2],
 ) -> Result<(), diesel::result::Error> {
@@ -269,6 +318,37 @@ async fn insert_current_collections_v2(
 }
 
 async fn insert_current_token_datas_v2(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<CurrentTokenDataV2>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_current_token_datas_v2_impl(
+                pg_conn,
+                &items_to_insert,
+            ))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let current_token_datas_v2 = clean_data_for_db(items_to_insert, true);
+
+                        insert_current_token_datas_v2_impl(pg_conn, &current_token_datas_v2).await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_current_token_datas_v2_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTokenDataV2],
 ) -> Result<(), diesel::result::Error> {
@@ -306,6 +386,41 @@ async fn insert_current_token_datas_v2(
 }
 
 async fn insert_current_token_ownerships_v2(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<CurrentTokenOwnershipV2>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_current_token_ownerships_v2_impl(
+                pg_conn,
+                &items_to_insert,
+            ))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let current_token_ownerships_v2 = clean_data_for_db(items_to_insert, true);
+
+                        insert_current_token_ownerships_v2_impl(
+                            pg_conn,
+                            &current_token_ownerships_v2,
+                        )
+                        .await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_current_token_ownerships_v2_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTokenOwnershipV2],
 ) -> Result<(), diesel::result::Error> {
@@ -342,6 +457,34 @@ async fn insert_current_token_ownerships_v2(
 }
 
 async fn insert_token_activities_v2(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<TokenActivityV2>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_token_activities_v2_impl(pg_conn, &items_to_insert))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let token_activities_v2 = clean_data_for_db(items_to_insert, true);
+
+                        insert_token_activities_v2_impl(pg_conn, &token_activities_v2).await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_token_activities_v2_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[TokenActivityV2],
 ) -> Result<(), diesel::result::Error> {
@@ -368,6 +511,38 @@ async fn insert_token_activities_v2(
 }
 
 async fn insert_current_token_v2_metadatas(
+    conn: &mut PgPoolConnection<'_>,
+    items_to_insert: Vec<CurrentTokenV2Metadata>,
+) -> Result<(), diesel::result::Error> {
+    match conn
+        .build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|pg_conn| {
+            Box::pin(insert_current_token_v2_metadatas_impl(
+                pg_conn,
+                &items_to_insert,
+            ))
+        })
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            conn.build_transaction()
+                .read_write()
+                .run::<_, Error, _>(|pg_conn| {
+                    Box::pin(async {
+                        let current_token_v2_metadatas = clean_data_for_db(items_to_insert, true);
+
+                        insert_current_token_v2_metadatas_impl(pg_conn, &current_token_v2_metadatas)
+                            .await
+                    })
+                })
+                .await
+        },
+    }
+}
+
+async fn insert_current_token_v2_metadatas_impl(
     conn: &mut MyDbConnection,
     items_to_insert: &[CurrentTokenV2Metadata],
 ) -> Result<(), diesel::result::Error> {
