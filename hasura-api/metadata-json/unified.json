@@ -1,5 +1,5 @@
 {
-  "resource_version": 296,
+  "resource_version": 357,
   "metadata": {
     "version": 3,
     "sources": [
@@ -2385,10 +2385,7 @@
             "isolation_level": "read-committed",
             "pool_settings": {
               "connection_lifetime": 600,
-              "idle_timeout": 180,
-              "max_connections": 100,
-              "total_max_connections": 1500,
-              "pool_timeout": 120
+              "total_max_connections": 1000
             },
             "use_prepared_statements": false
           }
