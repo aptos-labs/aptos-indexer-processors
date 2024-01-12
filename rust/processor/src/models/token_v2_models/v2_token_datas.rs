@@ -106,7 +106,7 @@ impl TokenDataV2 {
                 }
                 token_properties = metadata
                     .property_map
-                    .as_ref()
+                    .clone()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
             } else {
