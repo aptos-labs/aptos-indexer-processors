@@ -25,7 +25,7 @@ use serde_json::Value;
 // PK of current_objects, i.e. object_address, resource_type
 pub type CurrentTokenV2MetadataPK = (String, String);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(object_address, resource_type))]
 #[diesel(table_name = current_token_v2_metadata)]
 pub struct CurrentTokenV2Metadata {

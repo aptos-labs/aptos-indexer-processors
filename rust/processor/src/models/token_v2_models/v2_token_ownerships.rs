@@ -40,7 +40,7 @@ use std::collections::HashMap;
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
 pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = token_ownerships_v2)]
 pub struct TokenOwnershipV2 {
@@ -60,7 +60,7 @@ pub struct TokenOwnershipV2 {
     pub non_transferrable_by_owner: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
 #[diesel(table_name = current_token_ownerships_v2)]
 pub struct CurrentTokenOwnershipV2 {
@@ -88,7 +88,7 @@ pub struct NFTOwnershipV2 {
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
-#[derive(Debug, Identifiable, Queryable)]
+#[derive(Debug, Identifiable, Queryable, Clone)]
 #[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
 #[diesel(table_name = current_token_ownerships_v2)]
 pub struct CurrentTokenOwnershipV2Query {
