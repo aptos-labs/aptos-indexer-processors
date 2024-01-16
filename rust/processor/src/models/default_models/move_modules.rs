@@ -29,6 +29,7 @@ pub struct MoveModule {
     pub is_deleted: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MoveModuleByteCodeParsed {
     pub address: String,
     pub name: String,
@@ -50,15 +51,23 @@ impl MoveModule {
             transaction_version,
             transaction_block_height,
             write_set_change_index,
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             name: parsed_data
                 .as_ref()
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
             address: standardize_address(&write_module.address.to_string()),
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             bytecode: parsed_data.as_ref().map(|d| d.bytecode.clone()),
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             exposed_functions: parsed_data.as_ref().map(|d| d.exposed_functions.clone()),
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             friends: parsed_data.as_ref().map(|d| d.friends.clone()),
-            structs: parsed_data.as_ref().map(|d| d.structs.clone()),
+            structs: parsed_data.map(|d| d.structs),
             is_deleted: false,
         }
     }
@@ -73,6 +82,8 @@ impl MoveModule {
             transaction_version,
             transaction_block_height,
             write_set_change_index,
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             name: delete_module
                 .module
                 .as_ref()
