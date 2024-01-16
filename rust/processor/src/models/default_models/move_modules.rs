@@ -59,7 +59,7 @@ impl MoveModule {
             bytecode: parsed_data.as_ref().map(|d| d.bytecode.clone()),
             exposed_functions: parsed_data.as_ref().map(|d| d.exposed_functions.clone()),
             friends: parsed_data.as_ref().map(|d| d.friends.clone()),
-            structs: parsed_data.as_ref().map(|d| d.structs.clone()),
+            structs: parsed_data.map(|d| d.structs),
             is_deleted: false,
         }
     }
