@@ -29,6 +29,7 @@ pub struct MoveModule {
     pub is_deleted: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MoveModuleByteCodeParsed {
     pub address: String,
     pub name: String,

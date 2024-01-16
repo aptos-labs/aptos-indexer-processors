@@ -616,7 +616,7 @@ impl Worker {
             batch_start_version = batch_end + 1;
 
             processor
-                .update_last_processed_version(batch_end)
+                .update_last_processed_version(batch_end, batch_end_txn_timestamp.clone())
                 .await
                 .unwrap();
 
