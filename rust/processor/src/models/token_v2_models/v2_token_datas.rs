@@ -76,6 +76,8 @@ pub struct TokenDataIdFromTable {
 }
 
 impl TokenDataV2 {
+    // TODO: remove the useless_asref lint when new clippy nighly is released.
+    #[allow(clippy::useless_asref)]
     pub fn get_v2_from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
