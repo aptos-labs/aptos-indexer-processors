@@ -917,6 +917,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    roulette (room_address) {
+        #[max_length = 66]
+        room_address -> Varchar,
+        result_index -> Jsonb,
+        revealed_index -> Int8,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     signatures (transaction_version, multi_agent_index, multi_sig_index, is_sender_primary) {
         transaction_version -> Int8,
         multi_agent_index -> Int8,
@@ -1339,10 +1350,6 @@ diesel::table! {
 }
 
 diesel::joinable!(block_metadata_transactions -> transactions (version));
-diesel::joinable!(move_modules -> transactions (transaction_version));
-diesel::joinable!(move_resources -> transactions (transaction_version));
-diesel::joinable!(table_items -> transactions (transaction_version));
-diesel::joinable!(write_set_changes -> transactions (transaction_version));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
@@ -1395,6 +1402,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposal_votes,
     rock_paper_scissors_games,
     rock_paper_scissors_players,
+    roulette,
     signatures,
     spam_assets,
     table_items,

@@ -11,6 +11,7 @@ use crate::{
             },
             rock_paper_scissors_game::{RockPaperScissorsGame, RockPaperScissorsGameMapping},
             rock_paper_scissors_player::{RockPaperScissorsPlayer, RockPaperScissorsPlayerMapping},
+            roulette::{Roulette, RouletteMapping},
             tournament_coin_rewards::{TournamentCoinReward, TournamentCoinRewardMapping},
             tournament_players::{TournamentPlayer, TournamentPlayerMapping},
             tournament_rooms::{TournamentRoom, TournamentRoomMapping},
@@ -89,6 +90,7 @@ async fn insert_to_db(
     rock_paper_scissors_players_to_insert: Vec<RockPaperScissorsPlayer>,
     trivia_questiosn_to_insert: Vec<TriviaQuestion>,
     trivia_answers_to_insert: Vec<TriviaAnswer>,
+    roulette: Vec<Roulette>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -112,6 +114,7 @@ async fn insert_to_db(
                 &rock_paper_scissors_players_to_insert,
                 &trivia_questiosn_to_insert,
                 &trivia_answers_to_insert,
+                &roulette,
             ))
         })
         .await
@@ -139,6 +142,7 @@ async fn insert_to_db(
                             clean_data_for_db(trivia_questiosn_to_insert, true);
                         let trivia_answers_to_insert =
                             clean_data_for_db(trivia_answers_to_insert, true);
+                        let roulette = clean_data_for_db(roulette, true);
                         insert_to_db_impl(
                             pg_conn,
                             &tournaments_to_insert,
@@ -151,6 +155,7 @@ async fn insert_to_db(
                             &rock_paper_scissors_players_to_insert,
                             &trivia_questiosn_to_insert,
                             &trivia_answers_to_insert,
+                            &roulette,
                         )
                         .await
                     })
@@ -172,6 +177,7 @@ async fn insert_to_db_impl(
     rock_paper_scissors_players_to_insert: &[RockPaperScissorsPlayer],
     trivia_questiosn_to_insert: &[TriviaQuestion],
     trivia_answers_to_insert: &[TriviaAnswer],
+    roulette: &[Roulette],
 ) -> Result<(), diesel::result::Error> {
     insert_tournaments(conn, tournaments_to_insert).await?;
     insert_tournament_coin_rewards(conn, tournament_coin_rewards_to_insert).await?;
@@ -183,6 +189,7 @@ async fn insert_to_db_impl(
     insert_rock_paper_scissors_players(conn, rock_paper_scissors_players_to_insert).await?;
     insert_trivia_questions(conn, trivia_questiosn_to_insert).await?;
     insert_trivia_answers(conn, trivia_answers_to_insert).await?;
+    insert_roulette(conn, roulette).await?;
     Ok(())
 }
 
@@ -509,6 +516,32 @@ async fn insert_trivia_answers(
     Ok(())
 }
 
+async fn insert_roulette(
+    conn: &mut MyDbConnection,
+    items_to_insert: &[Roulette],
+) -> Result<(), diesel::result::Error> {
+    use schema::roulette::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), Roulette::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::roulette::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(room_address)
+                .do_update()
+                .set((
+                    result_index.eq(excluded(result_index)),
+                    revealed_index.eq(excluded(revealed_index)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+            Some(" WHERE roulette.last_transaction_version <= excluded.last_transaction_version "),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl ProcessorTrait for AptosTournamentProcessor {
     fn name(&self) -> &'static str {
@@ -537,6 +570,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let mut rock_paper_scissors_players: RockPaperScissorsPlayerMapping = HashMap::new();
         let mut trivia_questions: TriviaQuestionMapping = HashMap::new();
         let mut trivia_answers: TriviaAnswerMapping = HashMap::new();
+        let mut roulette: RouletteMapping = HashMap::new();
 
         for txn in transactions {
             let mut tournament_state_mapping: TournamentStateMapping = HashMap::new();
@@ -696,6 +730,13 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         ) {
                             trivia_answers.insert(answer.pk(), answer);
                         }
+                        if let Some(r) = Roulette::from_write_resource(
+                            &self.config.contract_address,
+                            wr,
+                            txn_version,
+                        ) {
+                            roulette.insert(r.pk(), r);
+                        }
 
                         let players = TournamentPlayer::from_room(
                             conn,
@@ -782,6 +823,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
             .collect::<Vec<_>>();
         let mut trivia_questions = trivia_questions.values().cloned().collect::<Vec<_>>();
         let mut trivia_answers = trivia_answers.values().cloned().collect::<Vec<_>>();
+        let mut roulette = roulette.values().cloned().collect::<Vec<_>>();
 
         tournaments.sort();
         tournament_coin_rewards.sort();
@@ -793,6 +835,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
         rock_paper_scissors_players.sort();
         trivia_questions.sort();
         trivia_answers.sort();
+        roulette.sort();
 
         insert_to_db(
             conn,
@@ -809,6 +852,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
             rock_paper_scissors_players,
             trivia_questions,
             trivia_answers,
+            roulette,
         )
         .await?;
 
