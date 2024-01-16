@@ -1,4 +1,3 @@
-// wsc_processor_v2.rs
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 

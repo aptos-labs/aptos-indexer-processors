@@ -14,7 +14,7 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use rust_decimal::Decimal;
-use sea_orm::entity::prelude::*;
+use sea_orm::{entity::prelude::*, ActiveValue::Set};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Default)]
@@ -64,7 +64,7 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
     pub fn from_transactions(transactions: Vec<TransactionPB>) -> Vec<Self> {
-        let mut transactions_to_return = vec![];
+        let mut transactions_to_return: Vec<ActiveModel> = vec![];
         for transaction in transactions {
             let (txn, blockmetadata_txn, _, _) = TransactionModel::from_transaction(&transaction);
             let txn_data = transaction
@@ -73,6 +73,7 @@ impl ActiveModel {
                 .expect("Txn Data doesn't exit!");
             let timestamp = &transaction.timestamp.as_ref().unwrap();
             transactions_to_return.push(Self::transaction_to_insert(
+                transaction.clone(),
                 txn,
                 txn_data,
                 blockmetadata_txn,
@@ -83,28 +84,47 @@ impl ActiveModel {
     }
 
     fn transaction_to_insert(
+        txn_pb: TransactionPB,
         txn: TransactionModel,
         txn_detail: &TxnData,
         blockmetadata_txn: Option<BlockMetadataTransactionModel>,
         timestamp: &Timestamp,
     ) -> Self {
-        let mut transaction = ActiveModel {
-            transaction_version: sea_orm::ActiveValue::Set(txn.version.to_string()),
-            transaction_block_height: sea_orm::ActiveValue::Set(txn.block_height),
-            hash: sea_orm::ActiveValue::Set(txn.hash),
-            transaction_type: sea_orm::ActiveValue::Set(txn.type_),
-            payload: sea_orm::ActiveValue::Set(Some(serde_json::to_value(&txn.payload).unwrap())),
-            state_change_hash: sea_orm::ActiveValue::Set(txn.state_change_hash),
-            event_root_hash: sea_orm::ActiveValue::Set(txn.event_root_hash),
-            state_checkpoint_hash: sea_orm::ActiveValue::Set(txn.state_checkpoint_hash),
-            success: sea_orm::ActiveValue::Set(txn.success),
-            vm_status: sea_orm::ActiveValue::Set(txn.vm_status),
-            accumulator_root_hash: sea_orm::ActiveValue::Set(txn.accumulator_root_hash),
-            gas_used: sea_orm::ActiveValue::Set(
-                Decimal::from_str(&txn.gas_used.to_string()).unwrap_or(Decimal::ZERO),
-            ),
-            epoch: sea_orm::ActiveValue::Set(txn.epoch),
-            ..<Self as std::default::Default>::default()
+        let mut transaction = Self {
+            transaction_version: Set(txn.version.to_string()),
+            transaction_block_height: Set(txn.block_height),
+            hash: Set(txn.hash),
+            transaction_type: Set(txn.type_),
+            payload: Set(Some(serde_json::to_value(&txn.payload).unwrap())),
+            state_change_hash: Set(txn.state_change_hash),
+            event_root_hash: Set(txn.event_root_hash),
+            state_checkpoint_hash: Set(txn.state_checkpoint_hash),
+            success: Set(txn.success),
+            vm_status: Set(txn.vm_status),
+            accumulator_root_hash: Set(txn.accumulator_root_hash),
+            gas_used: Set(Decimal::from_str(&txn.gas_used.to_string()).unwrap_or(Decimal::ZERO)),
+            epoch: Set(txn.epoch),
+            num_write_set_changes: Set(if let Some(info) = txn_pb.info {
+                info.changes.len() as i64
+            } else {
+                0
+            }),
+            payload_type: Set(None),
+            num_events: Set(0),
+            parent_signature_type: Set(None),
+            sender: Set(None),
+            sequence_number: Set(None),
+            max_gas_amount: Set(None),
+            expiration_timestamp_secs: Set(None),
+            gas_unit_price: Set(None),
+            timestamp: Set(None),
+            entry_function_id_str: Set(None),
+            signature: Set(None),
+            id: Set(None),
+            round: Set(None),
+            previous_block_votes_bitvec: Set(None),
+            proposer: Set(None),
+            failed_proposer_indices: Set(None),
         };
 
         match txn_detail {
@@ -117,25 +137,23 @@ impl ActiveModel {
                     txn.version,
                 );
                 transaction.parent_signature_type =
-                    sea_orm::ActiveValue::Set(Some(user_transaction.parent_signature_type));
-                transaction.sender = sea_orm::ActiveValue::Set(Some(user_transaction.sender));
-                transaction.sequence_number =
-                    sea_orm::ActiveValue::Set(Some(user_transaction.sequence_number));
+                    Set(Some(user_transaction.parent_signature_type));
+                transaction.sender = Set(Some(user_transaction.sender));
+                transaction.sequence_number = Set(Some(user_transaction.sequence_number));
                 transaction.expiration_timestamp_secs =
-                    sea_orm::ActiveValue::Set(Some(user_transaction.expiration_timestamp_secs));
-                transaction.timestamp = sea_orm::ActiveValue::Set(Some(user_transaction.timestamp));
+                    Set(Some(user_transaction.expiration_timestamp_secs));
+                transaction.timestamp = Set(Some(user_transaction.timestamp));
                 transaction.entry_function_id_str =
-                    sea_orm::ActiveValue::Set(Some(user_transaction.entry_function_id_str));
-                transaction.gas_unit_price = sea_orm::ActiveValue::Set(Some(
+                    Set(Some(user_transaction.entry_function_id_str));
+                transaction.gas_unit_price = Set(Some(
                     Decimal::from_str(&user_transaction.gas_unit_price.to_string())
                         .unwrap_or(Decimal::ZERO),
                 ));
-                transaction.max_gas_amount = sea_orm::ActiveValue::Set(Some(
+                transaction.max_gas_amount = Set(Some(
                     Decimal::from_str(&user_transaction.max_gas_amount.to_string())
                         .unwrap_or(Decimal::ZERO),
                 ));
-                transaction.signature =
-                    sea_orm::ActiveValue::Set(Some(serde_json::to_value(sigs).unwrap()));
+                transaction.signature = Set(Some(serde_json::to_value(sigs).unwrap()));
                 let payload = inner
                     .request
                     .as_ref()
@@ -143,33 +161,37 @@ impl ActiveModel {
                     .payload
                     .as_ref()
                     .expect("Getting payload failed.");
-                transaction.payload_type = sea_orm::ActiveValue::Set(Some(
+                transaction.payload_type = Set(Some(
                     Type::try_from(payload.r#type)
                         .expect("Payload type doesn't exist!")
                         .as_str_name()
                         .to_string(),
                 ));
+                transaction.num_events = Set(inner.events.len() as i64);
             },
-            TxnData::BlockMetadata(_) if blockmetadata_txn.is_some() => {
+            TxnData::BlockMetadata(inner) if blockmetadata_txn.is_some() => {
                 let blockmetadata_txn = blockmetadata_txn.unwrap();
-                transaction.id = sea_orm::ActiveValue::Set(Some(blockmetadata_txn.id));
-                transaction.round = sea_orm::ActiveValue::Set(Some(blockmetadata_txn.round));
+                transaction.id = Set(Some(blockmetadata_txn.id));
+                transaction.round = Set(Some(blockmetadata_txn.round));
                 let previous_block_votes_bitvec =
                     serde_json::to_string(&blockmetadata_txn.previous_block_votes_bitvec)
                         .unwrap_or_default();
-                transaction.previous_block_votes_bitvec = sea_orm::ActiveValue::Set(Some(
-                    serde_json::Value::String(previous_block_votes_bitvec),
-                ));
-                transaction.proposer = sea_orm::ActiveValue::Set(Some(blockmetadata_txn.proposer));
+                transaction.previous_block_votes_bitvec =
+                    Set(Some(serde_json::Value::String(previous_block_votes_bitvec)));
+                transaction.proposer = Set(Some(blockmetadata_txn.proposer));
+                transaction.failed_proposer_indices =
+                    Set(Some(blockmetadata_txn.failed_proposer_indices));
+                transaction.num_events = Set(inner.events.len() as i64);
             },
             TxnData::Genesis(inner) => {
                 let payload = inner.payload.as_ref().unwrap();
-                transaction.payload_type = sea_orm::ActiveValue::Set(Some(
+                transaction.payload_type = Set(Some(
                     WriteSetType::try_from(payload.write_set_type)
                         .expect("WriteSet type doesn't exist!")
                         .as_str_name()
                         .to_string(),
                 ));
+                transaction.num_events = Set(inner.events.len() as i64);
             },
             _ => {},
         }

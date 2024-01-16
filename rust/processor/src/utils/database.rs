@@ -130,7 +130,7 @@ pub async fn run_pending_migrations(conn: &mut MyDbConnection) {
 }
 
 pub async fn run_pending_migrations_v2(conn: &DatabaseConnection) {
-    Migrator::fresh(conn)
+    Migrator::refresh(conn)
         .await
         .expect("[Parser] Migrations for db v2 failed!");
 }

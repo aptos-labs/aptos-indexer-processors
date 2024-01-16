@@ -9,7 +9,7 @@ use crate::{
     models::default_models::write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     utils::util::truncate_str,
 };
-use sea_orm::entity::prelude::*;
+use sea_orm::{entity::prelude::*, ActiveValue::Set};
 use serde_json::json;
 
 pub enum WriteSetChangeEnum {
@@ -67,44 +67,38 @@ impl ActiveModel {
         match write_set_change_detail {
             WriteSetChangeDetail::Module(move_module) => {
                 WriteSetChangeEnum::Module(WriteSetChangesModule {
-                    transaction_version: sea_orm::ActiveValue::Set(transaction_version.to_string()),
-                    transaction_block_height: sea_orm::ActiveValue::Set(transaction_block_height),
-                    hash: sea_orm::ActiveValue::Set(hash),
-                    write_set_change_type: sea_orm::ActiveValue::Set(write_set_change_type),
-                    address: sea_orm::ActiveValue::Set(address),
-                    index: sea_orm::ActiveValue::Set(index),
-                    is_deleted: sea_orm::ActiveValue::Set(move_module.is_deleted),
-                    bytecode: sea_orm::ActiveValue::Set(move_module.bytecode.clone()),
-                    friends: sea_orm::ActiveValue::Set(Some(
-                        serde_json::to_value(&move_module.friends).unwrap(),
-                    )),
-                    exposed_functions: sea_orm::ActiveValue::Set(Some(
+                    transaction_version: Set(transaction_version.to_string()),
+                    transaction_block_height: Set(transaction_block_height),
+                    hash: Set(hash),
+                    write_set_change_type: Set(write_set_change_type),
+                    address: Set(address),
+                    index: Set(index),
+                    is_deleted: Set(move_module.is_deleted),
+                    bytecode: Set(move_module.bytecode.clone()),
+                    friends: Set(Some(serde_json::to_value(&move_module.friends).unwrap())),
+                    exposed_functions: Set(Some(
                         serde_json::to_value(&move_module.exposed_functions).unwrap(),
                     )),
-                    structs: sea_orm::ActiveValue::Set(Some(
-                        serde_json::to_value(&move_module.structs).unwrap(),
-                    )),
+                    structs: Set(Some(serde_json::to_value(&move_module.structs).unwrap())),
                 })
             },
             WriteSetChangeDetail::Resource(move_resource) => {
                 WriteSetChangeEnum::Resource(WriteSetChangesResource {
-                    transaction_version: sea_orm::ActiveValue::Set(transaction_version.to_string()),
-                    transaction_block_height: sea_orm::ActiveValue::Set(transaction_block_height),
-                    hash: sea_orm::ActiveValue::Set(hash),
-                    write_set_change_type: sea_orm::ActiveValue::Set(write_set_change_type),
-                    address: sea_orm::ActiveValue::Set(address),
-                    index: sea_orm::ActiveValue::Set(index),
-                    is_deleted: sea_orm::ActiveValue::Set(move_resource.is_deleted),
-                    name: sea_orm::ActiveValue::Set(move_resource.name.clone()),
-                    module: sea_orm::ActiveValue::Set(move_resource.module.clone()),
-                    generic_type_params: sea_orm::ActiveValue::Set(Some(
+                    transaction_version: Set(transaction_version.to_string()),
+                    transaction_block_height: Set(transaction_block_height),
+                    hash: Set(hash),
+                    write_set_change_type: Set(write_set_change_type),
+                    address: Set(address),
+                    index: Set(index),
+                    is_deleted: Set(move_resource.is_deleted),
+                    name: Set(move_resource.name.clone()),
+                    module: Set(move_resource.module.clone()),
+                    generic_type_params: Set(Some(
                         serde_json::to_value(&move_resource.generic_type_params).unwrap(),
                     )),
-                    data: sea_orm::ActiveValue::Set(Some(
-                        serde_json::to_value(&move_resource.data).unwrap(),
-                    )),
-                    state_key_hash: sea_orm::ActiveValue::Set(move_resource.state_key_hash.clone()),
-                    data_type: sea_orm::ActiveValue::Set(Some(truncate_str(
+                    data: Set(Some(serde_json::to_value(&move_resource.data).unwrap())),
+                    state_key_hash: Set(move_resource.state_key_hash.clone()),
+                    data_type: Set(Some(truncate_str(
                         &move_resource.type_.clone(),
                         WRITE_RESOURCE_TYPE_MAX_LENGTH,
                     ))),
@@ -113,12 +107,8 @@ impl ActiveModel {
             WriteSetChangeDetail::Table(table_item, _, table_metadata) => {
                 let decoded_key = serde_json::to_value(&table_item.decoded_key).unwrap();
                 let decoded_value = Some(serde_json::to_value(&table_item.decoded_value).unwrap());
-                let key_type = table_metadata
-                    .as_ref()
-                    .map(|metadata| metadata.key_type.clone());
-                let value_type = table_metadata
-                    .as_ref()
-                    .map(|metadata| metadata.value_type.clone());
+                let key_type = table_metadata.clone().clone();
+                let value_type = table_metadata.clone().clone();
                 let data: Option<serde_json::Value> =
                     match (decoded_key, decoded_value, key_type, value_type) {
                         (decoded_key, Some(decoded_value), key_type, value_type) => Some(json!({
@@ -131,16 +121,16 @@ impl ActiveModel {
                     };
 
                 WriteSetChangeEnum::Table(WriteSetChangesTable {
-                    transaction_version: sea_orm::ActiveValue::Set(transaction_version.to_string()),
-                    transaction_block_height: sea_orm::ActiveValue::Set(transaction_block_height),
-                    hash: sea_orm::ActiveValue::Set(hash),
-                    write_set_change_type: sea_orm::ActiveValue::Set(write_set_change_type),
-                    address: sea_orm::ActiveValue::Set(address),
-                    index: sea_orm::ActiveValue::Set(index),
-                    is_deleted: sea_orm::ActiveValue::Set(table_item.is_deleted),
-                    table_handle: sea_orm::ActiveValue::Set(table_item.table_handle.clone()),
-                    key: sea_orm::ActiveValue::Set(table_item.key.clone()),
-                    data: sea_orm::ActiveValue::Set(data),
+                    transaction_version: Set(transaction_version.to_string()),
+                    transaction_block_height: Set(transaction_block_height),
+                    hash: Set(hash),
+                    write_set_change_type: Set(write_set_change_type),
+                    address: Set(address),
+                    index: Set(index),
+                    is_deleted: Set(table_item.is_deleted),
+                    table_handle: Set(table_item.table_handle.clone()),
+                    key: Set(table_item.key.clone()),
+                    data: Set(data),
                 })
             },
         }

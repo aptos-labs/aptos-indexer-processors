@@ -2,7 +2,7 @@
 
 use crate::utils::util::standardize_address;
 use aptos_protos::transaction::v1::Event as EventPB;
-use sea_orm::entity::prelude::*;
+use sea_orm::{entity::prelude::*, ActiveValue::Set};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "events")]
@@ -52,20 +52,16 @@ impl ActiveModel {
         event_index: i64,
     ) -> Self {
         Self {
-            sequence_number: sea_orm::ActiveValue::Set(event.sequence_number as i64),
-            creation_number: sea_orm::ActiveValue::Set(
-                event.key.as_ref().unwrap().creation_number as i64,
-            ),
-            account_address: sea_orm::ActiveValue::Set(
-                standardize_address(event.key.as_ref().unwrap().account_address.as_str())
-            ),
-            transaction_version: sea_orm::ActiveValue::Set(transaction_version),
-            transaction_block_height: sea_orm::ActiveValue::Set(transaction_block_height),
-            event_type: sea_orm::ActiveValue::Set(event.type_str.clone()),
-            data: sea_orm::ActiveValue::Unchanged(
-                serde_json::from_str(event.data.as_str()).expect("Failed to parse JSON"),
-            ),
-            event_index: sea_orm::ActiveValue::Set(event_index),
+            sequence_number: Set(event.sequence_number as i64),
+            creation_number: Set(event.key.as_ref().unwrap().creation_number as i64),
+            account_address: Set(standardize_address(
+                event.key.as_ref().unwrap().account_address.as_str(),
+            )),
+            transaction_version: Set(transaction_version),
+            transaction_block_height: Set(transaction_block_height),
+            event_type: Set(event.type_str.clone()),
+            data: Set(serde_json::from_str(event.data.as_str()).expect("Failed to parse JSON")),
+            event_index: Set(event_index),
         }
     }
 }
