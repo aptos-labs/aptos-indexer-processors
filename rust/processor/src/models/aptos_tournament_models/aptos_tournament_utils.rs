@@ -8,6 +8,7 @@ use crate::{
 use anyhow::Context;
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 pub type TournamentStateMapping = HashMap<String, TournamentState>;
@@ -360,6 +361,168 @@ impl TokenV1RewardClaimed {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RPSAction {
+    pub vec: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RPSPlayer {
+    address: String,
+    token_address: String,
+    pub committed_action: Option<RPSAction>,
+    pub verified_action: Option<RPSAction>,
+}
+
+impl RPSPlayer {
+    pub fn get_address(&self) -> String {
+        standardize_address(&self.address)
+    }
+
+    pub fn get_token_address(&self) -> String {
+        standardize_address(&self.token_address)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RockPaperScissors {
+    pub player1: RPSPlayer,
+    pub player2: RPSPlayer,
+}
+
+impl RockPaperScissors {
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(write_resource, 0, txn_version, 0);
+
+        if let AptosTournamentResource::RockPaperScissors(inner) =
+            AptosTournamentResource::from_resource(
+                addr,
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TriviaQuestion {
+    pub possible_answers: Vec<String>,
+    pub question: String,
+    pub revealed_answer_index: i64,
+}
+
+impl TriviaQuestion {
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(write_resource, 0, txn_version, 0);
+
+        if let AptosTournamentResource::TriviaQuestion(inner) =
+            AptosTournamentResource::from_resource(
+                addr,
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TriviaAnswer {
+    round_address: String,
+    pub answer_index: i64,
+}
+
+impl TriviaAnswer {
+    pub fn get_round_address(&self) -> String {
+        standardize_address(&self.round_address)
+    }
+
+    pub fn from_write_resource(
+        addr: &str,
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !AptosTournamentResource::is_resource_supported(addr, type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(write_resource, 0, txn_version, 0);
+
+        if let AptosTournamentResource::TriviaAnswer(inner) =
+            AptosTournamentResource::from_resource(
+                addr,
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct RoulettePlayer {
+    address: String,
+    token_address: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub index: i64,
+}
+
+impl RoulettePlayer {
+    pub fn get_with_standardized_address(&self) -> Self {
+        Self {
+            address: standardize_address(&self.address),
+            token_address: standardize_address(&self.token_address),
+            index: self.index.clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Roulette {
+    players: Vec<RoulettePlayer>,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub revealed_index: i64,
+}
+
+impl Roulette {
+    pub fn get_players_json(&self) -> Value {
+        let mut players = vec![];
+        for player in &self.players {
+            players.push(player.get_with_standardized_address());
+        }
+        serde_json::to_value(&players).unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AptosTournamentResource {
     CurrentRound(CurrentRound),
     Room(Room),
@@ -371,6 +534,11 @@ pub enum AptosTournamentResource {
     CoinRewardClaimed(CoinRewardClaimed),
     TokenV1RewardPool(TokenV1RewardPool),
     TokenV1RewardClaimed(TokenV1RewardClaimed),
+    // MANUAL GAME INDEXING
+    RockPaperScissors(RockPaperScissors),
+    TriviaQuestion(TriviaQuestion),
+    TriviaAnswer(TriviaAnswer),
+    Roulette(Roulette),
 }
 
 impl AptosTournamentResource {
@@ -387,6 +555,11 @@ impl AptosTournamentResource {
             format!("{}::rewards::CoinRewardClaimed", contract_addr),
             format!("{}::rewards::TokenV1RewardPool", contract_addr),
             format!("{}::rewards::TokenV1RewardClaimed", contract_addr),
+            // MANUAL GAME INDEXING
+            format!("{}::rock_paper_scissors::RockPaperScissors", contract_addr),
+            format!("{}::trivia::TriviaQuestion", contract_addr),
+            format!("{}::trivia::TriviaAnswer", contract_addr),
+            format!("{}::roulette::Roulette", contract_addr),
         ]
         .contains(&data_type.to_string())
     }
@@ -433,6 +606,20 @@ impl AptosTournamentResource {
             x if x == format!("{}::rewards::TokenV1RewardClaimed", contract_addr) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::TokenV1RewardClaimed(inner)))
+            },
+            // MANUAL GAME INDEXING
+            x if x == format!("{}::rock_paper_scissors::RockPaperScissors", contract_addr) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::RockPaperScissors(inner)))
+            },
+            x if x == format!("{}::trivia::TriviaQuestion", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::TriviaQuestion(inner)))
+            },
+            x if x == format!("{}::trivia::TriviaAnswer", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::TriviaAnswer(inner)))
+            },
+            x if x == format!("{}::roulette::Roulette", contract_addr) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::Roulette(inner)))
             },
             _ => Ok(None),
         }
