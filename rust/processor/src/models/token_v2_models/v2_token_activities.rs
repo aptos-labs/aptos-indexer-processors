@@ -21,6 +21,7 @@ use aptos_protos::transaction::v1::Event;
 use bigdecimal::{BigDecimal, One, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
@@ -75,6 +76,7 @@ impl TokenActivityV2 {
         event_index: i64,
         entry_function_id_str: &Option<String>,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
+        fungible_token_data: &mut HashMap<String, bool>,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
@@ -90,10 +92,25 @@ impl TokenActivityV2 {
                 let object_core = &metadata.object.object_core;
                 let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
                 let token_data_id = fungible_asset.metadata.get_reference_address();
-                // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
-                    .await
-                {
+
+                // Exit early if we've already looked up whether this address is a
+                // fungible token and it isn't.
+                if fungible_token_data.get(&token_data_id) == Some(&false) {
+                    return Ok(None);
+                }
+
+                // This will first check the token_v2_metadata to see if we've seen
+                // that this address is a token earlier in the batch. If it's not in
+                // the map, we do a DB lookup.
+                let is_fungible_token =
+                    TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
+                        .await;
+
+                // Record that we've looked up whether this address is a fungible token.
+                fungible_token_data.insert(token_data_id.clone(), is_fungible_token);
+
+                // Exit early if it's not a token.
+                if !is_fungible_token {
                     return Ok(None);
                 }
 
