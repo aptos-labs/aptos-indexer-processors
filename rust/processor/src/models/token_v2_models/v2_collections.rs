@@ -5,10 +5,11 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource};
+use super::v2_token_utils::{TokenStandard, V2TokenResource};
 use crate::{
     models::{
         default_models::move_resources::MoveResource,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::{
             collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
             token_utils::{CollectionDataIdType, TokenWriteSet},
@@ -82,7 +83,7 @@ impl CollectionV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {

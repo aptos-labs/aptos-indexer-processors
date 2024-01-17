@@ -449,6 +449,8 @@ diesel::table! {
         last_transaction_version -> Int8,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        is_token -> Nullable<Bool>,
+        is_fungible_asset -> Nullable<Bool>,
     }
 }
 
@@ -861,6 +863,8 @@ diesel::table! {
         allow_ungated_transfer -> Bool,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        is_token -> Nullable<Bool>,
+        is_fungible_asset -> Nullable<Bool>,
     }
 }
 
@@ -1159,6 +1163,8 @@ diesel::table! {
         num_write_set_changes -> Int8,
         inserted_at -> Timestamp,
         epoch -> Int8,
+        #[max_length = 50]
+        payload_type -> Nullable<Varchar>,
     }
 }
 
@@ -1196,8 +1202,6 @@ diesel::table! {
         inserted_at -> Timestamp,
     }
 }
-
-diesel::joinable!(block_metadata_transactions -> transactions (version));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,

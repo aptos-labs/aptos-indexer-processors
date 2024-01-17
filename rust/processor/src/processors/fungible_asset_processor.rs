@@ -9,13 +9,13 @@ use crate::{
             v2_fungible_asset_balances::{
                 CurrentFungibleAssetBalance, CurrentFungibleAssetMapping, FungibleAssetBalance,
             },
-            v2_fungible_asset_utils::{
-                FeeStatement, FungibleAssetAggregatedData, FungibleAssetAggregatedDataMapping,
-                FungibleAssetMetadata, FungibleAssetStore,
-            },
+            v2_fungible_asset_utils::{FeeStatement, FungibleAssetMetadata, FungibleAssetStore},
             v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
         },
-        token_v2_models::v2_token_utils::{ObjectWithMetadata, TokenV2},
+        object_models::v2_object_utils::{
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        },
+        token_v2_models::v2_token_utils::TokenV2,
     },
     schema,
     utils::{
@@ -330,7 +330,7 @@ async fn parse_v2_coin(
     let mut fungible_asset_metadata: FungibleAssetMetadataMapping = HashMap::new();
 
     // Get Metadata for fungible assets by object
-    let mut fungible_asset_object_helper: FungibleAssetAggregatedDataMapping = HashMap::new();
+    let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = HashMap::new();
 
     for txn in transactions {
         let txn_version = txn.version as i64;
@@ -373,11 +373,18 @@ async fn parse_v2_coin(
                 {
                     fungible_asset_object_helper.insert(
                         standardize_address(&wr.address.to_string()),
-                        FungibleAssetAggregatedData {
+                        ObjectAggregatedData {
                             object,
                             fungible_asset_metadata: None,
                             fungible_asset_store: None,
                             token: None,
+                            // The following structs are unused in this processor
+                            aptos_collection: None,
+                            fixed_supply: None,
+                            unlimited_supply: None,
+                            property_map: None,
+                            transfer_event: None,
+                            fungible_asset_supply: None,
                         },
                     );
                 }

@@ -7,6 +7,9 @@ use crate::{
         fungible_asset_models::v2_fungible_asset_utils::{
             FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
         },
+        object_models::v2_object_utils::{
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        },
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
@@ -18,8 +21,7 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, FixedSupply, ObjectWithMetadata, PropertyMapModel,
-                TokenV2, TokenV2AggregatedData, TokenV2AggregatedDataMapping, TokenV2Burned,
+                AptosCollection, BurnEvent, FixedSupply, PropertyMapModel, TokenV2, TokenV2Burned,
                 TransferEvent, UnlimitedSupply,
             },
         },
@@ -501,7 +503,7 @@ async fn parse_v2_token(
     // Get Metadata for token v2 by object
     // We want to persist this through the entire batch so that even if a token is burned,
     // we can still get the object core metadata for it
-    let mut token_v2_metadata_helper: TokenV2AggregatedDataMapping = HashMap::new();
+    let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
     // Basically token properties
     let mut current_token_v2_metadata: HashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
         HashMap::new();
@@ -531,7 +533,7 @@ async fn parse_v2_token(
                     {
                         token_v2_metadata_helper.insert(
                             standardize_address(&wr.address.to_string()),
-                            TokenV2AggregatedData {
+                            ObjectAggregatedData {
                                 aptos_collection: None,
                                 fixed_supply: None,
                                 object,
