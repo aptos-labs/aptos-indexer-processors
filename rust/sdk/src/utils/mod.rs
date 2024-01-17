@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod txn_parsers;
+
 use aptos_protos::util::timestamp::Timestamp;
+pub use txn_parsers::*;
 
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
@@ -46,6 +49,12 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
         .as_secs_f64();
     let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
     current_timestamp - transaction_time
+}
+
+pub fn truncate_str(val: &str, max_chars: usize) -> String {
+    let mut trunc = val.to_string();
+    trunc.truncate(max_chars);
+    trunc
 }
 
 #[cfg(test)]

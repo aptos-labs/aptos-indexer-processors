@@ -6,9 +6,10 @@
 
 use crate::{
     models::default_models::move_resources::MoveResource,
-    utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
+    utils::util::{deserialize_from_string, hash_str, standardize_address},
 };
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::truncate_str;
 use aptos_protos::transaction::v1::{move_type::Content, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use regex::Regex;

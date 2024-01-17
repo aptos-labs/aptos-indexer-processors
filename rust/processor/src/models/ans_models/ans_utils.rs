@@ -6,10 +6,10 @@
 
 use crate::{
     models::default_models::move_resources::MoveResource,
-    utils::util::{bigdecimal_to_u64, deserialize_from_string, standardize_address, truncate_str},
+    utils::util::{bigdecimal_to_u64, deserialize_from_string, standardize_address},
 };
 use anyhow::Context;
-use aptos_processor_sdk::utils::parse_timestamp_secs;
+use aptos_processor_sdk::utils::{parse_timestamp_secs, truncate_str};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};

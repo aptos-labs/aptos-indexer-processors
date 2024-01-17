@@ -14,9 +14,10 @@ use crate::{
         token_models::token_utils::{NAME_LENGTH, TOKEN_ADDR},
     },
     schema::current_token_v2_metadata,
-    utils::util::{standardize_address, truncate_str},
+    utils::util::standardize_address,
 };
 use anyhow::Context;
+use aptos_processor_sdk::utils::truncate_str;
 use aptos_protos::transaction::v1::WriteResource;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

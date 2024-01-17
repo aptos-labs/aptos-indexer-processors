@@ -11,11 +11,9 @@ use super::{
 };
 use crate::{
     schema::transactions,
-    utils::util::{
-        get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
-        u64_to_bigdecimal,
-    },
+    utils::util::{standardize_address, u64_to_bigdecimal},
 };
+use aptos_processor_sdk::utils::{get_clean_payload, get_clean_writeset, get_payload_type};
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
     Transaction as TransactionPB, TransactionInfo,

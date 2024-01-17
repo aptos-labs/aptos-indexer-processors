@@ -9,9 +9,10 @@ use crate::{
         coin_models::coin_utils::COIN_ADDR, default_models::move_resources::MoveResource,
         token_models::token_utils::URI_LENGTH, token_v2_models::v2_token_utils::ResourceReference,
     },
-    utils::util::{deserialize_from_string, truncate_str},
+    utils::util::deserialize_from_string,
 };
 use anyhow::{Context, Result};
+use aptos_processor_sdk::utils::truncate_str;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};

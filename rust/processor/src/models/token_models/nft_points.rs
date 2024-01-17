@@ -5,11 +5,10 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::{
-    schema::nft_points,
-    utils::util::{get_clean_payload, get_entry_function_from_user_request, standardize_address},
+use crate::{schema::nft_points, utils::util::standardize_address};
+use aptos_processor_sdk::utils::{
+    get_clean_payload, get_entry_function_from_user_request, parse_timestamp,
 };
-use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
