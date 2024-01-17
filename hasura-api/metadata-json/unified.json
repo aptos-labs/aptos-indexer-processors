@@ -1,5 +1,5 @@
 {
-  "resource_version": 363,
+  "resource_version": 364,
   "metadata": {
     "version": 3,
     "sources": [
@@ -2011,6 +2011,7 @@
                 "permission": {
                   "columns": [
                     "last_success_version",
+                    "last_transaction_timestamp",
                     "last_updated",
                     "processor"
                   ],
