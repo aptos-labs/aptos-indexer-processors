@@ -7,15 +7,16 @@ use crate::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-        PgPoolConnection,
-    },
+    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
 use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
@@ -41,16 +42,6 @@ impl Debug for UserTransactionProcessor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    user_transactions: &[UserTransactionModel],
-    signatures: &[Signature],
-) -> Result<(), diesel::result::Error> {
-    insert_user_transactions(conn, user_transactions).await?;
-    insert_signatures(conn, signatures).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
@@ -65,78 +56,64 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(pg_conn, &user_transactions, &signatures))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            let user_transactions = clean_data_for_db(user_transactions, true);
-            let signatures = clean_data_for_db(signatures, true);
 
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async move {
-                        insert_to_db_impl(pg_conn, &user_transactions, &signatures).await
-                    })
-                })
-                .await
-        },
-    }
+    execute_in_chunks(
+        conn,
+        insert_user_transactions_query,
+        user_transactions,
+        UserTransactionModel::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn,
+        insert_signatures_query,
+        signatures,
+        Signature::field_count(),
+    )
+    .await?;
+
+    Ok(())
 }
 
-async fn insert_user_transactions(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[UserTransactionModel],
-) -> Result<(), diesel::result::Error> {
+fn insert_user_transactions_query(
+    items_to_insert: Vec<UserTransactionModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::user_transactions::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), UserTransactionModel::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::user_transactions::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(version)
-                .do_update()
-                .set((
-                    expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::user_transactions::table)
+            .values(items_to_insert)
+            .on_conflict(version)
+            .do_update()
+            .set((
+                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        None,
+    )
 }
 
-async fn insert_signatures(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[Signature],
-) -> Result<(), diesel::result::Error> {
+fn insert_signatures_query(
+    items_to_insert: Vec<Signature>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::signatures::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), Signature::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::signatures::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((
-                    transaction_version,
-                    multi_agent_index,
-                    multi_sig_index,
-                    is_sender_primary,
-                ))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::signatures::table)
+            .values(items_to_insert)
+            .on_conflict((
+                transaction_version,
+                multi_agent_index,
+                multi_sig_index,
+                is_sender_primary,
+            ))
+            .do_nothing(),
+        None,
+    )
 }
 
 #[async_trait]

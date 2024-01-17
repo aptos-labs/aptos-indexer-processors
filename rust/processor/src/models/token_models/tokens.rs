@@ -41,7 +41,7 @@ pub type CurrentTokenPendingClaimPK = (TokenDataIdHash, BigDecimal, Address, Add
 // PK of tokens table, used to dedupe tokens
 pub type TokenPK = (TokenDataIdHash, BigDecimal);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id_hash, property_version, transaction_version))]
 #[diesel(table_name = tokens)]
 pub struct Token {

@@ -14,7 +14,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, proposal_id, voter_address))]
 #[diesel(table_name = proposal_votes)]
 pub struct ProposalVote {

@@ -25,7 +25,7 @@ pub type DelegatorPoolMap = HashMap<StakingPoolAddress, DelegatorPool>;
 pub type DelegatorPoolBalanceMap = HashMap<StakingPoolAddress, CurrentDelegatorPoolBalance>;
 
 // All pools
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = delegated_staking_pools)]
 pub struct DelegatorPool {
@@ -58,7 +58,7 @@ pub struct PoolBalanceMetadata {
 }
 
 // Pools balances
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, staking_pool_address))]
 #[diesel(table_name = delegated_staking_pool_balances)]
 pub struct DelegatorPoolBalance {
@@ -72,7 +72,7 @@ pub struct DelegatorPoolBalance {
 }
 
 // All pools w latest balances (really a more comprehensive version than DelegatorPool)
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = current_delegated_staking_pool_balances)]
 pub struct CurrentDelegatorPoolBalance {

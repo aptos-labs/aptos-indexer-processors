@@ -12,7 +12,7 @@ use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id_hash, property_version, from_address, to_address))]
 #[diesel(table_name = current_token_pending_claims)]
 pub struct CurrentTokenPendingClaim {
