@@ -7,14 +7,13 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{
-        ObjectWithMetadata, TokenStandard, TokenV2AggregatedDataMapping, TokenV2Burned,
-    },
+    v2_token_utils::{TokenStandard, TokenV2Burned},
 };
 use crate::{
     models::{
         default_models::move_resources::MoveResource,
         fungible_asset_models::v2_fungible_asset_utils::V2FungibleAssetResource,
+        object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
         token_models::{
             collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
             token_utils::TokenWriteSet,
@@ -113,7 +112,7 @@ impl TokenOwnershipV2 {
     /// For nfts it's the same resources that we parse tokendatas from so we leverage the work done in there to get ownership data
     pub fn get_nft_v2_from_token_data(
         token_data: &TokenDataV2,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<
         Option<(
             Self,
@@ -361,7 +360,7 @@ impl TokenOwnershipV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);

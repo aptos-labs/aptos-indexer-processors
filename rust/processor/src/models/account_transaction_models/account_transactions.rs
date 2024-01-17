@@ -7,7 +7,7 @@
 
 use crate::{
     models::{
-        token_v2_models::v2_token_utils::ObjectWithMetadata,
+        object_models::v2_object_utils::ObjectWithMetadata,
         user_transactions_models::user_transactions::UserTransaction,
     },
     schema::account_transactions,

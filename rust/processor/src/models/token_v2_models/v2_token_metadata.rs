@@ -5,11 +5,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenV2AggregatedDataMapping, TOKEN_V2_ADDR};
+use super::v2_token_utils::TOKEN_V2_ADDR;
 use crate::{
     models::{
         coin_models::coin_utils::COIN_ADDR,
         default_models::move_resources::MoveResource,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::token_utils::{NAME_LENGTH, TOKEN_ADDR},
     },
     schema::current_token_v2_metadata,
@@ -40,7 +41,7 @@ impl CurrentTokenV2Metadata {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
         let object_address = standardize_address(&write_resource.address.to_string());
         if let Some(metadata) = token_v2_metadata.get(&object_address) {
