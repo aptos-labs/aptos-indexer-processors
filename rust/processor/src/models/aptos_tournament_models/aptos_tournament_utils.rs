@@ -640,6 +640,42 @@ fn remove_type_from_resource(data_type: &str) -> String {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateRoomEvent {
+    tournament_address: String,
+    current_round_address: String,
+}
+
+impl CreateRoomEvent {
+    pub fn get_tournament_address(&self) -> String {
+        standardize_address(&self.tournament_address)
+    }
+
+    pub fn get_current_round_address(&self) -> String {
+        standardize_address(&self.current_round_address)
+    }
+
+    pub fn from_event(
+        contract_addr: &str,
+        event: &Event,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        if let Some(AptosTournamentEvent::CreateRoomEvent(inner)) =
+            AptosTournamentEvent::from_event(
+                contract_addr,
+                event.type_str.as_str(),
+                &event.data,
+                txn_version,
+            )
+            .unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BurnPlayerTokenEvent {
     object_address: String,
 }
@@ -702,6 +738,7 @@ impl BurnRoomEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AptosTournamentEvent {
+    CreateRoomEvent(CreateRoomEvent),
     BurnPlayerTokenEvent(BurnPlayerTokenEvent),
     BurnRoomEvent(BurnRoomEvent),
 }
@@ -714,6 +751,9 @@ impl AptosTournamentEvent {
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
         match event_type {
+            x if x == format!("{}::room::CreateRoomEvent", contract_addr) => {
+                serde_json::from_str(event_data).map(|inner| Some(Self::CreateRoomEvent(inner)))
+            },
             x if x == format!("{}::token_manager::BurnPlayerTokenEvent", contract_addr) => {
                 serde_json::from_str(event_data)
                     .map(|inner| Some(Self::BurnPlayerTokenEvent(inner)))

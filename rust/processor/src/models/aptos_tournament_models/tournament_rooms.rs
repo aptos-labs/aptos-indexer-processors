@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::{
-    aptos_tournament_utils::{BurnRoomEvent, Room},
-    tournaments::{Tournament, TournamentMapping},
-};
+use super::aptos_tournament_utils::{BurnRoomEvent, CreateRoomEvent, Room};
 use crate::{
     models::token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     schema::tournament_rooms,
@@ -37,25 +34,22 @@ impl TournamentRoom {
         self.address.clone()
     }
 
-    pub async fn from_write_resource(
-        conn: &mut PgPoolConnection<'_>,
+    pub fn from_write_resource(
         contract_addr: &str,
         write_resource: &WriteResource,
         transaction_version: i64,
-        object_to_owner: &HashMap<String, String>,
-        previous_tournaments: &TournamentMapping,
+        create_room_events: &HashMap<String, CreateRoomEvent>,
     ) -> Option<Self> {
         if Room::from_write_resource(contract_addr, write_resource, transaction_version)
             .unwrap()
             .is_some()
         {
             let address = standardize_address(&write_resource.address);
-            let owner_address = object_to_owner.get(&address).unwrap();
-            let tournament = Tournament::lookup(conn, owner_address, previous_tournaments).await;
+            let create_room_event = create_room_events.get(&address).unwrap();
             return Some(TournamentRoom {
                 address: address.clone(),
-                tournament_address: tournament.pk(),
-                round_address: tournament.current_round_address.unwrap(),
+                tournament_address: create_room_event.get_tournament_address(),
+                round_address: create_room_event.get_current_round_address(),
                 in_progress: true,
                 last_transaction_version: transaction_version,
             });

@@ -6,8 +6,8 @@ use crate::{
     models::{
         aptos_tournament_models::{
             aptos_tournament_utils::{
-                CurrentRound, CurrentRoundMapping, TokenV1RewardClaimed, TournamentState,
-                TournamentStateMapping,
+                CreateRoomEvent, CurrentRound, CurrentRoundMapping, TokenV1RewardClaimed,
+                TournamentState, TournamentStateMapping,
             },
             rock_paper_scissors_game::{RockPaperScissorsGame, RockPaperScissorsGameMapping},
             rock_paper_scissors_player::{RockPaperScissorsPlayer, RockPaperScissorsPlayerMapping},
@@ -576,6 +576,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
             let mut tournament_state_mapping: TournamentStateMapping = HashMap::new();
             let mut current_round_mapping: CurrentRoundMapping = HashMap::new();
             let mut object_to_owner = HashMap::new();
+            let mut create_room_events = HashMap::new();
 
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
@@ -652,6 +653,24 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     }
                 }
 
+                // Pass through events for create room events
+                for event in user_txn.events.iter() {
+                    if let Some(create_room) = CreateRoomEvent::from_event(
+                        &self.config.contract_address,
+                        event,
+                        txn_version,
+                    )
+                    .unwrap()
+                    {
+                        create_room_events.insert(
+                            standardize_address(
+                                &event.key.clone().unwrap().account_address.as_ref(),
+                            ),
+                            create_room,
+                        );
+                    }
+                }
+
                 // Third pass: everything else
                 for wsc in transaction_info.changes.iter() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
@@ -663,15 +682,11 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             tournament_rounds.insert(round.pk(), round);
                         }
                         if let Some(room) = TournamentRoom::from_write_resource(
-                            conn,
                             &self.config.contract_address,
                             wr,
                             txn_version,
-                            &object_to_owner,
-                            &tournaments,
-                        )
-                        .await
-                        {
+                            &create_room_events,
+                        ) {
                             tournament_rooms.insert(room.pk(), room);
                         }
                         if let Some(coin_reward) = TournamentCoinReward::from_write_resource(
