@@ -1,5 +1,5 @@
 {
-  "resource_version": 357,
+  "resource_version": 364,
   "metadata": {
     "version": 3,
     "sources": [
@@ -2011,6 +2011,7 @@
                 "permission": {
                   "columns": [
                     "last_success_version",
+                    "last_transaction_timestamp",
                     "last_updated",
                     "processor"
                   ],
@@ -2399,7 +2400,7 @@
           "queries": [
             {
               "name": "Latest Processor Status",
-              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n  }\n}"
+              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n    last_transaction_timestamp\n  }\n}"
             }
           ]
         }
