@@ -142,8 +142,8 @@ async fn insert_to_db(
                             clean_data_for_db(tournament_token_rewards_to_insert, true);
                         let tournament_rounds_to_insert =
                             clean_data_for_db(tournament_rounds_to_insert, true);
-                        let tournament_rooms_to_insert =
-                            clean_data_for_db(tournament_rooms_to_insert, true);
+                        // let tournament_rooms_to_insert =
+                        //     clean_data_for_db(tournament_rooms_to_insert, true);
                         let tournament_rooms_to_delete =
                             clean_data_for_db(tournament_rooms_to_delete, true);
                         let tournament_players_to_insert =
