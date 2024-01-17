@@ -91,7 +91,7 @@ impl ProcessorTrait for NftMetadataProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-        db_chain_id: Option<u64>,
+        db_chain_id: Option<u8>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
