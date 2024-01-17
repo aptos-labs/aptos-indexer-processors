@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{ProcessorName, ProcessorStorageTrait};
 use crate::{
     models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
@@ -26,7 +26,10 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_processor_sdk::utils::parse_timestamp;
+use aptos_processor_sdk::{
+    processor::{ProcessingResult, ProcessorTrait},
+    utils::parse_timestamp,
+};
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
@@ -598,7 +601,10 @@ impl ProcessorTrait for StakeProcessor {
             },
         }
     }
+}
 
+#[async_trait]
+impl ProcessorStorageTrait for StakeProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }

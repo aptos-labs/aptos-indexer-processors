@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{ProcessorName, ProcessorStorageTrait};
 use crate::{
     models::{
         fungible_asset_models::v2_fungible_asset_utils::{
@@ -36,7 +36,10 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_processor_sdk::utils::parse_timestamp;
+use aptos_processor_sdk::{
+    processor::{ProcessingResult, ProcessorTrait},
+    utils::parse_timestamp,
+};
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
@@ -466,7 +469,10 @@ impl ProcessorTrait for TokenV2Processor {
             },
         }
     }
+}
 
+#[async_trait]
+impl ProcessorStorageTrait for TokenV2Processor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
