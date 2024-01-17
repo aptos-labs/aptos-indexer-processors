@@ -45,14 +45,15 @@ impl TournamentRoom {
             .is_some()
         {
             let address = standardize_address(&write_resource.address);
-            let create_room_event = create_room_events.get(&address).unwrap();
-            return Some(TournamentRoom {
-                address: address.clone(),
-                tournament_address: create_room_event.get_tournament_address(),
-                round_address: create_room_event.get_current_round_address(),
-                in_progress: true,
-                last_transaction_version: transaction_version,
-            });
+            if let Some(create_room_event) = create_room_events.get(&address) {
+                return Some(TournamentRoom {
+                    address: address.clone(),
+                    tournament_address: create_room_event.get_tournament_address(),
+                    round_address: create_room_event.get_current_round_address(),
+                    in_progress: true,
+                    last_transaction_version: transaction_version,
+                });
+            }
         }
         None
     }
