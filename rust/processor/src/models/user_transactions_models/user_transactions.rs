@@ -10,11 +10,9 @@
 use super::signatures::Signature;
 use crate::{
     schema::user_transactions,
-    utils::util::{
-        get_entry_function_from_user_request, parse_timestamp, standardize_address,
-        u64_to_bigdecimal,
-    },
+    utils::util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
 };
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::{
     transaction::v1::{UserTransaction as UserTransactionPB, UserTransactionRequest},
     util::timestamp::Timestamp,

@@ -104,6 +104,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-processor-sdk"
+version = "0.1.0"
+dependencies = [
+ "aptos-protos",
+ "bcs",
+ "bigdecimal",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.9.9",
+ "tracing",
+]
+
+[[package]]
 name = "aptos-protos"
 version = "1.1.2"
 source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c#af0dcea7144225a709e4f595e58f8026b99e901c"
@@ -1862,6 +1877,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-moving-average",
+ "aptos-processor-sdk",
  "aptos-protos",
  "async-trait",
  "base64 0.13.1",

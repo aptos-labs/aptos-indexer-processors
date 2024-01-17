@@ -15,9 +15,10 @@ use crate::{
     },
     utils::{
         database::{PgDbPool, PgPoolConnection},
-        util::{parse_timestamp, standardize_address},
+        util::standardize_address,
     },
 };
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use futures_util::future::try_join_all;

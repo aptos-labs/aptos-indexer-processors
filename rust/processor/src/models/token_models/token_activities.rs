@@ -6,10 +6,8 @@
 #![allow(clippy::unused_unit)]
 
 use super::token_utils::{TokenDataIdType, TokenEvent};
-use crate::{
-    schema::token_activities,
-    utils::util::{parse_timestamp, standardize_address},
-};
+use crate::{schema::token_activities, utils::util::standardize_address};
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{transaction::TxnData, Event, Transaction};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;

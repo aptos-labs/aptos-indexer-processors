@@ -17,8 +17,6 @@ use serde_json::Value;
 use sha2::Digest;
 use std::str::FromStr;
 
-// 9999-12-31 23:59:59, this is the max supported by Google BigQuery
-pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 // Max length of entry function id string to ensure that db doesn't explode
 pub const MAX_ENTRY_FUNCTION_LENGTH: usize = 1000;
 
@@ -235,25 +233,51 @@ fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayl
     }
 }
 
-pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
-    let final_ts = if ts.seconds >= MAX_TIMESTAMP_SECS {
-        Timestamp {
-            seconds: MAX_TIMESTAMP_SECS,
-            nanos: 0,
-        }
-    } else {
-        ts.clone()
-    };
-    chrono::NaiveDateTime::from_timestamp_opt(final_ts.seconds, final_ts.nanos as u32)
-        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+/// convert the bcs encoded inner value of property_map to its original value in string format
+pub fn deserialize_property_map_from_bcs_hexstring<'de, D>(
+    deserializer: D,
+) -> core::result::Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = serde_json::Value::deserialize(deserializer)?;
+    // iterate the json string to convert key-value pair
+    // assume the format of {“map”: {“data”: [{“key”: “Yuri”, “value”: {“type”: “String”, “value”: “0x42656e”}}, {“key”: “Tarded”, “value”: {“type”: “String”, “value”: “0x446f766572"}}]}}
+    // if successfully parsing we return the decoded property_map string otherwise return the original string
+    Ok(convert_bcs_propertymap(s.clone()).unwrap_or(s))
 }
 
-pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt(
-        std::cmp::min(ts, MAX_TIMESTAMP_SECS as u64) as i64,
-        0,
-    )
-    .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+/// convert the bcs encoded inner value of property_map to its original value in string format
+pub fn deserialize_token_object_property_map_from_bcs_hexstring<'de, D>(
+    deserializer: D,
+) -> core::result::Result<Value, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = serde_json::Value::deserialize(deserializer)?;
+    // iterate the json string to convert key-value pair
+    Ok(convert_bcs_token_object_propertymap(s.clone()).unwrap_or(s))
+}
+
+/// Convert the json serialized PropertyMap's inner BCS fields to their original value in string format
+pub fn convert_bcs_propertymap(s: Value) -> Option<Value> {
+    match PropertyMap::from_bcs_encode_str(s) {
+        Some(e) => match serde_json::to_value(&e) {
+            Ok(val) => Some(val),
+            Err(_) => None,
+        },
+        None => None,
+    }
+}
+
+pub fn convert_bcs_token_object_propertymap(s: Value) -> Option<Value> {
+    match TokenObjectPropertyMap::from_bcs_encode_str(s) {
+        Some(e) => match serde_json::to_value(&e) {
+            Ok(val) => Some(val),
+            Err(_) => None,
+        },
+        None => None,
+    }
 }
 
 pub fn remove_null_bytes<T: serde::Serialize + for<'de> serde::Deserialize<'de>>(input: &T) -> T {
@@ -286,32 +310,6 @@ fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
 
 fn string_null_byte_replacement(value: &str) -> String {
     value.replace('\u{0000}', "").replace("\\u0000", "")
-}
-
-/// convert the bcs encoded inner value of property_map to its original value in string format
-pub fn deserialize_property_map_from_bcs_hexstring<'de, D>(
-    deserializer: D,
-) -> core::result::Result<Value, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = serde_json::Value::deserialize(deserializer)?;
-    // iterate the json string to convert key-value pair
-    // assume the format of {“map”: {“data”: [{“key”: “Yuri”, “value”: {“type”: “String”, “value”: “0x42656e”}}, {“key”: “Tarded”, “value”: {“type”: “String”, “value”: “0x446f766572"}}]}}
-    // if successfully parsing we return the decoded property_map string otherwise return the original string
-    Ok(convert_bcs_propertymap(s.clone()).unwrap_or(s))
-}
-
-/// convert the bcs encoded inner value of property_map to its original value in string format
-pub fn deserialize_token_object_property_map_from_bcs_hexstring<'de, D>(
-    deserializer: D,
-) -> core::result::Result<Value, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = serde_json::Value::deserialize(deserializer)?;
-    // iterate the json string to convert key-value pair
-    Ok(convert_bcs_token_object_propertymap(s.clone()).unwrap_or(s))
 }
 
 pub fn deserialize_string_from_hexstring<'de, D>(
@@ -360,27 +358,6 @@ pub fn convert_bcs_hex_new(typ: u8, value: String) -> Option<String> {
         .ok()
 }
 
-/// Convert the json serialized PropertyMap's inner BCS fields to their original value in string format
-pub fn convert_bcs_propertymap(s: Value) -> Option<Value> {
-    match PropertyMap::from_bcs_encode_str(s) {
-        Some(e) => match serde_json::to_value(&e) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        },
-        None => None,
-    }
-}
-
-pub fn convert_bcs_token_object_propertymap(s: Value) -> Option<Value> {
-    match TokenObjectPropertyMap::from_bcs_encode_str(s) {
-        Some(e) => match serde_json::to_value(&e) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        },
-        None => None,
-    }
-}
-
 /// Convert the vector<u8> that is directly generated from b"xxx"
 pub fn convert_hex(val: String) -> Option<String> {
     let decoded = hex::decode(val.strip_prefix("0x").unwrap_or(&*val)).ok()?;
@@ -410,17 +387,6 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
     current_timestamp - transaction_time
 }
 
-/// Convert the protobuf timestamp to ISO format
-pub fn timestamp_to_iso(timestamp: &Timestamp) -> String {
-    let dt = parse_timestamp(timestamp, 0);
-    dt.format("%Y-%m-%dT%H:%M:%S%.9fZ").to_string()
-}
-
-/// Convert the protobuf timestamp to unixtime
-pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
-    timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9
-}
-
 /// Get name from unwrapped move type
 /// E.g. 0x1::domain::Name will return Name
 pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
@@ -431,8 +397,7 @@ pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Datelike;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug)]
     struct TypeInfoMock {
@@ -452,37 +417,6 @@ mod tests {
     struct TokenObjectDataMock {
         #[serde(deserialize_with = "deserialize_token_object_property_map_from_bcs_hexstring")]
         pub default_properties: serde_json::Value,
-    }
-
-    #[test]
-    fn test_parse_timestamp() {
-        let ts = parse_timestamp(
-            &Timestamp {
-                seconds: 1649560602,
-                nanos: 0,
-            },
-            1,
-        );
-        assert_eq!(ts.timestamp(), 1649560602);
-        assert_eq!(ts.year(), 2022);
-
-        let ts2 = parse_timestamp_secs(600000000000000, 2);
-        assert_eq!(ts2.year(), 9999);
-
-        let ts3 = parse_timestamp_secs(1659386386, 2);
-        assert_eq!(ts3.timestamp(), 1659386386);
-    }
-
-    #[test]
-    fn test_deserialize_string_from_bcs() {
-        let test_struct = TypeInfoMock {
-            module_name: String::from("0x6170746f735f636f696e"),
-            struct_name: String::from("0x4170746f73436f696e"),
-        };
-        let val = serde_json::to_string(&test_struct).unwrap();
-        let d: TypeInfoMock = serde_json::from_str(val.as_str()).unwrap();
-        assert_eq!(d.module_name.as_str(), "aptos_coin");
-        assert_eq!(d.struct_name.as_str(), "AptosCoin");
     }
 
     #[test]
@@ -602,5 +536,17 @@ mod tests {
         let val = serde_json::to_string(&test_struct).unwrap();
         let d: TokenObjectDataMock = serde_json::from_str(val.as_str()).unwrap();
         assert_eq!(d.default_properties, Value::Object(serde_json::Map::new()));
+    }
+
+    #[test]
+    fn test_deserialize_string_from_bcs() {
+        let test_struct = TypeInfoMock {
+            module_name: String::from("0x6170746f735f636f696e"),
+            struct_name: String::from("0x4170746f73436f696e"),
+        };
+        let val = serde_json::to_string(&test_struct).unwrap();
+        let d: TypeInfoMock = serde_json::from_str(val.as_str()).unwrap();
+        assert_eq!(d.module_name.as_str(), "aptos_coin");
+        assert_eq!(d.struct_name.as_str(), "AptosCoin");
     }
 }
