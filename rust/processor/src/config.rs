@@ -3,9 +3,9 @@
 
 use crate::{processors::ProcessorConfig, worker::Worker};
 use anyhow::{Context, Result};
+use aptos_processor_sdk::stream_subscriber::IndexerGrpcHttp2Config;
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
-use std::time::Duration;
 use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -53,36 +53,5 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             .next()
             .unwrap_or("unknown");
         before_underscore[..before_underscore.len().min(12)].to_string()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-#[serde(default)]
-pub struct IndexerGrpcHttp2Config {
-    /// Indexer GRPC http2 ping interval in seconds. Defaults to 30.
-    /// Tonic ref: https://docs.rs/tonic/latest/tonic/transport/channel/struct.Endpoint.html#method.http2_keep_alive_interval
-    indexer_grpc_http2_ping_interval_in_secs: u64,
-
-    /// Indexer GRPC http2 ping timeout in seconds. Defaults to 10.
-    indexer_grpc_http2_ping_timeout_in_secs: u64,
-}
-
-impl IndexerGrpcHttp2Config {
-    pub fn grpc_http2_ping_interval_in_secs(&self) -> Duration {
-        Duration::from_secs(self.indexer_grpc_http2_ping_interval_in_secs)
-    }
-
-    pub fn grpc_http2_ping_timeout_in_secs(&self) -> Duration {
-        Duration::from_secs(self.indexer_grpc_http2_ping_timeout_in_secs)
-    }
-}
-
-impl Default for IndexerGrpcHttp2Config {
-    fn default() -> Self {
-        Self {
-            indexer_grpc_http2_ping_interval_in_secs: 30,
-            indexer_grpc_http2_ping_timeout_in_secs: 10,
-        }
     }
 }
