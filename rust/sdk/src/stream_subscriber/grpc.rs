@@ -224,6 +224,16 @@ pub async fn create_fetcher_loop(
     );
 
     loop {
+        info!(
+            processor_name = processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = grpc_data_service_address.to_string(),
+            connection_id,
+            channel_size = BUFFER_SIZE - tx.capacity(),
+            step = ProcessorStep::TryingToFetchTxnsFromGrpc.get_step(),
+            "{}",
+            ProcessorStep::TryingToFetchTxnsFromGrpc.get_label(),
+        );
         let is_success = match resp_stream.next().await {
             Some(Ok(r)) => {
                 reconnection_retries = 0;
