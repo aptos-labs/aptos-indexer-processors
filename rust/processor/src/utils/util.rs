@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::models::property_map::{PropertyMap, TokenObjectPropertyMap};
-use aptos_protos::{
-    transaction::v1::{
-        multisig_transaction_payload::Payload as MultisigPayloadType,
-        transaction_payload::Payload as PayloadType, write_set::WriteSet as WriteSetType,
-        EntryFunctionId, EntryFunctionPayload, MoveScriptBytecode, MoveType, ScriptPayload,
-        TransactionPayload, UserTransactionRequest, WriteSet,
-    },
-    util::timestamp::Timestamp,
+use aptos_protos::transaction::v1::{
+    multisig_transaction_payload::Payload as MultisigPayloadType,
+    transaction_payload::Payload as PayloadType, write_set::WriteSet as WriteSetType,
+    EntryFunctionId, EntryFunctionPayload, MoveScriptBytecode, MoveType, ScriptPayload,
+    TransactionPayload, UserTransactionRequest, WriteSet,
 };
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -375,16 +372,6 @@ where
 
     let s = <String>::deserialize(deserializer)?;
     s.parse::<T>().map_err(D::Error::custom)
-}
-
-/// Convert the protobuf Timestamp to epcoh time in seconds.
-pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
-    let current_timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("SystemTime before UNIX EPOCH!")
-        .as_secs_f64();
-    let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
-    current_timestamp - transaction_time
 }
 
 /// Get name from unwrapped move type
