@@ -21,7 +21,7 @@ use crate::{
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -92,27 +92,20 @@ async fn insert_to_db(
     {
         Ok(_) => Ok(()),
         Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let coin_activities = clean_data_for_db(coin_activities, true);
-                        let coin_infos = clean_data_for_db(coin_infos, true);
-                        let coin_balances = clean_data_for_db(coin_balances, true);
-                        let current_coin_balances = clean_data_for_db(current_coin_balances, true);
-                        let coin_supply = clean_data_for_db(coin_supply, true);
+            let coin_activities = clean_data_for_db(coin_activities, true);
+            let coin_infos = clean_data_for_db(coin_infos, true);
+            let coin_balances = clean_data_for_db(coin_balances, true);
+            let current_coin_balances = clean_data_for_db(current_coin_balances, true);
+            let coin_supply = clean_data_for_db(coin_supply, true);
 
-                        insert_to_db_impl(
-                            pg_conn,
-                            &coin_activities,
-                            &coin_infos,
-                            &coin_balances,
-                            &current_coin_balances,
-                            &coin_supply,
-                        )
-                        .await
-                    })
-                })
+            insert_to_db_impl(
+                conn,
+                &coin_activities,
+                &coin_infos,
+                &coin_balances,
+                &current_coin_balances,
+                &coin_supply,
+            )
                 .await
         },
     }

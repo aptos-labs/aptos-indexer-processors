@@ -38,7 +38,6 @@ use futures::StreamExt;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
 use diesel::Connection;
-use futures_util::TryFutureExt;
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 use tonic::{Response, Streaming};
 use tracing::{error, info};
