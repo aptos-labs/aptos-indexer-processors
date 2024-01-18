@@ -4,22 +4,22 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::nft_marketplace_models::nft_marketplace_activities::NftMarketplaceActivity,
-    schema::{self, current_nft_marketplace_auctions::marketplace},
+    schema::{self},
     utils::{
         database::{
             clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
             PgPoolConnection,
         },
-        util::{get_entry_function_from_user_request, standardize_address, parse_timestamp, get_clean_payload},
+        util::{get_entry_function_from_user_request, get_clean_payload},
     },
 };
 use anyhow::bail;
-use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::result::Error;
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -131,7 +131,6 @@ impl ProcessorTrait for NftMarketplacesProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        println!("starting (nft_marketplace_processor.rs)...12345");
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
         let nft_marketplace_activities = parse_transactions(&transactions).await;
@@ -148,7 +147,6 @@ impl ProcessorTrait for NftMarketplacesProcessor {
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        println!("inserted (nft_marketplace_processor.rs)...12345");
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
@@ -189,7 +187,6 @@ async fn parse_transactions(
             NaiveDateTime::from_timestamp_opt(txn_timestamp, 0).expect("Txn Timestamp is invalid!");
         let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
         
-        println!("-------start of parse_transactions-------");
         // Make sure this is a user transaction
         if let TxnData::User(inner) = txn_data {
             let payload = inner
@@ -200,15 +197,19 @@ async fn parse_transactions(
                 .as_ref()
                 .expect("Getting payload failed.");
             let payload_cleaned = get_clean_payload(payload, txn_version).unwrap();
-            // TODO - get the coin_type
-            // let coin_type = if payload_cleaned["typeArguments"].as_array().unwrap().len() > 0 {
-            //     payload_cleaned["typeArguments"]
-            //         .as_array()
-            //         .unwrap()[0]
-            //         .as_str()
-            // } else {
-            //     "".to_string()
-            // };
+            let coin_type = if payload_cleaned["type_arguments"].as_array().unwrap().len() > 0 {
+                let struct_type = &payload_cleaned["type_arguments"]
+                    .as_array()
+                    .unwrap()[0]["struct"];
+                Some(format!(
+                    "{}::{}::{}",
+                    struct_type["address"].as_str().unwrap(),
+                    struct_type["module"].as_str().unwrap(),
+                    struct_type["name"].as_str().unwrap()
+                ))
+            } else {
+                None
+            };
 
             // Loop through the events
             for (index, event) in inner.events.iter().enumerate() {
@@ -218,7 +219,7 @@ async fn parse_transactions(
                         txn_version,
                         index as i64,
                         &get_entry_function_from_user_request(inner.request.as_ref().unwrap()),
-
+                        &coin_type,
                         txn_timestamp,
                     )
                     .expect("Failed to parse event!")
@@ -227,7 +228,6 @@ async fn parse_transactions(
                 }
             }
         }
-        println!("-------end of parse_transactions-------");
     }
     nft_marketplace_activities
 }

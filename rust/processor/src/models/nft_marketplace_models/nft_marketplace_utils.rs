@@ -25,7 +25,7 @@ pub struct MarketplaceTokenMetadata {
 
 impl MarketplaceTokenMetadata {
     pub fn from_event_data(
-        event_data: serde_json::Value,
+        event_data: &serde_json::Value,
     ) -> anyhow::Result<Option<Self>> {
         let token_metadata = event_data["token_metadata"].clone();
         if token_metadata.is_null() {
@@ -42,7 +42,7 @@ impl MarketplaceTokenMetadata {
         };
 
         // V2 Token
-        if (is_token_v2) {
+        if is_token_v2 {
             let collection_id = standardize_address(token_metadata["collection"]["vec"][0]["inner"].as_str().unwrap());
             let token_data_id = standardize_address(token_metadata["token"]["vec"][0]["inner"].as_str().unwrap());
             let collection_name = token_metadata["collection_name"].as_str().unwrap().to_string();
@@ -94,7 +94,7 @@ pub struct MarketplaceCollectionMetadata {
 
 impl MarketplaceCollectionMetadata {
     pub fn from_event_data(
-        event_data: serde_json::Value,
+        event_data: &serde_json::Value,
     ) -> anyhow::Result<Option<Self>> {
         let collection_metadata = event_data["collection_metadata"].clone();
         if collection_metadata.is_null() {

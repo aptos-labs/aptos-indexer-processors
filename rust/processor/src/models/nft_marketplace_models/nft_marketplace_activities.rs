@@ -55,7 +55,6 @@ impl NftMarketplaceActivity {
         coin_type: &Option<String>,
         transaction_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<Self>> {
-
         let type_str_vec = event.type_str.as_str().split("::").collect::<Vec<&str>>();
         let contract_addr = type_str_vec[0];
         let event_type = type_str_vec[type_str_vec.len() - 1];
@@ -66,7 +65,7 @@ impl NftMarketplaceActivity {
         // And if there any new marketplace we want to index, we only need to update the config file
         // Though, the event type namings has to match exactly. e.g "ListingFilledEvent"
         let example_marketplace_contract_address = "0x6de37368e31dff4580b211295198159ee6f98b42ffa93c5683bb955ca1be67e0";
-        if contract_addr.eq(example_marketplace_contract_address) {
+        if !contract_addr.eq(example_marketplace_contract_address) {
             return Ok(None);
         }
 
@@ -90,12 +89,13 @@ impl NftMarketplaceActivity {
         };
 
         let activity_fee_schedule_id = event.key.as_ref().unwrap().account_address.as_str();
-        let token_metadata = MarketplaceTokenMetadata::from_event_data(event_data)?;
-        let collection_metadata = MarketplaceCollectionMetadata::from_event_data(event_data)?;
+        let token_metadata = MarketplaceTokenMetadata::from_event_data(&event_data)?;
+        // TODO - for collection data
+        let _collection_metadata = MarketplaceCollectionMetadata::from_event_data(&event_data)?;
 
         // create the activity based on the event type
         match event_type {
-            MarketplaceEventType::ListingPlacedEvent => {
+            MarketplaceEventType::LISTING_PLACED_EVENT => {
                 // assert token_metadata exists
                 if token_metadata.is_none() {
                     bail!("Error: Token metadata missing from marketplace activity - {}", event_type);
@@ -114,14 +114,14 @@ impl NftMarketplaceActivity {
                         token_name: Some(token_metadata.token_name),
                         property_version: token_metadata.property_version,
                         price: price,
-                        token_amount: 1,
+                        token_amount: BigDecimal::from(1),
                         token_standard: token_metadata.token_standard,
-                        seller: Some(standardize_address(event_data["seller"].as_str())),
+                        seller: Some(standardize_address(event_data["seller"].as_str().unwrap())),
                         buyer: None,
                         coin_type: coin_type.clone(),
                         marketplace: "example_marketplace".to_string(),
                         contract_address: example_marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                        entry_function_id_str: entry_function_id_str.clone(),
+                        entry_function_id_str: entry_function_id_str.clone().unwrap(),
                         event_type: event_type.to_string(),
                         transaction_timestamp,
                     }))
