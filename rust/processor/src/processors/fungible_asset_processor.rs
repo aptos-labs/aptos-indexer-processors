@@ -87,45 +87,32 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
+    match insert_to_db_impl(
+        conn,
+        &fungible_asset_activities,
+        &fungible_asset_metadata,
+        &fungible_asset_balances,
+        &current_fungible_asset_balances,
+    ).await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            let fungible_asset_activities =
+                clean_data_for_db(fungible_asset_activities, true);
+            let fungible_asset_metadata =
+                clean_data_for_db(fungible_asset_metadata, true);
+            let fungible_asset_balances =
+                clean_data_for_db(fungible_asset_balances, true);
+            let current_fungible_asset_balances =
+                clean_data_for_db(current_fungible_asset_balances, true);
+
+            insert_to_db_impl(
+                conn,
                 &fungible_asset_activities,
                 &fungible_asset_metadata,
                 &fungible_asset_balances,
                 &current_fungible_asset_balances,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let fungible_asset_activities =
-                            clean_data_for_db(fungible_asset_activities, true);
-                        let fungible_asset_metadata =
-                            clean_data_for_db(fungible_asset_metadata, true);
-                        let fungible_asset_balances =
-                            clean_data_for_db(fungible_asset_balances, true);
-                        let current_fungible_asset_balances =
-                            clean_data_for_db(current_fungible_asset_balances, true);
-
-                        insert_to_db_impl(
-                            pg_conn,
-                            &fungible_asset_activities,
-                            &fungible_asset_metadata,
-                            &fungible_asset_balances,
-                            &current_fungible_asset_balances,
-                        )
-                        .await
-                    })
-                })
+            )
                 .await
         },
     }

@@ -60,23 +60,11 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| Box::pin(insert_to_db_impl(pg_conn, &account_transactions)))
-        .await
+    match insert_to_db_impl(conn, &account_transactions).await
     {
         Ok(_) => Ok(()),
         Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        insert_to_db_impl(pg_conn, &clean_data_for_db(account_transactions, true))
-                            .await
-                    })
-                })
-                .await
+            insert_to_db_impl(conn, &clean_data_for_db(account_transactions, true)).await
         },
     }
 }

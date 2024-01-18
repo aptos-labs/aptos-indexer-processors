@@ -73,26 +73,13 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(pg_conn, (&objects, &current_objects)))
-        })
-        .await
+    match insert_to_db_impl(conn, (&objects, &current_objects)).await
     {
         Ok(_) => Ok(()),
         Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async move {
-                        let objects = clean_data_for_db(objects, true);
-                        let current_objects = clean_data_for_db(current_objects, true);
-                        insert_to_db_impl(pg_conn, (&objects, &current_objects)).await
-                    })
-                })
-                .await
+            let objects = clean_data_for_db(objects, true);
+            let current_objects = clean_data_for_db(current_objects, true);
+            insert_to_db_impl(conn, (&objects, &current_objects)).await
         },
     }
 }

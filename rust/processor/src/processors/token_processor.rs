@@ -118,12 +118,36 @@ async fn insert_to_db(
     let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
     let (current_token_ownerships, current_token_datas, current_collection_datas) =
         basic_token_current_lists;
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
+    match insert_to_db_impl(
+            conn,
+            (&tokens, &token_ownerships, &token_datas, &collection_datas),
+            (
+                &current_token_ownerships,
+                &current_token_datas,
+                &current_collection_datas,
+            ),
+            &token_activities,
+            &current_token_claims,
+            &nft_points,
+        ).await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            let tokens = clean_data_for_db(tokens, true);
+            let token_datas = clean_data_for_db(token_datas, true);
+            let token_ownerships = clean_data_for_db(token_ownerships, true);
+            let collection_datas = clean_data_for_db(collection_datas, true);
+            let current_token_ownerships =
+                clean_data_for_db(current_token_ownerships, true);
+            let current_token_datas = clean_data_for_db(current_token_datas, true);
+            let current_collection_datas =
+                clean_data_for_db(current_collection_datas, true);
+            let token_activities = clean_data_for_db(token_activities, true);
+            let current_token_claims = clean_data_for_db(current_token_claims, true);
+            let nft_points = clean_data_for_db(nft_points, true);
+
+            insert_to_db_impl(
+                conn,
                 (&tokens, &token_ownerships, &token_datas, &collection_datas),
                 (
                     &current_token_ownerships,
@@ -133,44 +157,7 @@ async fn insert_to_db(
                 &token_activities,
                 &current_token_claims,
                 &nft_points,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let tokens = clean_data_for_db(tokens, true);
-                        let token_datas = clean_data_for_db(token_datas, true);
-                        let token_ownerships = clean_data_for_db(token_ownerships, true);
-                        let collection_datas = clean_data_for_db(collection_datas, true);
-                        let current_token_ownerships =
-                            clean_data_for_db(current_token_ownerships, true);
-                        let current_token_datas = clean_data_for_db(current_token_datas, true);
-                        let current_collection_datas =
-                            clean_data_for_db(current_collection_datas, true);
-                        let token_activities = clean_data_for_db(token_activities, true);
-                        let current_token_claims = clean_data_for_db(current_token_claims, true);
-                        let nft_points = clean_data_for_db(nft_points, true);
-
-                        insert_to_db_impl(
-                            pg_conn,
-                            (&tokens, &token_ownerships, &token_datas, &collection_datas),
-                            (
-                                &current_token_ownerships,
-                                &current_token_datas,
-                                &current_collection_datas,
-                            ),
-                            &token_activities,
-                            &current_token_claims,
-                            &nft_points,
-                        )
-                        .await
-                    })
-                })
+            )
                 .await
         },
     }

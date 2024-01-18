@@ -89,12 +89,34 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
+    match insert_to_db_impl(
+        conn,
+        &current_ans_lookups,
+        &ans_lookups,
+        &current_ans_primary_names,
+        &ans_primary_names,
+        &current_ans_lookups_v2,
+        &ans_lookups_v2,
+        &current_ans_primary_names_v2,
+        &ans_primary_names_v2,
+    ).await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
+            let ans_lookups = clean_data_for_db(ans_lookups, true);
+            let current_ans_primary_names =
+                clean_data_for_db(current_ans_primary_names, true);
+            let ans_primary_names = clean_data_for_db(ans_primary_names, true);
+            let current_ans_lookups_v2 =
+                clean_data_for_db(current_ans_lookups_v2, true);
+            let ans_lookups_v2 = clean_data_for_db(ans_lookups_v2, true);
+            let current_ans_primary_names_v2 =
+                clean_data_for_db(current_ans_primary_names_v2, true);
+            let ans_primary_names_v2 = clean_data_for_db(ans_primary_names_v2, true);
+
+            insert_to_db_impl(
+                conn,
                 &current_ans_lookups,
                 &ans_lookups,
                 &current_ans_primary_names,
@@ -103,42 +125,7 @@ async fn insert_to_db(
                 &ans_lookups_v2,
                 &current_ans_primary_names_v2,
                 &ans_primary_names_v2,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
-                        let ans_lookups = clean_data_for_db(ans_lookups, true);
-                        let current_ans_primary_names =
-                            clean_data_for_db(current_ans_primary_names, true);
-                        let ans_primary_names = clean_data_for_db(ans_primary_names, true);
-                        let current_ans_lookups_v2 =
-                            clean_data_for_db(current_ans_lookups_v2, true);
-                        let ans_lookups_v2 = clean_data_for_db(ans_lookups_v2, true);
-                        let current_ans_primary_names_v2 =
-                            clean_data_for_db(current_ans_primary_names_v2, true);
-                        let ans_primary_names_v2 = clean_data_for_db(ans_primary_names_v2, true);
-
-                        insert_to_db_impl(
-                            pg_conn,
-                            &current_ans_lookups,
-                            &ans_lookups,
-                            &current_ans_primary_names,
-                            &ans_primary_names,
-                            &current_ans_lookups_v2,
-                            &ans_lookups_v2,
-                            &current_ans_primary_names_v2,
-                            &ans_primary_names_v2,
-                        )
-                        .await
-                    })
-                })
+            )
                 .await
         },
     }

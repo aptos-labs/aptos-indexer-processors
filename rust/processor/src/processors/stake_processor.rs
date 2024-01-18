@@ -99,12 +99,38 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
+    match insert_to_db_impl(
+        conn,
+        &current_stake_pool_voters,
+        &proposal_votes,
+        &delegator_actvities,
+        &delegator_balances,
+        &current_delegator_balances,
+        &delegator_pools,
+        &delegator_pool_balances,
+        &current_delegator_pool_balances,
+        &current_delegated_voter,
+    ).await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            let current_stake_pool_voters =
+                clean_data_for_db(current_stake_pool_voters, true);
+            let proposal_votes = clean_data_for_db(proposal_votes, true);
+            let delegator_actvities = clean_data_for_db(delegator_actvities, true);
+            let delegator_balances = clean_data_for_db(delegator_balances, true);
+            let delegator_pools = clean_data_for_db(delegator_pools, true);
+            let delegator_pool_balances =
+                clean_data_for_db(delegator_pool_balances, true);
+            let current_delegator_pool_balances =
+                clean_data_for_db(current_delegator_pool_balances, true);
+            let current_delegator_pool_balances =
+                clean_data_for_db(current_delegator_pool_balances, true);
+            let current_delegated_voter =
+                clean_data_for_db(current_delegated_voter, true);
+
+            insert_to_db_impl(
+                conn,
                 &current_stake_pool_voters,
                 &proposal_votes,
                 &delegator_actvities,
@@ -114,47 +140,7 @@ async fn insert_to_db(
                 &delegator_pool_balances,
                 &current_delegator_pool_balances,
                 &current_delegated_voter,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let current_stake_pool_voters =
-                            clean_data_for_db(current_stake_pool_voters, true);
-                        let proposal_votes = clean_data_for_db(proposal_votes, true);
-                        let delegator_actvities = clean_data_for_db(delegator_actvities, true);
-                        let delegator_balances = clean_data_for_db(delegator_balances, true);
-                        let delegator_pools = clean_data_for_db(delegator_pools, true);
-                        let delegator_pool_balances =
-                            clean_data_for_db(delegator_pool_balances, true);
-                        let current_delegator_pool_balances =
-                            clean_data_for_db(current_delegator_pool_balances, true);
-                        let current_delegator_pool_balances =
-                            clean_data_for_db(current_delegator_pool_balances, true);
-                        let current_delegated_voter =
-                            clean_data_for_db(current_delegated_voter, true);
-
-                        insert_to_db_impl(
-                            pg_conn,
-                            &current_stake_pool_voters,
-                            &proposal_votes,
-                            &delegator_actvities,
-                            &delegator_balances,
-                            &current_delegator_balances,
-                            &delegator_pools,
-                            &delegator_pool_balances,
-                            &current_delegator_pool_balances,
-                            &current_delegated_voter,
-                        )
-                        .await
-                    })
-                })
-                .await
+            ).await
         },
     }
 }

@@ -109,12 +109,35 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
+    match insert_to_db_impl(
+        conn,
+        &collections_v2,
+        &token_datas_v2,
+        &token_ownerships_v2,
+        &current_collections_v2,
+        &current_token_datas_v2,
+        &current_token_ownerships_v2,
+        &token_activities_v2,
+        &current_token_v2_metadata,
+    ).await
+    {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            let collections_v2 = clean_data_for_db(collections_v2, true);
+            let token_datas_v2 = clean_data_for_db(token_datas_v2, true);
+            let token_ownerships_v2 = clean_data_for_db(token_ownerships_v2, true);
+            let current_collections_v2 =
+                clean_data_for_db(current_collections_v2, true);
+            let current_token_datas_v2 =
+                clean_data_for_db(current_token_datas_v2, true);
+            let current_token_ownerships_v2 =
+                clean_data_for_db(current_token_ownerships_v2, true);
+            let token_activities_v2 = clean_data_for_db(token_activities_v2, true);
+            let current_token_v2_metadata =
+                clean_data_for_db(current_token_v2_metadata, true);
+
+            insert_to_db_impl(
+                conn,
                 &collections_v2,
                 &token_datas_v2,
                 &token_ownerships_v2,
@@ -123,45 +146,8 @@ async fn insert_to_db(
                 &current_token_ownerships_v2,
                 &token_activities_v2,
                 &current_token_v2_metadata,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let collections_v2 = clean_data_for_db(collections_v2, true);
-                        let token_datas_v2 = clean_data_for_db(token_datas_v2, true);
-                        let token_ownerships_v2 = clean_data_for_db(token_ownerships_v2, true);
-                        let current_collections_v2 =
-                            clean_data_for_db(current_collections_v2, true);
-                        let current_token_datas_v2 =
-                            clean_data_for_db(current_token_datas_v2, true);
-                        let current_token_ownerships_v2 =
-                            clean_data_for_db(current_token_ownerships_v2, true);
-                        let token_activities_v2 = clean_data_for_db(token_activities_v2, true);
-                        let current_token_v2_metadata =
-                            clean_data_for_db(current_token_v2_metadata, true);
-
-                        insert_to_db_impl(
-                            pg_conn,
-                            &collections_v2,
-                            &token_datas_v2,
-                            &token_ownerships_v2,
-                            &current_collections_v2,
-                            &current_token_datas_v2,
-                            &current_token_ownerships_v2,
-                            &token_activities_v2,
-                            &current_token_v2_metadata,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
+            ).await
+        }
     }
 }
 
@@ -182,7 +168,7 @@ async fn insert_collections_v2(
                 .do_nothing(),
             None,
         )
-        .await?;
+            .await?;
     }
     Ok(())
 }
@@ -204,7 +190,7 @@ async fn insert_token_datas_v2(
                 .do_nothing(),
             None,
         )
-        .await?;
+            .await?;
     }
     Ok(())
 }
@@ -226,7 +212,7 @@ async fn insert_token_ownerships_v2(
                 .do_nothing(),
             None,
         )
-        .await?;
+            .await?;
     }
     Ok(())
 }
@@ -362,7 +348,7 @@ async fn insert_token_activities_v2(
                 )),
             None,
         )
-        .await?;
+            .await?;
     }
     Ok(())
 }
@@ -444,7 +430,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_activities_v2,
             current_token_v2_metadata,
         )
-        .await;
+            .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
@@ -462,7 +448,7 @@ impl ProcessorTrait for TokenV2Processor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 
@@ -627,7 +613,7 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                 )
-                .unwrap()
+                    .unwrap()
                 {
                     token_activities_v2.push(event);
                 }
@@ -640,7 +626,7 @@ async fn parse_v2_token(
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
                 )
-                .unwrap()
+                    .unwrap()
                 {
                     token_activities_v2.push(event);
                 }
@@ -654,8 +640,8 @@ async fn parse_v2_token(
                     &token_v2_metadata_helper,
                     conn,
                 )
-                .await
-                .unwrap()
+                    .await
+                    .unwrap()
                 {
                     token_activities_v2.push(event);
                 }
@@ -674,8 +660,8 @@ async fn parse_v2_token(
                                 table_handle_to_owner,
                                 conn,
                             )
-                            .await
-                            .unwrap()
+                                .await
+                                .unwrap()
                         {
                             collections_v2.push(collection);
                             current_collections_v2.insert(
@@ -690,7 +676,7 @@ async fn parse_v2_token(
                                 wsc_index,
                                 txn_timestamp,
                             )
-                            .unwrap()
+                                .unwrap()
                         {
                             token_datas_v2.push(token_data);
                             current_token_datas_v2.insert(
@@ -706,7 +692,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 table_handle_to_owner,
                             )
-                            .unwrap()
+                                .unwrap()
                         {
                             token_ownerships_v2.push(token_ownership);
                             if let Some(cto) = current_token_ownership {
@@ -729,7 +715,7 @@ async fn parse_v2_token(
                                 );
                             }
                         }
-                    },
+                    }
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
                             TokenOwnershipV2::get_v1_from_delete_table_item(
@@ -739,7 +725,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 table_handle_to_owner,
                             )
-                            .unwrap()
+                                .unwrap()
                         {
                             token_ownerships_v2.push(token_ownership);
                             if let Some(cto) = current_token_ownership {
@@ -762,7 +748,7 @@ async fn parse_v2_token(
                                 );
                             }
                         }
-                    },
+                    }
                     Change::WriteResource(resource) => {
                         if let Some((collection, current_collection)) =
                             CollectionV2::get_v2_from_write_resource(
@@ -772,7 +758,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &token_v2_metadata_helper,
                             )
-                            .unwrap()
+                                .unwrap()
                         {
                             collections_v2.push(collection);
                             current_collections_v2.insert(
@@ -788,14 +774,14 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &token_v2_metadata_helper,
                             )
-                            .unwrap()
+                                .unwrap()
                         {
                             // Add NFT ownership
                             if let Some(inner) = TokenOwnershipV2::get_nft_v2_from_token_data(
                                 &token_data,
                                 &token_v2_metadata_helper,
                             )
-                            .unwrap()
+                                .unwrap()
                             {
                                 let (
                                     nft_ownership,
@@ -854,7 +840,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &tokens_burned,
                             )
-                            .unwrap()
+                                .unwrap()
                         {
                             token_ownerships_v2.push(nft_ownership);
                             prior_nft_ownership.insert(
@@ -886,8 +872,8 @@ async fn parse_v2_token(
                                 &token_v2_metadata_helper,
                                 conn,
                             )
-                            .await
-                            .unwrap()
+                                .await
+                                .unwrap()
                         {
                             token_ownerships_v2.push(ft_ownership);
                             current_token_ownerships_v2.insert(
@@ -907,7 +893,7 @@ async fn parse_v2_token(
                             txn_version,
                             &token_v2_metadata_helper,
                         )
-                        .unwrap()
+                            .unwrap()
                         {
                             current_token_v2_metadata.insert(
                                 (
@@ -917,7 +903,7 @@ async fn parse_v2_token(
                                 token_metadata,
                             );
                         }
-                    },
+                    }
                     Change::DeleteResource(resource) => {
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
@@ -930,8 +916,8 @@ async fn parse_v2_token(
                                 &tokens_burned,
                                 conn,
                             )
-                            .await
-                            .unwrap()
+                                .await
+                                .unwrap()
                         {
                             token_ownerships_v2.push(nft_ownership);
                             prior_nft_ownership.insert(
@@ -952,8 +938,8 @@ async fn parse_v2_token(
                                 current_nft_ownership,
                             );
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         }

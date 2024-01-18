@@ -3,6 +3,7 @@
 
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
+
 use crate::utils::util::remove_null_bytes;
 use diesel::{
     pg::Pg,
@@ -17,16 +18,16 @@ use diesel_async::{
     },
     RunQueryDsl,
 };
-use diesel_migrations::{embed_migrations, EmbeddedMigrations};
-use once_cell::sync::Lazy;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use std::{cmp::min, sync::Arc};
+use diesel::backend::Backend;
 
 pub type MyDbConnection = AsyncPgConnection;
 pub type PgPool = Pool<MyDbConnection>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
-pub static MIGRATIONS: Lazy<EmbeddedMigrations> = Lazy::new(|| embed_migrations!());
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(QueryId)]
 /// Using this will append a where clause at the end of the string upsert function, e.g.
@@ -87,8 +88,8 @@ pub async fn execute_with_better_error<U>(
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
-where
-    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    where
+        U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
@@ -109,10 +110,9 @@ where
     res
 }
 
-pub async fn run_pending_migrations(conn: &mut MyDbConnection) {
-    MIGRATIONS
-        .run_pending_migrations(conn)
-        .await
+pub async fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
+    conn
+        .run_pending_migrations(MIGRATIONS)
         .expect("[Parser] Migrations failed!");
 }
 
@@ -124,8 +124,8 @@ impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
 //impl<T> RunQueryDsl<MyDbConnection> for UpsertFilterLatestTransactionQuery<T> {}
 
 impl<T> QueryFragment<Pg> for UpsertFilterLatestTransactionQuery<T>
-where
-    T: QueryFragment<Pg>,
+    where
+        T: QueryFragment<Pg>,
 {
     fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;
@@ -146,7 +146,7 @@ mod test {
         assert_eq!(get_chunks(65535, 1), vec![
             (0, 32767),
             (32767, 65534),
-            (65534, 65535)
+            (65534, 65535),
         ]);
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
         assert_eq!(get_chunks(10000, 20), vec![
@@ -156,14 +156,14 @@ mod test {
             (4914, 6552),
             (6552, 8190),
             (8190, 9828),
-            (9828, 10000)
+            (9828, 10000),
         ]);
         assert_eq!(get_chunks(65535, 2), vec![
             (0, 16383),
             (16383, 32766),
             (32766, 49149),
             (49149, 65532),
-            (65532, 65535)
+            (65532, 65535),
         ]);
     }
 }

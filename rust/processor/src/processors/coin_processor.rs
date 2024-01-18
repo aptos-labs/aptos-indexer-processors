@@ -81,20 +81,14 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
+    match insert_to_db_impl(
+                conn,
                 &coin_activities,
                 &coin_infos,
                 &coin_balances,
                 &current_coin_balances,
                 &coin_supply,
-            ))
-        })
-        .await
+            ).await
     {
         Ok(_) => Ok(()),
         Err(_) => {
