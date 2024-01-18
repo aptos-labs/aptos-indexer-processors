@@ -104,13 +104,13 @@ async fn insert_to_db(
             &current_table_items,
             &table_metadata,
         ),
-    ).await
+    )
+    .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
             let txns = clean_data_for_db(txns, true);
-            let block_metadata_transactions =
-                clean_data_for_db(block_metadata_transactions, true);
+            let block_metadata_transactions = clean_data_for_db(block_metadata_transactions, true);
             let wscs = clean_data_for_db(wscs, true);
             let move_modules = clean_data_for_db(move_modules, true);
             let move_resources = clean_data_for_db(move_resources, true);
@@ -130,8 +130,8 @@ async fn insert_to_db(
                     &table_metadata,
                 ),
             )
-                .await
-        }
+            .await
+        },
     }
 }
 
@@ -154,7 +154,7 @@ async fn insert_transactions(
                 )),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -177,7 +177,7 @@ async fn insert_block_metadata_transactions(
                 .do_nothing(),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -197,7 +197,7 @@ async fn insert_write_set_changes(
                 .do_nothing(),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -217,7 +217,7 @@ async fn insert_move_modules(
                 .do_nothing(),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -237,7 +237,7 @@ async fn insert_move_resources(
                 .do_nothing(),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -257,7 +257,7 @@ async fn insert_table_items(
                 .do_nothing(),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -304,7 +304,7 @@ async fn insert_table_metadata(
                 .do_nothing(),
             None,
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }
@@ -352,7 +352,7 @@ impl ProcessorTrait for DefaultProcessor {
                     if let Some(meta) = metadata {
                         table_metadata.insert(meta.handle.clone(), meta.clone());
                     }
-                }
+                },
             }
         }
 
@@ -385,7 +385,7 @@ impl ProcessorTrait for DefaultProcessor {
                 table_metadata,
             ),
         )
-            .await;
+        .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
@@ -404,7 +404,7 @@ impl ProcessorTrait for DefaultProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 

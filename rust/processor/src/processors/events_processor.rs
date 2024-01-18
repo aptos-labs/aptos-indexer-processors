@@ -60,8 +60,7 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match insert_to_db_impl(conn, &events).await
-    {
+    match insert_to_db_impl(conn, &events).await {
         Ok(_) => Ok(()),
         Err(_) => {
             let events = clean_data_for_db(events, true);

@@ -59,12 +59,9 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match insert_to_db_impl(conn, &account_transactions).await
-    {
+    match insert_to_db_impl(conn, &account_transactions).await {
         Ok(_) => Ok(()),
-        Err(_) => {
-            insert_to_db_impl(conn, &clean_data_for_db(account_transactions, true)).await
-        },
+        Err(_) => insert_to_db_impl(conn, &clean_data_for_db(account_transactions, true)).await,
     }
 }
 

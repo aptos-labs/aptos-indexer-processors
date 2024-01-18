@@ -34,10 +34,10 @@ use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
 };
+use diesel::Connection;
 use futures::StreamExt;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
-use diesel::Connection;
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 use tonic::{Response, Streaming};
 use tracing::{error, info};
@@ -217,7 +217,7 @@ impl Worker {
                 processor_name.to_string(),
                 batch_start_version,
             )
-                .await
+            .await
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -245,7 +245,7 @@ impl Worker {
                             Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
                             receiver.recv(),
                         )
-                            .await
+                        .await
                         {
                             Ok(result) => result.ok_or(TryRecvError::Disconnected),
                             Err(_) => {
@@ -259,15 +259,15 @@ impl Worker {
                                 panic!(
                                     "[Parser] Consumer thread timed out waiting for transactions"
                                 );
-                            }
+                            },
                         }
                         // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
                         // receiver.recv().await.ok_or(TryRecvError::Disconnected)
-                    }
+                    },
                     _ => {
                         // If we're not the first task, we should poll to see if we get any data.
                         receiver.try_recv()
-                    }
+                    },
                 };
                 match receive_status {
                     Ok(txn_pb) => {
@@ -304,11 +304,11 @@ impl Worker {
                         last_fetched_version =
                             txn_pb.transactions.as_slice().last().unwrap().version as i64;
                         transactions_batches.push(txn_pb);
-                    }
+                    },
                     // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
                     Err(TryRecvError::Empty) => {
                         break;
-                    }
+                    },
                     // This happens when the channel is closed. We should panic.
                     Err(TryRecvError::Disconnected) => {
                         error!(
@@ -318,7 +318,7 @@ impl Worker {
                             "[Parser] Channel closed; stream ended."
                         );
                         panic!("[Parser] Channel closed");
-                    }
+                    },
                 }
             }
 
@@ -557,7 +557,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         versions
-                    }
+                    },
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -568,8 +568,11 @@ impl Worker {
                         PROCESSOR_ERRORS_COUNT
                             .with_label_values(&[processor_name])
                             .inc();
-                        panic!("[Parser] Error processing '{:}' transactions: {:?}", processor_name, e);
-                    }
+                        panic!(
+                            "[Parser] Error processing '{:}' transactions: {:?}",
+                            processor_name, e
+                        );
+                    },
                 };
                 processed_versions.push(processed);
             }
@@ -685,8 +688,8 @@ impl Worker {
     async fn run_migrations(&self) {
         use diesel::pg::PgConnection;
 
-        let mut conn = PgConnection::establish(&self.postgres_connection_string)
-            .expect("migrations failed!");
+        let mut conn =
+            PgConnection::establish(&self.postgres_connection_string).expect("migrations failed!");
         run_pending_migrations(&mut conn).await;
     }
 
@@ -722,7 +725,7 @@ impl Worker {
                     "[Parser] Chain id matches! Continue to index...",
                 );
                 Ok(chain_id as u64)
-            }
+            },
             None => {
                 info!(
                     processor_name = processor_name,
@@ -738,10 +741,10 @@ impl Worker {
                         .on_conflict_do_nothing(),
                     None,
                 )
-                    .await
-                    .context("[Parser] Error updating chain_id!")
-                    .map(|_| grpc_chain_id as u64)
-            }
+                .await
+                .context("[Parser] Error updating chain_id!")
+                .map(|_| grpc_chain_id as u64)
+            },
         }
     }
 }
@@ -754,28 +757,28 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
-        }
+        },
         ProcessorConfig::AnsProcessor(config) => {
             Processor::from(AnsProcessor::new(db_pool, config.clone()))
-        }
+        },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
-        }
+        },
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
-        }
+        },
         ProcessorConfig::ObjectsProcessor => Processor::from(ObjectsProcessor::new(db_pool)),
         ProcessorConfig::StakeProcessor => Processor::from(StakeProcessor::new(db_pool)),
         ProcessorConfig::TokenProcessor(config) => {
             Processor::from(TokenProcessor::new(db_pool, config.clone()))
-        }
+        },
         ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
-        }
+        },
     }
 }
 
@@ -823,11 +826,11 @@ pub async fn get_stream(
     let channel = tonic::transport::Channel::from_shared(
         indexer_grpc_data_service_address.to_string(),
     )
-        .expect(
-            "[Parser] Failed to build GRPC channel, perhaps because the data service URL is invalid",
-        )
-        .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
-        .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
+    .expect(
+        "[Parser] Failed to build GRPC channel, perhaps because the data service URL is invalid",
+    )
+    .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
+    .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
 
     // If the scheme is https, add a TLS config.
     let channel = if indexer_grpc_data_service_address.scheme() == "https" {
@@ -864,7 +867,7 @@ pub async fn get_stream(
                 "[Parser] Error connecting to GRPC client"
             );
             panic!("[Parser] Error connecting to GRPC client");
-        }
+        },
     };
     let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
     info!(
@@ -920,7 +923,7 @@ pub async fn create_fetcher_loop(
         auth_token.clone(),
         processor_name.to_string(),
     )
-        .await;
+    .await;
     let mut connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
         Some(connection_id) => connection_id.to_str().unwrap().to_string(),
         None => "".to_string(),
@@ -1016,7 +1019,7 @@ pub async fn create_fetcher_loop(
                     size_in_bytes,
                 };
                 match tx.send(txn_pb.clone()).await {
-                    Ok(()) => {}
+                    Ok(()) => {},
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -1027,7 +1030,7 @@ pub async fn create_fetcher_loop(
                             "[Parser] Error sending GRPC response to channel."
                         );
                         panic!("[Parser] Error sending GRPC response to channel.")
-                    }
+                    },
                 }
                 info!(
                     processor_name = processor_name,
@@ -1051,7 +1054,7 @@ pub async fn create_fetcher_loop(
                     .set((BUFFER_SIZE - tx.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
                 true
-            }
+            },
             Some(Err(rpc_error)) => {
                 tracing::warn!(
                     processor_name = processor_name,
@@ -1064,7 +1067,7 @@ pub async fn create_fetcher_loop(
                     "[Parser] Error receiving datastream response."
                 );
                 false
-            }
+            },
             None => {
                 tracing::warn!(
                     processor_name = processor_name,
@@ -1076,7 +1079,7 @@ pub async fn create_fetcher_loop(
                     "[Parser] Stream ended."
                 );
                 false
-            }
+            },
         };
         // Check if we're at the end of the stream
         let is_end = if let Some(ending_version) = request_ending_version {
@@ -1156,7 +1159,7 @@ pub async fn create_fetcher_loop(
                 auth_token.clone(),
                 processor_name.to_string(),
             )
-                .await;
+            .await;
             connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
                 Some(connection_id) => connection_id.to_str().unwrap().to_string(),
                 None => "".to_string(),

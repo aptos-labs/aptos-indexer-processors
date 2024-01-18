@@ -110,24 +110,22 @@ async fn insert_to_db(
         &delegator_pool_balances,
         &current_delegator_pool_balances,
         &current_delegated_voter,
-    ).await
+    )
+    .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
-            let current_stake_pool_voters =
-                clean_data_for_db(current_stake_pool_voters, true);
+            let current_stake_pool_voters = clean_data_for_db(current_stake_pool_voters, true);
             let proposal_votes = clean_data_for_db(proposal_votes, true);
             let delegator_actvities = clean_data_for_db(delegator_actvities, true);
             let delegator_balances = clean_data_for_db(delegator_balances, true);
             let delegator_pools = clean_data_for_db(delegator_pools, true);
-            let delegator_pool_balances =
-                clean_data_for_db(delegator_pool_balances, true);
+            let delegator_pool_balances = clean_data_for_db(delegator_pool_balances, true);
             let current_delegator_pool_balances =
                 clean_data_for_db(current_delegator_pool_balances, true);
             let current_delegator_pool_balances =
                 clean_data_for_db(current_delegator_pool_balances, true);
-            let current_delegated_voter =
-                clean_data_for_db(current_delegated_voter, true);
+            let current_delegated_voter = clean_data_for_db(current_delegated_voter, true);
 
             insert_to_db_impl(
                 conn,
@@ -140,7 +138,8 @@ async fn insert_to_db(
                 &delegator_pool_balances,
                 &current_delegator_pool_balances,
                 &current_delegated_voter,
-            ).await
+            )
+            .await
         },
     }
 }

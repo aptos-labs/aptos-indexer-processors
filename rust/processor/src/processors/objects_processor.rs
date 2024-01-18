@@ -73,8 +73,7 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match insert_to_db_impl(conn, (&objects, &current_objects)).await
-    {
+    match insert_to_db_impl(conn, (&objects, &current_objects)).await {
         Ok(_) => Ok(()),
         Err(_) => {
             let objects = clean_data_for_db(objects, true);

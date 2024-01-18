@@ -6,6 +6,7 @@
 
 use crate::utils::util::remove_null_bytes;
 use diesel::{
+    backend::Backend,
     pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
     QueryResult,
@@ -20,7 +21,6 @@ use diesel_async::{
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use std::{cmp::min, sync::Arc};
-use diesel::backend::Backend;
 
 pub type MyDbConnection = AsyncPgConnection;
 pub type PgPool = Pool<MyDbConnection>;
@@ -88,8 +88,8 @@ pub async fn execute_with_better_error<U>(
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
-    where
-        U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+where
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
@@ -111,8 +111,7 @@ pub async fn execute_with_better_error<U>(
 }
 
 pub async fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
-    conn
-        .run_pending_migrations(MIGRATIONS)
+    conn.run_pending_migrations(MIGRATIONS)
         .expect("[Parser] Migrations failed!");
 }
 
@@ -124,8 +123,8 @@ impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
 //impl<T> RunQueryDsl<MyDbConnection> for UpsertFilterLatestTransactionQuery<T> {}
 
 impl<T> QueryFragment<Pg> for UpsertFilterLatestTransactionQuery<T>
-    where
-        T: QueryFragment<Pg>,
+where
+    T: QueryFragment<Pg>,
 {
     fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;

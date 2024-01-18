@@ -93,16 +93,14 @@ async fn insert_to_db(
         &fungible_asset_metadata,
         &fungible_asset_balances,
         &current_fungible_asset_balances,
-    ).await
+    )
+    .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
-            let fungible_asset_activities =
-                clean_data_for_db(fungible_asset_activities, true);
-            let fungible_asset_metadata =
-                clean_data_for_db(fungible_asset_metadata, true);
-            let fungible_asset_balances =
-                clean_data_for_db(fungible_asset_balances, true);
+            let fungible_asset_activities = clean_data_for_db(fungible_asset_activities, true);
+            let fungible_asset_metadata = clean_data_for_db(fungible_asset_metadata, true);
+            let fungible_asset_balances = clean_data_for_db(fungible_asset_balances, true);
             let current_fungible_asset_balances =
                 clean_data_for_db(current_fungible_asset_balances, true);
 
@@ -113,7 +111,7 @@ async fn insert_to_db(
                 &fungible_asset_balances,
                 &current_fungible_asset_balances,
             )
-                .await
+            .await
         },
     }
 }

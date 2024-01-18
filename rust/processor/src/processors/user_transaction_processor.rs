@@ -65,8 +65,7 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match insert_to_db_impl(conn, &user_transactions, &signatures).await
-    {
+    match insert_to_db_impl(conn, &user_transactions, &signatures).await {
         Ok(_) => Ok(()),
         Err(_) => {
             let user_transactions = clean_data_for_db(user_transactions, true);

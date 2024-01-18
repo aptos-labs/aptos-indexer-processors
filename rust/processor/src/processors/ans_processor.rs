@@ -99,17 +99,16 @@ async fn insert_to_db(
         &ans_lookups_v2,
         &current_ans_primary_names_v2,
         &ans_primary_names_v2,
-    ).await
+    )
+    .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
             let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
             let ans_lookups = clean_data_for_db(ans_lookups, true);
-            let current_ans_primary_names =
-                clean_data_for_db(current_ans_primary_names, true);
+            let current_ans_primary_names = clean_data_for_db(current_ans_primary_names, true);
             let ans_primary_names = clean_data_for_db(ans_primary_names, true);
-            let current_ans_lookups_v2 =
-                clean_data_for_db(current_ans_lookups_v2, true);
+            let current_ans_lookups_v2 = clean_data_for_db(current_ans_lookups_v2, true);
             let ans_lookups_v2 = clean_data_for_db(ans_lookups_v2, true);
             let current_ans_primary_names_v2 =
                 clean_data_for_db(current_ans_primary_names_v2, true);
@@ -126,7 +125,7 @@ async fn insert_to_db(
                 &current_ans_primary_names_v2,
                 &ans_primary_names_v2,
             )
-                .await
+            .await
         },
     }
 }

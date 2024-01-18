@@ -119,17 +119,18 @@ async fn insert_to_db(
     let (current_token_ownerships, current_token_datas, current_collection_datas) =
         basic_token_current_lists;
     match insert_to_db_impl(
-            conn,
-            (&tokens, &token_ownerships, &token_datas, &collection_datas),
-            (
-                &current_token_ownerships,
-                &current_token_datas,
-                &current_collection_datas,
-            ),
-            &token_activities,
-            &current_token_claims,
-            &nft_points,
-        ).await
+        conn,
+        (&tokens, &token_ownerships, &token_datas, &collection_datas),
+        (
+            &current_token_ownerships,
+            &current_token_datas,
+            &current_collection_datas,
+        ),
+        &token_activities,
+        &current_token_claims,
+        &nft_points,
+    )
+    .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
@@ -137,11 +138,9 @@ async fn insert_to_db(
             let token_datas = clean_data_for_db(token_datas, true);
             let token_ownerships = clean_data_for_db(token_ownerships, true);
             let collection_datas = clean_data_for_db(collection_datas, true);
-            let current_token_ownerships =
-                clean_data_for_db(current_token_ownerships, true);
+            let current_token_ownerships = clean_data_for_db(current_token_ownerships, true);
             let current_token_datas = clean_data_for_db(current_token_datas, true);
-            let current_collection_datas =
-                clean_data_for_db(current_collection_datas, true);
+            let current_collection_datas = clean_data_for_db(current_collection_datas, true);
             let token_activities = clean_data_for_db(token_activities, true);
             let current_token_claims = clean_data_for_db(current_token_claims, true);
             let nft_points = clean_data_for_db(nft_points, true);
@@ -158,7 +157,7 @@ async fn insert_to_db(
                 &current_token_claims,
                 &nft_points,
             )
-                .await
+            .await
         },
     }
 }

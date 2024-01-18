@@ -82,13 +82,14 @@ async fn insert_to_db(
         "Inserting to db",
     );
     match insert_to_db_impl(
-                conn,
-                &coin_activities,
-                &coin_infos,
-                &coin_balances,
-                &current_coin_balances,
-                &coin_supply,
-            ).await
+        conn,
+        &coin_activities,
+        &coin_infos,
+        &coin_balances,
+        &current_coin_balances,
+        &coin_supply,
+    )
+    .await
     {
         Ok(_) => Ok(()),
         Err(_) => {
@@ -106,7 +107,7 @@ async fn insert_to_db(
                 &current_coin_balances,
                 &coin_supply,
             )
-                .await
+            .await
         },
     }
 }
