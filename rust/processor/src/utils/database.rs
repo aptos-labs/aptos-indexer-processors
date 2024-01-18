@@ -17,7 +17,7 @@ use diesel_async::{
     },
     RunQueryDsl,
 };
-use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use once_cell::sync::Lazy;
 use std::{cmp::min, sync::Arc};
 

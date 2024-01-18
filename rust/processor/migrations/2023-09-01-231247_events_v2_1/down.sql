@@ -1,0 +1,2 @@
+-- nothing
+SELECT 1;
