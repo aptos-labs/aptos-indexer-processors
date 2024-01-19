@@ -89,12 +89,16 @@ fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
     (db_url.to_string(), cert_path)
 }
 
-fn establish_connection(url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+fn establish_connection(database_url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
     use native_tls::{Certificate, TlsConnector};
     use postgres_native_tls::MakeTlsConnector;
 
-    (async {
-        let (url, cert_path) = parse_and_clean_db_url(url);
+    (async move {
+        let (url, cert_path) = parse_and_clean_db_url(database_url);
+        println!(
+            "DB WITH SSL ESTABLISHING CONNECTION: {:?} -> {:?}",
+            database_url, url
+        );
 
         let cert = std::fs::read(cert_path.unwrap()).expect("Could not read certificate");
 
@@ -125,6 +129,7 @@ pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     let config = if cert_path.is_some() {
         let mut config = ManagerConfig::<AsyncPgConnection>::default();
         config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
+        println!("DB WITH SSL: {:?}", database_url);
         AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config)
     } else {
         AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
