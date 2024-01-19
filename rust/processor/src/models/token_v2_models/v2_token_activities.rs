@@ -8,7 +8,7 @@
 use super::{
     v2_token_datas::TokenDataV2,
     v2_token_ownerships::CurrentTokenOwnershipV2Query,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
+    v2_token_utils::{TokenStandard, V2TokenEvent},
 };
 use crate::{
     models::{
