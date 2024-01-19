@@ -528,7 +528,7 @@ diesel::table! {
         #[max_length = 512]
         entry_function_id_str -> Varchar,
         last_transaction_version -> Int8,
-        transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -560,7 +560,7 @@ diesel::table! {
         #[max_length = 512]
         entry_function_id_str -> Varchar,
         last_transaction_version -> Int8,
-        transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -974,7 +974,7 @@ diesel::table! {
         #[max_length = 66]
         collection_id -> Varchar,
         #[max_length = 66]
-        token_data_id -> Varchar,
+        token_data_id -> Nullable<Varchar>,
         #[max_length = 66]
         creator_address -> Varchar,
         #[max_length = 100]

@@ -85,6 +85,7 @@ impl MarketplaceTokenMetadata {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MarketplaceCollectionMetadata {
     pub collection_id: String,
     pub creator_address: String,
@@ -134,6 +135,7 @@ impl MarketplaceCollectionMetadata {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenDataIdType {
     pub creator: String,
     pub collection_name: String,
@@ -163,6 +165,7 @@ impl TokenDataIdType {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionDataIdType {
     pub creator: String,
     pub collection_name: String,
@@ -183,4 +186,66 @@ impl CollectionDataIdType {
         let key = format!("{}::{}", self.creator, self.collection_name);
         standardize_address(key.as_str())
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CollectionOfferEventMetadata {
+    pub collection_offer_id: String,
+    pub collection_metadata: MarketplaceCollectionMetadata,
+    pub item_price: BigDecimal,
+    pub buyer: String,
+    pub fee_schedule_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ListingMetadata {
+    pub seller: String,
+    pub fee_schedule_id: String,
+    pub token_address: String,
+}
+
+pub struct FixedPriceListing {
+    pub price: BigDecimal,
+}
+
+pub struct ListingTokenV1Container {
+    pub token_metadata: MarketplaceTokenMetadata,
+    pub amount: BigDecimal,
+}
+
+pub struct TokenOfferMetadata {
+    pub expiration_time: BigDecimal,
+    pub price: BigDecimal,
+    pub fee_schedule_id: String,
+}
+
+pub struct TokenOfferV1 {
+    pub token_metadata: MarketplaceTokenMetadata,
+}
+
+pub struct TokenOfferV2 {
+    pub token_address: String,
+}
+
+pub struct CollectionOfferMetadata {
+    pub expiration_time: BigDecimal,
+    pub item_price: BigDecimal,
+    pub remaining_token_amount: BigDecimal,
+    pub fee_schedule_id: String,
+}
+
+pub struct CollectionOfferV1 {
+    pub collection_metadata: MarketplaceCollectionMetadata,
+}
+
+pub struct CollectionOfferV2 {
+    pub collection_address: String,
+}
+
+pub struct AuctionListing {
+    pub auction_end_time: BigDecimal,
+    pub starting_bid_price: BigDecimal,
+    pub current_bid_price: Option<BigDecimal>,
+    pub current_bidder: Option<String>,
+    pub buy_it_now_price: Option<BigDecimal>,
 }

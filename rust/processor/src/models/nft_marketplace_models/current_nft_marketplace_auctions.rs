@@ -36,5 +36,4 @@ pub struct CurrentNftMarketplaceAuction {
     pub entry_function_id_str: String,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
 }
