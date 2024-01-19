@@ -1,5 +1,5 @@
 {
-  "resource_version": 364,
+  "resource_version": 385,
   "metadata": {
     "version": 3,
     "sources": [
@@ -153,7 +153,8 @@
                     "token_standard"
                   ],
                   "filter": {},
-                  "limit": 100
+                  "limit": 100,
+                  "allow_aggregations": true
                 }
               }
             ]
@@ -1717,6 +1718,32 @@
           },
           {
             "table": {
+              "name": "delegated_staking_pool_balances",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "active_table_handle",
+                    "inactive_table_handle",
+                    "operator_commission_percentage",
+                    "staking_pool_address",
+                    "total_coins",
+                    "total_shares",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "delegated_staking_pools",
               "schema": "public"
             },
@@ -2384,10 +2411,6 @@
               "from_env": "INDEXER_V2_POSTGRES_URL"
             },
             "isolation_level": "read-committed",
-            "pool_settings": {
-              "connection_lifetime": 600,
-              "total_max_connections": 1000
-            },
             "use_prepared_statements": false
           }
         }
