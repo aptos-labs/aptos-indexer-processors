@@ -72,27 +72,31 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
     }
 }
 
+fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
+    let mut db_url = url::Url::parse(url).expect("Could not parse database url");
+    let mut cert_path = None;
+
+    let mut query = "".to_string();
+    db_url.query_pairs().for_each(|(k, v)| {
+        if k == "sslrootcert" {
+            cert_path = Some(v.parse().unwrap());
+        } else {
+            query.push_str(&format!("{}={}&", k, v));
+        }
+    });
+    db_url.set_query(Some(&query));
+
+    (db_url.to_string(), cert_path)
+}
+
 fn establish_connection(url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
     use native_tls::{Certificate, TlsConnector};
     use postgres_native_tls::MakeTlsConnector;
 
     (async {
-        let mut db_url = url::Url::parse(url).expect("Could not parse database url");
-        println!("DB URL: {:?}", db_url);
-        let mut query = "".to_string();
-        let mut cert_path = "".to_string();
-        db_url.query_pairs().for_each(|(k, v)| {
-            if k == "sslrootcert" {
-                cert_path = v.parse().unwrap();
-            } else {
-                query.push_str(&format!("{}={}&", k, v));
-            }
-        });
-        db_url.set_query(Some(&query));
+        let (url, cert_path) = parse_and_clean_db_url(url);
 
-        let url = db_url.to_string();
-
-        let cert = std::fs::read(cert_path).expect("Could not read certificate");
+        let cert = std::fs::read(cert_path.unwrap()).expect("Could not read certificate");
 
         let cert = Certificate::from_pem(&cert).expect("Could not parse certificate");
         let connector = TlsConnector::builder()
@@ -116,11 +120,16 @@ fn establish_connection(url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnecti
 }
 
 pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
-    let mut config = ManagerConfig::<AsyncPgConnection>::default();
-    config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
+    let (_url, cert_path) = parse_and_clean_db_url(database_url);
 
-    let config =
-        AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config);
+    let config = if cert_path.is_some() {
+        let mut config = ManagerConfig::<AsyncPgConnection>::default();
+        config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
+        AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config)
+    } else {
+        AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
+    };
+
     Ok(Arc::new(Pool::builder().build(config).await?))
 }
 
