@@ -9,17 +9,18 @@ use diesel::{
     backend::Backend,
     pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
-    QueryResult,
+    ConnectionResult, QueryResult,
 };
 use diesel_async::{
     pg::AsyncPgConnection,
     pooled_connection::{
         bb8::{Pool, PooledConnection},
-        AsyncDieselConnectionManager, PoolError,
+        AsyncDieselConnectionManager, ManagerConfig, PoolError,
     },
     RunQueryDsl,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use futures_util::{future::BoxFuture, FutureExt};
 use std::{cmp::min, sync::Arc};
 
 pub type MyDbConnection = AsyncPgConnection;
@@ -71,8 +72,55 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
     }
 }
 
+fn establish_connection(url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+    use native_tls::{Certificate, TlsConnector};
+    use postgres_native_tls::MakeTlsConnector;
+
+    (async {
+        let mut db_url = url::Url::parse(url).expect("Could not parse database url");
+        println!("DB URL: {:?}", db_url);
+        let mut query = "".to_string();
+        let mut cert_path = "".to_string();
+        db_url.query_pairs().for_each(|(k, v)| {
+            if k == "sslrootcert" {
+                cert_path = v.parse().unwrap();
+            } else {
+                query.push_str(&format!("{}={}&", k, v));
+            }
+        });
+        db_url.set_query(Some(&query));
+
+        let url = db_url.to_string();
+
+        let cert = std::fs::read(cert_path).expect("Could not read certificate");
+
+        let cert = Certificate::from_pem(&cert).expect("Could not parse certificate");
+        let connector = TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .add_root_certificate(cert)
+            .build()
+            .expect("Could not build TLS connector");
+        let connector = MakeTlsConnector::new(connector);
+
+        let (client, connection) = tokio_postgres::connect(&url, connector)
+            .await
+            .expect("Could not connect to database");
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+        AsyncPgConnection::try_from(client).await
+    })
+    .boxed()
+}
+
 pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
-    let config = AsyncDieselConnectionManager::<MyDbConnection>::new(database_url);
+    let mut config = ManagerConfig::<AsyncPgConnection>::default();
+    config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
+
+    let config =
+        AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config);
     Ok(Arc::new(Pool::builder().build(config).await?))
 }
 
