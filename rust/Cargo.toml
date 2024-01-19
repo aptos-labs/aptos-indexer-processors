@@ -91,7 +91,6 @@ unescape = "0.1.0"
 url = { version = "2.4.0", features = ["serde"] }
 warp = { version = "0.3.5", features = ["tls"] }
 
-
 # Postgres SSL
 rustls = "0.22.2"
 tokio-postgres-rustls = "0.11.1"
