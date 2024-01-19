@@ -395,6 +395,10 @@ async fn parse_transactions(
 
                 let activity_fee_schedule_id = event.key.as_ref().unwrap().account_address.as_str();
                 let token_metadata = MarketplaceTokenMetadata::from_event_data(&event_data).unwrap();
+                if let Some(token_metadata) = token_metadata.clone() {
+                    token_metadatas.insert(token_metadata.token_data_id.clone(), token_metadata);
+                }
+                
                 let collection_metadata = MarketplaceCollectionMetadata::from_event_data(&event_data).unwrap();
                 if let Some(collection_metadata) = collection_metadata {
                     collection_metadatas.insert(collection_metadata.collection_id.clone(), collection_metadata);
@@ -859,6 +863,7 @@ async fn parse_transactions(
                     Change::WriteResource(write_resource) => {
                         let move_resource_address = standardize_address(&write_resource.address);
                         let move_resource_type = write_resource.type_str.clone();
+                        println!("move_resource_type: {}", move_resource_type.clone());
                         let move_resource_type_address = write_resource.r#type.as_ref().unwrap().address.clone();
                         let data = serde_json::from_str::<serde_json::Value>(&write_resource.data).unwrap();
 
@@ -876,13 +881,13 @@ async fn parse_transactions(
                         let listing_metadata = if move_resource_type.eq(format!("{}::listing::Listing", marketplace_contract_address).as_str()) {
                             Some(ListingMetadata {
                                 seller: standardize_address(data["seller"].as_str().unwrap()),
-                                fee_schedule_id: standardize_address(data["fee_schedule"]["innder"].as_str().unwrap()),
+                                fee_schedule_id: standardize_address(data["fee_schedule"]["inner"].as_str().unwrap()),
                                 token_address: standardize_address(data["object"]["inner"].as_str().unwrap()),
                             })
                         } else {
                             None
                         };
-                        let fixed_price_listing = if move_resource_type.eq(format!("{}::coin_listing::FixedPriceListing", marketplace_contract_address).as_str()) {
+                        let fixed_price_listing = if move_resource_type.starts_with(format!("{}::coin_listing::FixedPriceListing", marketplace_contract_address).as_str()) {
                             Some(FixedPriceListing {
                                 price: data["price"].as_str().unwrap().parse::<BigDecimal>().unwrap(),
                             })
@@ -1077,12 +1082,18 @@ async fn parse_transactions(
 
                         let move_resource_address = standardize_address(&write_resource.address);
                         let move_resource_type = write_resource.type_str.clone();
-
+                        println!("loop 3 - before checking listing::Listing");
                         if move_resource_type.eq(format!("{}::listing::Listing", marketplace_contract_address).as_str()) {
+                            println!("loop 3 - listing::Listing");
                             // Get the data related to this listing that was parsed from loop 2
                             let listing_metadata = listing_metadatas.get(&move_resource_address);
                             let fixed_price_listing = fixed_price_listings.get(&move_resource_address);
                             let auction_listing = auction_listings.get(&move_resource_address);
+
+                            println!("move_resource_address: {:?}", move_resource_address);
+                            println!("fixed_price_listing: {:?}", fixed_price_listing);
+                            println!("fixed_price_listings: {:?}", fixed_price_listings);
+                            println!("fixed_price_listings size: {:?}", fixed_price_listings.len());
 
                             // TODO Check if we should bail here
                             // if listing_metadata.is_none() {
@@ -1117,11 +1128,15 @@ async fn parse_transactions(
                                 }
                             } else {
                                 if let Some(fixed_price_listing) = fixed_price_listing {
+                                    println!("loop 3 - listing::Listing - fixed_price_listing");
+                                    println!("token metadatas: {:?}", token_metadatas);
+                                    println!("listing_token_v1_containers: {:?}", listing_token_v1_containers);
                                     let token_address = listing_metadata.as_ref().unwrap().token_address.clone();
                                     let token_v1_container = listing_token_v1_containers.get(&token_address);
 
                                     let mut current_listing = None;
                                     if let Some(token_v1_container) = token_v1_container {
+                                        println!("loop 3 - listing::Listing - fixed_price_listing - token_v1_container");
                                         let token_v1_metadata = token_v1_container.token_metadata.clone();
                                         current_listing = Some(CurrentNftMarketplaceListing {
                                             listing_id: move_resource_address.clone(),
@@ -1143,6 +1158,7 @@ async fn parse_transactions(
                                     } else {
                                         let token_v2_metadata = token_metadatas.get(&token_address);
                                         if let Some(token_v2_metadata) = token_v2_metadata {
+                                            println!("loop 3 - listing::Listing - fixed_price_listing - token_v2_metadata");
                                             current_listing = Some(CurrentNftMarketplaceListing {
                                                 listing_id: move_resource_address.clone(),
                                                 token_data_id: token_v2_metadata.token_data_id.clone(),
@@ -1162,7 +1178,6 @@ async fn parse_transactions(
                                             });
                                         }
                                     }
-
                                     nft_listings.push(current_listing.unwrap());
                                 }
                             }

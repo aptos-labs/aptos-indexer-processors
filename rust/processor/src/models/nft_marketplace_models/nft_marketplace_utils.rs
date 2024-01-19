@@ -32,7 +32,7 @@ impl MarketplaceTokenMetadata {
             return Ok(None);
         }
 
-        // V2 token will 
+        // V2 token
         let is_token_v2 = token_metadata["token"]["vec"].as_array().unwrap().len() > 0;
         let creator_address = standardize_address(token_metadata["creator_address"].as_str().unwrap());
         let property_version = if token_metadata["property_version"]["vec"].as_array().unwrap().len() > 0 {
@@ -204,10 +204,12 @@ pub struct ListingMetadata {
     pub token_address: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct FixedPriceListing {
     pub price: BigDecimal,
 }
 
+#[derive(Debug, Clone)]
 pub struct ListingTokenV1Container {
     pub token_metadata: MarketplaceTokenMetadata,
     pub amount: BigDecimal,
