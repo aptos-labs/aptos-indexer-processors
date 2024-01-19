@@ -688,6 +688,7 @@ impl Worker {
     async fn run_migrations(&self) {
         use diesel::pg::PgConnection;
 
+        println!("Running migrations: {:?}", self.postgres_connection_string);
         let mut conn =
             PgConnection::establish(&self.postgres_connection_string).expect("migrations failed!");
         run_pending_migrations(&mut conn).await;
