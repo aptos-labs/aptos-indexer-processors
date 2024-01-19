@@ -5,7 +5,7 @@
 
 use crate::{
     schema::signatures::{self},
-    utils::util::standardize_address,
+    utils::{counters::PROCESSOR_DATA_GAP_COUNT, util::standardize_address},
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
@@ -343,10 +343,14 @@ impl Signature {
                 String::from("single_key_secp256k1_ecdsa_signature")
             },
             wildcard => {
-                panic!(
+                tracing::warn!(
                     "Unspecified signature type or un-recognized type is not supported: {:?}",
                     wildcard
-                )
+                );
+                PROCESSOR_DATA_GAP_COUNT
+                    .with_label_values(&["unspecified_signature_type"])
+                    .inc();
+                "".to_string()
             },
         };
         Self {

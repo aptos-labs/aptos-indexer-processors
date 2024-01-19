@@ -214,3 +214,11 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Data gap warnings
+pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("indexer_processor_data_gap_count", "Data gap count", &[
+        "type"
+    ])
+    .unwrap()
+});
