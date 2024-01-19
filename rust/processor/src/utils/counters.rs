@@ -214,3 +214,14 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Transaction latency in seconds.
+/// Only two steps are measured: received the transaction from GRPC and processed entire batch.
+pub static TRANSACTION_LATENCY_IN_SECONDS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_transaction_latency_in_seconds",
+        "Transaction latency in seconds",
+        &["processor_name", "step", "message"]
+    )
+    .unwrap()
+});
