@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 pub const DOMAIN_LENGTH: usize = 64;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct OptionalString {
+pub struct OptionalString {
     vec: Vec<String>,
 }
 

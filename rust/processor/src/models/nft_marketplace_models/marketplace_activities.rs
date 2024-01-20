@@ -17,12 +17,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{schema::nft_marketplace_activities, utils::util::standardize_address};
 
-use super::nft_marketplace_utils::{MarketplaceTokenMetadata, MarketplaceCollectionMetadata};
+use super::marketplace_utils::{MarketplaceTokenMetadata, MarketplaceCollectionMetadata};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = nft_marketplace_activities)]
-pub struct NftMarketplaceActivity {
+pub struct MarketplaceActivity {
     pub transaction_version: i64,
     pub event_index: i64,
     pub offer_or_listing_id: String,

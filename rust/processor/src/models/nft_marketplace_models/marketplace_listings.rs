@@ -16,7 +16,7 @@ use crate::schema::current_nft_marketplace_listings;
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(listing_id, token_data_id))]
 #[diesel(table_name = current_nft_marketplace_listings)]
-pub struct CurrentNftMarketplaceListing {
+pub struct MarketplaceListing {
     pub listing_id: String,
     pub token_data_id: String,
     pub collection_id: String,

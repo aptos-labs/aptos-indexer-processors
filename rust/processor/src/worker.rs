@@ -11,7 +11,7 @@ use crate::{
         nft_metadata_processor::NftMetadataProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait, nft_marketplaces_processor::NftMarketplacesProcessor,
+        ProcessorConfig, ProcessorTrait, marketplaces_processor::MarketplacesProcessor,
     },
     schema::ledger_infos,
     utils::{
@@ -764,8 +764,8 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
         },
-        ProcessorConfig::NftMarketplacesProcessor => {
-            Processor::from(NftMarketplacesProcessor::new(db_pool))
+        ProcessorConfig::MarketplacesProcessor => {
+            Processor::from(MarketplacesProcessor::new(db_pool))
         },
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
