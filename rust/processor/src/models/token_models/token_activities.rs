@@ -8,7 +8,7 @@
 use super::token_utils::{TokenDataIdType, TokenEvent};
 use crate::{
     schema::token_activities,
-    utils::util::{parse_timestamp, standardize_address},
+    utils::util::{parse_timestamp, standardize_address, standardized_type_address},
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Event, Transaction};
 use bigdecimal::{BigDecimal, Zero};
@@ -66,7 +66,7 @@ impl TokenActivity {
             for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = transaction.version as i64;
                 if let Some(token_event) = TokenEvent::from_event(
-                    event.type_str.as_str(),
+                    &standardized_type_address(event.type_str.as_str()),
                     event.data.as_str(),
                     txn_version,
                 )

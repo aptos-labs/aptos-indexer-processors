@@ -359,22 +359,22 @@ impl TokenWriteSet {
         txn_version: i64,
     ) -> Result<Option<TokenWriteSet>> {
         match data_type {
-            "0x3::token::TokenDataId" => {
+            x if x == format!("{}::token::TokenDataId", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenDataId(inner)))
             },
-            "0x3::token::TokenId" => {
+            x if x == format!("{}::token::TokenId", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenId(inner)))
             },
-            "0x3::token::TokenData" => {
+            x if x == format!("{}::token::TokenData", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenData(inner)))
             },
-            "0x3::token::Token" => {
+            x if x == format!("{}::token::Token", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::Token(inner)))
             },
-            "0x3::token::CollectionData" => {
+            x if x == format!("{}::token::CollectionData", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::CollectionData(inner)))
             },
-            "0x3::token_transfers::TokenOfferId" => {
+            x if x == format!("{}::token_transfers::TokenOfferId", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenWriteSet::TokenOfferId(inner)))
             },
             _ => Ok(None),
@@ -401,26 +401,30 @@ pub enum TokenEvent {
 impl TokenEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<TokenEvent>> {
         match data_type {
-            "0x3::token::MintTokenEvent" => {
+            x if x == format!("{}::token::MintTokenEvent", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::MintTokenEvent(inner)))
             },
-            "0x3::token::BurnTokenEvent" => {
+            x if x == format!("{}::token::BurnTokenEvent", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::BurnTokenEvent(inner)))
             },
-            "0x3::token::MutateTokenPropertyMapEvent" => serde_json::from_str(data)
-                .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner))),
-            "0x3::token::WithdrawEvent" => {
+            x if x == format!("{}::token::MutateTokenPropertyMapEvent", TOKEN_ADDR) => {
+                serde_json::from_str(data)
+                    .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner)))
+            },
+            x if x == format!("{}::token::WithdrawEvent", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::WithdrawTokenEvent(inner)))
             },
-            "0x3::token::DepositEvent" => {
+            x if x == format!("{}::token::DepositEvent", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::DepositTokenEvent(inner)))
             },
-            "0x3::token_transfers::TokenOfferEvent" => {
+            x if x == format!("{}::token_transfers::TokenOfferEvent", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::OfferTokenEvent(inner)))
             },
-            "0x3::token_transfers::TokenCancelOfferEvent" => serde_json::from_str(data)
-                .map(|inner| Some(TokenEvent::CancelTokenOfferEvent(inner))),
-            "0x3::token_transfers::TokenClaimEvent" => {
+            x if x == format!("{}::token_transfers::TokenCancelOfferEvent", TOKEN_ADDR) => {
+                serde_json::from_str(data)
+                    .map(|inner| Some(TokenEvent::CancelTokenOfferEvent(inner)))
+            },
+            x if x == format!("{}::token_transfers::TokenClaimEvent", TOKEN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::ClaimTokenEvent(inner)))
             },
             _ => Ok(None),

@@ -13,7 +13,7 @@ use crate::{
     },
     utils::util::{
         deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,
-        standardize_address, truncate_str,
+        standardize_address, standardized_type_address, truncate_str,
     },
 };
 use anyhow::{Context, Result};
@@ -263,8 +263,12 @@ pub struct BurnEvent {
 
 impl BurnEvent {
     pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
-        if let Some(V2TokenEvent::BurnEvent(inner)) =
-            V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
+        if let Some(V2TokenEvent::BurnEvent(inner)) = V2TokenEvent::from_event(
+            &standardized_type_address(event.type_str.as_str()),
+            &event.data,
+            txn_version,
+        )
+        .unwrap()
         {
             Ok(Some(inner))
         } else {
@@ -286,8 +290,12 @@ pub struct TransferEvent {
 
 impl TransferEvent {
     pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
-        if let Some(V2TokenEvent::TransferEvent(inner)) =
-            V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
+        if let Some(V2TokenEvent::TransferEvent(inner)) = V2TokenEvent::from_event(
+            &standardized_type_address(event.type_str.as_str()),
+            &event.data,
+            txn_version,
+        )
+        .unwrap()
         {
             Ok(Some(inner))
         } else {
@@ -419,16 +427,16 @@ pub enum V2TokenEvent {
 impl V2TokenEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<Self>> {
         match data_type {
-            "0x4::collection::MintEvent" => {
+            x if x == format!("{}::collection::MintEvent", TOKEN_V2_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(Self::MintEvent(inner)))
             },
-            "0x4::token::MutationEvent" => {
+            x if x == format!("{}::token::MutationEvent", TOKEN_V2_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
             },
-            "0x4::collection::BurnEvent" => {
+            x if x == format!("{}::collection::BurnEvent", TOKEN_V2_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
             },
-            "0x1::object::TransferEvent" => {
+            x if x == format!("{}::object::TransferEvent", COIN_ADDR) => {
                 serde_json::from_str(data).map(|inner| Some(Self::TransferEvent(inner)))
             },
             _ => Ok(None),

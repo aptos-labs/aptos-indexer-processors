@@ -16,7 +16,10 @@ use crate::{
         },
     },
     schema::{current_token_datas_v2, token_datas_v2},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::{
+        database::PgPoolConnection,
+        util::{standardize_address, standardized_type_address},
+    },
 };
 use anyhow::Context;
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
@@ -167,7 +170,7 @@ impl TokenDataV2 {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token_data = match TokenWriteSet::from_table_item_type(
-            table_item_data.value_type.as_str(),
+            &standardized_type_address(table_item_data.value_type.as_str()),
             &table_item_data.value,
             txn_version,
         )? {
@@ -177,7 +180,7 @@ impl TokenDataV2 {
 
         if let Some(token_data) = maybe_token_data {
             let maybe_token_data_id = match TokenWriteSet::from_table_item_type(
-                table_item_data.key_type.as_str(),
+                &standardized_type_address(table_item_data.key_type.as_str()),
                 &table_item_data.key,
                 txn_version,
             )? {

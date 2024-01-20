@@ -6,7 +6,10 @@
 #![allow(clippy::unused_unit)]
 
 use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
-use crate::{schema::current_token_pending_claims, utils::util::standardize_address};
+use crate::{
+    schema::current_token_pending_claims,
+    utils::util::{standardize_address, standardized_type_address},
+};
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
@@ -44,7 +47,7 @@ impl CurrentTokenPendingClaim {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_offer = match TokenWriteSet::from_table_item_type(
-            table_item_data.key_type.as_str(),
+            &standardized_type_address(table_item_data.key_type.as_str()),
             &table_item_data.key,
             txn_version,
         )? {
@@ -53,7 +56,7 @@ impl CurrentTokenPendingClaim {
         };
         if let Some(offer) = &maybe_offer {
             let maybe_token = match TokenWriteSet::from_table_item_type(
-                table_item_data.value_type.as_str(),
+                &standardized_type_address(table_item_data.value_type.as_str()),
                 &table_item_data.value,
                 txn_version,
             )? {
@@ -122,7 +125,7 @@ impl CurrentTokenPendingClaim {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_offer = match TokenWriteSet::from_table_item_type(
-            table_item_data.key_type.as_str(),
+            &standardized_type_address(table_item_data.key_type.as_str()),
             &table_item_data.key,
             txn_version,
         )? {

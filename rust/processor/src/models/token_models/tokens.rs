@@ -17,7 +17,9 @@ use crate::{
     schema::tokens,
     utils::{
         database::PgPoolConnection,
-        util::{ensure_not_negative, parse_timestamp, standardize_address},
+        util::{
+            ensure_not_negative, parse_timestamp, standardize_address, standardized_type_address,
+        },
     },
 };
 use aptos_protos::transaction::v1::{
@@ -253,7 +255,7 @@ impl Token {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token = match TokenWriteSet::from_table_item_type(
-            table_item_data.value_type.as_str(),
+            &standardized_type_address(table_item_data.value_type.as_str()),
             &table_item_data.value,
             txn_version,
         )? {
@@ -311,7 +313,7 @@ impl Token {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token_id = match TokenWriteSet::from_table_item_type(
-            table_item_data.key_type.as_str(),
+            &standardized_type_address(table_item_data.key_type.as_str()),
             &table_item_data.key,
             txn_version,
         )? {

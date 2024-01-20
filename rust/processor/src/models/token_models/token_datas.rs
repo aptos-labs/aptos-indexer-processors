@@ -6,7 +6,10 @@
 #![allow(clippy::unused_unit)]
 
 use super::token_utils::TokenWriteSet;
-use crate::schema::{current_token_datas, token_datas};
+use crate::{
+    schema::{current_token_datas, token_datas},
+    utils::util::standardized_type_address,
+};
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -75,7 +78,7 @@ impl TokenData {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token_data = match TokenWriteSet::from_table_item_type(
-            table_item_data.value_type.as_str(),
+            &standardized_type_address(table_item_data.value_type.as_str()),
             &table_item_data.value,
             txn_version,
         )? {
@@ -85,7 +88,7 @@ impl TokenData {
 
         if let Some(token_data) = maybe_token_data {
             let maybe_token_data_id = match TokenWriteSet::from_table_item_type(
-                table_item_data.key_type.as_str(),
+                &standardized_type_address(table_item_data.key_type.as_str()),
                 &table_item_data.key,
                 txn_version,
             )? {

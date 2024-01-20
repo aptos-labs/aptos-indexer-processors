@@ -16,7 +16,10 @@ use crate::{
         token_models::token_utils::{TokenDataIdType, TokenEvent},
     },
     schema::token_activities_v2,
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::{
+        database::PgPoolConnection,
+        util::{standardize_address, standardized_type_address},
+    },
 };
 use aptos_protos::transaction::v1::Event;
 use bigdecimal::{BigDecimal, One, Zero};
@@ -222,7 +225,11 @@ impl TokenActivityV2 {
         entry_function_id_str: &Option<String>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
-        if let Some(token_event) = &TokenEvent::from_event(&event_type, &event.data, txn_version)? {
+        if let Some(token_event) = &TokenEvent::from_event(
+            &standardized_type_address(&event_type),
+            &event.data,
+            txn_version,
+        )? {
             let event_account_address =
                 standardize_address(&event.key.as_ref().unwrap().account_address);
             let token_activity_helper = match token_event {

@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     schema::{current_token_ownerships, token_ownerships},
-    utils::util::standardize_address,
+    utils::util::{standardize_address, standardized_type_address},
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -72,7 +72,7 @@ impl TokenOwnership {
     ) -> anyhow::Result<Option<(Self, Option<CurrentTokenOwnership>)>> {
         let txn_version = token.transaction_version;
         let maybe_token_id = match TokenWriteSet::from_table_item_type(
-            table_item_key_type,
+            &standardized_type_address(table_item_key_type),
             table_item_key,
             txn_version,
         )? {

@@ -23,7 +23,7 @@ use crate::{
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     utils::{
         database::PgPoolConnection,
-        util::{ensure_not_negative, standardize_address},
+        util::{ensure_not_negative, standardize_address, standardized_type_address},
     },
 };
 use anyhow::Context;
@@ -444,7 +444,7 @@ impl TokenOwnershipV2 {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token = match TokenWriteSet::from_table_item_type(
-            table_item_data.value_type.as_str(),
+            &standardized_type_address(table_item_data.value_type.as_str()),
             &table_item_data.value,
             txn_version,
         )? {
@@ -524,7 +524,7 @@ impl TokenOwnershipV2 {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token_id = match TokenWriteSet::from_table_item_type(
-            table_item_data.key_type.as_str(),
+            &standardized_type_address(table_item_data.key_type.as_str()),
             &table_item_data.key,
             txn_version,
         )? {
