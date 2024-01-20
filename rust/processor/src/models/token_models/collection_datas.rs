@@ -20,7 +20,7 @@ use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-pub const QUERY_RETRIES: u32 = 5;
+pub const QUERY_RETRIES: u32 = 1;
 pub const QUERY_RETRY_DELAY_MS: u64 = 500;
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(collection_data_id_hash, transaction_version))]

@@ -894,6 +894,45 @@ diesel::table! {
 }
 
 diesel::table! {
+    rock_paper_scissors_games (room_address) {
+        #[max_length = 66]
+        room_address -> Varchar,
+        #[max_length = 66]
+        player1_token_address -> Varchar,
+        #[max_length = 66]
+        player2_token_address -> Varchar,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    rock_paper_scissors_players (room_address, token_address) {
+        #[max_length = 66]
+        token_address -> Varchar,
+        #[max_length = 66]
+        room_address -> Varchar,
+        #[max_length = 66]
+        user_address -> Varchar,
+        committed_action -> Nullable<Array<Nullable<Text>>>,
+        verified_action -> Nullable<Array<Nullable<Text>>>,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    roulette (room_address) {
+        #[max_length = 66]
+        room_address -> Varchar,
+        result_index -> Jsonb,
+        revealed_index -> Int8,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     signatures (transaction_version, multi_agent_index, multi_sig_index, is_sender_primary) {
         transaction_version -> Int8,
         multi_agent_index -> Int8,
@@ -1140,6 +1179,96 @@ diesel::table! {
 }
 
 diesel::table! {
+    tournament_coin_rewards (tournament_address, coin_type) {
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        #[max_length = 66]
+        coin_type -> Varchar,
+        coins -> Numeric,
+        coin_reward_amount -> Int8,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournament_players (token_address) {
+        #[max_length = 66]
+        token_address -> Varchar,
+        #[max_length = 66]
+        user_address -> Varchar,
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        #[max_length = 66]
+        room_address -> Nullable<Varchar>,
+        player_name -> Varchar,
+        alive -> Bool,
+        token_uri -> Varchar,
+        coin_reward_claimed_type -> Nullable<Varchar>,
+        coin_reward_claimed_amount -> Nullable<Int8>,
+        token_reward_claimed -> Array<Nullable<Text>>,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournament_rooms (address) {
+        #[max_length = 66]
+        address -> Varchar,
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        #[max_length = 66]
+        round_address -> Varchar,
+        in_progress -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournament_rounds (address) {
+        #[max_length = 66]
+        address -> Varchar,
+        number -> Int8,
+        play_started -> Bool,
+        play_ended -> Bool,
+        paused -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournament_token_rewards (tournament_address) {
+        #[max_length = 66]
+        tournament_address -> Varchar,
+        tokens -> Array<Nullable<Text>>,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournaments (address) {
+        #[max_length = 66]
+        address -> Varchar,
+        tournament_name -> Varchar,
+        max_players -> Int8,
+        max_num_winners -> Int8,
+        players_joined -> Int8,
+        is_joinable -> Bool,
+        #[max_length = 66]
+        current_round_address -> Nullable<Varchar>,
+        current_round_number -> Int8,
+        current_game_module -> Nullable<Varchar>,
+        last_transaction_version -> Int8,
+        tournament_ended_at -> Nullable<Timestamp>,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -1165,6 +1294,30 @@ diesel::table! {
         epoch -> Int8,
         #[max_length = 50]
         payload_type -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    trivia_answers (token_address, round_address) {
+        #[max_length = 66]
+        token_address -> Varchar,
+        #[max_length = 66]
+        round_address -> Varchar,
+        answer_index -> Int8,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    trivia_questions (round_address) {
+        #[max_length = 66]
+        round_address -> Varchar,
+        question -> Varchar,
+        possible_answers -> Array<Nullable<Text>>,
+        revealed_answer_index -> Int8,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1252,6 +1405,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     objects,
     processor_status,
     proposal_votes,
+    rock_paper_scissors_games,
+    rock_paper_scissors_players,
+    roulette,
     signatures,
     spam_assets,
     table_items,
@@ -1263,7 +1419,15 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships,
     token_ownerships_v2,
     tokens,
+    tournament_coin_rewards,
+    tournament_players,
+    tournament_rooms,
+    tournament_rounds,
+    tournament_token_rewards,
+    tournaments,
     transactions,
+    trivia_answers,
+    trivia_questions,
     user_transactions,
     write_set_changes,
 );
