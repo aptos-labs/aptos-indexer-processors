@@ -17,9 +17,10 @@ use crate::{
     schema::tokens,
     utils::{
         database::PgPoolConnection,
-        util::{ensure_not_negative, parse_timestamp, standardize_address},
+        util::{ensure_not_negative, standardize_address},
     },
 };
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, DeleteTableItem,
     Transaction, WriteResource, WriteTableItem,

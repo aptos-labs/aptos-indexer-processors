@@ -25,11 +25,12 @@ use crate::{
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
-        util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
+        util::time_diff_since_pb_timestamp_in_secs,
     },
 };
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
+use aptos_processor_sdk::utils::{timestamp_to_iso, timestamp_to_unixtime};
 use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,

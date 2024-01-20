@@ -40,9 +40,9 @@ use crate::{
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
-        util::parse_timestamp,
     },
 };
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};

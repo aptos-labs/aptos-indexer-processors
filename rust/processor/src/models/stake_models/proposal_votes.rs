@@ -5,10 +5,8 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::stake_utils::StakeEvent;
-use crate::{
-    schema::proposal_votes,
-    utils::util::{parse_timestamp, standardize_address},
-};
+use crate::{schema::proposal_votes, utils::util::standardize_address};
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;

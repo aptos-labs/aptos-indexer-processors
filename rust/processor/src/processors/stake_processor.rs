@@ -22,10 +22,11 @@ use crate::{
             clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
             PgPoolConnection,
         },
-        util::{parse_timestamp, standardize_address},
+        util::standardize_address,
     },
 };
 use anyhow::bail;
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};

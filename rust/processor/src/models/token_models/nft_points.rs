@@ -7,11 +7,9 @@
 
 use crate::{
     schema::nft_points,
-    utils::util::{
-        get_clean_payload, get_entry_function_from_user_request, parse_timestamp,
-        standardize_address,
-    },
+    utils::util::{get_clean_payload, get_entry_function_from_user_request, standardize_address},
 };
+use aptos_processor_sdk::utils::parse_timestamp;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
