@@ -7,7 +7,6 @@
 use crate::utils::util::remove_null_bytes;
 use diesel::{
     backend::Backend,
-    pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
     ConnectionResult, QueryResult,
 };
@@ -95,11 +94,6 @@ fn establish_connection(database_url: &str) -> BoxFuture<ConnectionResult<AsyncP
 
     (async move {
         let (url, cert_path) = parse_and_clean_db_url(database_url);
-        println!(
-            "DB WITH SSL ESTABLISHING CONNECTION: {:?} -> {:?}",
-            database_url, url
-        );
-
         let cert = std::fs::read(cert_path.unwrap()).expect("Could not read certificate");
 
         let cert = Certificate::from_pem(&cert).expect("Could not parse certificate");
@@ -134,8 +128,12 @@ pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     } else {
         AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
     };
-
-    Ok(Arc::new(Pool::builder().build(config).await?))
+    let pool = Pool::builder()
+        // TODO: MAKE THIS CONFIGURABLE!
+        .max_size(40)
+        .build(config)
+        .await?;
+    Ok(Arc::new(pool))
 }
 
 /*
@@ -146,12 +144,46 @@ pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<Asyn
 */
 
 pub async fn execute_with_better_error<U>(
+    pool: PgDbPool,
+    query: U,
+    mut additional_where_clause: Option<&'static str>,
+) -> QueryResult<usize>
+where
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+{
+    let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    // This is needed because if we don't insert any row, then diesel makes a call like this
+    // SELECT 1 FROM TABLE WHERE 1=0
+    if original_query.to_lowercase().contains("where") {
+        additional_where_clause = None;
+    }
+    let final_query = UpsertFilterLatestTransactionQuery {
+        query,
+        where_clause: additional_where_clause,
+    };
+    let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    tracing::debug!("Executing query: {:?}", debug_string);
+    let conn = &mut pool.get().await.map_err(|e| {
+        tracing::warn!("Error getting connection from pool: {:?}", e);
+        diesel::result::Error::DatabaseError(
+            diesel::result::DatabaseErrorKind::UnableToSendCommand,
+            Box::new(e.to_string()),
+        )
+    })?;
+    let res = final_query.execute(conn).await;
+    if let Err(ref e) = res {
+        tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
+    }
+    res
+}
+
+pub async fn execute_with_better_error_conn<U>(
     conn: &mut MyDbConnection,
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
 where
-    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
@@ -172,6 +204,67 @@ where
     res
 }
 
+pub async fn execute_in_chunks<U, T>(
+    conn: PgDbPool,
+    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    items_to_insert: &[T],
+    chunk_size: usize,
+) -> Result<(), diesel::result::Error>
+where
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
+{
+    let chunks = get_chunks(items_to_insert.len(), chunk_size);
+
+    let futures = chunks.into_iter().map(|(start_ind, end_ind)| {
+        let items = (&items_to_insert[start_ind..end_ind]).to_vec();
+
+        let (query, additional_where_clause) = build_query(items.clone());
+        execute_or_retry_cleaned(
+            conn.clone(),
+            build_query.clone(),
+            items,
+            query,
+            additional_where_clause,
+        )
+    });
+    for res in futures_util::future::join_all(futures).await {
+        if let Err(e) = res {
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+
+async fn execute_or_retry_cleaned<U, T>(
+    conn: PgDbPool,
+    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    items: Vec<T>,
+    query: U,
+    additional_where_clause: Option<&'static str>,
+) -> Result<(), diesel::result::Error>
+where
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
+{
+    match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
+        Ok(_) => {},
+        Err(_) => {
+            let cleaned_items = clean_data_for_db(items, true);
+            let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
+            match execute_with_better_error(conn.clone(), cleaned_query, additional_where_clause)
+                .await
+            {
+                Ok(_) => {},
+                Err(e) => {
+                    return Err(e);
+                },
+            }
+        },
+    }
+    Ok(())
+}
+
 pub async fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
     conn.run_pending_migrations(MIGRATIONS)
         .expect("[Parser] Migrations failed!");
@@ -184,11 +277,11 @@ impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
 
 //impl<T> RunQueryDsl<MyDbConnection> for UpsertFilterLatestTransactionQuery<T> {}
 
-impl<T> QueryFragment<Pg> for UpsertFilterLatestTransactionQuery<T>
+impl<T> QueryFragment<diesel::pg::Pg> for UpsertFilterLatestTransactionQuery<T>
 where
-    T: QueryFragment<Pg>,
+    T: QueryFragment<diesel::pg::Pg>,
 {
-    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
+    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, diesel::pg::Pg>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;
         if let Some(w) = self.where_clause {
             out.push_sql(w);

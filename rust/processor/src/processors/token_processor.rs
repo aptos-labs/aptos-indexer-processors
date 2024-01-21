@@ -17,7 +17,7 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,
     },
 };
@@ -170,7 +170,7 @@ async fn insert_tokens(
 
     let chunks = get_chunks(tokens_to_insert.len(), Token::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::tokens::table)
                 .values(&tokens_to_insert[start_ind..end_ind])
@@ -194,7 +194,7 @@ async fn insert_token_ownerships(
         TokenOwnership::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::token_ownerships::table)
                 .values(&token_ownerships_to_insert[start_ind..end_ind])
@@ -220,7 +220,7 @@ async fn insert_token_datas(
 
     let chunks = get_chunks(token_datas_to_insert.len(), TokenData::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::token_datas::table)
                 .values(&token_datas_to_insert[start_ind..end_ind])
@@ -244,7 +244,7 @@ async fn insert_collection_datas(
         CollectionData::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::collection_datas::table)
                 .values(&collection_datas_to_insert[start_ind..end_ind])
@@ -266,7 +266,7 @@ async fn insert_current_token_ownerships(
     let chunks = get_chunks(items_to_insert.len(), CurrentTokenOwnership::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_token_ownerships::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -298,7 +298,7 @@ async fn insert_current_token_datas(
     let chunks = get_chunks(items_to_insert.len(), CurrentTokenData::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_token_datas::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -341,7 +341,7 @@ async fn insert_current_collection_datas(
     let chunks = get_chunks(items_to_insert.len(), CurrentCollectionData::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_collection_datas::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -376,7 +376,7 @@ async fn insert_token_activities(
     let chunks = get_chunks(items_to_insert.len(), TokenActivity::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::token_activities::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -406,7 +406,7 @@ async fn insert_current_token_claims(
     );
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_token_pending_claims::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -441,7 +441,7 @@ async fn insert_nft_points(
     let chunks = get_chunks(items_to_insert.len(), NftPoints::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::nft_points::table)
                 .values(&items_to_insert[start_ind..end_ind])

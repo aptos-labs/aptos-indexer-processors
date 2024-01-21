@@ -29,7 +29,7 @@ pub type FungibleAssetMetadataPK = String;
 pub type FungibleAssetMetadataMapping =
     HashMap<FungibleAssetMetadataPK, FungibleAssetMetadataModel>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(asset_type))]
 #[diesel(table_name = fungible_asset_metadata)]
 pub struct FungibleAssetMetadataModel {

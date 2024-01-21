@@ -20,8 +20,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
+            clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection,
+            PgDbPool, PgPoolConnection,
         },
         util::{get_entry_function_from_user_request, standardize_address},
     },
@@ -124,7 +124,7 @@ async fn insert_fungible_asset_activities(
 
     let chunks = get_chunks(item_to_insert.len(), FungibleAssetActivity::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::fungible_asset_activities::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -148,7 +148,7 @@ async fn insert_fungible_asset_metadata(
         FungibleAssetMetadataModel::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::fungible_asset_metadata::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -184,7 +184,7 @@ async fn insert_fungible_asset_balances(
 
     let chunks = get_chunks(item_to_insert.len(), FungibleAssetBalance::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::fungible_asset_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -212,7 +212,7 @@ async fn insert_current_fungible_asset_balances(
         CurrentFungibleAssetBalance::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_fungible_asset_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])

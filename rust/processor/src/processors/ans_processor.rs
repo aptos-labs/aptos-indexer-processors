@@ -13,8 +13,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
+            clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection,
+            PgDbPool, PgPoolConnection,
         },
         util::standardize_address,
     },
@@ -176,7 +176,7 @@ async fn insert_current_ans_lookups(
     let chunks = get_chunks(items_to_insert.len(), CurrentAnsLookup::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
                 conn,
                 diesel::insert_into(schema::current_ans_lookup::table)
                     .values(&items_to_insert[start_ind..end_ind])
@@ -205,7 +205,7 @@ async fn insert_ans_lookups(
     let chunks = get_chunks(items_to_insert.len(), AnsLookup::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::ans_lookup::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -227,7 +227,7 @@ async fn insert_current_ans_primary_names(
     let chunks = get_chunks(items_to_insert.len(), CurrentAnsPrimaryName::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_ans_primary_name::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -256,7 +256,7 @@ async fn insert_ans_primary_names(
     let chunks = get_chunks(items_to_insert.len(), AnsPrimaryName::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::ans_primary_name::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -278,7 +278,7 @@ async fn insert_current_ans_lookups_v2(
     let chunks = get_chunks(items_to_insert.len(), CurrentAnsLookupV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
                 conn,
                 diesel::insert_into(schema::current_ans_lookup_v2::table)
                     .values(&items_to_insert[start_ind..end_ind])
@@ -307,7 +307,7 @@ async fn insert_ans_lookups_v2(
     let chunks = get_chunks(items_to_insert.len(), AnsLookupV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::ans_lookup_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -332,7 +332,7 @@ async fn insert_current_ans_primary_names_v2(
     );
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_ans_primary_name_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -361,7 +361,7 @@ async fn insert_ans_primary_names_v2(
     let chunks = get_chunks(items_to_insert.len(), AnsPrimaryNameV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::ans_primary_name_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])

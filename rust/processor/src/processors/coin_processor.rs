@@ -14,7 +14,7 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,
     },
 };
@@ -120,7 +120,7 @@ async fn insert_coin_activities(
 
     let chunks = get_chunks(item_to_insert.len(), CoinActivity::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::coin_activities::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -150,7 +150,7 @@ async fn insert_coin_infos(
 
     let chunks = get_chunks(item_to_insert.len(), CoinInfo::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::coin_infos::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -181,7 +181,7 @@ async fn insert_coin_balances(
 
     let chunks = get_chunks(item_to_insert.len(), CoinBalance::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::coin_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -202,7 +202,7 @@ async fn insert_current_coin_balances(
 
     let chunks = get_chunks(item_to_insert.len(), CurrentCoinBalance::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_coin_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -228,7 +228,7 @@ async fn insert_coin_supply(
 
     let chunks = get_chunks(item_to_insert.len(), CoinSupply::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::coin_supply::table)
                 .values(&item_to_insert[start_ind..end_ind])

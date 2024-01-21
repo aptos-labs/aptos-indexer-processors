@@ -40,7 +40,7 @@ use std::collections::HashMap;
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
 pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = token_ownerships_v2)]
 pub struct TokenOwnershipV2 {
@@ -60,7 +60,7 @@ pub struct TokenOwnershipV2 {
     pub non_transferrable_by_owner: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
 #[diesel(table_name = current_token_ownerships_v2)]
 pub struct CurrentTokenOwnershipV2 {

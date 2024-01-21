@@ -19,8 +19,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
+            clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection,
+            PgDbPool, PgPoolConnection,
         },
         util::{parse_timestamp, standardize_address},
     },
@@ -152,7 +152,7 @@ async fn insert_current_stake_pool_voter(
 
     let chunks = get_chunks(item_to_insert.len(), CurrentStakingPoolVoter::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_staking_pool_voter::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -181,7 +181,7 @@ async fn insert_proposal_votes(
 
     let chunks = get_chunks(item_to_insert.len(), ProposalVote::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::proposal_votes::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -205,7 +205,7 @@ async fn insert_delegator_activities(
         DelegatedStakingActivity::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::delegated_staking_activities::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -226,7 +226,7 @@ async fn insert_delegator_balances(
 
     let chunks = get_chunks(item_to_insert.len(), DelegatorBalance::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::delegator_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -247,7 +247,7 @@ async fn insert_current_delegator_balances(
 
     let chunks = get_chunks(item_to_insert.len(), CurrentDelegatorBalance::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_delegator_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -275,7 +275,7 @@ async fn insert_delegator_pools(
 
     let chunks = get_chunks(item_to_insert.len(), DelegatorPool::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::delegated_staking_pools::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -301,7 +301,7 @@ async fn insert_delegator_pool_balances(
 
     let chunks = get_chunks(item_to_insert.len(), DelegatorPoolBalance::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::delegated_staking_pool_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -325,7 +325,7 @@ async fn insert_current_delegator_pool_balances(
         CurrentDelegatorPoolBalance::field_count(),
     );
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_delegated_staking_pool_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
@@ -356,7 +356,7 @@ async fn insert_current_delegated_voter(
 
     let chunks = get_chunks(item_to_insert.len(), CurrentDelegatedVoter::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_delegated_voter::table)
                 .values(&item_to_insert[start_ind..end_ind])

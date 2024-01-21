@@ -52,6 +52,7 @@ use std::fmt::Debug;
 
 type StartVersion = u64;
 type EndVersion = u64;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ProcessingResult {
     pub start_version: StartVersion,
@@ -105,6 +106,11 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         }
     }
 
+    fn get_pool(&self) -> PgDbPool {
+        let pool = self.connection_pool();
+        pool.clone()
+    }
+
     /// Store last processed version from database. We can assume that all previously processed
     /// versions are successful because any gap would cause the processor to panic
     async fn update_last_processed_version(
@@ -112,7 +118,6 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         version: u64,
         last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     ) -> anyhow::Result<()> {
-        let mut conn = self.get_conn().await;
         let timestamp = last_transaction_timestamp.map(|t| parse_timestamp(&t, version as i64));
         let status = ProcessorStatus {
             processor: self.name().to_string(),
@@ -120,7 +125,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
             last_transaction_timestamp: timestamp,
         };
         execute_with_better_error(
-            &mut conn,
+            self.get_pool(),
             diesel::insert_into(processor_status::table)
                 .values(&status)
                 .on_conflict(processor_status::processor)

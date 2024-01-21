@@ -14,7 +14,7 @@ use std::collections::HashMap;
 type StakingPoolAddress = String;
 pub type StakingPoolVoterMap = HashMap<StakingPoolAddress, CurrentStakingPoolVoter>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = current_staking_pool_voter)]
 pub struct CurrentStakingPoolVoter {

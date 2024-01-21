@@ -8,7 +8,7 @@ use crate::{
     },
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,
     },
 };
@@ -83,7 +83,7 @@ async fn insert_user_transactions(
     use schema::user_transactions::dsl::*;
     let chunks = get_chunks(items_to_insert.len(), UserTransactionModel::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::user_transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -107,7 +107,7 @@ async fn insert_signatures(
     use schema::signatures::dsl::*;
     let chunks = get_chunks(items_to_insert.len(), Signature::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::signatures::table)
                 .values(&items_to_insert[start_ind..end_ind])

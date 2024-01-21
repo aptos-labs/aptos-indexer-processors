@@ -24,7 +24,7 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
-        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -733,7 +733,7 @@ impl Worker {
                     chain_id = grpc_chain_id,
                     "[Parser] Adding chain id to db, continue to index..."
                 );
-                execute_with_better_error(
+                execute_with_better_error_conn(
                     &mut conn,
                     diesel::insert_into(ledger_infos::table)
                         .values(LedgerInfo {

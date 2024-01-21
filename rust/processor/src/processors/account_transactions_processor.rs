@@ -6,7 +6,7 @@ use crate::{
     models::account_transaction_models::account_transactions::AccountTransaction,
     schema,
     utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
+        clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection, PgDbPool,
         PgPoolConnection,
     },
 };
@@ -73,7 +73,7 @@ async fn insert_account_transactions(
 
     let chunks = get_chunks(item_to_insert.len(), AccountTransaction::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::account_transactions::table)
                 .values(&item_to_insert[start_ind..end_ind])

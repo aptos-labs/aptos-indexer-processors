@@ -29,8 +29,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
+            clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection,
+            PgDbPool, PgPoolConnection,
         },
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
@@ -158,7 +158,7 @@ async fn insert_collections_v2(
     let chunks = get_chunks(items_to_insert.len(), CollectionV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::collections_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -180,7 +180,7 @@ async fn insert_token_datas_v2(
     let chunks = get_chunks(items_to_insert.len(), TokenDataV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::token_datas_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -202,7 +202,7 @@ async fn insert_token_ownerships_v2(
     let chunks = get_chunks(items_to_insert.len(), TokenOwnershipV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::token_ownerships_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -224,7 +224,7 @@ async fn insert_current_collections_v2(
     let chunks = get_chunks(items_to_insert.len(), CurrentCollectionV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_collections_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -261,7 +261,7 @@ async fn insert_current_token_datas_v2(
     let chunks = get_chunks(items_to_insert.len(), CurrentTokenDataV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_token_datas_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -301,7 +301,7 @@ async fn insert_current_token_ownerships_v2(
     );
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_token_ownerships_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -334,7 +334,7 @@ async fn insert_token_activities_v2(
     let chunks = get_chunks(items_to_insert.len(), TokenActivityV2::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::token_activities_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -360,7 +360,7 @@ async fn insert_current_token_v2_metadatas(
     let chunks = get_chunks(items_to_insert.len(), CurrentTokenV2Metadata::field_count());
 
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_token_v2_metadata::table)
                 .values(&items_to_insert[start_ind..end_ind])

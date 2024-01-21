@@ -16,8 +16,8 @@ use crate::{
     schema,
     utils::{
         database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
+            clean_data_for_db, execute_with_better_error_conn, get_chunks, MyDbConnection,
+            PgDbPool, PgPoolConnection,
         },
         util::standardize_address,
     },
@@ -90,7 +90,7 @@ async fn insert_objects(
     use schema::objects::dsl::*;
     let chunks = get_chunks(items_to_insert.len(), Object::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::objects::table)
                 .values(&items_to_insert[start_ind..end_ind])
@@ -115,7 +115,7 @@ async fn insert_current_objects(
     use schema::current_objects::dsl::*;
     let chunks = get_chunks(items_to_insert.len(), CurrentObject::field_count());
     for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
+        execute_with_better_error_conn(
             conn,
             diesel::insert_into(schema::current_objects::table)
                 .values(&items_to_insert[start_ind..end_ind])
