@@ -217,21 +217,19 @@ where
     let chunks = get_chunks(items_to_insert.len(), chunk_size);
 
     let futures = chunks.into_iter().map(|(start_ind, end_ind)| {
-        let items = (&items_to_insert[start_ind..end_ind]).to_vec();
+        let items = (items_to_insert[start_ind..end_ind]).to_vec();
 
         let (query, additional_where_clause) = build_query(items.clone());
         execute_or_retry_cleaned(
             conn.clone(),
-            build_query.clone(),
+            build_query,
             items,
             query,
             additional_where_clause,
         )
     });
     for res in futures_util::future::join_all(futures).await {
-        if let Err(e) = res {
-            return Err(e);
-        }
+        res?;
     }
     Ok(())
 }

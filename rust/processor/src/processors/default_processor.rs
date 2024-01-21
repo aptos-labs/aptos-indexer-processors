@@ -120,9 +120,7 @@ async fn insert_to_db_impl(
     for res in [
         txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
     ] {
-        if let Err(e) = res {
-            return Err(e);
-        }
+        res?;
     }
 
     Ok(())
