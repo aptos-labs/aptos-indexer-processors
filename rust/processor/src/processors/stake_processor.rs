@@ -25,12 +25,13 @@ use crate::{
         util::{parse_timestamp, standardize_address},
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub struct StakeProcessor {
@@ -370,9 +371,9 @@ async fn insert_current_delegated_voter(
                     table_handle.eq(excluded(table_handle)),
                     inserted_at.eq(excluded(inserted_at)),
                 )),
-                Some(
-                    " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
-                ),
+            Some(
+                " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
+            ),
         ).await?;
     }
     Ok(())
@@ -394,19 +395,19 @@ impl ProcessorTrait for StakeProcessor {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
 
-        let mut all_current_stake_pool_voters: StakingPoolVoterMap = HashMap::new();
+        let mut all_current_stake_pool_voters: StakingPoolVoterMap = AHashMap::new();
         let mut all_proposal_votes = vec![];
         let mut all_delegator_activities = vec![];
         let mut all_delegator_balances = vec![];
-        let mut all_current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
-        let mut all_delegator_pools: DelegatorPoolMap = HashMap::new();
+        let mut all_current_delegator_balances: CurrentDelegatorBalanceMap = AHashMap::new();
+        let mut all_delegator_pools: DelegatorPoolMap = AHashMap::new();
         let mut all_delegator_pool_balances = vec![];
-        let mut all_current_delegator_pool_balances = HashMap::new();
+        let mut all_current_delegator_pool_balances = AHashMap::new();
 
-        let mut active_pool_to_staking_pool = HashMap::new();
+        let mut active_pool_to_staking_pool = AHashMap::new();
         // structs needed to get delegated voters
-        let mut all_current_delegated_voter = HashMap::new();
-        let mut all_vote_delegation_handle_to_pool_address = HashMap::new();
+        let mut all_current_delegated_voter = AHashMap::new();
+        let mut all_vote_delegation_handle_to_pool_address = AHashMap::new();
 
         for txn in &transactions {
             // Add votes data

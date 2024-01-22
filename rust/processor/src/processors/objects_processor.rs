@@ -22,12 +22,13 @@ use crate::{
         util::standardize_address,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub struct ObjectsProcessor {
@@ -157,8 +158,8 @@ impl ProcessorTrait for ObjectsProcessor {
         // Moving object handling here because we need a single object
         // map through transactions for lookups
         let mut all_objects = vec![];
-        let mut all_current_objects = HashMap::new();
-        let mut object_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
+        let mut all_current_objects = AHashMap::new();
+        let mut object_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
 
         for txn in &transactions {
             let txn_version = txn.version as i64;

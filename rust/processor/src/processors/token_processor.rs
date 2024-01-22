@@ -21,13 +21,14 @@ use crate::{
         PgPoolConnection,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -482,19 +483,19 @@ impl ProcessorTrait for TokenProcessor {
         let mut all_collection_datas = vec![];
         let mut all_token_activities = vec![];
 
-        // Hashmap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
-        let mut all_current_token_ownerships: HashMap<
+        // AHashMap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
+        let mut all_current_token_ownerships: AHashMap<
             CurrentTokenOwnershipPK,
             CurrentTokenOwnership,
-        > = HashMap::new();
-        let mut all_current_token_datas: HashMap<TokenDataIdHash, CurrentTokenData> =
-            HashMap::new();
-        let mut all_current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
-            HashMap::new();
-        let mut all_current_token_claims: HashMap<
+        > = AHashMap::new();
+        let mut all_current_token_datas: AHashMap<TokenDataIdHash, CurrentTokenData> =
+            AHashMap::new();
+        let mut all_current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
+            AHashMap::new();
+        let mut all_current_token_claims: AHashMap<
             CurrentTokenPendingClaimPK,
             CurrentTokenPendingClaim,
-        > = HashMap::new();
+        > = AHashMap::new();
 
         // This is likely temporary
         let mut all_nft_points = vec![];

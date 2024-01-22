@@ -10,11 +10,12 @@ use crate::{
         PgPoolConnection,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub struct AccountTransactionsProcessor {
@@ -101,7 +102,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
-        let mut account_transactions = HashMap::new();
+        let mut account_transactions = AHashMap::new();
 
         for txn in &transactions {
             account_transactions.extend(AccountTransaction::from_transaction(txn));

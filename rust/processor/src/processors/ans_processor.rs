@@ -19,6 +19,7 @@ use crate::{
         util::standardize_address,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
@@ -27,7 +28,7 @@ use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -468,13 +469,13 @@ fn parse_ans(
     Vec<CurrentAnsPrimaryNameV2>,
     Vec<AnsPrimaryNameV2>,
 ) {
-    let mut all_current_ans_lookups = HashMap::new();
+    let mut all_current_ans_lookups = AHashMap::new();
     let mut all_ans_lookups = vec![];
-    let mut all_current_ans_primary_names = HashMap::new();
+    let mut all_current_ans_primary_names = AHashMap::new();
     let mut all_ans_primary_names = vec![];
-    let mut all_current_ans_lookups_v2 = HashMap::new();
+    let mut all_current_ans_lookups_v2 = AHashMap::new();
     let mut all_ans_lookups_v2 = vec![];
-    let mut all_current_ans_primary_names_v2 = HashMap::new();
+    let mut all_current_ans_primary_names_v2 = AHashMap::new();
     let mut all_ans_primary_names_v2 = vec![];
 
     for transaction in transactions {
@@ -493,7 +494,7 @@ fn parse_ans(
         if let TxnData::User(user_txn) = txn_data {
             // TODO: Use the v2_renew_name_events to preserve metadata once we switch to a single ANS table to store everything
             let mut v2_renew_name_events = vec![];
-            let mut v2_address_to_subdomain_ext = HashMap::new();
+            let mut v2_address_to_subdomain_ext = AHashMap::new();
 
             // Parse V2 ANS Events. We only care about the following events:
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time

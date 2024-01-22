@@ -23,7 +23,8 @@ use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use ahash::AHashMap;
+use std::{ fmt::Debug};
 use tracing::error;
 
 pub struct MonitoringProcessor {

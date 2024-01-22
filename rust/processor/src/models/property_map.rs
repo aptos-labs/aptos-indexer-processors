@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::util;
+use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PropertyValue {
@@ -21,14 +21,14 @@ pub fn create_property_value(typ: String, value: String) -> Result<PropertyValue
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PropertyMap {
-    data: HashMap<String, PropertyValue>,
+    data: AHashMap<String, PropertyValue>,
 }
 
 impl PropertyMap {
     /// Deserializes PropertyValue from bcs encoded json
     pub fn from_bcs_encode_str(val: Value) -> Option<Value> {
         let mut pm = PropertyMap {
-            data: HashMap::new(),
+            data: AHashMap::new(),
         };
         let records: &Vec<Value> = val.get("map")?.get("data")?.as_array()?;
         for entry in records {
@@ -45,7 +45,7 @@ impl PropertyMap {
     /// For example: Object {"data": Object {"creation_time_sec": Object {"value": String("1666125588")}}}
     /// becomes Object {"creation_time_sec": "1666125588"}
     fn to_flat_json(val: PropertyMap) -> Value {
-        let mut map = HashMap::new();
+        let mut map = AHashMap::new();
         for (k, v) in val.data {
             map.insert(k, v.value);
         }
@@ -71,14 +71,14 @@ pub fn create_token_object_property_value(
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenObjectPropertyMap {
-    data: HashMap<String, TokenObjectPropertyValue>,
+    data: AHashMap<String, TokenObjectPropertyValue>,
 }
 
 impl TokenObjectPropertyMap {
     /// Deserializes PropertyValue from bcs encoded json
     pub fn from_bcs_encode_str(val: Value) -> Option<Value> {
         let mut pm = TokenObjectPropertyMap {
-            data: HashMap::new(),
+            data: AHashMap::new(),
         };
         let records: &Vec<Value> = val.get("data")?.as_array()?;
         for entry in records {
@@ -95,7 +95,7 @@ impl TokenObjectPropertyMap {
     /// For example: Object {"data": Object {"creation_time_sec": Object {"value": String("1666125588")}}}
     /// becomes Object {"creation_time_sec": "1666125588"}
     fn to_flat_json_new(val: TokenObjectPropertyMap) -> Value {
-        let mut map = HashMap::new();
+        let mut map = AHashMap::new();
         for (k, v) in val.data {
             map.insert(k, v.value);
         }

@@ -18,16 +18,16 @@ use crate::{
     },
     utils::util::{deserialize_from_string, standardize_address},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // PK of current_objects, i.e. object_address
 pub type CurrentObjectPK = String;
 
-/// Tracks all object related metadata in a hashmap for quick access (keyed on address of the object)
-pub type ObjectAggregatedDataMapping = HashMap<CurrentObjectPK, ObjectAggregatedData>;
+/// Tracks all object related metadata in a AHashMap for quick access (keyed on address of the object)
+pub type ObjectAggregatedDataMapping = AHashMap<CurrentObjectPK, ObjectAggregatedData>;
 
 /// Index of the event so that we can write its inverse to the db as primary key (to avoid collisiona)
 pub type EventIndex = i64;

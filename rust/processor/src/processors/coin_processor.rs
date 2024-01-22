@@ -18,12 +18,13 @@ use crate::{
         PgPoolConnection,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -259,9 +260,9 @@ impl ProcessorTrait for CoinProcessor {
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
-        let mut all_coin_infos: HashMap<String, CoinInfo> = HashMap::new();
-        let mut all_current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
-            HashMap::new();
+        let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
+        let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
+            AHashMap::new();
         let mut all_coin_supply = vec![];
 
         for txn in &transactions {

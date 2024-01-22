@@ -13,6 +13,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }

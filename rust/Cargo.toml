@@ -16,13 +16,14 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-indexer-processors"
-rust-version = "1.70"
+rust-version = "1.75"
 
 [workspace.dependencies]
 processor = { path = "processor" }
 server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }
 
+ahash = {version = "0.8.7", features = ["serde"]}
 anyhow = "1.0.62"
 async-trait = "0.1.53"
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "af0dcea7144225a709e4f595e58f8026b99e901c" }

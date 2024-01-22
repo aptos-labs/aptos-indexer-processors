@@ -35,15 +35,13 @@ use crate::{
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
 };
+use ahash::{AHashMap, AHashSet};
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::fmt::Debug;
 use tracing::error;
 
 pub struct TokenV2Processor {
@@ -474,23 +472,23 @@ async fn parse_v2_token(
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
     let mut token_activities_v2 = vec![];
-    let mut current_collections_v2: HashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
-        HashMap::new();
-    let mut current_token_datas_v2: HashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
-        HashMap::new();
-    let mut current_token_ownerships_v2: HashMap<
+    let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
+        AHashMap::new();
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+        AHashMap::new();
+    let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
         CurrentTokenOwnershipV2,
-    > = HashMap::new();
+    > = AHashMap::new();
     // Tracks prior ownership in case a token gets burned
-    let mut prior_nft_ownership: HashMap<String, NFTOwnershipV2> = HashMap::new();
+    let mut prior_nft_ownership: AHashMap<String, NFTOwnershipV2> = AHashMap::new();
     // Get Metadata for token v2 by object
     // We want to persist this through the entire batch so that even if a token is burned,
     // we can still get the object core metadata for it
-    let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
+    let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
     // Basically token properties
-    let mut current_token_v2_metadata: HashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
-        HashMap::new();
+    let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
+        AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
@@ -507,7 +505,7 @@ async fn parse_v2_token(
             let entry_function_id_str = get_entry_function_from_user_request(user_request);
 
             // Get burn events for token v2 by object
-            let mut tokens_burned: TokenV2Burned = HashSet::new();
+            let mut tokens_burned: TokenV2Burned = AHashSet::new();
 
             // Need to do a first pass to get all the objects
             for wsc in transaction_info.changes.iter() {
