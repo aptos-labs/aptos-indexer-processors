@@ -53,7 +53,7 @@ const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
-const BUFFER_SIZE: usize = 50;
+const BUFFER_SIZE: usize = 100;
 // 20MB
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
