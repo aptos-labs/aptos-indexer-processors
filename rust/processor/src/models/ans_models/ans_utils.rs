@@ -24,7 +24,7 @@ pub struct OptionalString {
 }
 
 impl OptionalString {
-    fn get_string(&self) -> Option<String> {
+    pub fn get_string(&self) -> Option<String> {
         if self.vec.is_empty() {
             None
         } else {

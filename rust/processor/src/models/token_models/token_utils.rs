@@ -39,6 +39,10 @@ pub struct TokenDataIdType {
 }
 
 impl TokenDataIdType {
+    pub fn new(creator: String, collection: String, name: String) -> Self {
+        Self { creator, collection, name, }
+    }
+
     pub fn to_id(&self) -> String {
         format!("0x{}", self.to_hash())
     }

@@ -8,16 +8,16 @@ use crate::{
             marketplace_activities::{MarketplaceActivity, MarketplaceEventType},
             marketplace_auctions::MarketplaceAuction,
             marketplace_collection_offers::MarketplaceCollectionOffer,
-            marketplace_listings::{self, MarketplaceListing},
+            marketplace_listings::MarketplaceListing,
             marketplace_token_offers::MarketplaceTokenOffer,
             marketplace_utils::{
-                AuctionListing, CollectionDataIdType, CollectionOfferEventMetadata,
-                CollectionOfferMetadata, CollectionOfferV1, CollectionOfferV2, FixedPriceListing,
-                ListingMetadata, ListingTokenV1Container, MarketplaceCollectionMetadata,
-                MarketplaceTokenMetadata, TokenDataIdType, TokenOfferMetadata, TokenOfferV1,
-                TokenOfferV2,
+                AuctionListing, CollectionOfferEventMetadata, CollectionOfferMetadata,
+                CollectionOfferV1, CollectionOfferV2, FixedPriceListing, ListingMetadata,
+                ListingTokenV1Container, MarketplaceCollectionMetadata, MarketplaceTokenMetadata,
+                TokenOfferMetadata, TokenOfferV1, TokenOfferV2,
             },
         },
+        token_models::token_utils::{CollectionDataIdType, TokenDataIdType},
         token_v2_models::v2_token_utils::{ObjectCore, ObjectWithMetadata, TokenStandard},
     },
     schema::{self},
@@ -170,10 +170,7 @@ async fn insert_current_nft_marketplace_listings(
 ) -> Result<(), diesel::result::Error> {
     use schema::current_nft_marketplace_listings::dsl::*;
 
-    let chunks = get_chunks(
-        item_to_insert.len(),
-        MarketplaceListing::field_count(),
-    );
+    let chunks = get_chunks(item_to_insert.len(), MarketplaceListing::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
@@ -194,10 +191,7 @@ async fn insert_current_nft_marketplace_token_offers(
 ) -> Result<(), diesel::result::Error> {
     use schema::current_nft_marketplace_token_offers::dsl::*;
 
-    let chunks = get_chunks(
-        item_to_insert.len(),
-        MarketplaceTokenOffer::field_count(),
-    );
+    let chunks = get_chunks(item_to_insert.len(), MarketplaceTokenOffer::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
@@ -242,10 +236,7 @@ async fn insert_current_nft_marketplace_auctions(
 ) -> Result<(), diesel::result::Error> {
     use schema::current_nft_marketplace_auctions::dsl::*;
 
-    let chunks = get_chunks(
-        item_to_insert.len(),
-        MarketplaceAuction::field_count(),
-    );
+    let chunks = get_chunks(item_to_insert.len(), MarketplaceAuction::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
@@ -451,8 +442,7 @@ async fn parse_transactions(
                 let mut activity = Option::<MarketplaceActivity>::None;
                 let mut current_listing = Option::<MarketplaceListing>::None;
                 let mut current_token_offer = Option::<MarketplaceTokenOffer>::None;
-                let mut current_collection_offer =
-                    Option::<MarketplaceCollectionOffer>::None;
+                let mut current_collection_offer = Option::<MarketplaceCollectionOffer>::None;
                 let mut current_auction: Option<MarketplaceAuction> = None;
 
                 // create the activity based on the event type
@@ -1063,24 +1053,19 @@ async fn parse_transactions(
                             let property_version =
                                 data["token"]["id"]["property_version"].as_str().unwrap();
                             let token_data_id_struct = &data["token"]["id"]["token_data_id"];
-                            let token_data_id_type = TokenDataIdType {
-                                creator: token_data_id_struct.get("creator").unwrap().to_string(),
-                                collection_name: token_data_id_struct
-                                    .get("collection")
-                                    .unwrap()
-                                    .to_string(),
-                                token_name: token_data_id_struct.get("name").unwrap().to_string(),
-                            };
+                            let token_data_id_type = TokenDataIdType::new(
+                                token_data_id_struct.get("creator").unwrap().to_string(),
+                                token_data_id_struct.get("collection").unwrap().to_string(),
+                                token_data_id_struct.get("name").unwrap().to_string(),
+                            );
 
                             Some(ListingTokenV1Container {
                                 token_metadata: MarketplaceTokenMetadata {
-                                    collection_id: token_data_id_type.to_collection_id(),
-                                    collection_name: token_data_id_type.collection_name.clone(), // TODO probably need to truncate this
-                                    creator_address: standardize_address(
-                                        token_data_id_type.clone().creator.as_str(),
-                                    ),
+                                    collection_id: token_data_id_type.to_id(),
+                                    collection_name: token_data_id_type.get_name_trunc(),
+                                    creator_address: token_data_id_type.get_creator_address(),
                                     token_data_id: token_data_id_type.to_hash(),
-                                    token_name: token_data_id_type.token_name, // TODO probably need to cruncate this
+                                    token_name: token_data_id_type.get_name_trunc(),
                                     property_version: Some(
                                         BigDecimal::from_str(property_version).unwrap_or_default(),
                                     ),
@@ -1133,24 +1118,22 @@ async fn parse_transactions(
                         .as_str())
                         {
                             let property_version = data["property_version"].as_str().unwrap();
-                            let token_data_id_type = TokenDataIdType {
-                                creator: data["creator_address"].as_str().unwrap().to_string(),
-                                collection_name: data["collection_name"]
+                            let token_data_id_type = TokenDataIdType::new(
+                                data["creator_address"].as_str().unwrap().to_string(),
+                                data["collection_name"]
                                     .as_str()
                                     .unwrap()
-                                    .to_string(),
-                                token_name: data["token_name"].as_str().unwrap().to_string(),
-                            };
+                                    .to_string(), 
+                                    data["token_name"].as_str().unwrap().to_string(),
+                            );
 
                             Some(TokenOfferV1 {
                                 token_metadata: MarketplaceTokenMetadata {
-                                    collection_id: token_data_id_type.to_collection_id(),
-                                    collection_name: token_data_id_type.collection_name.clone(), // TODO probably need to truncate this
-                                    creator_address: standardize_address(
-                                        token_data_id_type.clone().creator.as_str(),
-                                    ),
+                                    collection_id: token_data_id_type.to_id(),
+                                    collection_name: token_data_id_type.get_name_trunc(),
+                                    creator_address: token_data_id_type.get_creator_address(),
                                     token_data_id: token_data_id_type.to_hash(),
-                                    token_name: token_data_id_type.token_name, // TODO probably need to cruncate this
+                                    token_name: token_data_id_type.get_name_trunc(),
                                     property_version: Some(
                                         BigDecimal::from_str(property_version).unwrap_or_default(),
                                     ),
@@ -1223,7 +1206,7 @@ async fn parse_transactions(
                             let creator_address = data["creator_address"].as_str().unwrap();
                             let collection_id_type = CollectionDataIdType {
                                 creator: creator_address.to_string(),
-                                collection_name: collection_name.to_string(),
+                                name: collection_name.to_string(),
                             };
                             Some(CollectionOfferV1 {
                                 collection_metadata: MarketplaceCollectionMetadata {
@@ -1543,38 +1526,35 @@ async fn parse_transactions(
                                     let token_v2_metadata =
                                         token_metadatas.get(&token_offer_v2.token_address);
                                     if let Some(token_v2_metadata) = token_v2_metadata {
-                                        current_token_offer =
-                                            Some(MarketplaceTokenOffer {
-                                                offer_id: move_resource_address.clone(),
-                                                token_data_id: token_offer_v2.token_address.clone(),
-                                                collection_id: token_v2_metadata
-                                                    .collection_id
-                                                    .clone(),
-                                                fee_schedule_id: token_offer_metadata
-                                                    .unwrap()
-                                                    .fee_schedule_id
-                                                    .clone(),
-                                                buyer: Some(
-                                                    token_offer_object.unwrap().get_owner_address(),
-                                                ),
-                                                price: token_offer_metadata.unwrap().price.clone(),
-                                                token_amount: BigDecimal::from(1),
-                                                expiration_time: token_offer_metadata
-                                                    .unwrap()
-                                                    .expiration_time
-                                                    .clone(),
-                                                is_deleted: false,
-                                                token_standard: TokenStandard::V2.to_string(),
-                                                coin_type: coin_type.clone(),
-                                                marketplace: "example_marketplace".to_string(),
-                                                contract_address: marketplace_contract_address
-                                                    .to_string(), // TODO - update this to the actual marketplace contract address
-                                                entry_function_id_str: entry_function_id_str
-                                                    .clone()
-                                                    .unwrap(),
-                                                last_transaction_version: txn_version,
-                                                last_transaction_timestamp: txn_timestamp,
-                                            });
+                                        current_token_offer = Some(MarketplaceTokenOffer {
+                                            offer_id: move_resource_address.clone(),
+                                            token_data_id: token_offer_v2.token_address.clone(),
+                                            collection_id: token_v2_metadata.collection_id.clone(),
+                                            fee_schedule_id: token_offer_metadata
+                                                .unwrap()
+                                                .fee_schedule_id
+                                                .clone(),
+                                            buyer: Some(
+                                                token_offer_object.unwrap().get_owner_address(),
+                                            ),
+                                            price: token_offer_metadata.unwrap().price.clone(),
+                                            token_amount: BigDecimal::from(1),
+                                            expiration_time: token_offer_metadata
+                                                .unwrap()
+                                                .expiration_time
+                                                .clone(),
+                                            is_deleted: false,
+                                            token_standard: TokenStandard::V2.to_string(),
+                                            coin_type: coin_type.clone(),
+                                            marketplace: "example_marketplace".to_string(),
+                                            contract_address: marketplace_contract_address
+                                                .to_string(), // TODO - update this to the actual marketplace contract address
+                                            entry_function_id_str: entry_function_id_str
+                                                .clone()
+                                                .unwrap(),
+                                            last_transaction_version: txn_version,
+                                            last_transaction_timestamp: txn_timestamp,
+                                        });
                                     }
                                 }
                             }
@@ -1598,12 +1578,47 @@ async fn parse_transactions(
 
                             let mut current_collection_offer = None;
                             if let Some(collection_offer_v1) = collection_offer_v1 {
-                                current_collection_offer =
-                                    Some(MarketplaceCollectionOffer {
+                                current_collection_offer = Some(MarketplaceCollectionOffer {
+                                    collection_offer_id: move_resource_address.clone(),
+                                    collection_id: collection_offer_v1
+                                        .collection_metadata
+                                        .collection_id
+                                        .clone(),
+                                    fee_schedule_id: collection_offer_metadata
+                                        .unwrap()
+                                        .fee_schedule_id
+                                        .clone(),
+                                    buyer: collection_object.unwrap().get_owner_address(),
+                                    item_price: collection_offer_metadata
+                                        .unwrap()
+                                        .item_price
+                                        .clone(),
+                                    remaining_token_amount: collection_offer_metadata
+                                        .unwrap()
+                                        .remaining_token_amount
+                                        .clone(),
+                                    expiration_time: collection_offer_metadata
+                                        .unwrap()
+                                        .expiration_time
+                                        .clone(),
+                                    is_deleted: false,
+                                    token_standard: TokenStandard::V1.to_string(),
+                                    coin_type: coin_type.clone(),
+                                    marketplace: "example_marketplace".to_string(),
+                                    contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
+                                    entry_function_id_str: entry_function_id_str.clone().unwrap(),
+                                    last_transaction_version: txn_version,
+                                    transaction_timestamp: txn_timestamp,
+                                });
+                            } else {
+                                let collection_offer_v2 =
+                                    collection_offer_v2s.get(&move_resource_address);
+                                if let Some(collection_ofer_v2) = collection_offer_v2 {
+                                    current_collection_offer = Some(MarketplaceCollectionOffer {
                                         collection_offer_id: move_resource_address.clone(),
-                                        collection_id: collection_offer_v1
-                                            .collection_metadata
-                                            .collection_id
+                                        collection_id: collection_offer_v2
+                                            .unwrap()
+                                            .collection_address
                                             .clone(),
                                         fee_schedule_id: collection_offer_metadata
                                             .unwrap()
@@ -1623,7 +1638,7 @@ async fn parse_transactions(
                                             .expiration_time
                                             .clone(),
                                         is_deleted: false,
-                                        token_standard: TokenStandard::V1.to_string(),
+                                        token_standard: TokenStandard::V2.to_string(),
                                         coin_type: coin_type.clone(),
                                         marketplace: "example_marketplace".to_string(),
                                         contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
@@ -1633,46 +1648,6 @@ async fn parse_transactions(
                                         last_transaction_version: txn_version,
                                         transaction_timestamp: txn_timestamp,
                                     });
-                            } else {
-                                let collection_offer_v2 =
-                                    collection_offer_v2s.get(&move_resource_address);
-                                if let Some(collection_ofer_v2) = collection_offer_v2 {
-                                    current_collection_offer =
-                                        Some(MarketplaceCollectionOffer {
-                                            collection_offer_id: move_resource_address.clone(),
-                                            collection_id: collection_offer_v2
-                                                .unwrap()
-                                                .collection_address
-                                                .clone(),
-                                            fee_schedule_id: collection_offer_metadata
-                                                .unwrap()
-                                                .fee_schedule_id
-                                                .clone(),
-                                            buyer: collection_object.unwrap().get_owner_address(),
-                                            item_price: collection_offer_metadata
-                                                .unwrap()
-                                                .item_price
-                                                .clone(),
-                                            remaining_token_amount: collection_offer_metadata
-                                                .unwrap()
-                                                .remaining_token_amount
-                                                .clone(),
-                                            expiration_time: collection_offer_metadata
-                                                .unwrap()
-                                                .expiration_time
-                                                .clone(),
-                                            is_deleted: false,
-                                            token_standard: TokenStandard::V2.to_string(),
-                                            coin_type: coin_type.clone(),
-                                            marketplace: "example_marketplace".to_string(),
-                                            contract_address: marketplace_contract_address
-                                                .to_string(), // TODO - update this to the actual marketplace contract address
-                                            entry_function_id_str: entry_function_id_str
-                                                .clone()
-                                                .unwrap(),
-                                            last_transaction_version: txn_version,
-                                            transaction_timestamp: txn_timestamp,
-                                        });
                                 }
                             }
                             nft_collection_offers.push(current_collection_offer.unwrap());

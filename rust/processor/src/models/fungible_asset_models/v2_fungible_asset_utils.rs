@@ -161,11 +161,11 @@ pub struct FungibleAssetSupply {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OptionalBigDecimal {
-    vec: Vec<BigDecimalWrapper>,
+    pub vec: Vec<BigDecimalWrapper>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct BigDecimalWrapper(#[serde(deserialize_with = "deserialize_from_string")] pub BigDecimal);
+pub struct BigDecimalWrapper(#[serde(deserialize_with = "deserialize_from_string")] pub BigDecimal);
 
 impl FungibleAssetSupply {
     pub fn from_write_resource(
