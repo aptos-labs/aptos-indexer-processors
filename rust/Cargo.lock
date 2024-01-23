@@ -1931,6 +1931,7 @@ dependencies = [
  "hex",
  "kanal",
  "native-tls",
+ "num_cpus",
  "once_cell",
  "postgres-native-tls",
  "prometheus",

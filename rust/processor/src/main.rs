@@ -6,9 +6,23 @@ use clap::Parser;
 use processor::IndexerGrpcProcessorConfig;
 use server_framework::ServerArgs;
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<()> {
-    let args = ServerArgs::parse();
-    args.run::<IndexerGrpcProcessorConfig>(tokio::runtime::Handle::current())
-        .await
+const RUNTIME_WORKER_MULTIPLIER: usize = 2;
+
+fn main() -> Result<()> {
+    let worker_threads = (num_cpus::get() * RUNTIME_WORKER_MULTIPLIER).min(16);
+    println!(
+        "Starting processor tokio runtime with worker_threads: {}",
+        worker_threads
+    );
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads((num_cpus::get() * RUNTIME_WORKER_MULTIPLIER).min(16))
+        .build()
+        .unwrap()
+        .block_on(async {
+            let args = ServerArgs::parse();
+            args.run::<IndexerGrpcProcessorConfig>(tokio::runtime::Handle::current())
+                .await
+        })
 }

@@ -56,4 +56,5 @@ url = { workspace = true }
 
 # Postgres SSL
 native-tls = "0.2.11"
+num_cpus = "1.16.0"
 postgres-native-tls = "0.5.0"
