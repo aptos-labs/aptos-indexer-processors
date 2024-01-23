@@ -4,7 +4,7 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use std::{str::FromStr, collections::HashSet};
+use std::{collections::HashSet, str::FromStr};
 
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
@@ -12,14 +12,15 @@ use serde::{Deserialize, Serialize};
 use crate::{
     models::{
         ans_models::ans_utils::OptionalString,
+        default_models::move_resources::MoveResource,
         fungible_asset_models::v2_fungible_asset_utils::OptionalBigDecimal,
         token_models::token_utils::{CollectionDataIdType, TokenDataIdType, NAME_LENGTH},
-        token_v2_models::v2_token_utils::TokenStandard,
+        token_v2_models::v2_token_utils::{ResourceReference, TokenStandard},
     },
     utils::util::{deserialize_from_string, standardize_address, truncate_str},
 };
 use anyhow::{Context, Result};
-use aptos_protos::transaction::v1::Event;
+use aptos_protos::transaction::v1::{Event, WriteResource};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MarketplaceTokenMetadata {
@@ -214,57 +215,276 @@ pub struct CollectionOfferEventMetadata {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ListingMetadata {
-    pub seller: String,
-    pub fee_schedule_id: String,
-    pub token_address: String,
+    seller: String,
+    pub fee_schedule: ResourceReference,
+    pub object: ResourceReference, // token address
 }
 
-#[derive(Debug, Clone)]
+impl ListingMetadata {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::listing::Listing", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "ListingMetadata from event with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+
+    pub fn get_seller_address(&self) -> String {
+        standardize_address(&self.seller)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FixedPriceListing {
     pub price: BigDecimal,
 }
 
-#[derive(Debug, Clone)]
+impl FixedPriceListing {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::coin_listing::FixedPriceListing", contract_address) {
+            return Ok(None);
+        }
+
+        serde_json::from_str(&write_resource.data)
+            .map(|inner| Some(inner))
+            .context(format!(
+                "FixedPriceListing from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ListingTokenV1Container {
     pub token_metadata: MarketplaceTokenMetadata,
     pub amount: BigDecimal,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenOfferMetadata {
     pub expiration_time: BigDecimal,
-    pub price: BigDecimal,
-    pub fee_schedule_id: String,
+    pub item_price: BigDecimal,
+    pub fee_schedule: ResourceReference,
 }
 
+impl TokenOfferMetadata {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::token_offer::TokenOffer", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "ListingMetadata from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenOfferV1 {
-    pub token_metadata: MarketplaceTokenMetadata,
+    token_name: String,
+    collection_name: String,
+    creator_address: String,
+    property_version: BigDecimal,
 }
 
+impl TokenOfferV1 {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::token_offer::TokenOfferTokenV1", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "TokenOfferV1 from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenOfferV2 {
-    pub token_address: String,
+    pub token: ResourceReference,
 }
 
+impl TokenOfferV2 {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::token_offer::TokenOfferTokenV2", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "TokenOfferV2 from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionOfferMetadata {
     pub expiration_time: BigDecimal,
     pub item_price: BigDecimal,
-    pub remaining_token_amount: BigDecimal,
-    pub fee_schedule_id: String,
+    pub remaining: BigDecimal,
+    pub fee_schedule: ResourceReference,
 }
 
+impl CollectionOfferMetadata {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::collection_offer::CollectionOffer", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "CollectionOfferMetadata from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionOfferV1 {
-    pub collection_metadata: MarketplaceCollectionMetadata,
+    creator_address: String,
+    collection_name: String,
 }
 
+impl CollectionOfferV1 {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::collection_offer::CollectionOfferTokenV1", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "CollectionOfferV1 from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionOfferV2 {
-    pub collection_address: String,
+    pub collection: ResourceReference,
 }
 
+impl CollectionOfferV2 {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::collection_offer::CollectionOfferTokenV2", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "CollectionOfferV2 from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuctionListing {
+    pub buy_it_now_price: OptionalBigDecimal,
+    pub current_bid: CurrentBidWrapper,
     pub auction_end_time: BigDecimal,
-    pub starting_bid_price: BigDecimal,
-    pub current_bid_price: Option<BigDecimal>,
-    pub current_bidder: Option<String>,
-    pub buy_it_now_price: Option<BigDecimal>,
+    pub starting_bid: BigDecimal,
+}
+
+impl AuctionListing {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::coin_listing::AuctionListing", contract_address) {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_str::<Self>(data).context(
+            format!(
+                "AuctionListing from wsc with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ),
+        )?))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CurrentBidWrapper {
+    pub vec: Vec<CurrentBid>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CurrentBid {
+    pub coins: CurrentBidValue, // coins
+    bidder: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CurrentBidValue {
+    pub value: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -436,52 +656,35 @@ impl MarketplaceEvent {
         events.insert(Self::AUCTION_BID_EVENT);
         events
     }
-    
-    pub fn from_event(
-        data_type: &str,
-        data: &str,
-        txn_version: i64,
-    ) -> Result<Option<Self>> {
+
+    pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<Self>> {
         match data_type {
             x if x.ends_with(Self::LISTING_FILLED_EVENT) => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::ListingFilledEvent(inner)))
+                serde_json::from_str(data).map(|inner| Some(Self::ListingFilledEvent(inner)))
             },
             x if x.ends_with(Self::LISTING_CANCELED_EVENT) => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::ListingCanceledEvent(inner)))
+                serde_json::from_str(data).map(|inner| Some(Self::ListingCanceledEvent(inner)))
             },
-            x if x.ends_with(Self::LISTING_PLACED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::ListingPlacedEvent(inner)))
+            x if x.ends_with(Self::LISTING_PLACED_EVENT) => {
+                serde_json::from_str(data).map(|inner| Some(Self::ListingPlacedEvent(inner)))
             },
-            x if x.ends_with(Self::COLLECTION_OFFER_PLACED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::CollectionOfferPlacedEvent(inner)))
+            x if x.ends_with(Self::COLLECTION_OFFER_PLACED_EVENT) => serde_json::from_str(data)
+                .map(|inner| Some(Self::CollectionOfferPlacedEvent(inner))),
+            x if x.ends_with(Self::COLLECTION_OFFER_CANCELED_EVENT) => serde_json::from_str(data)
+                .map(|inner| Some(Self::CollectionOfferCanceledEvent(inner))),
+            x if x.ends_with(Self::COLLECTION_OFFER_FILLED_EVENT) => serde_json::from_str(data)
+                .map(|inner| Some(Self::CollectionOfferFilledEvent(inner))),
+            x if x.ends_with(Self::TOKEN_OFFER_PLACED_EVENT) => {
+                serde_json::from_str(data).map(|inner| Some(Self::TokenOfferPlacedEvent(inner)))
             },
-            x if x.ends_with(Self::COLLECTION_OFFER_CANCELED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::CollectionOfferCanceledEvent(inner)))
+            x if x.ends_with(Self::TOKEN_OFFER_CANCELED_EVENT) => {
+                serde_json::from_str(data).map(|inner| Some(Self::TokenOfferCanceledEvent(inner)))
             },
-            x if x.ends_with(Self::COLLECTION_OFFER_FILLED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::CollectionOfferFilledEvent(inner)))
+            x if x.ends_with(Self::TOKEN_OFFER_FILLED_EVENT) => {
+                serde_json::from_str(data).map(|inner| Some(Self::TokenOfferFilledEvent(inner)))
             },
-            x if x.ends_with(Self::TOKEN_OFFER_PLACED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::TokenOfferPlacedEvent(inner)))
-            },
-            x if x.ends_with(Self::TOKEN_OFFER_CANCELED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::TokenOfferCanceledEvent(inner)))
-            },
-            x if x.ends_with(Self::TOKEN_OFFER_FILLED_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::TokenOfferFilledEvent(inner)))
-            },
-            x if x.ends_with(Self::AUCTION_BID_EVENT)  => {
-                serde_json::from_str(data)
-                    .map(|inner| Some(Self::AuctionBidEvent(inner)))
+            x if x.ends_with(Self::AUCTION_BID_EVENT) => {
+                serde_json::from_str(data).map(|inner| Some(Self::AuctionBidEvent(inner)))
             },
             _ => Ok(None),
         }
@@ -528,7 +731,6 @@ pub struct ListingCanceledEvent {
 }
 
 impl ListingCanceledEvent {
-
     pub fn get_listing_address(&self) -> String {
         standardize_address(&self.listing)
     }

@@ -17,7 +17,7 @@ use crate::{
                 TokenOfferMetadata, TokenOfferV1, TokenOfferV2, MarketplaceEvent, TokenMetadata, CollectionMetadata,
             },
         },
-        token_models::token_utils::{CollectionDataIdType, TokenDataIdType},
+        token_models::token_utils::{CollectionDataIdType, TokenDataIdType, TokenType},
         token_v2_models::v2_token_utils::{ObjectCore, ObjectWithMetadata, TokenStandard},
     },
     schema::{self},
@@ -390,7 +390,7 @@ async fn parse_transactions(
                 CollectionOfferEventMetadata,
             > = HashMap::new();
 
-            // Loop through the events for the activities
+            // Loop through the events for the all activities
             for (index, event) in inner.events.iter().enumerate() {
                 // get event type and contract address
                 let type_str_vec = event.type_str.as_str().split("::").collect::<Vec<&str>>();
@@ -489,7 +489,7 @@ async fn parse_transactions(
                     &coin_type,
                 ).unwrap() {
                     nft_collection_offers.push(collection_offer);
-                    
+
                     // The collection offer resource may be deleted after it is filled,
                     // so we need to parse collection offer metadata from the event
                     let collection_offer_filled_metadata = CollectionOfferEventMetadata {
@@ -509,8 +509,8 @@ async fn parse_transactions(
             let mut object_metadatas: HashMap<String, ObjectCore> = HashMap::new();
             let mut listing_metadatas: HashMap<String, ListingMetadata> = HashMap::new();
             let mut fixed_price_listings: HashMap<String, FixedPriceListing> = HashMap::new();
-            let mut listing_token_v1_containers: HashMap<String, ListingTokenV1Container> =
-                HashMap::new();
+            let mut listing_token_v1_containers: HashMap<String, TokenType> =
+                HashMap::new(); // String to ListingTokenV1Container
             let mut token_offer_metadatas: HashMap<String, TokenOfferMetadata> = HashMap::new();
             let mut token_offer_v1s: HashMap<String, TokenOfferV1> = HashMap::new();
             let mut token_offer_v2s: HashMap<String, TokenOfferV2> = HashMap::new();
@@ -529,11 +529,13 @@ async fn parse_transactions(
                     Change::WriteResource(write_resource) => {
                         let move_resource_address = standardize_address(&write_resource.address);
                         let move_resource_type = write_resource.type_str.clone();
-                        println!("move_resource_type: {}", move_resource_type.clone());
                         let move_resource_type_address =
                             write_resource.r#type.as_ref().unwrap().address.clone();
-                        let data = serde_json::from_str::<serde_json::Value>(&write_resource.data)
-                            .unwrap();
+                        if !move_resource_type_address.eq(marketplace_contract_address) {
+                            continue;
+                        }
+                        // let data = serde_json::from_str::<serde_json::Value>(&write_resource.data)
+                        //     .unwrap();
 
                         // Parse object metadata
                         let object_core_metadata =
@@ -546,90 +548,22 @@ async fn parse_transactions(
                             );
                         }
 
-                        if !move_resource_type_address.eq(marketplace_contract_address) {
-                            continue;
-                        }
-
                         // Parse listing metadata
-                        let listing_metadata = if move_resource_type.eq(format!(
-                            "{}::listing::Listing",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            Some(ListingMetadata {
-                                seller: standardize_address(data["seller"].as_str().unwrap()),
-                                fee_schedule_id: standardize_address(
-                                    data["fee_schedule"]["inner"].as_str().unwrap(),
-                                ),
-                                token_address: standardize_address(
-                                    data["object"]["inner"].as_str().unwrap(),
-                                ),
-                            })
-                        } else {
-                            None
-                        };
-                        let fixed_price_listing = if move_resource_type.starts_with(
-                            format!(
-                                "{}::coin_listing::FixedPriceListing",
-                                marketplace_contract_address
-                            )
-                            .as_str(),
-                        ) {
-                            Some(FixedPriceListing {
-                                price: data["price"]
-                                    .as_str()
-                                    .unwrap()
-                                    .parse::<BigDecimal>()
-                                    .unwrap(),
-                            })
-                        } else {
-                            None
-                        };
-                        let listing_token_v1_container = if move_resource_type.eq(format!(
-                            "{}::listing::TokenV1Container",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            let token = data.get("token");
-                            let amount = if token.is_some() {
-                                token
-                                    .unwrap()
-                                    .get("amount")
-                                    .unwrap()
-                                    .to_string()
-                                    .parse::<BigDecimal>()
-                                    .unwrap()
-                            } else {
-                                BigDecimal::from(0)
-                            };
-                            let property_version =
-                                data["token"]["id"]["property_version"].as_str().unwrap();
-                            let token_data_id_struct = &data["token"]["id"]["token_data_id"];
-                            let token_data_id_type = TokenDataIdType::new(
-                                token_data_id_struct.get("creator").unwrap().to_string(),
-                                token_data_id_struct.get("collection").unwrap().to_string(),
-                                token_data_id_struct.get("name").unwrap().to_string(),
-                            );
-
-                            Some(ListingTokenV1Container {
-                                token_metadata: MarketplaceTokenMetadata {
-                                    collection_id: token_data_id_type.to_id(),
-                                    collection_name: token_data_id_type.get_name_trunc(),
-                                    creator_address: token_data_id_type.get_creator_address(),
-                                    token_data_id: token_data_id_type.to_hash(),
-                                    token_name: token_data_id_type.get_name_trunc(),
-                                    property_version: Some(
-                                        BigDecimal::from_str(property_version).unwrap_or_default(),
-                                    ),
-                                    token_standard: TokenStandard::V1.to_string(),
-                                },
-                                amount,
-                            })
-                        } else {
-                            None
-                        };
+                        let listing_metadata = ListingMetadata::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
+                        let fixed_price_listing = FixedPriceListing::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
+                        let listing_token_v1_container = TokenType::from_marketplace_write_resource(
+                            write_resource, 
+                            marketplace_contract_address, 
+                            txn_version
+                        ).unwrap();
 
                         if let Some(listing_metadata) = listing_metadata {
                             listing_metadatas
@@ -645,72 +579,21 @@ async fn parse_transactions(
                         }
 
                         // Parse token offer metadata
-                        let token_offer_metadata = if move_resource_type.eq(format!(
-                            "{}::token_offer::TokenOffer",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            Some(TokenOfferMetadata {
-                                expiration_time: BigDecimal::from_str(
-                                    data["expiration_time"].as_str().unwrap(),
-                                )
-                                .unwrap(),
-                                price: BigDecimal::from_str(data["item_price"].as_str().unwrap())
-                                    .unwrap(),
-                                fee_schedule_id: standardize_address(
-                                    data["fee_schedule"]["inner"].as_str().unwrap(),
-                                ),
-                            })
-                        } else {
-                            None
-                        };
-                        let token_offer_v1 = if move_resource_type.eq(format!(
-                            "{}::token_offer::TokenOfferTokenV1",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            let property_version = data["property_version"].as_str().unwrap();
-                            let token_data_id_type = TokenDataIdType::new(
-                                data["creator_address"].as_str().unwrap().to_string(),
-                                data["collection_name"]
-                                    .as_str()
-                                    .unwrap()
-                                    .to_string(), 
-                                    data["token_name"].as_str().unwrap().to_string(),
-                            );
-
-                            Some(TokenOfferV1 {
-                                token_metadata: MarketplaceTokenMetadata {
-                                    collection_id: token_data_id_type.to_id(),
-                                    collection_name: token_data_id_type.get_name_trunc(),
-                                    creator_address: token_data_id_type.get_creator_address(),
-                                    token_data_id: token_data_id_type.to_hash(),
-                                    token_name: token_data_id_type.get_name_trunc(),
-                                    property_version: Some(
-                                        BigDecimal::from_str(property_version).unwrap_or_default(),
-                                    ),
-                                    token_standard: TokenStandard::V1.to_string(),
-                                },
-                            })
-                        } else {
-                            None
-                        };
-                        let token_offer_v2 = if move_resource_type.eq(format!(
-                            "{}::token_offer::TokenOfferTokenV2",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            Some(TokenOfferV2 {
-                                token_address: standardize_address(
-                                    data["token"]["inner"].as_str().unwrap(),
-                                ),
-                            })
-                        } else {
-                            None
-                        };
+                        let token_offer_metadata = TokenOfferMetadata::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
+                        let token_offer_v1 = TokenOfferV1::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
+                        let token_offer_v2 = TokenOfferV2::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
 
                         if let Some(token_offer_metadata) = token_offer_metadata {
                             token_offer_metadatas
@@ -724,69 +607,21 @@ async fn parse_transactions(
                         }
 
                         // Parse collection offer metadata
-                        let collection_offer_metadata = if move_resource_type.eq(format!(
-                            "{}::collection_offer::CollectionOffer",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            Some(CollectionOfferMetadata {
-                                expiration_time: BigDecimal::from_str(
-                                    data["expiration_time"].as_str().unwrap(),
-                                )
-                                .unwrap(),
-                                item_price: BigDecimal::from_str(
-                                    data["item_price"].as_str().unwrap(),
-                                )
-                                .unwrap(),
-                                remaining_token_amount: BigDecimal::from_str(
-                                    data["remaining"].as_str().unwrap(),
-                                )
-                                .unwrap(),
-                                fee_schedule_id: standardize_address(
-                                    data["fee_schedule"]["inner"].as_str().unwrap(),
-                                ),
-                            })
-                        } else {
-                            None
-                        };
-                        let collection_offer_v1 = if move_resource_type.eq(format!(
-                            "{}::collection_offer::CollectionOfferTokenV1",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            let collection_name = data["collection_name"].as_str().unwrap();
-                            let creator_address = data["creator_address"].as_str().unwrap();
-                            let collection_id_type = CollectionDataIdType {
-                                creator: creator_address.to_string(),
-                                name: collection_name.to_string(),
-                            };
-                            Some(CollectionOfferV1 {
-                                collection_metadata: MarketplaceCollectionMetadata {
-                                    collection_id: collection_id_type.to_hash(),
-                                    collection_name: collection_name.to_string(),
-                                    creator_address: standardize_address(creator_address),
-                                    token_standard: TokenStandard::V1.to_string(),
-                                },
-                            })
-                        } else {
-                            None
-                        };
-                        let collection_offer_v2 = if move_resource_type.eq(format!(
-                            "{}::collection_offer::CollectionOfferTokenV2",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            Some(CollectionOfferV2 {
-                                collection_address: standardize_address(
-                                    data["collection"]["inner"].as_str().unwrap(),
-                                ),
-                            })
-                        } else {
-                            None
-                        };
+                        let collection_offer_metadata = CollectionOfferMetadata::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
+                        let collection_offer_v1 = CollectionOfferV1::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
+                        let collection_offer_v2 = CollectionOfferV2::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
 
                         if let Some(collection_offer_metadata) = collection_offer_metadata {
                             collection_offer_metadatas
@@ -802,58 +637,11 @@ async fn parse_transactions(
                         }
 
                         // Parse auction metadata
-                        let auction_listing = if move_resource_type.eq(format!(
-                            "{}::coin_listing::AuctionListing",
-                            marketplace_contract_address
-                        )
-                        .as_str())
-                        {
-                            let maybe_buy_it_now_price = data["buy_it_now_price"]["vec"].as_array();
-                            let buy_it_now_price = if maybe_buy_it_now_price.is_some()
-                                && maybe_buy_it_now_price.unwrap().len() > 0
-                            {
-                                Some(
-                                    BigDecimal::from_str(
-                                        maybe_buy_it_now_price.unwrap()[0].as_str().unwrap(),
-                                    )
-                                    .unwrap(),
-                                )
-                            } else {
-                                None
-                            };
-
-                            let mut current_bid_price = None;
-                            let mut current_bidder = None;
-                            let maybe_current_bid = data["current_bid"]["vec"].as_array();
-                            if maybe_current_bid.is_some() && maybe_current_bid.unwrap().len() > 0 {
-                                let current_bid =
-                                    maybe_current_bid.unwrap()[0].as_object().unwrap();
-                                current_bid_price = Some(
-                                    BigDecimal::from_str(current_bid["price"].as_str().unwrap())
-                                        .unwrap(),
-                                );
-                                current_bidder = Some(standardize_address(
-                                    current_bid["bidder"].as_str().unwrap(),
-                                ));
-                            }
-
-                            Some(AuctionListing {
-                                auction_end_time: data["auction_end_time"]
-                                    .as_str()
-                                    .unwrap()
-                                    .parse::<BigDecimal>()
-                                    .unwrap(),
-                                starting_bid_price: BigDecimal::from_str(
-                                    data["starting_bid_price"].as_str().unwrap(),
-                                )
-                                .unwrap(),
-                                current_bid_price,
-                                current_bidder,
-                                buy_it_now_price,
-                            })
-                        } else {
-                            None
-                        };
+                        let auction_listing = AuctionListing::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        ).unwrap();
 
                         // Reconstruct the full listing and offer models and create DB objects
                         if let Some(auction_listing) = auction_listing {

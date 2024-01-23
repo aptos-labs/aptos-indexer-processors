@@ -9,9 +9,11 @@ use crate::utils::util::{
     deserialize_string_from_hexstring, hash_str, standardize_address, truncate_str,
 };
 use anyhow::{Context, Result};
+use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
+use crate::models::default_models::move_resources::MoveResource;
 
 pub const TOKEN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000003";
 pub const NAME_LENGTH: usize = 128;
@@ -189,6 +191,27 @@ pub struct TokenType {
     pub id: TokenIdType,
     #[serde(deserialize_with = "deserialize_property_map_from_bcs_hexstring")]
     pub token_properties: serde_json::Value,
+}
+
+impl TokenType {
+    pub fn from_marketplace_write_resource(
+        write_resource: &WriteResource,
+        contract_address: &str,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let data = write_resource.data.as_str();
+        if type_str != format!("{}::listing::TokenV1Container", contract_address) {
+            return Ok(None);
+        }
+
+        serde_json::from_str(&write_resource.data)
+            .map(|inner| Some(inner))
+            .context(format!(
+                "TokenType from write resource with version {} failed! failed to parse data {:?}",
+                txn_version, data
+            ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
