@@ -26,6 +26,10 @@ const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 /// GRPC connection id
 const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
+/// We will try to reconnect to GRPC 5 times in case upstream connection is being updated
+pub const RECONNECTION_MAX_RETRIES: u64 = 65;
+/// 80MB
+pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 80;
 
 pub fn grpc_request_builder(
     starting_version: u64,
@@ -99,8 +103,8 @@ pub async fn get_stream(
         Ok(client) => client
             .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
             .send_compressed(tonic::codec::CompressionEncoding::Gzip)
-            .max_decoding_message_size(crate::worker::MAX_RESPONSE_SIZE)
-            .max_encoding_message_size(crate::worker::MAX_RESPONSE_SIZE),
+            .max_decoding_message_size(MAX_RESPONSE_SIZE)
+            .max_encoding_message_size(MAX_RESPONSE_SIZE),
         Err(e) => {
             error!(
                 processor_name = processor_name,
@@ -461,7 +465,7 @@ pub async fn create_fetcher_loop(
             // TODO: Turn this into exponential backoff
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-            if reconnection_retries >= crate::worker::RECONNECTION_MAX_RETRIES {
+            if reconnection_retries >= RECONNECTION_MAX_RETRIES {
                 error!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
