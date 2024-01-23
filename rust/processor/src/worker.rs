@@ -43,7 +43,7 @@ pub const BUFFER_SIZE: usize = 100;
 // 40MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 40;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
-pub const RECONNECTION_MAX_RETRIES: u64 = 100;
+pub const RECONNECTION_MAX_RETRIES: u64 = 65;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 pub const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
