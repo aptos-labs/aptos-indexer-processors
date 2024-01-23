@@ -5,7 +5,6 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use std::sync::Arc;
 use super::{
     block_metadata_transactions::BlockMetadataTransaction,
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
@@ -24,6 +23,7 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]

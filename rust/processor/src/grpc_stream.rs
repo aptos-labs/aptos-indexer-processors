@@ -258,7 +258,7 @@ pub async fn create_fetcher_loop(
                     .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
-                let transactions = r.transactions.into_iter().map(|t| Arc::new(t)).collect();
+                let transactions = r.transactions.into_iter().map(Arc::new).collect();
                 let txn_pb = TransactionsPBResponse {
                     transactions,
                     chain_id,
