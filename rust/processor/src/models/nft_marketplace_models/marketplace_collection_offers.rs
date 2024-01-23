@@ -40,7 +40,6 @@ pub struct MarketplaceCollectionOffer {
 impl MarketplaceCollectionOffer {
     pub fn from_event(
         event: &Event,
-        event_index: i64,
         transaction_version: i64,
         transaction_timestamp: chrono::NaiveDateTime,
         entry_function_id_str: &Option<String>,
@@ -57,7 +56,7 @@ impl MarketplaceCollectionOffer {
                     Some(MarketplaceCollectionOffer {
                         collection_offer_id: marketplace_event.get_collection_offer_address(),
                         collection_id: marketplace_event.collection_metadata.get_collection_address().unwrap(),
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address,
+                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         buyer: marketplace_event.get_purchaser_address(),
                         item_price: marketplace_event.price.clone(),
                         remaining_token_amount: marketplace_event.remaining_token_amount.clone(),

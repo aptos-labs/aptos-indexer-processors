@@ -193,23 +193,30 @@ pub struct TokenType {
     pub token_properties: serde_json::Value,
 }
 
-impl TokenType {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenTypeWrapper {
+    pub token: TokenType,
+}
+
+impl TokenTypeWrapper {
     pub fn from_marketplace_write_resource(
         write_resource: &WriteResource,
         contract_address: &str,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
+        println!("from_marketplace_write_resource ------------- ");
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        let data = write_resource.data.as_str();
         if type_str != format!("{}::listing::TokenV1Container", contract_address) {
             return Ok(None);
         }
+
+        println!("write_resource.data: {}", write_resource.data);
 
         serde_json::from_str(&write_resource.data)
             .map(|inner| Some(inner))
             .context(format!(
                 "TokenType from write resource with version {} failed! failed to parse data {:?}",
-                txn_version, data
+                txn_version, &write_resource.data
             ))
     }
 }

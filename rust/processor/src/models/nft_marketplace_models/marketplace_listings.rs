@@ -40,7 +40,6 @@ pub struct MarketplaceListing {
 impl MarketplaceListing {
     pub fn from_event(
         event: &Event,
-        event_index: i64,
         transaction_version: i64,
         transaction_timestamp: chrono::NaiveDateTime,
         entry_function_id_str: &Option<String>,
@@ -59,7 +58,7 @@ impl MarketplaceListing {
                             listing_id: marketplace_event.get_listing_address(),
                             token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
                             collection_id: marketplace_event.token_metadata.get_collection_address(),
-                            fee_schedule_id: event.key.as_ref().unwrap().account_address,
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                             price: marketplace_event.price.clone(),
                             token_amount: BigDecimal::from(0),
                             token_standard: marketplace_event.token_metadata.get_token_standard(),
@@ -83,7 +82,7 @@ impl MarketplaceListing {
                         listing_id: marketplace_event.get_listing_address(),
                         token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
                         collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address,
+                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         price: marketplace_event.price.clone(),
                         token_amount: BigDecimal::from(0),
                         token_standard: marketplace_event.token_metadata.get_token_standard(),

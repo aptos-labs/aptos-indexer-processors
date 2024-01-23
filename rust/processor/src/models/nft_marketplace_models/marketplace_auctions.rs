@@ -43,7 +43,6 @@ pub struct MarketplaceAuction {
 impl MarketplaceAuction {
     pub fn from_event(
         event: &Event,
-        event_index: i64,
         transaction_version: i64,
         transaction_timestamp: chrono::NaiveDateTime,
         entry_function_id_str: &Option<String>,
@@ -62,9 +61,9 @@ impl MarketplaceAuction {
                             listing_id: marketplace_event.get_listing_address(),
                             token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
                             collection_id: marketplace_event.token_metadata.get_collection_address(),
-                            fee_schedule_id: event.key.as_ref().unwrap().account_address,
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                             seller: marketplace_event.get_seller_address(),
-                            bid_price: Some(marketplace_event.price),
+                            bid_price: Some(marketplace_event.price.clone()),
                             bidder: Some(marketplace_event.get_purchaser_address()),
                             starting_bid_price: BigDecimal::from(0),
                             buy_it_now_price: None,
