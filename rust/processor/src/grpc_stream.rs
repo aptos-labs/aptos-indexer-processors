@@ -28,8 +28,8 @@ const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 /// We will try to reconnect to GRPC 5 times in case upstream connection is being updated
 pub const RECONNECTION_MAX_RETRIES: u64 = 65;
-/// 80MB
-pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 80;
+/// 256MB
+pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
 
 pub fn grpc_request_builder(
     starting_version: u64,
