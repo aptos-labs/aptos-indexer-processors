@@ -28,7 +28,7 @@ use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -463,7 +463,7 @@ impl ProcessorTrait for TokenProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,

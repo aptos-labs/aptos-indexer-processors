@@ -48,7 +48,7 @@ use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 type StartVersion = u64;
 type EndVersion = u64;
@@ -70,7 +70,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     /// Process all transactions including writing to the database
     async fn process_transactions(
         &self,
-        transactions: Vec<ProtoTransaction>,
+        transactions: Vec<Arc<ProtoTransaction>>,
         start_version: u64,
         end_version: u64,
         db_chain_id: Option<u64>,

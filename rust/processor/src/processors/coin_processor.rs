@@ -24,7 +24,7 @@ use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -250,7 +250,7 @@ impl ProcessorTrait for CoinProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,

@@ -5,6 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
+use std::sync::Arc;
 use super::{
     block_metadata_transactions::BlockMetadataTransaction,
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
@@ -219,7 +220,7 @@ impl Transaction {
     }
 
     pub fn from_transactions(
-        transactions: &[TransactionPB],
+        transactions: &Vec<Arc<TransactionPB>>,
     ) -> (
         Vec<Self>,
         Vec<BlockMetadataTransaction>,

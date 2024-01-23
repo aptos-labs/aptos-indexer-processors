@@ -27,6 +27,7 @@ use google_cloud_pubsub::client::{Client, ClientConfig};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tracing::info;
@@ -87,7 +88,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         db_chain_id: Option<u64>,
@@ -188,7 +189,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
 /// Copied from token_processor;
 async fn parse_v2_token(
-    transactions: &[Transaction],
+    transactions: &Vec<Arc<Transaction>>,
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {

@@ -56,7 +56,7 @@ impl ProcessorTrait for MonitoringProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,

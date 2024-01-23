@@ -41,7 +41,7 @@ use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Chan
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub struct TokenV2Processor {
@@ -384,7 +384,7 @@ impl ProcessorTrait for TokenV2Processor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -454,7 +454,7 @@ impl ProcessorTrait for TokenV2Processor {
 }
 
 async fn parse_v2_token(
-    transactions: &[Transaction],
+    transactions: &Vec<Arc<Transaction>>,
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
 ) -> (

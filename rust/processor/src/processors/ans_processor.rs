@@ -28,7 +28,7 @@ use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -383,7 +383,7 @@ impl ProcessorTrait for AnsProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _db_chain_id: Option<u64>,
@@ -455,7 +455,7 @@ impl ProcessorTrait for AnsProcessor {
 }
 
 fn parse_ans(
-    transactions: &[Transaction],
+    transactions: &[Arc<Transaction>],
     ans_v1_primary_names_table_handle: String,
     ans_v1_name_records_table_handle: String,
     ans_v2_contract_address: String,

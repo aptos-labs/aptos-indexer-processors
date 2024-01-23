@@ -33,7 +33,7 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -246,7 +246,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -302,7 +302,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
 async fn parse_v2_coin(
-    transactions: &[Transaction],
+    transactions: &Vec<Arc<Transaction>>,
     conn: &mut PgPoolConnection<'_>,
 ) -> (
     Vec<FungibleAssetActivity>,

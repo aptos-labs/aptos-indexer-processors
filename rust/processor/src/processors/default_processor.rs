@@ -24,7 +24,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tokio::join;
 use tracing::error;
 
@@ -348,7 +348,7 @@ impl ProcessorTrait for DefaultProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,

@@ -28,6 +28,7 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 type TableHandle = String;
 type Address = String;
@@ -360,7 +361,7 @@ impl TableMetadataForToken {
     /// Mapping from table handle to owner type, including type of the table (AKA resource type)
     /// from user transactions in a batch of transactions
     pub fn get_table_handle_to_owner_from_transactions(
-        transactions: &[Transaction],
+        transactions: &Vec<Arc<Transaction>>,
     ) -> TableHandleToOwner {
         let mut table_handle_to_owner: TableHandleToOwner = AHashMap::new();
         // Do a first pass to get all the table metadata in the batch.

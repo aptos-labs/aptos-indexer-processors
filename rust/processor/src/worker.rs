@@ -50,7 +50,7 @@ pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<Arc<Transaction>>,
     pub chain_id: u64,
     pub size_in_bytes: u64,
 }

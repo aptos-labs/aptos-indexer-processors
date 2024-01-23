@@ -17,7 +17,7 @@ use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub struct UserTransactionProcessor {
@@ -133,7 +133,7 @@ impl ProcessorTrait for UserTransactionProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -149,7 +149,7 @@ impl ProcessorTrait for UserTransactionProcessor {
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
                     inner,
-                    &txn.timestamp.unwrap(),
+                    &txn.timestamp.clone().unwrap(),
                     block_height,
                     txn.epoch as i64,
                     txn_version,

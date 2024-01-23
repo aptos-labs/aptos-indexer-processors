@@ -13,7 +13,7 @@ use aptos_protos::indexer::v1::{
 };
 use futures_util::StreamExt;
 use prost::Message;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tonic::{Response, Streaming};
 use tracing::{error, info};
 use url::Url;
@@ -258,8 +258,9 @@ pub async fn create_fetcher_loop(
                     .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
+                let transactions = r.transactions.into_iter().map(|t| Arc::new(t)).collect();
                 let txn_pb = TransactionsPBResponse {
-                    transactions: r.transactions,
+                    transactions,
                     chain_id,
                     size_in_bytes,
                 };
