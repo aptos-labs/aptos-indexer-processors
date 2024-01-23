@@ -5,7 +5,7 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
         nft_marketplace_models::{
-            marketplace_activities::{MarketplaceActivity, MarketplaceEventType},
+            marketplace_activities::MarketplaceActivity,
             marketplace_auctions::MarketplaceAuction,
             marketplace_collection_offers::MarketplaceCollectionOffer,
             marketplace_listings::MarketplaceListing,
@@ -14,7 +14,7 @@ use crate::{
                 AuctionListing, CollectionOfferEventMetadata, CollectionOfferMetadata,
                 CollectionOfferV1, CollectionOfferV2, FixedPriceListing, ListingMetadata,
                 ListingTokenV1Container, MarketplaceCollectionMetadata, MarketplaceTokenMetadata,
-                TokenOfferMetadata, TokenOfferV1, TokenOfferV2,
+                TokenOfferMetadata, TokenOfferV1, TokenOfferV2, MarketplaceEvent, TokenMetadata, CollectionMetadata,
             },
         },
         token_models::token_utils::{CollectionDataIdType, TokenDataIdType},
@@ -64,18 +64,18 @@ impl Debug for MarketplacesProcessor {
 
 async fn insert_to_db_impl(
     conn: &mut MyDbConnection,
-    nft_marketplace_activities: &[MarketplaceActivity],
+    marketplace_activities: &[MarketplaceActivity],
     nft_marketplace_listings: &[MarketplaceListing],
     nft_marketplace_token_offers: &[MarketplaceTokenOffer],
     nft_marketplace_collection_offers: &[MarketplaceCollectionOffer],
     nft_marketplace_auctions: &[MarketplaceAuction],
 ) -> Result<(), diesel::result::Error> {
-    insert_nft_marketplace_activities(conn, nft_marketplace_activities).await?;
-    insert_current_nft_marketplace_listings(conn, nft_marketplace_listings).await?;
-    insert_current_nft_marketplace_token_offers(conn, nft_marketplace_token_offers).await?;
-    insert_current_nft_marketplace_collection_offers(conn, nft_marketplace_collection_offers)
+    insert_marketplace_activities(conn, marketplace_activities).await?;
+    insert_marketplace_listings(conn, nft_marketplace_listings).await?;
+    insert_marketplace_token_offers(conn, nft_marketplace_token_offers).await?;
+    insert_marketplace_collection_offers(conn, nft_marketplace_collection_offers)
         .await?;
-    insert_current_nft_marketplace_auctions(conn, nft_marketplace_auctions).await?;
+    insert_marketplace_auctions(conn, nft_marketplace_auctions).await?;
     Ok(())
 }
 
@@ -84,7 +84,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    nft_marketplace_activities: Vec<MarketplaceActivity>,
+    marketplace_activities: Vec<MarketplaceActivity>,
     nft_marketplace_listings: Vec<MarketplaceListing>,
     nft_marketplace_token_offers: Vec<MarketplaceTokenOffer>,
     nft_marketplace_collection_offers: Vec<MarketplaceCollectionOffer>,
@@ -102,7 +102,7 @@ async fn insert_to_db(
         .run::<_, Error, _>(|pg_conn| {
             Box::pin(insert_to_db_impl(
                 pg_conn,
-                &nft_marketplace_activities,
+                &marketplace_activities,
                 &nft_marketplace_listings,
                 &nft_marketplace_token_offers,
                 &nft_marketplace_collection_offers,
@@ -117,8 +117,8 @@ async fn insert_to_db(
                 .read_write()
                 .run::<_, Error, _>(|pg_conn| {
                     Box::pin(async {
-                        let nft_marketplace_activities =
-                            clean_data_for_db(nft_marketplace_activities, true);
+                        let marketplace_activities =
+                            clean_data_for_db(marketplace_activities, true);
                         let nft_marketplace_listings =
                             clean_data_for_db(nft_marketplace_listings, true);
                         let nft_marketplace_token_offers =
@@ -129,7 +129,7 @@ async fn insert_to_db(
                             clean_data_for_db(nft_marketplace_auctions, true);
                         insert_to_db_impl(
                             pg_conn,
-                            &nft_marketplace_activities,
+                            &marketplace_activities,
                             &nft_marketplace_listings,
                             &nft_marketplace_token_offers,
                             &nft_marketplace_collection_offers,
@@ -143,17 +143,17 @@ async fn insert_to_db(
     }
 }
 
-async fn insert_nft_marketplace_activities(
+async fn insert_marketplace_activities(
     conn: &mut MyDbConnection,
     item_to_insert: &[MarketplaceActivity],
 ) -> Result<(), diesel::result::Error> {
-    use schema::nft_marketplace_activities::dsl::*;
+    use schema::marketplace_activities::dsl::*;
 
     let chunks = get_chunks(item_to_insert.len(), MarketplaceActivity::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
-            diesel::insert_into(schema::nft_marketplace_activities::table)
+            diesel::insert_into(schema::marketplace_activities::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, event_index))
                 .do_nothing(),
@@ -164,17 +164,17 @@ async fn insert_nft_marketplace_activities(
     Ok(())
 }
 
-async fn insert_current_nft_marketplace_listings(
+async fn insert_marketplace_listings(
     conn: &mut MyDbConnection,
     item_to_insert: &[MarketplaceListing],
 ) -> Result<(), diesel::result::Error> {
-    use schema::current_nft_marketplace_listings::dsl::*;
+    use schema::marketplace_listings::dsl::*;
 
     let chunks = get_chunks(item_to_insert.len(), MarketplaceListing::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
-            diesel::insert_into(schema::current_nft_marketplace_listings::table)
+            diesel::insert_into(schema::marketplace_listings::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((listing_id, token_data_id))
                 .do_nothing(),
@@ -185,17 +185,17 @@ async fn insert_current_nft_marketplace_listings(
     Ok(())
 }
 
-async fn insert_current_nft_marketplace_token_offers(
+async fn insert_marketplace_token_offers(
     conn: &mut MyDbConnection,
     item_to_insert: &[MarketplaceTokenOffer],
 ) -> Result<(), diesel::result::Error> {
-    use schema::current_nft_marketplace_token_offers::dsl::*;
+    use schema::marketplace_token_offers::dsl::*;
 
     let chunks = get_chunks(item_to_insert.len(), MarketplaceTokenOffer::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
-            diesel::insert_into(schema::current_nft_marketplace_token_offers::table)
+            diesel::insert_into(schema::marketplace_token_offers::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((offer_id, token_data_id))
                 .do_nothing(),
@@ -206,11 +206,11 @@ async fn insert_current_nft_marketplace_token_offers(
     Ok(())
 }
 
-async fn insert_current_nft_marketplace_collection_offers(
+async fn insert_marketplace_collection_offers(
     conn: &mut MyDbConnection,
     item_to_insert: &[MarketplaceCollectionOffer],
 ) -> Result<(), diesel::result::Error> {
-    use schema::current_nft_marketplace_collection_offers::dsl::*;
+    use schema::marketplace_collection_offers::dsl::*;
 
     let chunks = get_chunks(
         item_to_insert.len(),
@@ -219,7 +219,7 @@ async fn insert_current_nft_marketplace_collection_offers(
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
-            diesel::insert_into(schema::current_nft_marketplace_collection_offers::table)
+            diesel::insert_into(schema::marketplace_collection_offers::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((collection_offer_id, collection_id))
                 .do_nothing(),
@@ -230,17 +230,17 @@ async fn insert_current_nft_marketplace_collection_offers(
     Ok(())
 }
 
-async fn insert_current_nft_marketplace_auctions(
+async fn insert_marketplace_auctions(
     conn: &mut MyDbConnection,
     item_to_insert: &[MarketplaceAuction],
 ) -> Result<(), diesel::result::Error> {
-    use schema::current_nft_marketplace_auctions::dsl::*;
+    use schema::marketplace_auctions::dsl::*;
 
     let chunks = get_chunks(item_to_insert.len(), MarketplaceAuction::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
             conn,
-            diesel::insert_into(schema::current_nft_marketplace_auctions::table)
+            diesel::insert_into(schema::marketplace_auctions::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((listing_id, token_data_id))
                 .do_nothing(),
@@ -267,11 +267,11 @@ impl ProcessorTrait for MarketplacesProcessor {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
         let (
-            nft_marketplace_activities,
-            current_nft_marketplace_listings,
-            current_nft_marketplace_token_offers,
-            current_nft_marketplace_collection_offers,
-            current_nft_marketplace_auctions,
+            marketplace_activities,
+            marketplace_listings,
+            marketplace_token_offers,
+            marketplace_collection_offers,
+            marketplace_auctions,
         ) = parse_transactions(&transactions).await;
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
 
@@ -282,11 +282,11 @@ impl ProcessorTrait for MarketplacesProcessor {
             self.name(),
             start_version,
             end_version,
-            nft_marketplace_activities,
-            current_nft_marketplace_listings,
-            current_nft_marketplace_token_offers,
-            current_nft_marketplace_collection_offers,
-            current_nft_marketplace_auctions,
+            marketplace_activities,
+            marketplace_listings,
+            marketplace_token_offers,
+            marketplace_collection_offers,
+            marketplace_auctions,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
@@ -324,7 +324,7 @@ async fn parse_transactions(
     Vec<MarketplaceCollectionOffer>,
     Vec<MarketplaceAuction>,
 ) {
-    let mut nft_marketplace_activities = vec![];
+    let mut marketplace_activities = vec![];
     let mut nft_listings = vec![];
     let mut nft_token_offers = vec![];
     let mut nft_collection_offers = vec![];
@@ -375,14 +375,14 @@ async fn parse_transactions(
                 get_entry_function_from_user_request(inner.request.as_ref().unwrap());
 
             // Get the events set. Only the events in the set will be indexed
-            let events_set = MarketplaceEventType::get_events_set();
+            let events_set = MarketplaceEvent::get_events_set();
 
             // Token metadatas parsed from events. The key is generated token_data_id for token v1,
             // and token address for token v2.
-            let mut token_metadatas: HashMap<String, MarketplaceTokenMetadata> = HashMap::new();
+            let mut token_metadatas: HashMap<String, TokenMetadata> = HashMap::new();
             // Collection metaddatas parsed from events. The key is generated collection_id for token v1,
             // and collection address for token v2.
-            let mut collection_metadatas: HashMap<String, MarketplaceCollectionMetadata> =
+            let mut collection_metadatas: HashMap<String, CollectionMetadata> =
                 HashMap::new();
 
             let mut collection_offer_filled_metadatas: HashMap<
@@ -398,16 +398,13 @@ async fn parse_transactions(
                 let event_type = type_str_vec[type_str_vec.len() - 1];
 
                 // Only the events in the set will be indexed
-                if !events_set.contains(event_type) {
-                    continue;
-                }
-
                 // TODO - We currently only index events from our own smart contracts
-                if !contract_addr.eq(marketplace_contract_address) {
+                if !events_set.contains(event_type) || !contract_addr.eq(marketplace_contract_address) {
                     continue;
                 }
 
                 let event_data = serde_json::from_str::<serde_json::Value>(&event.data).unwrap();
+                let activity_fee_schedule_id = event.key.as_ref().unwrap().account_address.as_str();
                 let price = event_data["price"]
                     .as_str()
                     .expect("Error: Price missing from marketplace activity")
@@ -422,533 +419,90 @@ async fn parse_transactions(
                         // collection_offer
                         standardize_address(event_data["collection_offer"].as_str().unwrap())
                     };
-
-                let activity_fee_schedule_id = event.key.as_ref().unwrap().account_address.as_str();
-                let token_metadata =
-                    MarketplaceTokenMetadata::from_event_data(&event_data).unwrap();
-                if let Some(token_metadata) = token_metadata.clone() {
-                    token_metadatas.insert(token_metadata.token_data_id.clone(), token_metadata);
+                
+                // Get the token and collection metadata from event.
+                let token_metadata = TokenMetadata::from_event(event, txn_version).unwrap();
+                if let Some(token_metadata) = token_metadata {
+                    token_metadatas.insert(token_metadata.get_token_address().unwrap(), token_metadata.clone());
                 }
-
                 let collection_metadata =
-                    MarketplaceCollectionMetadata::from_event_data(&event_data).unwrap();
+                    CollectionMetadata::from_event(event, txn_version).unwrap();
                 if let Some(collection_metadata) = collection_metadata {
                     collection_metadatas.insert(
-                        collection_metadata.collection_id.clone(),
+                        collection_metadata.get_collection_address().unwrap(),
                         collection_metadata,
                     );
                 }
 
-                let mut activity = Option::<MarketplaceActivity>::None;
-                let mut current_listing = Option::<MarketplaceListing>::None;
-                let mut current_token_offer = Option::<MarketplaceTokenOffer>::None;
-                let mut current_collection_offer = Option::<MarketplaceCollectionOffer>::None;
-                let mut current_auction: Option<MarketplaceAuction> = None;
-
-                // create the activity based on the event type
-                match event_type {
-                    MarketplaceEventType::LISTING_PLACED_EVENT => {
-                        // assert token_metadata exists
-                        if token_metadata.is_none() {
-                            continue;
-                        }
-
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id,
-                                token_data_id: Some(token_metadata.token_data_id),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price,
-                                token_amount: BigDecimal::from(1),
-                                token_standard: token_metadata.token_standard,
-                                seller: Some(standardize_address(
-                                    event_data["seller"].as_str().unwrap(),
-                                )),
-                                buyer: None,
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::LISTING_PLACED_EVENT.to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::LISTING_FILLED_EVENT => {
-                        // assert token_metadata exists
-                        let listing_type = event_data["type"].clone();
-                        if token_metadata.is_none() || listing_type.is_null() {
-                            continue;
-                        }
-
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id.clone(),
-                                token_data_id: Some(token_metadata.token_data_id.clone()),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price: price.clone(),
-                                token_amount: BigDecimal::from(1),
-                                token_standard: token_metadata.token_standard.clone(),
-                                seller: Some(standardize_address(
-                                    event_data["seller"].as_str().unwrap(),
-                                )),
-                                buyer: Some(standardize_address(
-                                    event_data["buyer"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::LISTING_FILLED_EVENT.to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-
-                            if listing_type == "auction" {
-                                current_auction = Some(MarketplaceAuction {
-                                    listing_id: activity_offer_or_listing_id,
-                                    token_data_id: token_metadata.token_data_id,
-                                    collection_id: token_metadata.collection_id,
-                                    fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                    seller: standardize_address(
-                                        event_data["seller"].as_str().unwrap(),
-                                    ),
-                                    current_bid_price: Some(price),
-                                    current_bidder: Some(standardize_address(
-                                        event_data["purcheser"].as_str().unwrap(),
-                                    )),
-                                    starting_bid_price: BigDecimal::from(1),
-                                    buy_it_now_price: None,
-                                    token_amount: BigDecimal::from(1),
-                                    expiration_time: BigDecimal::from(0),
-                                    is_deleted: true,
-                                    token_standard: token_metadata.token_standard,
-                                    coin_type: coin_type.clone(),
-                                    marketplace: "example_marketplace".to_string(),
-                                    contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                    entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                    last_transaction_version: txn_version,
-                                    last_transaction_timestamp: txn_timestamp,
-                                });
-                            } else {
-                                current_listing = Some(MarketplaceListing {
-                                    listing_id: activity_offer_or_listing_id,
-                                    token_data_id: token_metadata.token_data_id,
-                                    collection_id: token_metadata.collection_id,
-                                    fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                    seller: Some(standardize_address(
-                                        event_data["seller"].as_str().unwrap(),
-                                    )),
-                                    price,
-                                    token_amount: BigDecimal::from(0),
-                                    is_deleted: true,
-                                    token_standard: token_metadata.token_standard,
-                                    coin_type: coin_type.clone(),
-                                    marketplace: "example_marketplace".to_string(),
-                                    contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                    entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                    last_transaction_version: txn_version,
-                                    last_transaction_timestamp: txn_timestamp,
-                                });
-                            }
-                        }
-                    },
-                    MarketplaceEventType::LISTING_CANCELED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id.clone(),
-                                token_data_id: Some(token_metadata.token_data_id.clone()),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price: price.clone(),
-                                token_amount: BigDecimal::from(1),
-                                token_standard: token_metadata.token_standard.clone(),
-                                seller: Some(standardize_address(
-                                    event_data["seller"].as_str().unwrap(),
-                                )),
-                                buyer: None,
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::LISTING_CANCELED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-
-                            current_listing = Some(MarketplaceListing {
-                                listing_id: activity_offer_or_listing_id,
-                                token_data_id: token_metadata.token_data_id,
-                                collection_id: token_metadata.collection_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                seller: Some(standardize_address(
-                                    event_data["seller"].as_str().unwrap(),
-                                )),
-                                price,
-                                token_amount: BigDecimal::from(0),
-                                is_deleted: true,
-                                token_standard: token_metadata.token_standard,
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                last_transaction_version: txn_version,
-                                last_transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::COLLECTION_OFFER_PLACED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id,
-                                token_data_id: None,
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: None,
-                                property_version: None,
-                                price,
-                                token_amount: event_data["token_amount"]
-                                    .as_str()
-                                    .unwrap()
-                                    .parse::<BigDecimal>()
-                                    .unwrap(),
-                                token_standard: token_metadata.token_standard,
-                                seller: None,
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::COLLECTION_OFFER_PLACED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::COLLECTION_OFFER_CANCELED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id.clone(),
-                                token_data_id: None,
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: None,
-                                property_version: None,
-                                price: price.clone(),
-                                token_amount: event_data["token_amount"]
-                                    .as_str()
-                                    .unwrap()
-                                    .parse::<BigDecimal>()
-                                    .unwrap(),
-                                token_standard: token_metadata.token_standard.clone(),
-                                seller: None,
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::COLLECTION_OFFER_CANCELED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-
-                            current_collection_offer = Some(MarketplaceCollectionOffer {
-                                collection_offer_id: activity_offer_or_listing_id,
-                                collection_id: token_metadata.collection_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                buyer: standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                ),
-                                item_price: price,
-                                remaining_token_amount: event_data["remaining_token_amount"]
-                                    .as_str()
-                                    .unwrap()
-                                    .parse::<BigDecimal>()
-                                    .unwrap(),
-                                expiration_time: BigDecimal::from(0),
-                                is_deleted: true,
-                                token_standard: token_metadata.token_standard,
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                last_transaction_version: txn_version,
-                                transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::COLLECTION_OFFER_FILLED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id.clone(),
-                                token_data_id: Some(token_metadata.token_data_id),
-                                creator_address: token_metadata.creator_address.clone(),
-                                collection_name: token_metadata.collection_name.clone(),
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price: price.clone(),
-                                token_amount: match event_data
-                                    .get("remaining_token_amount")
-                                    .is_none()
-                                {
-                                    true => BigDecimal::from(0),
-                                    false => event_data["remaining_token_amount"]
-                                        .as_str()
-                                        .unwrap()
-                                        .parse::<BigDecimal>()
-                                        .unwrap(),
-                                },
-                                token_standard: token_metadata.token_standard.clone(),
-                                seller: Some(standardize_address(
-                                    event_data["seller"].as_str().unwrap(),
-                                )),
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::COLLECTION_OFFER_FILLED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-
-                            let collectiion_offer_filled_metadata = CollectionOfferEventMetadata {
-                                collection_offer_id: activity_offer_or_listing_id.clone(),
-                                collection_metadata: MarketplaceCollectionMetadata {
-                                    collection_id: token_metadata.collection_id,
-                                    collection_name: token_metadata.collection_name,
-                                    creator_address: token_metadata.creator_address,
-                                    token_standard: token_metadata.token_standard,
-                                },
-                                item_price: price,
-                                buyer: standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                ),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                            };
-                            collection_offer_filled_metadatas.insert(
-                                activity_offer_or_listing_id.clone(),
-                                collectiion_offer_filled_metadata,
-                            );
-                        }
-                    },
-                    MarketplaceEventType::TOKEN_OFFER_PLACED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id,
-                                token_data_id: Some(token_metadata.token_data_id),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price,
-                                token_amount: BigDecimal::from(1),
-                                token_standard: token_metadata.token_standard,
-                                seller: None,
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::TOKEN_OFFER_PLACED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::TOKEN_OFFER_CANCELED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id.clone(),
-                                token_data_id: Some(token_metadata.token_data_id.clone()),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price: price.clone(),
-                                token_amount: BigDecimal::from(0),
-                                token_standard: token_metadata.token_standard.clone(),
-                                seller: None,
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::TOKEN_OFFER_CANCELED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-
-                            current_token_offer = Some(MarketplaceTokenOffer {
-                                offer_id: activity_offer_or_listing_id,
-                                token_data_id: token_metadata.token_data_id,
-                                collection_id: token_metadata.collection_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                price,
-                                token_amount: BigDecimal::from(0),
-                                expiration_time: BigDecimal::from(0),
-                                is_deleted: true,
-                                token_standard: token_metadata.token_standard,
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                last_transaction_version: txn_version,
-                                last_transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::TOKEN_OFFER_FILLED_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id.clone(),
-                                token_data_id: Some(token_metadata.token_data_id.clone()),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price: price.clone(),
-                                token_amount: BigDecimal::from(1),
-                                token_standard: token_metadata.token_standard.clone(),
-                                seller: Some(standardize_address(
-                                    event_data["seller"].as_str().unwrap(),
-                                )),
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::TOKEN_OFFER_FILLED_EVENT
-                                    .to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-
-                            current_token_offer = Some(MarketplaceTokenOffer {
-                                offer_id: activity_offer_or_listing_id,
-                                token_data_id: token_metadata.token_data_id,
-                                collection_id: token_metadata.collection_id,
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                buyer: Some(standardize_address(
-                                    event_data["purchaser"].as_str().unwrap(),
-                                )),
-                                price,
-                                token_amount: BigDecimal::from(0),
-                                expiration_time: BigDecimal::from(0),
-                                is_deleted: true,
-                                token_standard: token_metadata.token_standard,
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                last_transaction_version: txn_version,
-                                last_transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    MarketplaceEventType::AUCTION_BID_EVENT => {
-                        if let Some(token_metadata) = token_metadata {
-                            activity = Some(MarketplaceActivity {
-                                transaction_version: txn_version,
-                                event_index: index as i64,
-                                offer_or_listing_id: activity_offer_or_listing_id.clone(),
-                                fee_schedule_id: activity_fee_schedule_id.to_string(),
-                                collection_id: token_metadata.collection_id,
-                                token_data_id: Some(token_metadata.token_data_id),
-                                creator_address: token_metadata.creator_address,
-                                collection_name: token_metadata.collection_name,
-                                token_name: Some(token_metadata.token_name),
-                                property_version: token_metadata.property_version,
-                                price: event_data["new_bid"]
-                                    .as_str()
-                                    .unwrap()
-                                    .parse::<BigDecimal>()
-                                    .unwrap(),
-                                token_amount: BigDecimal::from(1),
-                                token_standard: token_metadata.token_standard,
-                                seller: None,
-                                buyer: Some(standardize_address(
-                                    event_data["new_bidder"].as_str().unwrap(),
-                                )),
-                                coin_type: coin_type.clone(),
-                                marketplace: "example_marketplace".to_string(),
-                                contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                entry_function_id_str: entry_function_id_str.clone().unwrap(),
-                                event_type: MarketplaceEventType::AUCTION_BID_EVENT.to_string(),
-                                transaction_timestamp: txn_timestamp,
-                            });
-                        }
-                    },
-                    &_ => {
-                        continue;
-                    },
+                // Get the acitivty, listing, token_offer, and auction from event.
+                if let Some(activity) = MarketplaceActivity::from_event(
+                    &event,
+                    index as i64,
+                    txn_version,
+                    txn_timestamp,
+                    &entry_function_id_str,
+                    &marketplace_contract_address,
+                    &coin_type,
+                ).unwrap() {
+                    marketplace_activities.push(activity);
                 }
-                nft_marketplace_activities.push(activity.unwrap());
-                if let Some(current_listing) = current_listing {
-                    nft_listings.push(current_listing);
+                if let Some(listing) = MarketplaceListing::from_event(
+                    &event,
+                    index as i64,
+                    txn_version,
+                    txn_timestamp,
+                    &entry_function_id_str,
+                    &marketplace_contract_address,
+                    &coin_type,
+                ).unwrap() {
+                    nft_listings.push(listing);
                 }
-                if let Some(token_offer) = current_token_offer {
+                if let Some(token_offer) = MarketplaceTokenOffer::from_event(
+                    &event,
+                    index as i64,
+                    txn_version,
+                    txn_timestamp,
+                    &entry_function_id_str,
+                    &marketplace_contract_address,
+                    &coin_type,
+                ).unwrap() {
                     nft_token_offers.push(token_offer);
                 }
-                if let Some(auction) = current_auction {
+                if let Some(auction) = MarketplaceAuction::from_event(
+                    &event,
+                    index as i64,
+                    txn_version,
+                    txn_timestamp,
+                    &entry_function_id_str,
+                    &marketplace_contract_address,
+                    &coin_type,
+                ).unwrap() {
                     nft_auctions.push(auction);
+                }
+                if let Some(collection_offer) = MarketplaceCollectionOffer::from_event(
+                    &event,
+                    index as i64,
+                    txn_version,
+                    txn_timestamp,
+                    &entry_function_id_str,
+                    &marketplace_contract_address,
+                    &coin_type,
+                ).unwrap() {
+                    nft_collection_offers.push(collection_offer);
+                    
+                    // The collection offer resource may be deleted after it is filled,
+                    // so we need to parse collection offer metadata from the event
+                    let collection_offer_filled_metadata = CollectionOfferEventMetadata {
+                        collection_offer_id: collection_offer.collection_offer_id.clone(),
+                        fee_schedule_id: collection_offer.fee_schedule_id.clone(),
+                        buyer: collection_offer.buyer.clone(),
+                        item_price: collection_offer.item_price.clone(),
+                        collection_metadata: collection_metadata.unwrap(),
+                    };
+                    collection_offer_filled_metadatas.insert(
+                        collection_offer_filled_metadata.collection_offer_id.clone(),
+                        collection_offer_filled_metadata,
+                    );
                 }
             }
 
@@ -1697,7 +1251,7 @@ async fn parse_transactions(
     }
 
     (
-        nft_marketplace_activities,
+        marketplace_activities,
         nft_listings,
         nft_token_offers,
         nft_collection_offers,

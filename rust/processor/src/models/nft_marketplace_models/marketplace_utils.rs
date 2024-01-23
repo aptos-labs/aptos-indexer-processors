@@ -4,7 +4,7 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use std::str::FromStr;
+use std::{str::FromStr, collections::HashSet};
 
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
@@ -13,12 +13,13 @@ use crate::{
     models::{
         ans_models::ans_utils::OptionalString,
         fungible_asset_models::v2_fungible_asset_utils::OptionalBigDecimal,
-        token_models::token_utils::{CollectionDataIdType, TokenDataIdType},
+        token_models::token_utils::{CollectionDataIdType, TokenDataIdType, NAME_LENGTH},
         token_v2_models::v2_token_utils::TokenStandard,
     },
-    utils::util::{deserialize_from_string, standardize_address},
+    utils::util::{deserialize_from_string, standardize_address, truncate_str},
 };
 use anyhow::{Context, Result};
+use aptos_protos::transaction::v1::Event;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MarketplaceTokenMetadata {
@@ -205,7 +206,7 @@ impl MarketplaceCollectionMetadata {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionOfferEventMetadata {
     pub collection_offer_id: String,
-    pub collection_metadata: MarketplaceCollectionMetadata,
+    pub collection_metadata: CollectionMetadata,
     pub item_price: BigDecimal,
     pub buyer: String,
     pub fee_schedule_id: String,
@@ -281,17 +282,25 @@ impl TokenMetadata {
         standardize_address(&self.creator_address)
     }
 
-    pub fn get_collection_address(&self) -> Option<String> {
+    pub fn get_collection_address(&self) -> String {
         if let Some(inner) = self.collection.get_string() {
-            Some(standardize_address(&inner))
+            standardize_address(&inner)
         } else {
             let token_data_id = TokenDataIdType::new(
                 self.creator_address.clone(),
                 self.collection_name.clone(),
                 self.token_name.clone(),
             );
-            Some(token_data_id.get_collection_id())
+            token_data_id.get_collection_id()
         }
+    }
+
+    pub fn get_collection_name_truncated(&self) -> String {
+        truncate_str(&self.collection_name, NAME_LENGTH)
+    }
+
+    pub fn get_token_name_truncated(&self) -> String {
+        truncate_str(&self.token_name, NAME_LENGTH)
     }
 
     pub fn get_token_address(&self) -> Option<String> {
@@ -310,16 +319,45 @@ impl TokenMetadata {
     pub fn get_property_version(&self) -> Option<BigDecimal> {
         self.property_version.vec.first().map(|x| x.0.clone())
     }
+
+    pub fn get_token_standard(&self) -> String {
+        if let Some(inner) = self.token.get_string() {
+            TokenStandard::V2.to_string()
+        } else {
+            TokenStandard::V1.to_string()
+        }
+    }
+
+    pub fn from_event(event: &Event, transaction_version: i64) -> anyhow::Result<Option<Self>> {
+        serde_json::from_str(&event.data)
+            .map(|inner| Some(inner))
+            .context(format!(
+                "TokenMetadata from event with version {} failed! failed to parse data {:?}",
+                transaction_version, event.data
+            ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CollectionMetadata {
     creator_address: String,
-    pub collection_name: String,
+    collection_name: String,
     collection: OptionalString,
 }
 
 impl CollectionMetadata {
+    pub fn new(
+        creator_address: String,
+        collection_name: String,
+        collection: OptionalString,
+    ) -> Self {
+        Self {
+            creator_address,
+            collection_name,
+            collection,
+        }
+    }
+
     pub fn get_creator_address(&self) -> String {
         standardize_address(&self.creator_address)
     }
@@ -343,6 +381,19 @@ impl CollectionMetadata {
             TokenStandard::V1.to_string()
         }
     }
+
+    pub fn get_collection_name_truncated(&self) -> String {
+        truncate_str(&self.collection_name, NAME_LENGTH)
+    }
+
+    pub fn from_event(event: &Event, transaction_version: i64) -> anyhow::Result<Option<Self>> {
+        serde_json::from_str(&event.data)
+            .map(|inner| Some(inner))
+            .context(format!(
+                "CollectionMetadata from event with version {} failed! failed to parse data {:?}",
+                transaction_version, event.data
+            ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -360,50 +411,75 @@ pub enum MarketplaceEvent {
 }
 
 impl MarketplaceEvent {
+    pub const LISTING_FILLED_EVENT: &'static str = "events::ListingFilledEvent";
+    pub const LISTING_CANCELED_EVENT: &'static str = "ListingCanceledEvent";
+    pub const LISTING_PLACED_EVENT: &'static str = "ListingPlacedEvent";
+    pub const COLLECTION_OFFER_PLACED_EVENT: &'static str = "CollectionOfferPlacedEvent";
+    pub const COLLECTION_OFFER_CANCELED_EVENT: &'static str = "CollectionOfferCanceledEvent";
+    pub const COLLECTION_OFFER_FILLED_EVENT: &'static str = "CollectionOfferFilledEvent";
+    pub const TOKEN_OFFER_PLACED_EVENT: &'static str = "TokenOfferPlacedEvent";
+    pub const TOKEN_OFFER_CANCELED_EVENT: &'static str = "TokenOfferCanceledEvent";
+    pub const TOKEN_OFFER_FILLED_EVENT: &'static str = "TokenOfferFilledEvent";
+    pub const AUCTION_BID_EVENT: &'static str = "AuctionBidEvent";
+
+    pub fn get_events_set() -> HashSet<&'static str> {
+        let mut events = HashSet::new();
+        events.insert(Self::LISTING_FILLED_EVENT);
+        events.insert(Self::LISTING_CANCELED_EVENT);
+        events.insert(Self::LISTING_PLACED_EVENT);
+        events.insert(Self::COLLECTION_OFFER_PLACED_EVENT);
+        events.insert(Self::COLLECTION_OFFER_CANCELED_EVENT);
+        events.insert(Self::COLLECTION_OFFER_FILLED_EVENT);
+        events.insert(Self::TOKEN_OFFER_PLACED_EVENT);
+        events.insert(Self::TOKEN_OFFER_CANCELED_EVENT);
+        events.insert(Self::TOKEN_OFFER_FILLED_EVENT);
+        events.insert(Self::AUCTION_BID_EVENT);
+        events
+    }
+    
     pub fn from_event(
         data_type: &str,
         data: &str,
         txn_version: i64,
-        contract_addr: &str,
     ) -> Result<Option<Self>> {
         match data_type {
-            x if x == format!("{}::event::ListingFilledEvent", contract_addr) => {
+            x if x.ends_with(Self::LISTING_FILLED_EVENT) => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::ListingFilledEvent(inner)))
             },
-            x if x == format!("{}::event::ListingCanceledEvent", contract_addr) => {
+            x if x.ends_with(Self::LISTING_CANCELED_EVENT) => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::ListingCanceledEvent(inner)))
             },
-            x if x == format!("{}::event::ListingPlacedEvent", contract_addr) => {
+            x if x.ends_with(Self::LISTING_PLACED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::ListingPlacedEvent(inner)))
             },
-            x if x == format!("{}::event::CollectionOfferPlacedEvent", contract_addr) => {
+            x if x.ends_with(Self::COLLECTION_OFFER_PLACED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::CollectionOfferPlacedEvent(inner)))
             },
-            x if x == format!("{}::event::CollectionOfferCanceledEvent", contract_addr) => {
+            x if x.ends_with(Self::COLLECTION_OFFER_CANCELED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::CollectionOfferCanceledEvent(inner)))
             },
-            x if x == format!("{}::event::CollectionOfferFilledEvent", contract_addr) => {
+            x if x.ends_with(Self::COLLECTION_OFFER_FILLED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::CollectionOfferFilledEvent(inner)))
             },
-            x if x == format!("{}::event::TokenOfferPlacedEvent", contract_addr) => {
+            x if x.ends_with(Self::TOKEN_OFFER_PLACED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::TokenOfferPlacedEvent(inner)))
             },
-            x if x == format!("{}::event::TokenOfferCanceledEvent", contract_addr) => {
+            x if x.ends_with(Self::TOKEN_OFFER_CANCELED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::TokenOfferCanceledEvent(inner)))
             },
-            x if x == format!("{}::event::TokenOfferFilledEvent", contract_addr) => {
+            x if x.ends_with(Self::TOKEN_OFFER_FILLED_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::TokenOfferFilledEvent(inner)))
             },
-            x if x == format!("{}::event::AuctionBidEvent", contract_addr) => {
+            x if x.ends_with(Self::AUCTION_BID_EVENT)  => {
                 serde_json::from_str(data)
                     .map(|inner| Some(Self::AuctionBidEvent(inner)))
             },
@@ -418,7 +494,7 @@ impl MarketplaceEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ListingFilledEvent {
-    token: String,
+    pub r#type: String,
     listing: String,
     seller: String,
     purchaser: String,
@@ -428,14 +504,22 @@ pub struct ListingFilledEvent {
 }
 
 impl ListingFilledEvent {
-    pub fn get_token_address(&self) -> String {
-        standardize_address(&self.token)
+    pub fn get_listing_address(&self) -> String {
+        standardize_address(&self.listing)
+    }
+
+    pub fn get_seller_address(&self) -> String {
+        standardize_address(&self.seller)
+    }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ListingCanceledEvent {
-    token: String,
+    pub r#type: String,
     listing: String,
     seller: String,
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -444,14 +528,19 @@ pub struct ListingCanceledEvent {
 }
 
 impl ListingCanceledEvent {
-    pub fn get_token_address(&self) -> String {
-        standardize_address(&self.token)
+
+    pub fn get_listing_address(&self) -> String {
+        standardize_address(&self.listing)
+    }
+
+    pub fn get_seller_address(&self) -> String {
+        standardize_address(&self.seller)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ListingPlacedEvent {
-    token: String,
+    pub r#type: String,
     listing: String,
     seller: String,
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -460,8 +549,12 @@ pub struct ListingPlacedEvent {
 }
 
 impl ListingPlacedEvent {
-    pub fn get_token_address(&self) -> String {
-        standardize_address(&self.token)
+    pub fn get_listing_address(&self) -> String {
+        standardize_address(&self.listing)
+    }
+
+    pub fn get_seller_address(&self) -> String {
+        standardize_address(&self.seller)
     }
 }
 
@@ -476,8 +569,12 @@ pub struct CollectionOfferPlacedEvent {
 }
 
 impl CollectionOfferPlacedEvent {
-    pub fn get_collection_address(&self) -> String {
+    pub fn get_collection_offer_address(&self) -> String {
         standardize_address(&self.collection_offer)
+    }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
     }
 }
 
@@ -492,8 +589,12 @@ pub struct CollectionOfferCanceledEvent {
 }
 
 impl CollectionOfferCanceledEvent {
-    pub fn get_collection_address(&self) -> String {
+    pub fn get_collection_offer_address(&self) -> String {
         standardize_address(&self.collection_offer)
+    }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
     }
 }
 
@@ -504,13 +605,20 @@ pub struct CollectionOfferFilledEvent {
     seller: String,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub price: BigDecimal,
-    pub remaining_token_amount: BigDecimal,
     pub token_metadata: TokenMetadata,
 }
 
 impl CollectionOfferFilledEvent {
-    pub fn get_collection_address(&self) -> String {
+    pub fn get_collection_offer_address(&self) -> String {
         standardize_address(&self.collection_offer)
+    }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
+    }
+
+    pub fn get_seller_address(&self) -> String {
+        standardize_address(&self.seller)
     }
 }
 
@@ -527,6 +635,10 @@ impl TokenOfferPlacedEvent {
     pub fn get_token_offer_address(&self) -> String {
         standardize_address(&self.token_offer)
     }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -541,6 +653,10 @@ pub struct TokenOfferCanceledEvent {
 impl TokenOfferCanceledEvent {
     pub fn get_token_offer_address(&self) -> String {
         standardize_address(&self.token_offer)
+    }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
     }
 }
 
@@ -557,6 +673,14 @@ pub struct TokenOfferFilledEvent {
 impl TokenOfferFilledEvent {
     pub fn get_token_offer_address(&self) -> String {
         standardize_address(&self.token_offer)
+    }
+
+    pub fn get_purchaser_address(&self) -> String {
+        standardize_address(&self.purchaser)
+    }
+
+    pub fn get_seller_address(&self) -> String {
+        standardize_address(&self.seller)
     }
 }
 
@@ -575,5 +699,17 @@ pub struct AuctionBidEvent {
 impl AuctionBidEvent {
     pub fn get_listing_address(&self) -> String {
         standardize_address(&self.listing)
+    }
+
+    pub fn get_new_bidder_address(&self) -> String {
+        standardize_address(&self.new_bidder)
+    }
+
+    pub fn get_previous_bidder_address(&self) -> Option<String> {
+        if let Some(previous_bidder) = &self.previous_bidder {
+            Some(standardize_address(previous_bidder))
+        } else {
+            None
+        }
     }
 }

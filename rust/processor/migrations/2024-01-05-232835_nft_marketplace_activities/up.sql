@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS marketplace_collection_offers (
   contract_address VARCHAR(66) NOT NULL,
   entry_function_id_str VARCHAR(512) NOT NULL,
   last_transaction_version BIGINT NOT NULL,
-  transaction_timestamp TIMESTAMP NOT NULL,
+  last_transaction_timestamp TIMESTAMP NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- constraints
   PRIMARY KEY (collection_offer_id, collection_id)

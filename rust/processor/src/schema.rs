@@ -437,135 +437,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    current_nft_marketplace_auctions (listing_id, token_data_id) {
-        #[max_length = 66]
-        listing_id -> Varchar,
-        #[max_length = 66]
-        token_data_id -> Varchar,
-        #[max_length = 66]
-        collection_id -> Varchar,
-        #[max_length = 66]
-        fee_schedule_id -> Varchar,
-        #[max_length = 66]
-        seller -> Varchar,
-        current_bid_price -> Nullable<Numeric>,
-        #[max_length = 66]
-        current_bidder -> Nullable<Varchar>,
-        starting_bid_price -> Numeric,
-        buy_it_now_price -> Nullable<Numeric>,
-        token_amount -> Numeric,
-        expiration_time -> Numeric,
-        is_deleted -> Bool,
-        #[max_length = 10]
-        token_standard -> Varchar,
-        #[max_length = 1000]
-        coin_type -> Nullable<Varchar>,
-        #[max_length = 100]
-        marketplace -> Varchar,
-        #[max_length = 66]
-        contract_address -> Varchar,
-        #[max_length = 512]
-        entry_function_id_str -> Varchar,
-        last_transaction_version -> Int8,
-        last_transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    current_nft_marketplace_collection_offers (collection_offer_id, collection_id) {
-        #[max_length = 66]
-        collection_offer_id -> Varchar,
-        #[max_length = 66]
-        collection_id -> Varchar,
-        #[max_length = 66]
-        fee_schedule_id -> Varchar,
-        #[max_length = 66]
-        buyer -> Varchar,
-        item_price -> Numeric,
-        remaining_token_amount -> Numeric,
-        expiration_time -> Numeric,
-        is_deleted -> Bool,
-        #[max_length = 10]
-        token_standard -> Varchar,
-        #[max_length = 1000]
-        coin_type -> Nullable<Varchar>,
-        #[max_length = 100]
-        marketplace -> Varchar,
-        #[max_length = 66]
-        contract_address -> Varchar,
-        #[max_length = 512]
-        entry_function_id_str -> Varchar,
-        last_transaction_version -> Int8,
-        transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    current_nft_marketplace_listings (listing_id, token_data_id) {
-        #[max_length = 66]
-        listing_id -> Varchar,
-        #[max_length = 66]
-        token_data_id -> Varchar,
-        #[max_length = 66]
-        collection_id -> Varchar,
-        #[max_length = 66]
-        fee_schedule_id -> Varchar,
-        price -> Numeric,
-        token_amount -> Numeric,
-        #[max_length = 10]
-        token_standard -> Varchar,
-        #[max_length = 66]
-        seller -> Nullable<Varchar>,
-        is_deleted -> Bool,
-        #[max_length = 1000]
-        coin_type -> Nullable<Varchar>,
-        #[max_length = 100]
-        marketplace -> Varchar,
-        #[max_length = 66]
-        contract_address -> Varchar,
-        #[max_length = 512]
-        entry_function_id_str -> Varchar,
-        last_transaction_version -> Int8,
-        last_transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    current_nft_marketplace_token_offers (offer_id, token_data_id) {
-        #[max_length = 66]
-        offer_id -> Varchar,
-        #[max_length = 66]
-        token_data_id -> Varchar,
-        #[max_length = 66]
-        collection_id -> Varchar,
-        #[max_length = 66]
-        fee_schedule_id -> Varchar,
-        #[max_length = 66]
-        buyer -> Varchar,
-        price -> Numeric,
-        token_amount -> Numeric,
-        expiration_time -> Numeric,
-        is_deleted -> Bool,
-        #[max_length = 10]
-        token_standard -> Varchar,
-        #[max_length = 1000]
-        coin_type -> Nullable<Varchar>,
-        #[max_length = 100]
-        marketplace -> Varchar,
-        #[max_length = 66]
-        contract_address -> Varchar,
-        #[max_length = 512]
-        entry_function_id_str -> Varchar,
-        last_transaction_version -> Int8,
-        last_transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     current_objects (object_address) {
         #[max_length = 66]
         object_address -> Varchar,
@@ -1029,7 +900,7 @@ diesel::table! {
         #[max_length = 512]
         entry_function_id_str -> Varchar,
         last_transaction_version -> Int8,
-        transaction_timestamp -> Timestamp,
+        last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -1131,48 +1002,6 @@ diesel::table! {
         inserted_at -> Timestamp,
         #[max_length = 66]
         state_key_hash -> Varchar,
-    }
-}
-
-diesel::table! {
-    nft_marketplace_activities (transaction_version, event_index) {
-        transaction_version -> Int8,
-        event_index -> Int8,
-        #[max_length = 66]
-        offer_or_listing_id -> Varchar,
-        #[max_length = 66]
-        fee_schedule_id -> Varchar,
-        #[max_length = 66]
-        collection_id -> Varchar,
-        #[max_length = 66]
-        token_data_id -> Nullable<Varchar>,
-        #[max_length = 66]
-        creator_address -> Varchar,
-        #[max_length = 100]
-        collection_name -> Varchar,
-        #[max_length = 100]
-        token_name -> Nullable<Varchar>,
-        property_version -> Nullable<Numeric>,
-        price -> Numeric,
-        token_amount -> Numeric,
-        #[max_length = 10]
-        token_standard -> Varchar,
-        #[max_length = 66]
-        seller -> Nullable<Varchar>,
-        #[max_length = 66]
-        buyer -> Nullable<Varchar>,
-        #[max_length = 1000]
-        coin_type -> Nullable<Varchar>,
-        #[max_length = 100]
-        marketplace -> Varchar,
-        #[max_length = 66]
-        contract_address -> Varchar,
-        #[max_length = 512]
-        entry_function_id_str -> Varchar,
-        #[max_length = 32]
-        event_type -> Varchar,
-        transaction_timestamp -> Timestamp,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -1568,10 +1397,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_delegated_voter,
     current_delegator_balances,
     current_fungible_asset_balances,
-    current_nft_marketplace_auctions,
-    current_nft_marketplace_collection_offers,
-    current_nft_marketplace_listings,
-    current_nft_marketplace_token_offers,
     current_objects,
     current_staking_pool_voter,
     current_table_items,
@@ -1598,7 +1423,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     marketplace_token_offers,
     move_modules,
     move_resources,
-    nft_marketplace_activities,
     nft_points,
     objects,
     processor_status,
