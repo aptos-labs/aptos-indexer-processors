@@ -147,9 +147,7 @@ impl Worker {
                 0
             });
 
-        let starting_version = self
-            .starting_version
-            .unwrap_or(starting_version_from_db);
+        let starting_version = self.starting_version.unwrap_or(starting_version_from_db);
 
         info!(
             processor_name = processor_name,
