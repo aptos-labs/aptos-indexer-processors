@@ -598,7 +598,7 @@ pub async fn do_processor(
             transactions_pb.transactions,
             start_version,
             end_version,
-            // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
+            // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initialized (e.g. so they can have a chain_id field set on new() funciton)
             Some(db_chain_id),
         )
         .await;
