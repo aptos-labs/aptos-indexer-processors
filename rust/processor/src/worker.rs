@@ -218,146 +218,100 @@ impl Worker {
             "[Parser] Fetching transaction batches from channel",
         );
         let txn_channel_fetch_latency = std::time::Instant::now();
-        let mut transactions_batches = vec![];
-        let mut last_fetched_version = batch_start_version as i64 - 1;
 
-        // Make a new thread that copies from one channel, into another: if it doesn't see any new data for
-        // `CONSUMER_THREAD_TIMEOUT_IN_SECS`: panic
         let stream_address = self.indexer_grpc_data_service_address.to_string();
         let processor_name_string = processor_name.to_string();
+        let auth_token = self.auth_token.clone();
 
-        let tasks = vec![];
+        let mut tasks = vec![];
         for task_index in (0..concurrent_tasks) {
             let join_handle = tokio::spawn(async move {
-                match timeout(
+                let txn_pb = match timeout(
                     Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
                     receiver.recv(),
                 )
                     .await
                 {
-                    let txn_pb = Ok(txn_pb) => match txn_pb {
-                        Ok(txn_pb) => {
-                            if let Some(existing_id) = db_chain_id {
-                                if txn_pb.chain_id != existing_id {
-                                    error!(
-                                    processor_name = processor_name,
-                                    stream_address = stream_address,
-                                    chain_id = txn_pb.chain_id,
-                                    existing_id = existing_id,
-                                    "[Parser] Stream somehow changed chain id!",
-                                );
-                                    panic!("[Parser] Stream somehow changed chain id!");
-                                }
-                            } else {
-                                db_chain_id = Some(
-                                    self.check_or_update_chain_id(txn_pb.chain_id as i64)
-                                        .await
-                                        .unwrap(),
-                                );
-                            }
-                            let current_fetched_version =
-                                txn_pb.transactions.as_slice().first().unwrap().version;
-                            if last_fetched_version + 1 != current_fetched_version as i64 {
-                                error!(
-                                batch_start_version = batch_start_version,
-                                last_fetched_version = last_fetched_version,
-                                current_fetched_version = current_fetched_version,
-                                "[Parser] Received batch with gap from GRPC stream"
-                            );
-                                panic!("[Parser] Received batch with gap from GRPC stream");
-                            }
-                            last_fetched_version =
-                                txn_pb.transactions.as_slice().last().unwrap().version as i64;
-                            txn_pb
-                        }
+                    Ok(txn_pb) => match txn_pb {
+                        Ok(txn_pb) => txn_pb,
                         // This happens when the channel is closed. We should panic.
                         Err(_e) => {
                             error!(
-                            processor_name = processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            stream_address = self.indexer_grpc_data_service_address.as_str(),
-                            "[Parser] Channel closed; stream ended."
-                        );
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                stream_address = self.indexer_grpc_data_service_address.as_str(),
+                                "[Parser] Channel closed; stream ended."
+                            );
                             panic!("[Parser] Channel closed");
                         }
                     },
                     Err(_) => {
                         error!(
-                        processor_name = processor_name,
-                        service_type = PROCESSOR_SERVICE_TYPE,
-                        stream_address = stream_address,
-                        "[Parser] Consumer thread timed out waiting for transactions",
-                    );
+                            processor_name = processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            stream_address = stream_address,
+                            "[Parser] Consumer thread timed out waiting for transactions",
+                        );
                         panic!("[Parser] Consumer thread timed out waiting for transactions");
                     }
                 };
-            });
-        }
 
-            let size_in_bytes = transactions_batches
-                .iter()
-                .fold(0.0, |acc, txn_batch| acc + txn_batch.size_in_bytes as f64);
-            let batch_start_txn_timestamp = transactions_batches
-                .first()
-                .unwrap()
-                .transactions
-                .as_slice()
-                .first()
-                .unwrap()
-                .timestamp
-                .clone();
-            let batch_end_txn_timestamp = transactions_batches
-                .last()
-                .unwrap()
-                .transactions
-                .as_slice()
-                .last()
-                .unwrap()
-                .timestamp
-                .clone();
-            info!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                start_version = batch_start_version,
-                end_version = last_fetched_version,
-                num_of_transactions = last_fetched_version - batch_start_version as i64 + 1,
-                size_in_bytes,
-                duration_in_secs = txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                tps = (last_fetched_version as f64 - batch_start_version as f64)
-                    / txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                bytes_per_sec = size_in_bytes / txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                "[Parser] Successfully fetched transaction batches from channel."
-            );
+                let size_in_bytes = txn_pb.size_in_bytes as f64;
+                let first_txn = txn_pb.transactions.as_slice().first().unwrap();
+                let last_txn = txn_pb.transactions.as_slice().last().unwrap();
+                info!(
+                    processor_name = processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    start_version = batch_start_version,
+                    end_version = first_txn.version,
+                    num_of_transactions = last_txn.version - batch_start_version as i64 + 1,
+                    size_in_bytes,
+                    duration_in_secs = txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                    tps = (last_txn.version as f64 - batch_start_version as f64)
+                        / txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                    bytes_per_sec =
+                        size_in_bytes / txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                    "[Parser][T#{}] Successfully fetched transaction batches from channel.",
+                    task_index
+                );
 
-            // Process the transactions in parallel
-            let mut tasks = vec![];
-            for transactions_pb in transactions_batches {
+                if let Some(existing_id) = db_chain_id {
+                    if txn_pb.chain_id != existing_id {
+                        error!(
+                            processor_name = processor_name,
+                            stream_address = stream_address,
+                            chain_id = txn_pb.chain_id,
+                            existing_id = existing_id,
+                            "[Parser][T#{}] Stream somehow changed chain id!",
+                            task_index
+                        );
+                        panic!(
+                            "[Parser][T#{}] Stream somehow changed chain id!",
+                            task_index
+                        );
+                    }
+                } else {
+                    db_chain_id = Some(
+                        self.check_or_update_chain_id(txn_pb.chain_id as i64)
+                            .await
+                            .unwrap(),
+                    );
+                }
+
                 let processor_clone = processor.clone();
-                let auth_token = self.auth_token.clone();
-                let task = tokio::spawn(async move {
-                    do_processor(
-                        transactions_pb,
-                        processor_clone,
-                        db_chain_id,
-                        processor_name,
-                        &auth_token,
-                        enable_verbose_logging,
-                    )
-                        .await
-                });
-                tasks.push(task);
-            }
-            let processing_time = std::time::Instant::now();
-            let task_count = tasks.len();
-            let batches = match futures::future::try_join_all(tasks).await {
-                Ok(res) => res,
-                Err(err) => panic!("[Parser] Error processing transaction batches: {:?}", err),
-            };
+                let processing_time = std::time::Instant::now();
 
-            // Update states depending on results of the batch processing
-            let mut processed_versions = vec![];
-            for res in batches {
-                let processed: ProcessingResult = match res {
+                let res = do_processor(
+                    txn_pb,
+                    processor_clone,
+                    db_chain_id,
+                    processor_name,
+                    &auth_token,
+                    enable_verbose_logging,
+                )
+                    .await;
+
+                let processed = match res {
                     Ok(versions) => {
                         PROCESSOR_SUCCESSES_COUNT
                             .with_label_values(&[processor_name])
@@ -366,11 +320,11 @@ impl Worker {
                     }
                     Err(e) => {
                         error!(
-                            processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
-                            error = ?e,
-                            "[Parser] Error processing transactions"
-                        );
+                        processor_name = processor_name,
+                        stream_address = self.indexer_grpc_data_service_address.to_string(),
+                        error = ?e,
+                        "[Parser] Error processing transactions"
+                    );
                         PROCESSOR_ERRORS_COUNT
                             .with_label_values(&[processor_name])
                             .inc();
@@ -380,115 +334,139 @@ impl Worker {
                         );
                     }
                 };
-                processed_versions.push(processed);
-            }
 
-            // Make sure there are no gaps and advance states
-            processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
-            let mut prev_start = None;
-            let mut prev_end = None;
-            let mut max_processing_duration_in_secs: f64 = 0.0;
-            let mut max_db_insertion_duration_in_secs: f64 = 0.0;
-            let processed_versions_sorted = processed_versions.clone();
-            for processing_result in processed_versions {
-                let start = processing_result.start_version;
-                let end = processing_result.end_version;
-                max_processing_duration_in_secs = max_processing_duration_in_secs
-                    .max(processing_result.processing_duration_in_secs);
+                let mut max_processing_duration_in_secs: f64 = 0.0;
+                let mut max_db_insertion_duration_in_secs: f64 = 0.0;
+                max_processing_duration_in_secs =
+                    max_processing_duration_in_secs.max(processed.processing_duration_in_secs);
                 max_db_insertion_duration_in_secs = max_db_insertion_duration_in_secs
-                    .max(processing_result.db_insertion_duration_in_secs);
-                if prev_start.is_none() {
-                    prev_start = Some(start);
-                    prev_end = Some(end);
-                } else {
-                    if prev_end.unwrap() + 1 != start {
-                        error!(
-                            processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
-                            processed_versions = processed_versions_sorted
-                                .iter()
-                                .map(|result| format!(
-                                    "{}-{}",
-                                    result.start_version, result.end_version
-                                ))
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                            "[Parser] Gaps in processing stream"
-                        );
-                        panic!();
-                    }
-                    prev_start = Some(start);
-                    prev_end = Some(end);
-                }
-            }
-            let batch_start = processed_versions_sorted.first().unwrap().start_version;
-            let batch_end = processed_versions_sorted.last().unwrap().end_version;
-            batch_start_version = batch_end + 1;
+                    .max(processed.db_insertion_duration_in_secs);
 
-            processor
-                .update_last_processed_version(batch_end, batch_end_txn_timestamp.clone())
-                .await
-                .unwrap();
-
-            ma.tick_now(batch_end - batch_start + 1);
-            info!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                start_version = batch_start,
-                end_version = batch_end,
-                start_txn_timestamp_iso = batch_start_txn_timestamp
-                    .clone()
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
-                end_txn_timestamp_iso = batch_end_txn_timestamp
-                    .map(|t| timestamp_to_iso(&t))
-                    .unwrap_or_default(),
-                num_of_transactions = batch_end - batch_start + 1,
-                task_count,
-                size_in_bytes,
-                duration_in_secs = processing_time.elapsed().as_secs_f64(),
-                tps = (ma.avg() * 1000.0) as u64,
-                bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
-                step = ProcessorStep::ProcessedMultipleBatches.get_step(),
-                "{}",
-                ProcessorStep::ProcessedMultipleBatches.get_label(),
-            );
-            LATEST_PROCESSED_VERSION
-                .with_label_values(&[
-                    processor_name,
-                    ProcessorStep::ProcessedMultipleBatches.get_step(),
-                    ProcessorStep::ProcessedMultipleBatches.get_label(),
-                ])
-                .set(batch_end as i64);
-            TRANSACTION_UNIX_TIMESTAMP
-                .with_label_values(&[
-                    processor_name,
-                    ProcessorStep::ProcessedMultipleBatches.get_step(),
-                    ProcessorStep::ProcessedMultipleBatches.get_label(),
-                ])
-                .set(
-                    batch_start_txn_timestamp
-                        .map(|t| timestamp_to_unixtime(&t))
-                        .unwrap_or_default(),
-                );
-            PROCESSED_BYTES_COUNT
-                .with_label_values(&[
-                    processor_name,
-                    ProcessorStep::ProcessedMultipleBatches.get_step(),
-                    ProcessorStep::ProcessedMultipleBatches.get_label(),
-                ])
-                .inc_by(size_in_bytes as u64);
-            NUM_TRANSACTIONS_PROCESSED_COUNT
-                .with_label_values(&[
-                    processor_name,
-                    ProcessorStep::ProcessedMultipleBatches.get_step(),
-                    ProcessorStep::ProcessedMultipleBatches.get_label(),
-                ])
-                .inc_by(batch_end - batch_start + 1);
-            MULTI_BATCH_PROCESSING_TIME_IN_SECS
-                .with_label_values(&[processor_name])
-                .set(processing_time.elapsed().as_secs_f64());
+                processor
+                    .update_last_processed_version(batch_end, batch_end_txn_timestamp.clone())
+                    .await
+                    .unwrap();
+            });
+            tasks.push(join_handle);
         }
+
+        // Process the transactions in parallel
+
+        let processing_time = std::time::Instant::now();
+        let task_count = tasks.len();
+
+        // This will be forever, until all the indexer dies
+        // This will be forever, until all the indexer dies
+        // This will be forever, until all the indexer dies
+        futures::future::try_join_all(tasks).await.expect("[Processor] Processor tasks have died");
+
+        // Update states depending on results of the batch processing
+        let mut processed_versions = vec![];
+
+        // TODO: MAKE THIS GAP HANDLING CODE WORK FOR OUR NEW ASYNC WORLD!
+        // Make sure there are no gaps and advance states
+        processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
+        let mut prev_start = None;
+        let mut prev_end = None;
+        let mut max_processing_duration_in_secs: f64 = 0.0;
+        let mut max_db_insertion_duration_in_secs: f64 = 0.0;
+        let processed_versions_sorted = processed_versions.clone();
+        for processing_result in processed_versions {
+            let start = processing_result.start_version;
+            let end = processing_result.end_version;
+            max_processing_duration_in_secs =
+                max_processing_duration_in_secs.max(processing_result.processing_duration_in_secs);
+            max_db_insertion_duration_in_secs = max_db_insertion_duration_in_secs
+                .max(processing_result.db_insertion_duration_in_secs);
+
+            if prev_start.is_none() {
+                prev_start = Some(start);
+                prev_end = Some(end);
+            } else {
+                if prev_end.unwrap() + 1 != start {
+                    error!(
+                        processor_name = processor_name,
+                        stream_address = self.indexer_grpc_data_service_address.to_string(),
+                        processed_versions = processed_versions_sorted
+                            .iter()
+                            .map(|result| format!(
+                                "{}-{}",
+                                result.start_version, result.end_version
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        "[Parser] Gaps in processing stream"
+                    );
+                    panic!();
+                }
+                prev_start = Some(start);
+                prev_end = Some(end);
+            }
+        }
+
+        processor
+            .update_last_processed_version(batch_end, batch_end_txn_timestamp.clone())
+            .await
+            .unwrap();
+
+        ma.tick_now(batch_end - batch_start + 1);
+        info!(
+            processor_name = processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            start_version = batch_start,
+            end_version = batch_end,
+            start_txn_timestamp_iso = batch_start_txn_timestamp
+                .clone()
+                .map(|t| timestamp_to_iso(&t))
+                .unwrap_or_default(),
+            end_txn_timestamp_iso = batch_end_txn_timestamp
+                .map(|t| timestamp_to_iso(&t))
+                .unwrap_or_default(),
+            num_of_transactions = batch_end - batch_start + 1,
+            task_count,
+            size_in_bytes,
+            duration_in_secs = processing_time.elapsed().as_secs_f64(),
+            tps = (ma.avg() * 1000.0) as u64,
+            bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
+            step = ProcessorStep::ProcessedMultipleBatches.get_step(),
+            "{}",
+            ProcessorStep::ProcessedMultipleBatches.get_label(),
+        );
+        LATEST_PROCESSED_VERSION
+            .with_label_values(&[
+                processor_name,
+                ProcessorStep::ProcessedMultipleBatches.get_step(),
+                ProcessorStep::ProcessedMultipleBatches.get_label(),
+            ])
+            .set(batch_end as i64);
+        TRANSACTION_UNIX_TIMESTAMP
+            .with_label_values(&[
+                processor_name,
+                ProcessorStep::ProcessedMultipleBatches.get_step(),
+                ProcessorStep::ProcessedMultipleBatches.get_label(),
+            ])
+            .set(
+                batch_start_txn_timestamp
+                    .map(|t| timestamp_to_unixtime(&t))
+                    .unwrap_or_default(),
+            );
+        PROCESSED_BYTES_COUNT
+            .with_label_values(&[
+                processor_name,
+                ProcessorStep::ProcessedMultipleBatches.get_step(),
+                ProcessorStep::ProcessedMultipleBatches.get_label(),
+            ])
+            .inc_by(size_in_bytes as u64);
+        NUM_TRANSACTIONS_PROCESSED_COUNT
+            .with_label_values(&[
+                processor_name,
+                ProcessorStep::ProcessedMultipleBatches.get_step(),
+                ProcessorStep::ProcessedMultipleBatches.get_label(),
+            ])
+            .inc_by(batch_end - batch_start + 1);
+        MULTI_BATCH_PROCESSING_TIME_IN_SECS
+            .with_label_values(&[processor_name])
+            .set(processing_time.elapsed().as_secs_f64());
     }
 
     async fn run_migrations(&self) {
