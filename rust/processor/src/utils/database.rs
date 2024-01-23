@@ -45,7 +45,7 @@ pub const MAX_DIESEL_PARAM_SIZE: u16 = u16::MAX / 2;
 /// we may need to chunk an array of items based on how many columns are in the table.
 /// This function returns boundaries of chunks in the form of (start_index, end_index)
 pub fn get_chunks(num_items_to_insert: usize, _column_count: usize) -> Vec<(usize, usize)> {
-    let max_item_size = 30; // MAX_DIESEL_PARAM_SIZE as usize / column_count;
+    let max_item_size = 40; // MAX_DIESEL_PARAM_SIZE as usize / column_count;
     let mut chunk: (usize, usize) = (0, min(num_items_to_insert, max_item_size));
     let mut chunks = vec![chunk];
     while chunk.1 != num_items_to_insert {
@@ -130,7 +130,7 @@ pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     };
     let pool = Pool::builder()
         // TODO: MAKE THIS CONFIGURABLE!
-        .max_size(650)
+        .max_size(800)
         .build(config)
         .await?;
     Ok(Arc::new(pool))
