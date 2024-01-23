@@ -40,8 +40,8 @@ use url::Url;
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
 pub const BUFFER_SIZE: usize = 100;
-// 20MB
-pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 20;
+// 40MB
+pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 40;
 // We will try to reconnect to GRPC 5 times in case upstream connection is being updated
 pub const RECONNECTION_MAX_RETRIES: u64 = 100;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
