@@ -242,192 +242,194 @@ impl Worker {
             let receiver_clone = receiver.clone();
 
             let join_handle = tokio::spawn(async move {
-                let txn_pb = match timeout(
-                    Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
-                    receiver_clone.recv(),
-                )
-                .await
-                {
-                    Ok(txn_pb) => match txn_pb {
-                        Ok(txn_pb) => txn_pb,
-                        // This happens when the channel is closed. We should panic.
-                        Err(_e) => {
+                loop {
+                    let txn_pb = match timeout(
+                        Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
+                        receiver_clone.recv(),
+                    )
+                    .await
+                    {
+                        Ok(txn_pb) => match txn_pb {
+                            Ok(txn_pb) => txn_pb,
+                            // This happens when the channel is closed. We should panic.
+                            Err(_e) => {
+                                error!(
+                                    processor_name = processor_name,
+                                    service_type = PROCESSOR_SERVICE_TYPE,
+                                    stream_address = stream_address,
+                                    "[Parser][T#{}] Channel closed; stream ended.",
+                                    task_index
+                                );
+                                panic!("[Parser][T#{}] Channel closed", task_index);
+                            },
+                        },
+                        Err(_) => {
                             error!(
                                 processor_name = processor_name,
                                 service_type = PROCESSOR_SERVICE_TYPE,
                                 stream_address = stream_address,
-                                "[Parser][T#{}] Channel closed; stream ended.",
+                                "[Parser][T#{}] Consumer thread timed out waiting for transactions",
                                 task_index
                             );
-                            panic!("[Parser][T#{}] Channel closed", task_index);
+                            panic!(
+                                "[Parser][T#{}] Consumer thread timed out waiting for transactions",
+                                task_index
+                            );
                         },
-                    },
-                    Err(_) => {
-                        error!(
-                            processor_name = processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            stream_address = stream_address,
-                            "[Parser][T#{}] Consumer thread timed out waiting for transactions",
-                            task_index
-                        );
-                        panic!(
-                            "[Parser][T#{}] Consumer thread timed out waiting for transactions",
-                            task_index
-                        );
-                    },
-                };
+                    };
 
-                let size_in_bytes = txn_pb.size_in_bytes as f64;
-                let first_txn = txn_pb.transactions.as_slice().first().unwrap();
-                let first_txn_version = first_txn.version;
-                let first_txn_timestamp = first_txn.timestamp.clone();
-                let last_txn = txn_pb.transactions.as_slice().last().unwrap();
-                let last_txn_version = last_txn.version;
-                let last_txn_timestamp = last_txn.timestamp.clone();
+                    let size_in_bytes = txn_pb.size_in_bytes as f64;
+                    let first_txn = txn_pb.transactions.as_slice().first().unwrap();
+                    let first_txn_version = first_txn.version;
+                    let first_txn_timestamp = first_txn.timestamp.clone();
+                    let last_txn = txn_pb.transactions.as_slice().last().unwrap();
+                    let last_txn_version = last_txn.version;
+                    let last_txn_timestamp = last_txn.timestamp.clone();
 
-                info!(
-                    processor_name = processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    start_version = first_txn_version,
-                    end_version = last_txn_version,
-                    num_of_transactions = (last_txn_version - first_txn_version) as i64 + 1,
-                    size_in_bytes,
-                    duration_in_secs = txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                    tps = (last_txn_version as f64 - first_txn_version as f64)
-                        / txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                    bytes_per_sec =
-                        size_in_bytes / txn_channel_fetch_latency.elapsed().as_secs_f64(),
-                    "[Parser][T#{}] Successfully fetched transaction batches from channel.",
-                    task_index
-                );
-
-                // Ensure chain_id has not changed
-                if txn_pb.chain_id != chain_id {
-                    error!(
+                    info!(
                         processor_name = processor_name,
-                        stream_address = stream_address,
-                        chain_id = txn_pb.chain_id,
-                        existing_id = chain_id,
-                        "[Parser][T#{}] Stream somehow changed chain id!",
+                        service_type = PROCESSOR_SERVICE_TYPE,
+                        start_version = first_txn_version,
+                        end_version = last_txn_version,
+                        num_of_transactions = (last_txn_version - first_txn_version) as i64 + 1,
+                        size_in_bytes,
+                        duration_in_secs = txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                        tps = (last_txn_version as f64 - first_txn_version as f64)
+                            / txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                        bytes_per_sec =
+                            size_in_bytes / txn_channel_fetch_latency.elapsed().as_secs_f64(),
+                        "[Parser][T#{}] Successfully fetched transaction batches from channel.",
                         task_index
                     );
-                    panic!(
-                        "[Parser][T#{}] Stream somehow changed chain id!",
-                        task_index
-                    );
-                }
 
-                let processing_time = std::time::Instant::now();
-
-                let res = do_processor(
-                    txn_pb,
-                    processor_clone.clone(),
-                    chain_id,
-                    processor_name,
-                    &auth_token,
-                    enable_verbose_logging,
-                )
-                .await;
-
-                let _processed = match res {
-                    Ok(versions) => {
-                        PROCESSOR_SUCCESSES_COUNT
-                            .with_label_values(&[processor_name])
-                            .inc();
-                        versions
-                    },
-                    Err(e) => {
+                    // Ensure chain_id has not changed
+                    if txn_pb.chain_id != chain_id {
                         error!(
                             processor_name = processor_name,
                             stream_address = stream_address,
-                            error = ?e,
-                            "[Parser][T#{}] Error processing transactions", task_index
+                            chain_id = txn_pb.chain_id,
+                            existing_id = chain_id,
+                            "[Parser][T#{}] Stream somehow changed chain id!",
+                            task_index
                         );
-                        PROCESSOR_ERRORS_COUNT
-                            .with_label_values(&[processor_name])
-                            .inc();
                         panic!(
-                            "[Parser][T#{}] Error processing '{:}' transactions: {:?}",
-                            task_index, processor_name, e
+                            "[Parser][T#{}] Stream somehow changed chain id!",
+                            task_index
                         );
-                    },
-                };
+                    }
 
-                /*
-                let mut max_processing_duration_in_secs: f64 = processed.processing_duration_in_secs;
-                let mut max_db_insertion_duration_in_secs: f64 = processed.db_insertion_duration_in_secs;
-                max_processing_duration_in_secs =
-                    max_processing_duration_in_secs.max(processed.processing_duration_in_secs);
-                max_db_insertion_duration_in_secs =
-                    max_db_insertion_duration_in_secs.max(processed.db_insertion_duration_in_secs);
-                   */
+                    let processing_time = std::time::Instant::now();
 
-                processor_clone
-                    .update_last_processed_version(last_txn_version, last_txn_timestamp.clone())
-                    .await
-                    .unwrap();
-
-                let mut ma_locked = ma_clone.lock().await;
-                ma_locked.tick_now(last_txn_version - first_txn_version + 1);
-                let tps = (ma_locked.avg() * 1000.0) as u64;
-                info!(
-                    processor_name = processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    start_version = first_txn_version,
-                    end_version = last_txn_version,
-                    start_txn_timestamp_iso = first_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_iso(&t))
-                        .unwrap_or_default(),
-                    end_txn_timestamp_iso = last_txn_timestamp
-                        .map(|t| timestamp_to_iso(&t))
-                        .unwrap_or_default(),
-                    num_of_transactions = last_txn_version - first_txn_version + 1,
-                    task_count = concurrent_tasks,
-                    size_in_bytes,
-                    duration_in_secs = processing_time.elapsed().as_secs_f64(),
-                    tps = tps,
-                    bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
-                    step = ProcessorStep::ProcessedMultipleBatches.get_step(),
-                    "{}",
-                    ProcessorStep::ProcessedMultipleBatches.get_label(),
-                );
-                LATEST_PROCESSED_VERSION
-                    .with_label_values(&[
+                    let res = do_processor(
+                        txn_pb,
+                        processor_clone.clone(),
+                        chain_id,
                         processor_name,
-                        ProcessorStep::ProcessedMultipleBatches.get_step(),
-                        ProcessorStep::ProcessedMultipleBatches.get_label(),
-                    ])
-                    .set(last_txn_version as i64);
-                // TODO: do an atomic thing, or ideally move to an async metrics collector!
-                TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[
-                        processor_name,
-                        ProcessorStep::ProcessedMultipleBatches.get_step(),
-                        ProcessorStep::ProcessedMultipleBatches.get_label(),
-                    ])
-                    .set(
-                        first_txn_timestamp
-                            .map(|t| timestamp_to_unixtime(&t))
+                        &auth_token,
+                        enable_verbose_logging,
+                    )
+                    .await;
+
+                    let _processed = match res {
+                        Ok(versions) => {
+                            PROCESSOR_SUCCESSES_COUNT
+                                .with_label_values(&[processor_name])
+                                .inc();
+                            versions
+                        },
+                        Err(e) => {
+                            error!(
+                                processor_name = processor_name,
+                                stream_address = stream_address,
+                                error = ?e,
+                                "[Parser][T#{}] Error processing transactions", task_index
+                            );
+                            PROCESSOR_ERRORS_COUNT
+                                .with_label_values(&[processor_name])
+                                .inc();
+                            panic!(
+                                "[Parser][T#{}] Error processing '{:}' transactions: {:?}",
+                                task_index, processor_name, e
+                            );
+                        },
+                    };
+
+                    /*
+                    let mut max_processing_duration_in_secs: f64 = processed.processing_duration_in_secs;
+                    let mut max_db_insertion_duration_in_secs: f64 = processed.db_insertion_duration_in_secs;
+                    max_processing_duration_in_secs =
+                        max_processing_duration_in_secs.max(processed.processing_duration_in_secs);
+                    max_db_insertion_duration_in_secs =
+                        max_db_insertion_duration_in_secs.max(processed.db_insertion_duration_in_secs);
+                       */
+
+                    processor_clone
+                        .update_last_processed_version(last_txn_version, last_txn_timestamp.clone())
+                        .await
+                        .unwrap();
+
+                    let mut ma_locked = ma_clone.lock().await;
+                    ma_locked.tick_now(last_txn_version - first_txn_version + 1);
+                    let tps = (ma_locked.avg() * 1000.0) as u64;
+                    info!(
+                        processor_name = processor_name,
+                        service_type = PROCESSOR_SERVICE_TYPE,
+                        start_version = first_txn_version,
+                        end_version = last_txn_version,
+                        start_txn_timestamp_iso = first_txn_timestamp
+                            .clone()
+                            .map(|t| timestamp_to_iso(&t))
                             .unwrap_or_default(),
+                        end_txn_timestamp_iso = last_txn_timestamp
+                            .map(|t| timestamp_to_iso(&t))
+                            .unwrap_or_default(),
+                        num_of_transactions = last_txn_version - first_txn_version + 1,
+                        task_count = concurrent_tasks,
+                        size_in_bytes,
+                        duration_in_secs = processing_time.elapsed().as_secs_f64(),
+                        tps = tps,
+                        bytes_per_sec = size_in_bytes / processing_time.elapsed().as_secs_f64(),
+                        step = ProcessorStep::ProcessedMultipleBatches.get_step(),
+                        "{}",
+                        ProcessorStep::ProcessedMultipleBatches.get_label(),
                     );
-                PROCESSED_BYTES_COUNT
-                    .with_label_values(&[
-                        processor_name,
-                        ProcessorStep::ProcessedMultipleBatches.get_step(),
-                        ProcessorStep::ProcessedMultipleBatches.get_label(),
-                    ])
-                    .inc_by(size_in_bytes as u64);
-                NUM_TRANSACTIONS_PROCESSED_COUNT
-                    .with_label_values(&[
-                        processor_name,
-                        ProcessorStep::ProcessedMultipleBatches.get_step(),
-                        ProcessorStep::ProcessedMultipleBatches.get_label(),
-                    ])
-                    .inc_by(last_txn_version - first_txn_version + 1);
-                MULTI_BATCH_PROCESSING_TIME_IN_SECS
-                    .with_label_values(&[processor_name])
-                    .set(processing_time.elapsed().as_secs_f64());
+                    LATEST_PROCESSED_VERSION
+                        .with_label_values(&[
+                            processor_name,
+                            ProcessorStep::ProcessedMultipleBatches.get_step(),
+                            ProcessorStep::ProcessedMultipleBatches.get_label(),
+                        ])
+                        .set(last_txn_version as i64);
+                    // TODO: do an atomic thing, or ideally move to an async metrics collector!
+                    TRANSACTION_UNIX_TIMESTAMP
+                        .with_label_values(&[
+                            processor_name,
+                            ProcessorStep::ProcessedMultipleBatches.get_step(),
+                            ProcessorStep::ProcessedMultipleBatches.get_label(),
+                        ])
+                        .set(
+                            first_txn_timestamp
+                                .map(|t| timestamp_to_unixtime(&t))
+                                .unwrap_or_default(),
+                        );
+                    PROCESSED_BYTES_COUNT
+                        .with_label_values(&[
+                            processor_name,
+                            ProcessorStep::ProcessedMultipleBatches.get_step(),
+                            ProcessorStep::ProcessedMultipleBatches.get_label(),
+                        ])
+                        .inc_by(size_in_bytes as u64);
+                    NUM_TRANSACTIONS_PROCESSED_COUNT
+                        .with_label_values(&[
+                            processor_name,
+                            ProcessorStep::ProcessedMultipleBatches.get_step(),
+                            ProcessorStep::ProcessedMultipleBatches.get_label(),
+                        ])
+                        .inc_by(last_txn_version - first_txn_version + 1);
+                    MULTI_BATCH_PROCESSING_TIME_IN_SECS
+                        .with_label_values(&[processor_name])
+                        .set(processing_time.elapsed().as_secs_f64());
+                }
             });
 
             tasks.push(join_handle);
