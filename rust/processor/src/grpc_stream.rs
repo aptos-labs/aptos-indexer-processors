@@ -137,7 +137,7 @@ pub async fn get_stream(
 /// 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
 /// all existing transactions are processed
 pub async fn create_fetcher_loop(
-    tx: tokio::sync::mpsc::Sender<TransactionsPBResponse>,
+    txn_sender: tokio::sync::mpsc::Sender<TransactionsPBResponse>,
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
@@ -212,7 +212,7 @@ pub async fn create_fetcher_loop(
                         .map(|t| timestamp_to_iso(&t))
                         .unwrap_or_default(),
                     num_of_transactions = end_version - start_version + 1,
-                    channel_size = buffer_size - tx.capacity(),
+                    channel_size = buffer_size - txn_sender.capacity(),
                     size_in_bytes = r.encoded_len() as f64,
                     duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64(),
                     tps = (r.transactions.len() as f64
@@ -263,14 +263,14 @@ pub async fn create_fetcher_loop(
                     chain_id,
                     size_in_bytes,
                 };
-                match tx.send(txn_pb.clone()).await {
+                match txn_sender.send(txn_pb.clone()).await {
                     Ok(()) => {},
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
                             stream_address = indexer_grpc_data_service_address.to_string(),
                             connection_id,
-                            channel_size = buffer_size - tx.capacity(),
+                            channel_size = buffer_size - txn_sender.capacity(),
                             error = ?e,
                             "[Parser] Error sending GRPC response to channel."
                         );
@@ -284,7 +284,7 @@ pub async fn create_fetcher_loop(
                     connection_id,
                     start_version = start_version,
                     end_version = end_version,
-                    channel_size = buffer_size - tx.capacity(),
+                    channel_size = buffer_size - txn_sender.capacity(),
                     size_in_bytes = txn_pb.size_in_bytes,
                     duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64(),
                     tps = (txn_pb.transactions.len() as f64
@@ -296,7 +296,7 @@ pub async fn create_fetcher_loop(
                 );
                 FETCHER_THREAD_CHANNEL_SIZE
                     .with_label_values(&[&processor_name])
-                    .set((buffer_size - tx.capacity()) as i64);
+                    .set((buffer_size - txn_sender.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
                 true
             },
@@ -344,7 +344,7 @@ pub async fn create_fetcher_loop(
             );
             // Wait for the fetched transactions to finish processing before closing the channel
             loop {
-                let channel_capacity = tx.capacity();
+                let channel_capacity = txn_sender.capacity();
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
