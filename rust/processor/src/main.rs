@@ -5,7 +5,6 @@ use anyhow::Result;
 use clap::Parser;
 use processor::IndexerGrpcProcessorConfig;
 use server_framework::ServerArgs;
-use tracing::info;
 
 const RUNTIME_WORKER_MULTIPLIER: usize = 2;
 
