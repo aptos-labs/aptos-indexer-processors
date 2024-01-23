@@ -757,11 +757,22 @@ impl BurnPlayerTokenEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BurnRoomEvent {
     object_address: String,
+    players: RoomPlayers,
 }
 
 impl BurnRoomEvent {
     pub fn get_object_address(&self) -> String {
         standardize_address(&self.object_address)
+    }
+
+    pub fn get_players(&self) -> Vec<String> {
+        let mut players = vec![];
+        for player_vec in &self.players.vec {
+            for player in player_vec {
+                players.push(player.get_address());
+            }
+        }
+        players
     }
 
     pub fn from_event(
