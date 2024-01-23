@@ -32,7 +32,7 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use diesel::Connection;
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
+use tokio::time::timeout;
 use tracing::{error, info};
 use url::Url;
 
@@ -178,7 +178,7 @@ impl Worker {
         // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
-        let (tx, mut receiver) = tokio::sync::mpsc::channel::<TransactionsPBResponse>(BUFFER_SIZE);
+        let (tx, mut receiver) = kanal::bounded_async::<TransactionsPBResponse>(BUFFER_SIZE);
         let request_ending_version = self.ending_version;
         let auth_token = self.auth_token.clone();
         tokio::spawn(async move {
@@ -201,7 +201,7 @@ impl Worker {
                 batch_start_version,
                 BUFFER_SIZE,
             )
-            .await
+                .await
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -211,100 +211,88 @@ impl Worker {
         // 4. We have not received anything in X seconds, we should panic.
         // 5. If it's the wrong chain, panic.
         let mut db_chain_id = None;
-        loop {
-            info!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = self.indexer_grpc_data_service_address.as_str(),
-                "[Parser] Fetching transaction batches from channel",
-            );
-            let txn_channel_fetch_latency = std::time::Instant::now();
-            let mut transactions_batches = vec![];
-            let mut last_fetched_version = batch_start_version as i64 - 1;
-            for task_index in 0..concurrent_tasks {
-                let receive_status = match task_index {
-                    0 => {
-                        // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
-                        match timeout(
-                            Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
-                            receiver.recv(),
-                        )
-                        .await
-                        {
-                            Ok(result) => result.ok_or(TryRecvError::Disconnected),
-                            Err(_) => {
-                                error!(
+        info!(
+            processor_name = processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = self.indexer_grpc_data_service_address.as_str(),
+            "[Parser] Fetching transaction batches from channel",
+        );
+        let txn_channel_fetch_latency = std::time::Instant::now();
+        let mut transactions_batches = vec![];
+        let mut last_fetched_version = batch_start_version as i64 - 1;
+
+        // Make a new thread that copies from one channel, into another: if it doesn't see any new data for
+        // `CONSUMER_THREAD_TIMEOUT_IN_SECS`: panic
+        let stream_address = self.indexer_grpc_data_service_address.to_string();
+        let processor_name_string = processor_name.to_string();
+
+        let tasks = vec![];
+        for task_index in (0..concurrent_tasks) {
+            let join_handle = tokio::spawn(async move {
+                match timeout(
+                    Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
+                    receiver.recv(),
+                )
+                    .await
+                {
+                    let txn_pb = Ok(txn_pb) => match txn_pb {
+                        Ok(txn_pb) => {
+                            if let Some(existing_id) = db_chain_id {
+                                if txn_pb.chain_id != existing_id {
+                                    error!(
                                     processor_name = processor_name,
-                                    service_type = PROCESSOR_SERVICE_TYPE,
-                                    stream_address =
-                                        self.indexer_grpc_data_service_address.as_str(),
-                                    "[Parser] Consumer thread timed out waiting for transactions",
-                                );
-                                panic!(
-                                    "[Parser] Consumer thread timed out waiting for transactions"
-                                );
-                            },
-                        }
-                        // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
-                        // receiver.recv().await.ok_or(TryRecvError::Disconnected)
-                    },
-                    _ => {
-                        // If we're not the first task, we should poll to see if we get any data.
-                        receiver.try_recv()
-                    },
-                };
-                match receive_status {
-                    Ok(txn_pb) => {
-                        if let Some(existing_id) = db_chain_id {
-                            if txn_pb.chain_id != existing_id {
-                                error!(
-                                    processor_name = processor_name,
-                                    stream_address =
-                                        self.indexer_grpc_data_service_address.as_str(),
+                                    stream_address = stream_address,
                                     chain_id = txn_pb.chain_id,
                                     existing_id = existing_id,
                                     "[Parser] Stream somehow changed chain id!",
                                 );
-                                panic!("[Parser] Stream somehow changed chain id!");
+                                    panic!("[Parser] Stream somehow changed chain id!");
+                                }
+                            } else {
+                                db_chain_id = Some(
+                                    self.check_or_update_chain_id(txn_pb.chain_id as i64)
+                                        .await
+                                        .unwrap(),
+                                );
                             }
-                        } else {
-                            db_chain_id = Some(
-                                self.check_or_update_chain_id(txn_pb.chain_id as i64)
-                                    .await
-                                    .unwrap(),
-                            );
-                        }
-                        let current_fetched_version =
-                            txn_pb.transactions.as_slice().first().unwrap().version;
-                        if last_fetched_version + 1 != current_fetched_version as i64 {
-                            error!(
+                            let current_fetched_version =
+                                txn_pb.transactions.as_slice().first().unwrap().version;
+                            if last_fetched_version + 1 != current_fetched_version as i64 {
+                                error!(
                                 batch_start_version = batch_start_version,
                                 last_fetched_version = last_fetched_version,
                                 current_fetched_version = current_fetched_version,
                                 "[Parser] Received batch with gap from GRPC stream"
                             );
-                            panic!("[Parser] Received batch with gap from GRPC stream");
+                                panic!("[Parser] Received batch with gap from GRPC stream");
+                            }
+                            last_fetched_version =
+                                txn_pb.transactions.as_slice().last().unwrap().version as i64;
+                            txn_pb
                         }
-                        last_fetched_version =
-                            txn_pb.transactions.as_slice().last().unwrap().version as i64;
-                        transactions_batches.push(txn_pb);
-                    },
-                    // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
-                    Err(TryRecvError::Empty) => {
-                        break;
-                    },
-                    // This happens when the channel is closed. We should panic.
-                    Err(TryRecvError::Disconnected) => {
-                        error!(
+                        // This happens when the channel is closed. We should panic.
+                        Err(_e) => {
+                            error!(
                             processor_name = processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.indexer_grpc_data_service_address.as_str(),
                             "[Parser] Channel closed; stream ended."
                         );
-                        panic!("[Parser] Channel closed");
+                            panic!("[Parser] Channel closed");
+                        }
                     },
-                }
-            }
+                    Err(_) => {
+                        error!(
+                        processor_name = processor_name,
+                        service_type = PROCESSOR_SERVICE_TYPE,
+                        stream_address = stream_address,
+                        "[Parser] Consumer thread timed out waiting for transactions",
+                    );
+                        panic!("[Parser] Consumer thread timed out waiting for transactions");
+                    }
+                };
+            });
+        }
 
             let size_in_bytes = transactions_batches
                 .iter()
@@ -355,7 +343,7 @@ impl Worker {
                         &auth_token,
                         enable_verbose_logging,
                     )
-                    .await
+                        .await
                 });
                 tasks.push(task);
             }
@@ -375,7 +363,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         versions
-                    },
+                    }
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -390,7 +378,7 @@ impl Worker {
                             "[Parser] Error processing '{:}' transactions: {:?}",
                             processor_name, e
                         );
-                    },
+                    }
                 };
                 processed_versions.push(processed);
             }
@@ -544,7 +532,7 @@ impl Worker {
                     "[Parser] Chain id matches! Continue to index...",
                 );
                 Ok(chain_id as u64)
-            },
+            }
             None => {
                 info!(
                     processor_name = processor_name,
@@ -560,10 +548,10 @@ impl Worker {
                         .on_conflict_do_nothing(),
                     None,
                 )
-                .await
-                .context("[Parser] Error updating chain_id!")
-                .map(|_| grpc_chain_id as u64)
-            },
+                    .await
+                    .context("[Parser] Error updating chain_id!")
+                    .map(|_| grpc_chain_id as u64)
+            }
         }
     }
 }
@@ -739,27 +727,27 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
-        },
+        }
         ProcessorConfig::AnsProcessor(config) => {
             Processor::from(AnsProcessor::new(db_pool, config.clone()))
-        },
+        }
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
-        },
+        }
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
-        },
+        }
         ProcessorConfig::ObjectsProcessor => Processor::from(ObjectsProcessor::new(db_pool)),
         ProcessorConfig::StakeProcessor => Processor::from(StakeProcessor::new(db_pool)),
         ProcessorConfig::TokenProcessor(config) => {
             Processor::from(TokenProcessor::new(db_pool, config.clone()))
-        },
+        }
         ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
-        },
+        }
     }
 }

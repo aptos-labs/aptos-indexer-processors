@@ -12,6 +12,7 @@ use aptos_protos::indexer::v1::{
     raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
 };
 use futures_util::StreamExt;
+use kanal::AsyncSender;
 use prost::Message;
 use std::{sync::Arc, time::Duration};
 use tonic::{Response, Streaming};
@@ -137,7 +138,7 @@ pub async fn get_stream(
 /// 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
 /// all existing transactions are processed
 pub async fn create_fetcher_loop(
-    txn_sender: tokio::sync::mpsc::Sender<TransactionsPBResponse>,
+    txn_sender: AsyncSender<TransactionsPBResponse>,
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
