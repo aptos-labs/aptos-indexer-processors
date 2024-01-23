@@ -11,16 +11,15 @@ const RUNTIME_WORKER_MULTIPLIER: usize = 2;
 
 fn main() -> Result<()> {
     let num_cpus = num_cpus::get();
-    let worker_threads = (num_cpus * RUNTIME_WORKER_MULTIPLIER).min(16);
-    info!(
-        num_cpus = num_cpus,
-        num_worker_threads = worker_threads,
-        "[Processor] Starting processor tokio runtime",
+    let worker_threads = (num_cpus * RUNTIME_WORKER_MULTIPLIER).max(16);
+    println!(
+        "[Processor] Starting processor tokio runtime: num_cpus={}, worker_threads={}",
+        num_cpus, worker_threads
     );
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .worker_threads((num_cpus::get() * RUNTIME_WORKER_MULTIPLIER).min(16))
+        .worker_threads(worker_threads)
         .build()
         .unwrap()
         .block_on(async {
