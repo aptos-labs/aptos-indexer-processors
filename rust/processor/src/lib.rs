@@ -12,6 +12,7 @@
 extern crate diesel;
 
 mod config;
+pub mod grpc_stream;
 pub mod models;
 pub mod processors;
 pub mod schema;
