@@ -264,7 +264,15 @@ pub async fn create_fetcher_loop(
                     chain_id,
                     size_in_bytes,
                 };
-                match txn_sender.send(txn_pb.clone()).await {
+                let size_in_bytes = txn_pb.size_in_bytes;
+                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
+                let tps = (txn_pb.transactions.len() as f64
+                    / txn_channel_send_latency.elapsed().as_secs_f64())
+                    as u64;
+                let bytes_per_sec =
+                    txn_pb.size_in_bytes as f64 / txn_channel_send_latency.elapsed().as_secs_f64();
+
+                match txn_sender.send(txn_pb).await {
                     Ok(()) => {},
                     Err(e) => {
                         error!(
@@ -286,13 +294,10 @@ pub async fn create_fetcher_loop(
                     start_version = start_version,
                     end_version = end_version,
                     channel_size = buffer_size - txn_sender.capacity(),
-                    size_in_bytes = txn_pb.size_in_bytes,
-                    duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64(),
-                    tps = (txn_pb.transactions.len() as f64
-                        / txn_channel_send_latency.elapsed().as_secs_f64())
-                        as u64,
-                    bytes_per_sec = txn_pb.size_in_bytes as f64
-                        / txn_channel_send_latency.elapsed().as_secs_f64(),
+                    size_in_bytes = size_in_bytes,
+                    duration_in_secs = duration_in_secs,
+                    bytes_per_sec = bytes_per_sec,
+                    tps = tps,
                     "[Parser] Successfully sent transactions to channel."
                 );
                 FETCHER_THREAD_CHANNEL_SIZE
