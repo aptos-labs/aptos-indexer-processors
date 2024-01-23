@@ -17,9 +17,10 @@ use crate::{
     utils::{
         counters::{
             ProcessorStep, LATEST_PROCESSED_VERSION, MULTI_BATCH_PROCESSING_TIME_IN_SECS,
-            NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT,
-            PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS, PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS,
-            PROCESSOR_ERRORS_COUNT, PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            NUM_TRANSACTIONS_PROCESSED_COUNT, PB_CHANNEL_FETCH_WAIT_TIME_SECS,
+            PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
+            PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
+            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
@@ -239,12 +240,18 @@ impl Worker {
 
             let join_handle = tokio::spawn(async move {
                 loop {
-                    let txn_pb = match timeout(
+                    let pb_channel_fetch_time = std::time::Instant::now();
+                    let txn_pb_res = timeout(
                         Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
                         receiver_clone.recv(),
                     )
-                    .await
-                    {
+                    .await;
+                    // Track how much time this thread spent waiting for a pb bundle
+                    PB_CHANNEL_FETCH_WAIT_TIME_SECS
+                        .with_label_values(&[processor_name, &task_index.to_string()])
+                        .set(pb_channel_fetch_time.elapsed().as_secs_f64());
+
+                    let txn_pb = match txn_pb_res {
                         Ok(txn_pb) => match txn_pb {
                             Ok(txn_pb) => txn_pb,
                             // This happens when the channel is closed. We should panic.
@@ -259,7 +266,7 @@ impl Worker {
                                 panic!("[Parser][T#{}] Channel closed", task_index);
                             },
                         },
-                        Err(_) => {
+                        Err(_e) => {
                             error!(
                                 processor_name = processor_name,
                                 service_type = PROCESSOR_SERVICE_TYPE,

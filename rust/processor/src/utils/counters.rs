@@ -145,6 +145,16 @@ pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// The amount of time that a thread spent waiting for a protobuf bundle of transactions
+pub static PB_CHANNEL_FETCH_WAIT_TIME_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_pb_channel_fetch_wait_time_secs",
+        "Count of bytes processed",
+        &["processor_name", "thread_number"]
+    )
+    .unwrap()
+});
+
 /// Count of transactions processed.
 pub static NUM_TRANSACTIONS_PROCESSED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
