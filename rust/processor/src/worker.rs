@@ -40,7 +40,7 @@ use url::Url;
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
-pub const BUFFER_SIZE: usize = 300;
+pub const BUFFER_SIZE: usize = 100;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 pub const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
@@ -200,19 +200,51 @@ impl Worker {
                 start_version = starting_version,
                 "[Parser] Starting fetcher thread"
             );
-            crate::grpc_stream::create_fetcher_loop(
-                tx,
-                indexer_grpc_data_service_address,
+
+            let chunk_size = 1_000_000;
+
+            let loop1 = crate::grpc_stream::create_fetcher_loop(
+                tx.clone(),
+                indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
                 starting_version,
-                request_ending_version,
-                auth_token,
+                request_ending_version.or(Some(starting_version + chunk_size)),
+                auth_token.clone(),
                 processor_name.to_string(),
                 starting_version,
                 BUFFER_SIZE,
-            )
-            .await
+            );
+
+            let loop2 = crate::grpc_stream::create_fetcher_loop(
+                tx.clone(),
+                indexer_grpc_data_service_address.clone(),
+                indexer_grpc_http2_ping_interval,
+                indexer_grpc_http2_ping_timeout,
+                starting_version + chunk_size,
+                Some(starting_version + chunk_size + chunk_size),
+                auth_token.clone(),
+                processor_name.to_string(),
+                starting_version,
+                BUFFER_SIZE,
+            );
+
+            let loop3 = crate::grpc_stream::create_fetcher_loop(
+                tx.clone(),
+                indexer_grpc_data_service_address.clone(),
+                indexer_grpc_http2_ping_interval,
+                indexer_grpc_http2_ping_timeout,
+                starting_version + chunk_size,
+                Some(starting_version + chunk_size + chunk_size),
+                auth_token.clone(),
+                processor_name.to_string(),
+                starting_version,
+                BUFFER_SIZE,
+            );
+
+            // join all 3 tasks
+            let _ = futures::future::join_all(vec![loop1, loop2, loop3]).await;
+            unreachable!("At least one PB fetcher tasks should run forever");
         });
 
         // This is the consumer side of the channel. These are the major states:
