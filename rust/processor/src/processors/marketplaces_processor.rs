@@ -664,133 +664,52 @@ async fn parse_transactions(
                             let fixed_price_listing =
                                 fixed_price_listings.get(&move_resource_address);
                             let auction_listing = auction_listings.get(&move_resource_address);
+                            let token_metadata = token_metadatas.get(
+                                &listing_metadata
+                                    .unwrap()
+                                    .object
+                                    .get_reference_address(),
+                            );
 
                             if let Some(auction_listing) = auction_listing {
-                                let token_metadata = token_metadatas.get(
-                                    &listing_metadata
-                                        .as_ref()
-                                        .unwrap()
-                                        .object
-                                        .get_reference_address(),
-                                );
-                                if let Some(token_metadata) = token_metadata {
-                                    let current_auction = MarketplaceAuction {
-                                        listing_id: move_resource_address.clone(),
-                                        token_data_id: listing_metadata
-                                            .as_ref()
-                                            .unwrap()
-                                            .object
-                                            .get_reference_address(),
-                                        collection_id: token_metadata.get_collection_address(),
-                                        fee_schedule_id: listing_metadata
-                                            .as_ref()
-                                            .unwrap()
-                                            .fee_schedule
-                                            .get_reference_address(),
-                                        seller: listing_metadata
-                                            .as_ref()
-                                            .unwrap()
-                                            .get_seller_address(),
-                                        bid_price: Some(auction_listing.get_current_bid_price()),
-                                        bidder: Some(auction_listing.get_current_bidder()),
-                                        starting_bid_price: auction_listing.starting_bid.clone(),
-                                        buy_it_now_price: auction_listing.get_buy_it_now_price(),
-                                        token_amount: BigDecimal::from(1),
-                                        expiration_time: auction_listing.auction_end_time.clone(),
-                                        is_deleted: false,
-                                        token_standard: TokenStandard::V2.to_string(),
-                                        coin_type: coin_type.clone(),
-                                        marketplace: "example_marketplace".to_string(),
-                                        contract_address: marketplace_contract_address.to_string(), // TODO - update this to the actual marketplace contract address
-                                        entry_function_id_str: entry_function_id_str
-                                            .clone()
-                                            .unwrap(),
-                                        last_transaction_version: txn_version,
-                                        last_transaction_timestamp: txn_timestamp,
-                                    };
-                                    nft_auctions.push(current_auction);
+                                let cur_auction = MarketplaceAuction::from_aggregated_data(
+                                    write_resource, 
+                                    txn_version, 
+                                    txn_timestamp, 
+                                    marketplace_contract_address, 
+                                    &coin_type, 
+                                    &entry_function_id_str, 
+                                    listing_metadata, 
+                                    auction_listing, 
+                                    token_metadata,
+                                ).unwrap();
+                                if let Some(cur_auction) = cur_auction {
+                                    nft_auctions.push(cur_auction);
                                 }
                             } else {
-                                if let Some(fixed_price_listing) = fixed_price_listing {
-                                    let token_address = listing_metadata
+                                let token_address = listing_metadata
                                         .as_ref()
                                         .unwrap()
                                         .object
                                         .get_reference_address();
-                                    let token_v1_container =
-                                        listing_token_v1_containers.get(&token_address);
+                                let token_v1_container =
+                                    listing_token_v1_containers.get(&token_address);
+                                let token_v2_metadata = token_metadatas.get(&token_address);
 
-                                    let mut current_listing = None;
-                                    if let Some(token_v1_container) = token_v1_container {
-                                        let token_v1_metadata = token_v1_container.token.id.clone();
-                                        current_listing = Some(MarketplaceListing {
-                                            listing_id: move_resource_address.clone(),
-                                            token_data_id: token_v1_metadata.token_data_id.to_id(),
-                                            collection_id: token_v1_metadata
-                                                .token_data_id
-                                                .get_collection_id(),
-                                            fee_schedule_id: listing_metadata
-                                                .as_ref()
-                                                .unwrap()
-                                                .fee_schedule
-                                                .get_reference_address(),
-                                            seller: Some(
-                                                listing_metadata
-                                                    .as_ref()
-                                                    .unwrap()
-                                                    .get_seller_address(),
-                                            ),
-                                            price: fixed_price_listing.price.clone(),
-                                            token_amount: token_v1_container.token.amount.clone(),
-                                            is_deleted: false,
-                                            token_standard: TokenStandard::V1.to_string(),
-                                            coin_type: coin_type.clone(),
-                                            marketplace: "example_marketplace".to_string(),
-                                            contract_address: marketplace_contract_address
-                                                .to_string(), // TODO - update this to the actual marketplace contract address
-                                            entry_function_id_str: entry_function_id_str
-                                                .clone()
-                                                .unwrap(),
-                                            last_transaction_version: txn_version,
-                                            last_transaction_timestamp: txn_timestamp,
-                                        });
-                                    } else {
-                                        let token_v2_metadata = token_metadatas.get(&token_address);
-                                        if let Some(token_v2_metadata) = token_v2_metadata {
-                                            current_listing = Some(MarketplaceListing {
-                                                listing_id: move_resource_address.clone(),
-                                                token_data_id: token_v2_metadata
-                                                    .get_token_address(),
-                                                collection_id: token_v2_metadata
-                                                    .get_collection_address(),
-                                                fee_schedule_id: listing_metadata
-                                                    .as_ref()
-                                                    .unwrap()
-                                                    .fee_schedule
-                                                    .get_reference_address(),
-                                                seller: Some(
-                                                    listing_metadata
-                                                        .as_ref()
-                                                        .unwrap()
-                                                        .get_seller_address(),
-                                                ),
-                                                price: fixed_price_listing.price.clone(),
-                                                token_amount: BigDecimal::from(1),
-                                                is_deleted: false,
-                                                token_standard: TokenStandard::V2.to_string(),
-                                                coin_type: coin_type.clone(),
-                                                marketplace: "example_marketplace".to_string(),
-                                                contract_address: marketplace_contract_address
-                                                    .to_string(), // TODO - update this to the actual marketplace contract address
-                                                entry_function_id_str: entry_function_id_str
-                                                    .clone()
-                                                    .unwrap(),
-                                                last_transaction_version: txn_version,
-                                                last_transaction_timestamp: txn_timestamp,
-                                            });
-                                        }
-                                    }
-                                    nft_listings.push(current_listing.unwrap());
+                                let current_listing = MarketplaceListing::from_aggregated_data(
+                                    write_resource, 
+                                    txn_version, 
+                                    txn_timestamp, 
+                                    marketplace_contract_address, 
+                                    &coin_type, 
+                                    &entry_function_id_str, 
+                                    listing_metadata, 
+                                    fixed_price_listing, 
+                                    token_v1_container, 
+                                    token_v2_metadata
+                                ).unwrap();
+                                if let Some(current_listing) = current_listing {
+                                    nft_listings.push(current_listing);
                                 }
                             }
                         } else if move_resource_type.eq(format!(
