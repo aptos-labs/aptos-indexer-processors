@@ -16,7 +16,7 @@ use crate::{
                 TokenOfferMetadata, TokenOfferV1, TokenOfferV2, MarketplaceEvent, TokenMetadata, CollectionMetadata,
             },
         },
-        token_models::token_utils::{TokenType, TokenTypeWrapper},
+        token_models::token_utils::TokenTypeWrapper,
         token_v2_models::v2_token_utils::{ObjectCore, ObjectWithMetadata, TokenStandard},
     },
     schema::{self},

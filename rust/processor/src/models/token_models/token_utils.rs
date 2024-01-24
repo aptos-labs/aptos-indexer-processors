@@ -204,13 +204,10 @@ impl TokenTypeWrapper {
         contract_address: &str,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        println!("from_marketplace_write_resource ------------- ");
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if type_str != format!("{}::listing::TokenV1Container", contract_address) {
             return Ok(None);
         }
-
-        println!("write_resource.data: {}", write_resource.data);
 
         serde_json::from_str(&write_resource.data)
             .map(|inner| Some(inner))

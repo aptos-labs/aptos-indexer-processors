@@ -44,6 +44,9 @@ pub struct MarketplaceActivity {
 }
 
 impl MarketplaceActivity {
+    /**
+     * Get the MarketplaceActivity, token metadata, and collection metadata from an event
+     */
     pub fn from_event(
         event: &Event,
         event_index: i64,
@@ -57,7 +60,7 @@ impl MarketplaceActivity {
         if let Some(marketplace_event) =
             &MarketplaceEvent::from_event(&event_type, &event.data, transaction_version)?
         {
-            match marketplace_event {
+            let result = match marketplace_event {
                 MarketplaceEvent::ListingFilledEvent(marketplace_event) => {
                     (Some(MarketplaceActivity {
                         transaction_version,
@@ -113,7 +116,7 @@ impl MarketplaceActivity {
                     }), Some(marketplace_event.token_metadata.clone()), None)
                 },
                 MarketplaceEvent::ListingPlacedEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
+                    let activity = MarketplaceActivity {
                         transaction_version,
                         event_index,
                         offer_or_listing_id: marketplace_event.get_listing_address(), 
@@ -137,7 +140,8 @@ impl MarketplaceActivity {
                             .unwrap_or_else(|| "".to_string()),
                         event_type: MarketplaceEvent::LISTING_PLACED_EVENT.to_string(),
                         transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    };
+                    (Some(activity), Some(marketplace_event.token_metadata.clone()), None)
                 },
                 MarketplaceEvent::CollectionOfferPlacedEvent(marketplace_event) => {
                     (Some(MarketplaceActivity {
@@ -331,6 +335,7 @@ impl MarketplaceActivity {
                     }), Some(marketplace_event.token_metadata.clone()), None)
                 },
             };
+            return Ok(result);
         }
         Ok((None, None, None))
     }

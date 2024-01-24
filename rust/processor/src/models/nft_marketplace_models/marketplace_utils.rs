@@ -4,7 +4,7 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use std::{collections::HashSet, str::FromStr};
+use std::collections::HashSet;
 
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
