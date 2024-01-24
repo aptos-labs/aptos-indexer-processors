@@ -15,17 +15,18 @@ use crate::{
     },
     schema,
     utils::{
-        database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
-        },
+        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::standardize_address,
     },
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -51,15 +52,6 @@ impl Debug for ObjectsProcessor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    (objects, current_objects): (&[Object], &[CurrentObject]),
-) -> Result<(), diesel::result::Error> {
-    insert_objects(conn, objects).await?;
-    insert_current_objects(conn, current_objects).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
@@ -73,83 +65,67 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(pg_conn, (&objects, &current_objects)))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async move {
-                        let objects = clean_data_for_db(objects, true);
-                        let current_objects = clean_data_for_db(current_objects, true);
-                        insert_to_db_impl(pg_conn, (&objects, &current_objects)).await
-                    })
-                })
-                .await
-        },
-    }
+
+    execute_in_chunks(conn, insert_objects_query, objects, Object::field_count()).await?;
+    execute_in_chunks(
+        conn,
+        insert_current_objects_query,
+        current_objects,
+        CurrentObject::field_count(),
+    )
+    .await?;
+
+    Ok(())
 }
 
-async fn insert_objects(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[Object],
-) -> Result<(), diesel::result::Error> {
+fn insert_objects_query(
+    items_to_insert: Vec<Object>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::objects::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), Object::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::objects::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    is_token.eq(excluded(is_token)),
-                    is_fungible_asset.eq(excluded(is_fungible_asset)),
-                )),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::objects::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_update()
+            .set((
+                inserted_at.eq(excluded(inserted_at)),
+                is_token.eq(excluded(is_token)),
+                is_fungible_asset.eq(excluded(is_fungible_asset)),
+            )),
+        None,
+    )
 }
 
-async fn insert_current_objects(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentObject],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_objects_query(
+    items_to_insert: Vec<CurrentObject>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_objects::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), CurrentObject::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_objects::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(object_address)
-                .do_update()
-                .set((
-                    owner_address.eq(excluded(owner_address)),
-                    state_key_hash.eq(excluded(state_key_hash)),
-                    allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
-                    last_guid_creation_num.eq(excluded(last_guid_creation_num)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    is_token.eq(excluded(is_token)),
-                    is_fungible_asset.eq(excluded(is_fungible_asset)),
-                )),
-                Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::current_objects::table)
+            .values(items_to_insert)
+            .on_conflict(object_address)
+            .do_update()
+            .set((
+                owner_address.eq(excluded(owner_address)),
+                state_key_hash.eq(excluded(state_key_hash)),
+                allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
+                last_guid_creation_num.eq(excluded(last_guid_creation_num)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                is_deleted.eq(excluded(is_deleted)),
+                inserted_at.eq(excluded(inserted_at)),
+                is_token.eq(excluded(is_token)),
+                is_fungible_asset.eq(excluded(is_fungible_asset)),
+            )),
+        Some(
+            " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
+        ),
+    )
 }
 
 #[async_trait]

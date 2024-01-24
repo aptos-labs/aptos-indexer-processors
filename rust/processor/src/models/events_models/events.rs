@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 // p99 currently is 303 so using 300 as a safe max length
 const EVENT_TYPE_MAX_LENGTH: usize = 300;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = events)]
 pub struct Event {

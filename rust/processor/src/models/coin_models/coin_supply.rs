@@ -20,7 +20,7 @@ const APTOS_COIN_SUPPLY_TABLE_HANDLE: &str =
 const APTOS_COIN_SUPPLY_TABLE_KEY: &str =
     "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935";
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, coin_type_hash))]
 #[diesel(table_name = coin_supply)]
 pub struct CoinSupply {

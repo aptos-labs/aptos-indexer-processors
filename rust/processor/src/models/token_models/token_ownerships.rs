@@ -17,7 +17,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(
     token_data_id_hash,
     property_version,
@@ -40,7 +40,7 @@ pub struct TokenOwnership {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id_hash, property_version, owner_address))]
 #[diesel(table_name = current_token_ownerships)]
 pub struct CurrentTokenOwnership {

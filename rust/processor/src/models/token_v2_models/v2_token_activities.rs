@@ -23,7 +23,7 @@ use bigdecimal::{BigDecimal, One, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = token_activities_v2)]
 pub struct TokenActivityV2 {

@@ -39,7 +39,7 @@ pub type CoinType = String;
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
 pub type EventToCoinType = HashMap<EventGuidResource, CoinType>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = fungible_asset_activities)]
 pub struct FungibleAssetActivity {

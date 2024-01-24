@@ -19,10 +19,7 @@ use crate::{
     },
     schema,
     utils::{
-        database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
-        },
+        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
@@ -30,7 +27,11 @@ use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
 use tracing::error;
@@ -57,20 +58,6 @@ impl Debug for FungibleAssetProcessor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    fungible_asset_activities: &[FungibleAssetActivity],
-    fungible_asset_metadata: &[FungibleAssetMetadataModel],
-    fungible_asset_balances: &[FungibleAssetBalance],
-    current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
-) -> Result<(), diesel::result::Error> {
-    insert_fungible_asset_activities(conn, fungible_asset_activities).await?;
-    insert_fungible_asset_metadata(conn, fungible_asset_metadata).await?;
-    insert_fungible_asset_balances(conn, fungible_asset_balances).await?;
-    insert_current_fungible_asset_balances(conn, current_fungible_asset_balances).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
     conn: &mut PgPoolConnection<'_>,
     name: &'static str,
@@ -87,86 +74,67 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                &fungible_asset_activities,
-                &fungible_asset_metadata,
-                &fungible_asset_balances,
-                &current_fungible_asset_balances,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let fungible_asset_activities =
-                            clean_data_for_db(fungible_asset_activities, true);
-                        let fungible_asset_metadata =
-                            clean_data_for_db(fungible_asset_metadata, true);
-                        let fungible_asset_balances =
-                            clean_data_for_db(fungible_asset_balances, true);
-                        let current_fungible_asset_balances =
-                            clean_data_for_db(current_fungible_asset_balances, true);
 
-                        insert_to_db_impl(
-                            pg_conn,
-                            &fungible_asset_activities,
-                            &fungible_asset_metadata,
-                            &fungible_asset_balances,
-                            &current_fungible_asset_balances,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
-    }
-}
+    execute_in_chunks(
+        conn,
+        insert_fungible_asset_activities_query,
+        fungible_asset_activities,
+        FungibleAssetActivity::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn,
+        insert_fungible_asset_metadata_query,
+        fungible_asset_metadata,
+        FungibleAssetMetadataModel::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn,
+        insert_fungible_asset_balances_query,
+        fungible_asset_balances,
+        FungibleAssetBalance::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn,
+        insert_current_fungible_asset_balances_query,
+        current_fungible_asset_balances,
+        CurrentFungibleAssetBalance::field_count(),
+    )
+    .await?;
 
-async fn insert_fungible_asset_activities(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[FungibleAssetActivity],
-) -> Result<(), diesel::result::Error> {
-    use schema::fungible_asset_activities::dsl::*;
-
-    let chunks = get_chunks(item_to_insert.len(), FungibleAssetActivity::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::fungible_asset_activities::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, event_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
     Ok(())
 }
 
-async fn insert_fungible_asset_metadata(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[FungibleAssetMetadataModel],
-) -> Result<(), diesel::result::Error> {
+fn insert_fungible_asset_activities_query(
+    items_to_insert: Vec<FungibleAssetActivity>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::fungible_asset_activities::dsl::*;
+
+    (
+        diesel::insert_into(schema::fungible_asset_activities::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, event_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_fungible_asset_metadata_query(
+    items_to_insert: Vec<FungibleAssetMetadataModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::fungible_asset_metadata::dsl::*;
 
-    let chunks = get_chunks(
-        item_to_insert.len(),
-        FungibleAssetMetadataModel::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::fungible_asset_metadata::table)
-                .values(&item_to_insert[start_ind..end_ind])
+                .values(items_to_insert)
                 .on_conflict(asset_type)
                 .do_update()
                 .set(
@@ -186,51 +154,41 @@ async fn insert_fungible_asset_metadata(
                     )
                 ),
             Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+        )
 }
 
-async fn insert_fungible_asset_balances(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[FungibleAssetBalance],
-) -> Result<(), diesel::result::Error> {
+fn insert_fungible_asset_balances_query(
+    items_to_insert: Vec<FungibleAssetBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::fungible_asset_balances::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), FungibleAssetBalance::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::fungible_asset_balances::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_update()
-                .set((
-                    is_frozen.eq(excluded(is_frozen)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::fungible_asset_balances::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_update()
+            .set((
+                is_frozen.eq(excluded(is_frozen)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        None,
+    )
 }
 
-async fn insert_current_fungible_asset_balances(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[CurrentFungibleAssetBalance],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_fungible_asset_balances_query(
+    items_to_insert: Vec<CurrentFungibleAssetBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_fungible_asset_balances::dsl::*;
 
-    let chunks: Vec<(usize, usize)> = get_chunks(
-        item_to_insert.len(),
-        CurrentFungibleAssetBalance::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::current_fungible_asset_balances::table)
-                .values(&item_to_insert[start_ind..end_ind])
+                .values(items_to_insert)
                 .on_conflict(storage_id)
                 .do_update()
                 .set(
@@ -247,9 +205,7 @@ async fn insert_current_fungible_asset_balances(
                     )
                 ),
             Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+        )
 }
 
 #[async_trait]

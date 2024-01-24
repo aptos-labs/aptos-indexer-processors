@@ -12,7 +12,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id_hash, transaction_version))]
 #[diesel(table_name = token_datas)]
 pub struct TokenData {
@@ -39,7 +39,7 @@ pub struct TokenData {
     pub description: String,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id_hash))]
 #[diesel(table_name = current_token_datas)]
 pub struct CurrentTokenData {

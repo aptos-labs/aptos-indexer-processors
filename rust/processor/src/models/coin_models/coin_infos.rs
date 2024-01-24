@@ -11,7 +11,7 @@ use aptos_protos::transaction::v1::WriteResource;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(coin_type_hash))]
 #[diesel(table_name = coin_infos)]
 pub struct CoinInfo {

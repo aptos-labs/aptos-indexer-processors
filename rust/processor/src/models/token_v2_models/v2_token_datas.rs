@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 // PK of current_token_datas_v2, i.e. token_data_id
 pub type CurrentTokenDataV2PK = String;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = token_datas_v2)]
 pub struct TokenDataV2 {
@@ -50,7 +50,7 @@ pub struct TokenDataV2 {
     pub decimals: i64,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(token_data_id))]
 #[diesel(table_name = current_token_datas_v2)]
 pub struct CurrentTokenDataV2 {
@@ -106,7 +106,7 @@ impl TokenDataV2 {
                 }
                 token_properties = metadata
                     .property_map
-                    .as_ref()
+                    .clone()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
             } else {

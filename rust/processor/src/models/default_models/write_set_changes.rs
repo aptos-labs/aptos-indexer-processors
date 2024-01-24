@@ -16,7 +16,9 @@ use aptos_protos::transaction::v1::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone,
+)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, index))]
 #[diesel(table_name = write_set_changes)]

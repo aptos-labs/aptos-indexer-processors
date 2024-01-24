@@ -82,6 +82,40 @@ pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<Asyn
 }
 */
 
+pub async fn execute_in_chunks<U, T>(
+    conn: &mut MyDbConnection,
+    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    items_to_insert: Vec<T>,
+    chunk_size: usize,
+) -> Result<(), diesel::result::Error>
+where
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
+{
+    let chunks = get_chunks(items_to_insert.len(), chunk_size);
+
+    for (start_ind, end_ind) in chunks {
+        let items = &items_to_insert[start_ind..end_ind];
+
+        let (query, additional_where_clause) = build_query(items.to_vec());
+        match execute_with_better_error(conn, query, additional_where_clause).await {
+            Ok(_) => {},
+            Err(_) => {
+                let cleaned_items = clean_data_for_db(items.to_vec(), true);
+                let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
+                match execute_with_better_error(conn, cleaned_query, additional_where_clause).await
+                {
+                    Ok(_) => {},
+                    Err(e) => {
+                        return Err(e);
+                    },
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
 pub async fn execute_with_better_error<U>(
     conn: &mut MyDbConnection,
     query: U,

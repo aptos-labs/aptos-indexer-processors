@@ -23,7 +23,7 @@ use std::collections::HashMap;
 
 pub type AccountTransactionPK = (String, i64);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(account_address, transaction_version))]
 #[diesel(table_name = account_transactions)]
 pub struct AccountTransaction {

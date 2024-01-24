@@ -30,7 +30,7 @@ pub type ShareToPoolMapping = HashMap<TableHandle, PoolBalanceMetadata>;
 pub type CurrentDelegatorBalancePK = (Address, Address, String);
 pub type CurrentDelegatorBalanceMap = HashMap<CurrentDelegatorBalancePK, CurrentDelegatorBalance>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(delegator_address, pool_address, pool_type))]
 #[diesel(table_name = current_delegator_balances)]
 pub struct CurrentDelegatorBalance {
@@ -43,7 +43,7 @@ pub struct CurrentDelegatorBalance {
     pub parent_table_handle: String,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = delegator_balances)]
 pub struct DelegatorBalance {

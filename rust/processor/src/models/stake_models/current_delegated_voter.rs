@@ -34,7 +34,9 @@ pub struct CurrentDelegatedVoterQuery {
     pub inserted_at: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize)]
+#[derive(
+    Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize, Clone,
+)]
 #[diesel(primary_key(delegator_address, delegation_pool_address))]
 #[diesel(table_name = current_delegated_voter)]
 pub struct CurrentDelegatedVoter {
