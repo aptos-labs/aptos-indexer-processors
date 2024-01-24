@@ -556,8 +556,9 @@ async fn parse_v2_token(
                         token_v2_metadata_helper.get_mut(&transfer_events.get_object_address())
                     {
                         // we don't want index to be 0 otherwise we might have collision with write set change index
+                        // note that these will be multiplied by -1 so that it doesn't conflict with wsc index
                         let index = if index == 0 {
-                            user_txn.events.len() - aggregated_data.transfer_events.len()
+                            user_txn.events.len()
                         } else {
                             index
                         };
@@ -747,6 +748,9 @@ async fn parse_v2_token(
                                 )
                                 .unwrap();
                             if let Some(current_nft_ownership) = ownerships.first() {
+                                // Note that the first element in ownerships is the current ownership. We need to cache
+                                // it in prior_nft_ownership so that moving forward if we see a burn we'll know
+                                // where it came from.
                                 prior_nft_ownership.insert(
                                     current_nft_ownership.token_data_id.clone(),
                                     NFTOwnershipV2 {
