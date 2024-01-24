@@ -518,126 +518,121 @@ async fn parse_transactions(
                             continue;
                         }
 
-                        // Parse object metadata
-                        let object_core_metadata =
+                        // 1. Parse object metadata
+                        if let Some(object_core_metadata) =
                             ObjectWithMetadata::from_write_resource(write_resource, txn_version)
-                                .unwrap();
-                        if let Some(object_core_metadata) = object_core_metadata {
+                                .unwrap()
+                        {
                             object_metadatas.insert(
                                 move_resource_address.clone(),
                                 object_core_metadata.object_core,
                             );
                         }
 
-                        // Parse listing metadata
-                        let listing_metadata = ListingMetadata::from_write_resource(
+                        // 2. Parse listing metadatas
+                        if let Some(listing_metadata) = ListingMetadata::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
                         )
-                        .unwrap();
-                        let fixed_price_listing = FixedPriceListing::from_write_resource(
+                        .unwrap()
+                        {
+                            listing_metadatas
+                                .insert(move_resource_address.clone(), listing_metadata);
+                        }
+                        if let Some(fixed_price_listing) = FixedPriceListing::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
                         )
-                        .unwrap();
-                        let listing_token_v1_container =
+                        .unwrap()
+                        {
+                            fixed_price_listings
+                                .insert(move_resource_address.clone(), fixed_price_listing);
+                        }
+                        if let Some(listing_token_v1_container) =
                             TokenTypeWrapper::from_marketplace_write_resource(
                                 write_resource,
                                 marketplace_contract_address,
                                 txn_version,
                             )
-                            .unwrap();
-
-                        if let Some(listing_metadata) = listing_metadata {
-                            listing_metadatas
-                                .insert(move_resource_address.clone(), listing_metadata);
-                        }
-                        if let Some(fixed_price_listing) = fixed_price_listing {
-                            fixed_price_listings
-                                .insert(move_resource_address.clone(), fixed_price_listing);
-                        }
-                        if let Some(listing_token_v1_container) = listing_token_v1_container {
+                            .unwrap()
+                        {
                             listing_token_v1_containers
                                 .insert(move_resource_address.clone(), listing_token_v1_container);
                         }
 
-                        // Parse token offer metadata
-                        let token_offer_metadata = TokenOfferMetadata::from_write_resource(
+                        // 3. Parse token offer metadata
+                        if let Some(token_offer_metadata) = TokenOfferMetadata::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
                         )
-                        .unwrap();
-                        let token_offer_v1 = TokenOfferV1::from_write_resource(
-                            &write_resource,
-                            marketplace_contract_address,
-                            txn_version,
-                        )
-                        .unwrap();
-                        let token_offer_v2 = TokenOfferV2::from_write_resource(
-                            &write_resource,
-                            marketplace_contract_address,
-                            txn_version,
-                        )
-                        .unwrap();
-
-                        if let Some(token_offer_metadata) = token_offer_metadata {
+                        .unwrap()
+                        {
                             token_offer_metadatas
                                 .insert(move_resource_address.clone(), token_offer_metadata);
                         }
-                        if let Some(token_offer_v1) = token_offer_v1 {
+                        if let Some(token_offer_v1) = TokenOfferV1::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
                             token_offer_v1s.insert(move_resource_address.clone(), token_offer_v1);
                         }
-                        if let Some(token_offer_v2) = token_offer_v2 {
+                        if let Some(token_offer_v2) = TokenOfferV2::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
                             token_offer_v2s.insert(move_resource_address.clone(), token_offer_v2);
                         }
 
-                        // Parse collection offer metadata
-                        let collection_offer_metadata =
+                        // 4. Parse collection offer metadata
+                        if let Some(collection_offer_metadata) =
                             CollectionOfferMetadata::from_write_resource(
                                 &write_resource,
                                 marketplace_contract_address,
                                 txn_version,
                             )
-                            .unwrap();
-                        let collection_offer_v1 = CollectionOfferV1::from_write_resource(
-                            &write_resource,
-                            marketplace_contract_address,
-                            txn_version,
-                        )
-                        .unwrap();
-                        let collection_offer_v2 = CollectionOfferV2::from_write_resource(
-                            &write_resource,
-                            marketplace_contract_address,
-                            txn_version,
-                        )
-                        .unwrap();
-
-                        if let Some(collection_offer_metadata) = collection_offer_metadata {
+                            .unwrap()
+                        {
                             collection_offer_metadatas
                                 .insert(move_resource_address.clone(), collection_offer_metadata);
                         }
-                        if let Some(collection_offer_v1) = collection_offer_v1 {
+                        if let Some(collection_offer_v1) = CollectionOfferV1::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
                             collection_offer_v1s
                                 .insert(move_resource_address.clone(), collection_offer_v1);
                         }
-                        if let Some(collection_offer_v2) = collection_offer_v2 {
+                        if let Some(collection_offer_v2) = CollectionOfferV2::from_write_resource(
+                            &write_resource,
+                            marketplace_contract_address,
+                            txn_version,
+                        )
+                        .unwrap()
+                        {
                             collection_offer_v2s
                                 .insert(move_resource_address.clone(), collection_offer_v2);
                         }
 
                         // Parse auction metadata
-                        let auction_listing = AuctionListing::from_write_resource(
+                        if let Some(auction_listing) = AuctionListing::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
                         )
-                        .unwrap();
-
-                        // Reconstruct the full listing and offer models and create DB objects
-                        if let Some(auction_listing) = auction_listing {
+                        .unwrap()
+                        {
                             auction_listings.insert(move_resource_address.clone(), auction_listing);
                         }
                     },
