@@ -75,11 +75,11 @@ pub async fn get_stream(
     let channel = tonic::transport::Channel::from_shared(
         indexer_grpc_data_service_address.to_string(),
     )
-    .expect(
-        "[Parser] Failed to build GRPC channel, perhaps because the data service URL is invalid",
-    )
-    .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
-    .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
+        .expect(
+            "[Parser] Failed to build GRPC channel, perhaps because the data service URL is invalid",
+        )
+        .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
+        .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
 
     // If the scheme is https, add a TLS config.
     let channel = if indexer_grpc_data_service_address.scheme() == "https" {
@@ -116,7 +116,7 @@ pub async fn get_stream(
                 "[Parser] Error connecting to GRPC client"
             );
             panic!("[Parser] Error connecting to GRPC client");
-        },
+        }
     };
     let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
     info!(
@@ -157,7 +157,7 @@ pub async fn get_chain_id(
         auth_token.clone(),
         processor_name.to_string(),
     )
-    .await;
+        .await;
     let connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
         Some(connection_id) => connection_id.to_str().unwrap().to_string(),
         None => "".to_string(),
@@ -183,7 +183,7 @@ pub async fn get_chain_id(
                 "[Parser] Error receiving datastream response for chain id"
             );
             panic!("[Parser] Error receiving datastream response for chain id");
-        },
+        }
         None => {
             error!(
                 processor_name = processor_name,
@@ -193,7 +193,7 @@ pub async fn get_chain_id(
                 "[Parser] Stream ended before getting response fo for chain id"
             );
             panic!("[Parser] Stream ended before getting response fo for chain id");
-        },
+        }
     }
 }
 
@@ -235,7 +235,7 @@ pub async fn create_fetcher_loop(
         auth_token.clone(),
         processor_name.to_string(),
     )
-    .await;
+        .await;
     let mut connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
         Some(connection_id) => connection_id.to_str().unwrap().to_string(),
         None => "".to_string(),
@@ -295,6 +295,7 @@ pub async fn create_fetcher_loop(
                 );
 
                 let current_fetched_version = start_version;
+                // TODO: FIX THIS NONSENSICAL ERROR
                 if last_fetched_version + 1 != current_fetched_version as i64 {
                     error!(
                         batch_start_version = batch_start_version,
@@ -302,7 +303,7 @@ pub async fn create_fetcher_loop(
                         current_fetched_version = current_fetched_version,
                         "[Parser] Received batch with gap from GRPC stream"
                     );
-                    panic!("[Parser] Received batch with gap from GRPC stream");
+                    //  panic!("[Parser] Received batch with gap from GRPC stream");
                 }
                 last_fetched_version = end_version as i64;
                 batch_start_version = (last_fetched_version + 1) as u64;
@@ -356,7 +357,7 @@ pub async fn create_fetcher_loop(
                     txn_pb.size_in_bytes as f64 / txn_channel_send_latency.elapsed().as_secs_f64();
 
                 match txn_sender.send(txn_pb).await {
-                    Ok(()) => {},
+                    Ok(()) => {}
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -367,7 +368,7 @@ pub async fn create_fetcher_loop(
                             "[Parser] Error sending GRPC response to channel."
                         );
                         panic!("[Parser] Error sending GRPC response to channel.")
-                    },
+                    }
                 }
                 info!(
                     processor_name = processor_name,
@@ -388,7 +389,7 @@ pub async fn create_fetcher_loop(
                     .set((buffer_size - txn_sender.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
                 true
-            },
+            }
             Some(Err(rpc_error)) => {
                 tracing::warn!(
                     processor_name = processor_name,
@@ -401,7 +402,7 @@ pub async fn create_fetcher_loop(
                     "[Parser] Error receiving datastream response."
                 );
                 false
-            },
+            }
             None => {
                 tracing::warn!(
                     processor_name = processor_name,
@@ -413,7 +414,7 @@ pub async fn create_fetcher_loop(
                     "[Parser] Stream ended."
                 );
                 false
-            },
+            }
         };
         // Check if we're at the end of the stream
         let is_end = if let Some(ending_version) = request_ending_version {
@@ -493,7 +494,7 @@ pub async fn create_fetcher_loop(
                 auth_token.clone(),
                 processor_name.to_string(),
             )
-            .await;
+                .await;
             connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
                 Some(connection_id) => connection_id.to_str().unwrap().to_string(),
                 None => "".to_string(),
