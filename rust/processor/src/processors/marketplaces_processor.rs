@@ -11,9 +11,10 @@ use crate::{
             marketplace_listings::MarketplaceListing,
             marketplace_token_offers::MarketplaceTokenOffer,
             marketplace_utils::{
-                AuctionListing, CollectionOfferEventMetadata, CollectionOfferMetadata,
-                CollectionOfferV1, CollectionOfferV2, FixedPriceListing, ListingMetadata,
-                TokenOfferMetadata, TokenOfferV1, TokenOfferV2, MarketplaceEvent, TokenMetadata, CollectionMetadata,
+                AuctionListing, CollectionMetadata, CollectionOfferEventMetadata,
+                CollectionOfferMetadata, CollectionOfferV1, CollectionOfferV2, FixedPriceListing,
+                ListingMetadata, MarketplaceEvent, TokenMetadata, TokenOfferMetadata, TokenOfferV1,
+                TokenOfferV2,
             },
         },
         token_models::token_utils::TokenTypeWrapper,
@@ -71,8 +72,7 @@ async fn insert_to_db_impl(
     insert_marketplace_activities(conn, marketplace_activities).await?;
     insert_marketplace_listings(conn, nft_marketplace_listings).await?;
     insert_marketplace_token_offers(conn, nft_marketplace_token_offers).await?;
-    insert_marketplace_collection_offers(conn, nft_marketplace_collection_offers)
-        .await?;
+    insert_marketplace_collection_offers(conn, nft_marketplace_collection_offers).await?;
     insert_marketplace_auctions(conn, nft_marketplace_auctions).await?;
     Ok(())
 }
@@ -380,8 +380,7 @@ async fn parse_transactions(
             let mut token_metadatas: HashMap<String, TokenMetadata> = HashMap::new();
             // Collection metaddatas parsed from events. The key is generated collection_id for token v1,
             // and collection address for token v2.
-            let mut collection_metadatas: HashMap<String, CollectionMetadata> =
-                HashMap::new();
+            let mut collection_metadatas: HashMap<String, CollectionMetadata> = HashMap::new();
 
             let mut collection_offer_filled_metadatas: HashMap<
                 String,
@@ -397,22 +396,27 @@ async fn parse_transactions(
 
                 // Only the events in the set will be indexed
                 // TODO - We currently only index events from our own smart contracts
-                if !events_set.contains(event_type) || !contract_addr.eq(marketplace_contract_address) {
+                if !events_set.contains(event_type)
+                    || !contract_addr.eq(marketplace_contract_address)
+                {
                     continue;
                 }
 
                 // Get the acitivty, listing, token_offer, and auction from event.
-                let (activity, token_metadata, collection_metadata) = MarketplaceActivity::from_event(
-                    &event,
-                    index as i64,
-                    txn_version,
-                    txn_timestamp,
-                    &entry_function_id_str,
-                    &marketplace_contract_address,
-                    &coin_type,
-                ).unwrap();
+                let (activity, token_metadata, collection_metadata) =
+                    MarketplaceActivity::from_event(
+                        &event,
+                        index as i64,
+                        txn_version,
+                        txn_timestamp,
+                        &entry_function_id_str,
+                        &marketplace_contract_address,
+                        &coin_type,
+                    )
+                    .unwrap();
                 if let Some(token_metadata) = token_metadata {
-                    token_metadatas.insert(token_metadata.get_token_address().unwrap(), token_metadata.clone());
+                    token_metadatas
+                        .insert(token_metadata.get_token_address(), token_metadata.clone());
                 }
                 if let Some(collection_metadata) = &collection_metadata {
                     collection_metadatas.insert(
@@ -431,7 +435,9 @@ async fn parse_transactions(
                     &entry_function_id_str,
                     &marketplace_contract_address,
                     &coin_type,
-                ).unwrap() {
+                )
+                .unwrap()
+                {
                     nft_listings.push(listing);
                 }
                 if let Some(token_offer) = MarketplaceTokenOffer::from_event(
@@ -441,7 +447,9 @@ async fn parse_transactions(
                     &entry_function_id_str,
                     &marketplace_contract_address,
                     &coin_type,
-                ).unwrap() {
+                )
+                .unwrap()
+                {
                     nft_token_offers.push(token_offer);
                 }
                 if let Some(auction) = MarketplaceAuction::from_event(
@@ -451,7 +459,9 @@ async fn parse_transactions(
                     &entry_function_id_str,
                     &marketplace_contract_address,
                     &coin_type,
-                ).unwrap() {
+                )
+                .unwrap()
+                {
                     nft_auctions.push(auction);
                 }
                 if let Some(collection_offer) = MarketplaceCollectionOffer::from_event(
@@ -461,7 +471,9 @@ async fn parse_transactions(
                     &entry_function_id_str,
                     &marketplace_contract_address,
                     &coin_type,
-                ).unwrap() {
+                )
+                .unwrap()
+                {
                     // The collection offer resource may be deleted after it is filled,
                     // so we need to parse collection offer metadata from the event
                     let collection_offer_filled_metadata = CollectionOfferEventMetadata {
@@ -483,8 +495,7 @@ async fn parse_transactions(
             let mut object_metadatas: HashMap<String, ObjectCore> = HashMap::new();
             let mut listing_metadatas: HashMap<String, ListingMetadata> = HashMap::new();
             let mut fixed_price_listings: HashMap<String, FixedPriceListing> = HashMap::new();
-            let mut listing_token_v1_containers: HashMap<String, TokenTypeWrapper> =
-                HashMap::new(); // String to ListingTokenV1Container
+            let mut listing_token_v1_containers: HashMap<String, TokenTypeWrapper> = HashMap::new(); // String to ListingTokenV1Container
             let mut token_offer_metadatas: HashMap<String, TokenOfferMetadata> = HashMap::new();
             let mut token_offer_v1s: HashMap<String, TokenOfferV1> = HashMap::new();
             let mut token_offer_v2s: HashMap<String, TokenOfferV2> = HashMap::new();
@@ -526,17 +537,21 @@ async fn parse_transactions(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
                         let fixed_price_listing = FixedPriceListing::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
-                        let listing_token_v1_container = TokenTypeWrapper::from_marketplace_write_resource(
-                            write_resource, 
-                            marketplace_contract_address, 
-                            txn_version
-                        ).unwrap();
+                        )
+                        .unwrap();
+                        let listing_token_v1_container =
+                            TokenTypeWrapper::from_marketplace_write_resource(
+                                write_resource,
+                                marketplace_contract_address,
+                                txn_version,
+                            )
+                            .unwrap();
 
                         if let Some(listing_metadata) = listing_metadata {
                             listing_metadatas
@@ -556,17 +571,20 @@ async fn parse_transactions(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
                         let token_offer_v1 = TokenOfferV1::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
                         let token_offer_v2 = TokenOfferV2::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
 
                         if let Some(token_offer_metadata) = token_offer_metadata {
                             token_offer_metadatas
@@ -580,21 +598,25 @@ async fn parse_transactions(
                         }
 
                         // Parse collection offer metadata
-                        let collection_offer_metadata = CollectionOfferMetadata::from_write_resource(
-                            &write_resource,
-                            marketplace_contract_address,
-                            txn_version,
-                        ).unwrap();
+                        let collection_offer_metadata =
+                            CollectionOfferMetadata::from_write_resource(
+                                &write_resource,
+                                marketplace_contract_address,
+                                txn_version,
+                            )
+                            .unwrap();
                         let collection_offer_v1 = CollectionOfferV1::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
                         let collection_offer_v2 = CollectionOfferV2::from_write_resource(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
 
                         if let Some(collection_offer_metadata) = collection_offer_metadata {
                             collection_offer_metadatas
@@ -614,7 +636,8 @@ async fn parse_transactions(
                             &write_resource,
                             marketplace_contract_address,
                             txn_version,
-                        ).unwrap();
+                        )
+                        .unwrap();
 
                         // Reconstruct the full listing and offer models and create DB objects
                         if let Some(auction_listing) = auction_listing {
@@ -651,15 +674,31 @@ async fn parse_transactions(
                             let auction_listing = auction_listings.get(&move_resource_address);
 
                             if let Some(auction_listing) = auction_listing {
-                                let token_metadata = token_metadatas
-                                    .get(&listing_metadata.as_ref().unwrap().object.get_reference_address());
+                                let token_metadata = token_metadatas.get(
+                                    &listing_metadata
+                                        .as_ref()
+                                        .unwrap()
+                                        .object
+                                        .get_reference_address(),
+                                );
                                 if let Some(token_metadata) = token_metadata {
                                     let current_auction = MarketplaceAuction {
                                         listing_id: move_resource_address.clone(),
-                                        token_data_id: listing_metadata.as_ref().unwrap().object.get_reference_address(),
+                                        token_data_id: listing_metadata
+                                            .as_ref()
+                                            .unwrap()
+                                            .object
+                                            .get_reference_address(),
                                         collection_id: token_metadata.get_collection_address(),
-                                        fee_schedule_id: listing_metadata.as_ref().unwrap().fee_schedule.get_reference_address(),
-                                        seller: listing_metadata.as_ref().unwrap().get_seller_address(),
+                                        fee_schedule_id: listing_metadata
+                                            .as_ref()
+                                            .unwrap()
+                                            .fee_schedule
+                                            .get_reference_address(),
+                                        seller: listing_metadata
+                                            .as_ref()
+                                            .unwrap()
+                                            .get_seller_address(),
                                         bid_price: Some(auction_listing.get_current_bid_price()),
                                         bidder: Some(auction_listing.get_current_bidder()),
                                         starting_bid_price: auction_listing.starting_bid.clone(),
@@ -681,25 +720,33 @@ async fn parse_transactions(
                                 }
                             } else {
                                 if let Some(fixed_price_listing) = fixed_price_listing {
-                                    let token_address =
-                                        listing_metadata.as_ref().unwrap().object.get_reference_address();
+                                    let token_address = listing_metadata
+                                        .as_ref()
+                                        .unwrap()
+                                        .object
+                                        .get_reference_address();
                                     let token_v1_container =
                                         listing_token_v1_containers.get(&token_address);
 
                                     let mut current_listing = None;
                                     if let Some(token_v1_container) = token_v1_container {
-                                        let token_v1_metadata =
-                                            token_v1_container.token.id.clone();
+                                        let token_v1_metadata = token_v1_container.token.id.clone();
                                         current_listing = Some(MarketplaceListing {
                                             listing_id: move_resource_address.clone(),
                                             token_data_id: token_v1_metadata.token_data_id.to_id(),
-                                            collection_id: token_v1_metadata.token_data_id.get_collection_id(),
+                                            collection_id: token_v1_metadata
+                                                .token_data_id
+                                                .get_collection_id(),
                                             fee_schedule_id: listing_metadata
                                                 .as_ref()
                                                 .unwrap()
-                                                .fee_schedule.get_reference_address(),
+                                                .fee_schedule
+                                                .get_reference_address(),
                                             seller: Some(
-                                                listing_metadata.as_ref().unwrap().get_seller_address(),
+                                                listing_metadata
+                                                    .as_ref()
+                                                    .unwrap()
+                                                    .get_seller_address(),
                                             ),
                                             price: fixed_price_listing.price.clone(),
                                             token_amount: token_v1_container.token.amount.clone(),
@@ -720,12 +767,15 @@ async fn parse_transactions(
                                         if let Some(token_v2_metadata) = token_v2_metadata {
                                             current_listing = Some(MarketplaceListing {
                                                 listing_id: move_resource_address.clone(),
-                                                token_data_id: token_v2_metadata.get_token_address().unwrap(),
-                                                collection_id: token_v2_metadata.get_collection_address(),
+                                                token_data_id: token_v2_metadata
+                                                    .get_token_address(),
+                                                collection_id: token_v2_metadata
+                                                    .get_collection_address(),
                                                 fee_schedule_id: listing_metadata
                                                     .as_ref()
                                                     .unwrap()
-                                                    .fee_schedule.get_reference_address(),
+                                                    .fee_schedule
+                                                    .get_reference_address(),
                                                 seller: Some(
                                                     listing_metadata
                                                         .as_ref()
@@ -771,7 +821,8 @@ async fn parse_transactions(
                                     collection_id: token_data_id.get_collection_id(),
                                     fee_schedule_id: token_offer_metadata
                                         .unwrap()
-                                        .fee_schedule.get_reference_address(),
+                                        .fee_schedule
+                                        .get_reference_address(),
                                     buyer: Some(token_offer_object.unwrap().get_owner_address()),
                                     price: token_offer_metadata.unwrap().item_price.clone(),
                                     token_amount: BigDecimal::from(1),
@@ -792,16 +843,18 @@ async fn parse_transactions(
                                 let token_offer_v2 = token_offer_v2s.get(&move_resource_address);
 
                                 if let Some(token_offer_v2) = token_offer_v2 {
-                                    let token_v2_metadata =
-                                        token_metadatas.get(&token_offer_v2.token.get_reference_address());
+                                    let token_v2_metadata = token_metadatas
+                                        .get(&token_offer_v2.token.get_reference_address());
                                     if let Some(token_v2_metadata) = token_v2_metadata {
                                         current_token_offer = Some(MarketplaceTokenOffer {
                                             offer_id: move_resource_address.clone(),
-                                            token_data_id: token_v2_metadata.get_token_address().unwrap(),
-                                            collection_id: token_v2_metadata.get_collection_address(),
+                                            token_data_id: token_v2_metadata.get_token_address(),
+                                            collection_id: token_v2_metadata
+                                                .get_collection_address(),
                                             fee_schedule_id: token_offer_metadata
                                                 .unwrap()
-                                                .fee_schedule.get_reference_address(),
+                                                .fee_schedule
+                                                .get_reference_address(),
                                             buyer: Some(
                                                 token_offer_object.unwrap().get_owner_address(),
                                             ),
@@ -839,16 +892,17 @@ async fn parse_transactions(
                             let collection_offer_v1 =
                                 collection_offer_v1s.get(&move_resource_address);
 
-
                             let mut current_collection_offer = None;
                             if let Some(collection_offer_v1) = collection_offer_v1 {
-                                let collection_data_id = collection_offer_v1.get_collection_data_id();
+                                let collection_data_id =
+                                    collection_offer_v1.get_collection_data_id();
                                 current_collection_offer = Some(MarketplaceCollectionOffer {
                                     collection_offer_id: move_resource_address.clone(),
                                     collection_id: collection_data_id.to_id(),
                                     fee_schedule_id: collection_offer_metadata
                                         .unwrap()
-                                        .fee_schedule.get_reference_address(),
+                                        .fee_schedule
+                                        .get_reference_address(),
                                     buyer: collection_object.unwrap().get_owner_address(),
                                     item_price: collection_offer_metadata
                                         .unwrap()
@@ -877,12 +931,18 @@ async fn parse_transactions(
                                 if let Some(collection_offer_v2) = collection_offer_v2 {
                                     current_collection_offer = Some(MarketplaceCollectionOffer {
                                         collection_offer_id: move_resource_address.clone(),
-                                        collection_id: collection_offer_v2.collection.get_reference_address(),
+                                        collection_id: collection_offer_v2
+                                            .collection
+                                            .get_reference_address(),
                                         fee_schedule_id: collection_offer_metadata
                                             .unwrap()
-                                            .fee_schedule.get_reference_address(),
+                                            .fee_schedule
+                                            .get_reference_address(),
                                         buyer: collection_object.unwrap().get_owner_address(),
-                                        item_price: collection_offer_metadata.unwrap().item_price.clone(),
+                                        item_price: collection_offer_metadata
+                                            .unwrap()
+                                            .item_price
+                                            .clone(),
                                         remaining_token_amount: collection_offer_metadata
                                             .unwrap()
                                             .remaining
@@ -922,7 +982,9 @@ async fn parse_transactions(
                                 .clone();
                             let current_collection_offer = MarketplaceCollectionOffer {
                                 collection_offer_id: move_resource_address.clone(),
-                                collection_id: collection_metadata.get_collection_address().unwrap(),
+                                collection_id: collection_metadata
+                                    .get_collection_address()
+                                    .unwrap(),
                                 fee_schedule_id: maybe_collection_offer_filled_metadata
                                     .fee_schedule_id
                                     .clone(),

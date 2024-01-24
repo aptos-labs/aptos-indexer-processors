@@ -50,14 +50,15 @@ impl MarketplaceListing {
         if let Some(marketplace_event) =
             &MarketplaceEvent::from_event(&event_type, &event.data, transaction_version)?
         {
-
             let listing = match marketplace_event {
                 MarketplaceEvent::ListingFilledEvent(marketplace_event) => {
                     if marketplace_event.r#type != "auction" {
                         Some(MarketplaceListing {
                             listing_id: marketplace_event.get_listing_address(),
-                            token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
-                            collection_id: marketplace_event.token_metadata.get_collection_address(),
+                            token_data_id: marketplace_event.token_metadata.get_token_address(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
                             fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                             price: marketplace_event.price.clone(),
                             token_amount: BigDecimal::from(0),
@@ -80,7 +81,7 @@ impl MarketplaceListing {
                 MarketplaceEvent::ListingCanceledEvent(marketplace_event) => {
                     Some(MarketplaceListing {
                         listing_id: marketplace_event.get_listing_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
+                        token_data_id: marketplace_event.token_metadata.get_token_address(),
                         collection_id: marketplace_event.token_metadata.get_collection_address(),
                         fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         price: marketplace_event.price.clone(),
@@ -98,9 +99,7 @@ impl MarketplaceListing {
                         last_transaction_timestamp: transaction_timestamp,
                     })
                 },
-                _ => {
-                    None
-                },
+                _ => None,
             };
             return Ok(listing);
         }

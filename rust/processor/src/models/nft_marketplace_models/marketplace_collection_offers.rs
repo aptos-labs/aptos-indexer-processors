@@ -50,12 +50,14 @@ impl MarketplaceCollectionOffer {
         if let Some(marketplace_event) =
             &MarketplaceEvent::from_event(&event_type, &event.data, transaction_version)?
         {
-
             let token_offer = match marketplace_event {
                 MarketplaceEvent::CollectionOfferCanceledEvent(marketplace_event) => {
                     Some(MarketplaceCollectionOffer {
                         collection_offer_id: marketplace_event.get_collection_offer_address(),
-                        collection_id: marketplace_event.collection_metadata.get_collection_address().unwrap(),
+                        collection_id: marketplace_event
+                            .collection_metadata
+                            .get_collection_address()
+                            .unwrap(),
                         fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         buyer: marketplace_event.get_purchaser_address(),
                         item_price: marketplace_event.price.clone(),
@@ -73,9 +75,7 @@ impl MarketplaceCollectionOffer {
                         last_transaction_timestamp: transaction_timestamp,
                     })
                 },
-                _ => {
-                    None
-                },
+                _ => None,
             };
             return Ok(token_offer);
         }

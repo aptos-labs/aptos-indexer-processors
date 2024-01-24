@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{schema::marketplace_activities, utils::util::standardize_address};
 
-use super::marketplace_utils::{MarketplaceEvent, TokenMetadata, CollectionMetadata};
+use super::marketplace_utils::{CollectionMetadata, MarketplaceEvent, TokenMetadata};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
@@ -55,77 +55,113 @@ impl MarketplaceActivity {
         entry_function_id_str: &Option<String>,
         contract_address: &str,
         coin_type: &Option<String>,
-    ) -> anyhow::Result<(Option<MarketplaceActivity>, Option<TokenMetadata>, Option<CollectionMetadata>)> {
+    ) -> anyhow::Result<(
+        Option<MarketplaceActivity>,
+        Option<TokenMetadata>,
+        Option<CollectionMetadata>,
+    )> {
         let event_type = event.type_str.as_str();
         if let Some(marketplace_event) =
             &MarketplaceEvent::from_event(&event_type, &event.data, transaction_version)?
         {
             let result = match marketplace_event {
                 MarketplaceEvent::ListingFilledEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_listing_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.price.clone(),
-                        token_amount: BigDecimal::from(1),
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: Some(marketplace_event.get_seller_address()),
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::LISTING_FILLED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_listing_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.price.clone(),
+                            token_amount: BigDecimal::from(1),
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: Some(marketplace_event.get_seller_address()),
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::LISTING_FILLED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::ListingCanceledEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_listing_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.price.clone(),
-                        token_amount: BigDecimal::from(1),
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: Some(marketplace_event.get_seller_address()),
-                        buyer: None,
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::LISTING_CANCELED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_listing_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.price.clone(),
+                            token_amount: BigDecimal::from(1),
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: Some(marketplace_event.get_seller_address()),
+                            buyer: None,
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::LISTING_CANCELED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::ListingPlacedEvent(marketplace_event) => {
                     let activity = MarketplaceActivity {
                         transaction_version,
                         event_index,
-                        offer_or_listing_id: marketplace_event.get_listing_address(), 
+                        offer_or_listing_id: marketplace_event.get_listing_address(),
                         fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
+                        token_data_id: Some(marketplace_event.token_metadata.get_token_address()),
                         creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
+                        collection_name: marketplace_event
+                            .token_metadata
+                            .get_collection_name_truncated(),
+                        token_name: Some(
+                            marketplace_event.token_metadata.get_token_name_truncated(),
+                        ),
                         property_version: marketplace_event.token_metadata.get_property_version(),
                         price: marketplace_event.price.clone(),
                         token_amount: BigDecimal::from(1),
@@ -141,198 +177,297 @@ impl MarketplaceActivity {
                         event_type: MarketplaceEvent::LISTING_PLACED_EVENT.to_string(),
                         transaction_timestamp,
                     };
-                    (Some(activity), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(activity),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::CollectionOfferPlacedEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_collection_offer_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.collection_metadata.get_collection_address().unwrap(),
-                        token_data_id: None,
-                        creator_address: marketplace_event.collection_metadata.get_creator_address(),
-                        collection_name: marketplace_event.collection_metadata.get_collection_name_truncated(),
-                        token_name: None,
-                        property_version: None,
-                        price: marketplace_event.price.clone(),
-                        token_amount: marketplace_event.token_amount.clone(),
-                        token_standard: marketplace_event.collection_metadata.get_token_standard(),
-                        seller: None,
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::COLLECTION_OFFER_PLACED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), None, Some(marketplace_event.collection_metadata.clone()))
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_collection_offer_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .collection_metadata
+                                .get_collection_address()
+                                .unwrap(),
+                            token_data_id: None,
+                            creator_address: marketplace_event
+                                .collection_metadata
+                                .get_creator_address(),
+                            collection_name: marketplace_event
+                                .collection_metadata
+                                .get_collection_name_truncated(),
+                            token_name: None,
+                            property_version: None,
+                            price: marketplace_event.price.clone(),
+                            token_amount: marketplace_event.token_amount.clone(),
+                            token_standard: marketplace_event
+                                .collection_metadata
+                                .get_token_standard(),
+                            seller: None,
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::COLLECTION_OFFER_PLACED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        None,
+                        Some(marketplace_event.collection_metadata.clone()),
+                    )
                 },
-                MarketplaceEvent::CollectionOfferCanceledEvent(
-                    marketplace_event,
-                ) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_collection_offer_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.collection_metadata.get_collection_address().unwrap(),
-                        token_data_id: None,
-                        creator_address: marketplace_event.collection_metadata.get_creator_address(),
-                        collection_name: marketplace_event.collection_metadata.get_collection_name_truncated(),
-                        token_name: None,
-                        property_version: None,
-                        price: marketplace_event.price.clone(),
-                        token_amount: marketplace_event.remaining_token_amount.clone(),
-                        token_standard: marketplace_event.collection_metadata.get_token_standard(),
-                        seller: None,
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::COLLECTION_OFFER_CANCELED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), None, Some(marketplace_event.collection_metadata.clone()))
+                MarketplaceEvent::CollectionOfferCanceledEvent(marketplace_event) => {
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_collection_offer_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .collection_metadata
+                                .get_collection_address()
+                                .unwrap(),
+                            token_data_id: None,
+                            creator_address: marketplace_event
+                                .collection_metadata
+                                .get_creator_address(),
+                            collection_name: marketplace_event
+                                .collection_metadata
+                                .get_collection_name_truncated(),
+                            token_name: None,
+                            property_version: None,
+                            price: marketplace_event.price.clone(),
+                            token_amount: marketplace_event.remaining_token_amount.clone(),
+                            token_standard: marketplace_event
+                                .collection_metadata
+                                .get_token_standard(),
+                            seller: None,
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::COLLECTION_OFFER_CANCELED_EVENT
+                                .to_string(),
+                            transaction_timestamp,
+                        }),
+                        None,
+                        Some(marketplace_event.collection_metadata.clone()),
+                    )
                 },
                 MarketplaceEvent::CollectionOfferFilledEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_collection_offer_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.price.clone(),
-                        token_amount: BigDecimal::from(0), // there is no token amount for CollectionOfferFilledEvent
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: Some(marketplace_event.get_seller_address()),
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::COLLECTION_OFFER_FILLED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_collection_offer_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.price.clone(),
+                            token_amount: BigDecimal::from(0), // there is no token amount for CollectionOfferFilledEvent
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: Some(marketplace_event.get_seller_address()),
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::COLLECTION_OFFER_FILLED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::TokenOfferPlacedEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_token_offer_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.price.clone(),
-                        token_amount: BigDecimal::from(1),
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: None,
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::TOKEN_OFFER_PLACED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_token_offer_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.price.clone(),
+                            token_amount: BigDecimal::from(1),
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: None,
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::TOKEN_OFFER_PLACED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::TokenOfferCanceledEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_token_offer_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.price.clone(),
-                        token_amount: BigDecimal::from(0),
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: None,
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::TOKEN_OFFER_CANCELED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_token_offer_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.price.clone(),
+                            token_amount: BigDecimal::from(0),
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: None,
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::TOKEN_OFFER_CANCELED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::TokenOfferFilledEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_token_offer_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.price.clone(),
-                        token_amount: BigDecimal::from(1),
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: Some(marketplace_event.get_seller_address()),
-                        buyer: Some(marketplace_event.get_purchaser_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::TOKEN_OFFER_FILLED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_token_offer_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.price.clone(),
+                            token_amount: BigDecimal::from(1),
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: Some(marketplace_event.get_seller_address()),
+                            buyer: Some(marketplace_event.get_purchaser_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::TOKEN_OFFER_FILLED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
                 MarketplaceEvent::AuctionBidEvent(marketplace_event) => {
-                    (Some(MarketplaceActivity {
-                        transaction_version,
-                        event_index,
-                        offer_or_listing_id: marketplace_event.get_listing_address(), 
-                        fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
-                        collection_id: marketplace_event.token_metadata.get_collection_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address(),
-                        creator_address: marketplace_event.token_metadata.get_creator_address(),
-                        collection_name: marketplace_event.token_metadata.get_collection_name_truncated(),
-                        token_name: Some(marketplace_event.token_metadata.get_token_name_truncated()),
-                        property_version: marketplace_event.token_metadata.get_property_version(),
-                        price: marketplace_event.new_bid.clone(),
-                        token_amount: BigDecimal::from(1),
-                        token_standard: marketplace_event.token_metadata.get_token_standard(),
-                        seller: None,
-                        buyer: Some(marketplace_event.get_new_bidder_address()),
-                        coin_type: coin_type.clone(),
-                        marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
-                        contract_address: standardize_address(contract_address),
-                        entry_function_id_str: entry_function_id_str
-                            .clone()
-                            .unwrap_or_else(|| "".to_string()),
-                        event_type: MarketplaceEvent::TOKEN_OFFER_FILLED_EVENT.to_string(),
-                        transaction_timestamp,
-                    }), Some(marketplace_event.token_metadata.clone()), None)
+                    (
+                        Some(MarketplaceActivity {
+                            transaction_version,
+                            event_index,
+                            offer_or_listing_id: marketplace_event.get_listing_address(),
+                            fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
+                            token_data_id: Some(
+                                marketplace_event.token_metadata.get_token_address(),
+                            ),
+                            creator_address: marketplace_event.token_metadata.get_creator_address(),
+                            collection_name: marketplace_event
+                                .token_metadata
+                                .get_collection_name_truncated(),
+                            token_name: Some(
+                                marketplace_event.token_metadata.get_token_name_truncated(),
+                            ),
+                            property_version: marketplace_event
+                                .token_metadata
+                                .get_property_version(),
+                            price: marketplace_event.new_bid.clone(),
+                            token_amount: BigDecimal::from(1),
+                            token_standard: marketplace_event.token_metadata.get_token_standard(),
+                            seller: None,
+                            buyer: Some(marketplace_event.get_new_bidder_address()),
+                            coin_type: coin_type.clone(),
+                            marketplace: "example_v2_marketplace".to_string(), // TODO: update this to actual marketpalce name
+                            contract_address: standardize_address(contract_address),
+                            entry_function_id_str: entry_function_id_str
+                                .clone()
+                                .unwrap_or_else(|| "".to_string()),
+                            event_type: MarketplaceEvent::TOKEN_OFFER_FILLED_EVENT.to_string(),
+                            transaction_timestamp,
+                        }),
+                        Some(marketplace_event.token_metadata.clone()),
+                        None,
+                    )
                 },
             };
             return Ok(result);

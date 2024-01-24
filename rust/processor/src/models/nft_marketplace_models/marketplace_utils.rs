@@ -231,7 +231,12 @@ impl CollectionOfferV1 {
     ) -> anyhow::Result<Option<Self>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         let data = write_resource.data.as_str();
-        if type_str != format!("{}::collection_offer::CollectionOfferTokenV1", contract_address) {
+        if type_str
+            != format!(
+                "{}::collection_offer::CollectionOfferTokenV1",
+                contract_address
+            )
+        {
             return Ok(None);
         }
 
@@ -244,10 +249,8 @@ impl CollectionOfferV1 {
     }
 
     pub fn get_collection_data_id(&self) -> CollectionDataIdType {
-        let collection_data_id = CollectionDataIdType::new(
-            self.creator_address.clone(),
-            self.collection_name.clone(),
-        );
+        let collection_data_id =
+            CollectionDataIdType::new(self.creator_address.clone(), self.collection_name.clone());
 
         collection_data_id
     }
@@ -266,7 +269,12 @@ impl CollectionOfferV2 {
     ) -> anyhow::Result<Option<Self>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         let data = write_resource.data.as_str();
-        if type_str != format!("{}::collection_offer::CollectionOfferTokenV2", contract_address) {
+        if type_str
+            != format!(
+                "{}::collection_offer::CollectionOfferTokenV2",
+                contract_address
+            )
+        {
             return Ok(None);
         }
 
@@ -343,12 +351,27 @@ pub struct CurrentBidValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InnerResourceVec {
+    pub vec: Vec<ResourceReference>,
+}
+
+impl InnerResourceVec {
+    pub fn get_address(&self) -> Option<String> {
+        if self.vec.is_empty() {
+            None
+        } else {
+            self.vec.first().as_ref().map(|x| x.get_reference_address())
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenMetadata {
     creator_address: String,
     collection_name: String,
-    collection: OptionalString,
+    collection: InnerResourceVec,
     token_name: String,
-    token: OptionalString,
+    token: InnerResourceVec,
     property_version: OptionalBigDecimal,
 }
 
@@ -358,8 +381,8 @@ impl TokenMetadata {
     }
 
     pub fn get_collection_address(&self) -> String {
-        if let Some(inner) = self.collection.get_string() {
-            standardize_address(&inner)
+        if let Some(inner) = self.collection.get_address() {
+            inner
         } else {
             let token_data_id = TokenDataIdType::new(
                 self.creator_address.clone(),
@@ -378,16 +401,16 @@ impl TokenMetadata {
         truncate_str(&self.token_name, NAME_LENGTH)
     }
 
-    pub fn get_token_address(&self) -> Option<String> {
-        if let Some(inner) = self.token.get_string() {
-            Some(standardize_address(&inner))
+    pub fn get_token_address(&self) -> String {
+        if let Some(inner) = self.token.get_address() {
+            inner
         } else {
             let token_data_id = TokenDataIdType::new(
                 self.creator_address.clone(),
                 self.collection_name.clone(),
                 self.token_name.clone(),
             );
-            Some(token_data_id.to_id())
+            token_data_id.to_id()
         }
     }
 
@@ -396,7 +419,7 @@ impl TokenMetadata {
     }
 
     pub fn get_token_standard(&self) -> String {
-        if let Some(_inner) = self.token.get_string() {
+        if let Some(_inner) = self.token.get_address() {
             TokenStandard::V2.to_string()
         } else {
             TokenStandard::V1.to_string()

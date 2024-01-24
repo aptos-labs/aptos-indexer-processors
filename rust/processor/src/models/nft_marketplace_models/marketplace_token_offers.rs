@@ -51,12 +51,11 @@ impl MarketplaceTokenOffer {
         if let Some(marketplace_event) =
             &MarketplaceEvent::from_event(&event_type, &event.data, transaction_version)?
         {
-
             let token_offer = match marketplace_event {
                 MarketplaceEvent::TokenOfferFilledEvent(marketplace_event) => {
                     Some(MarketplaceTokenOffer {
                         offer_id: marketplace_event.get_token_offer_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
+                        token_data_id: marketplace_event.token_metadata.get_token_address(),
                         collection_id: marketplace_event.token_metadata.get_collection_address(),
                         fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         buyer: Some(marketplace_event.get_purchaser_address()),
@@ -78,7 +77,7 @@ impl MarketplaceTokenOffer {
                 MarketplaceEvent::TokenOfferCanceledEvent(marketplace_event) => {
                     Some(MarketplaceTokenOffer {
                         offer_id: marketplace_event.get_token_offer_address(),
-                        token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
+                        token_data_id: marketplace_event.token_metadata.get_token_address(),
                         collection_id: marketplace_event.token_metadata.get_collection_address(),
                         fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                         buyer: Some(marketplace_event.get_purchaser_address()),
@@ -97,9 +96,7 @@ impl MarketplaceTokenOffer {
                         last_transaction_timestamp: transaction_timestamp,
                     })
                 },
-                _ => {
-                    None
-                },
+                _ => None,
             };
             return Ok(token_offer);
         }

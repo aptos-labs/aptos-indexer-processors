@@ -12,8 +12,8 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-use crate::{schema::marketplace_auctions, utils::util::standardize_address};
 use super::marketplace_utils::MarketplaceEvent;
+use crate::{schema::marketplace_auctions, utils::util::standardize_address};
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(listing_id, token_data_id))]
@@ -53,14 +53,15 @@ impl MarketplaceAuction {
         if let Some(marketplace_event) =
             &MarketplaceEvent::from_event(&event_type, &event.data, transaction_version)?
         {
-
             let auction = match marketplace_event {
                 MarketplaceEvent::ListingFilledEvent(marketplace_event) => {
                     if marketplace_event.r#type == "auction" {
                         Some(MarketplaceAuction {
                             listing_id: marketplace_event.get_listing_address(),
-                            token_data_id: marketplace_event.token_metadata.get_token_address().unwrap(),
-                            collection_id: marketplace_event.token_metadata.get_collection_address(),
+                            token_data_id: marketplace_event.token_metadata.get_token_address(),
+                            collection_id: marketplace_event
+                                .token_metadata
+                                .get_collection_address(),
                             fee_schedule_id: event.key.as_ref().unwrap().account_address.clone(),
                             seller: marketplace_event.get_seller_address(),
                             bid_price: Some(marketplace_event.price.clone()),
@@ -84,9 +85,7 @@ impl MarketplaceAuction {
                         None
                     }
                 },
-                _ => {
-                    None
-                },
+                _ => None,
             };
             return Ok(auction);
         }
