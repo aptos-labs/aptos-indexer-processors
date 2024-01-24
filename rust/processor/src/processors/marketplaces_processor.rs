@@ -517,8 +517,6 @@ async fn parse_transactions(
                         if !move_resource_type_address.eq(marketplace_contract_address) {
                             continue;
                         }
-                        // let data = serde_json::from_str::<serde_json::Value>(&write_resource.data)
-                        //     .unwrap();
 
                         // Parse object metadata
                         let object_core_metadata =
@@ -1010,7 +1008,7 @@ async fn parse_transactions(
             }
         }
     }
-    
+
     (
         marketplace_activities,
         nft_listings,

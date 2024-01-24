@@ -770,8 +770,8 @@ pub struct AuctionBidEvent {
     new_bidder: String, // address
     pub new_bid: BigDecimal,
     new_end_time: BigDecimal,
-    previous_bidder: Option<String>,
-    previous_bid: Option<BigDecimal>,
+    previous_bidder: OptionalString,
+    previous_bid: OptionalString,
     previous_end_time: BigDecimal,
     pub token_metadata: TokenMetadata,
 }
@@ -786,7 +786,7 @@ impl AuctionBidEvent {
     }
 
     pub fn get_previous_bidder_address(&self) -> Option<String> {
-        if let Some(previous_bidder) = &self.previous_bidder {
+        if let Some(previous_bidder) = &self.previous_bidder.get_string() {
             Some(standardize_address(previous_bidder))
         } else {
             None
