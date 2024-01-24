@@ -386,7 +386,6 @@ async fn parse_transactions(
                 String,
                 CollectionOfferEventMetadata,
             > = HashMap::new();
-
             // Loop through the events for the all activities
             for (index, event) in inner.events.iter().enumerate() {
                 // get event type and contract address
@@ -1011,7 +1010,7 @@ async fn parse_transactions(
             }
         }
     }
-
+    
     (
         marketplace_activities,
         nft_listings,

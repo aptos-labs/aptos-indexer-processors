@@ -509,7 +509,7 @@ pub enum MarketplaceEvent {
 }
 
 impl MarketplaceEvent {
-    pub const LISTING_FILLED_EVENT: &'static str = "events::ListingFilledEvent";
+    pub const LISTING_FILLED_EVENT: &'static str = "ListingFilledEvent";
     pub const LISTING_CANCELED_EVENT: &'static str = "ListingCanceledEvent";
     pub const LISTING_PLACED_EVENT: &'static str = "ListingPlacedEvent";
     pub const COLLECTION_OFFER_PLACED_EVENT: &'static str = "CollectionOfferPlacedEvent";
