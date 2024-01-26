@@ -222,3 +222,13 @@ pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     ])
     .unwrap()
 });
+
+/// GRPC latency.
+pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_grpc_latency_in_secs",
+        "GRPC latency observed by processor",
+        &["processor_name"]
+    )
+    .unwrap()
+});

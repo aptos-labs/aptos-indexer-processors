@@ -16,11 +16,11 @@ use crate::{
     schema::ledger_infos,
     utils::{
         counters::{
-            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
-            MULTI_BATCH_PROCESSING_TIME_IN_SECS, NUM_TRANSACTIONS_PROCESSED_COUNT,
-            PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
-            PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
-            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, GRPC_LATENCY_BY_PROCESSOR_IN_SECS,
+            LATEST_PROCESSED_VERSION, MULTI_BATCH_PROCESSING_TIME_IN_SECS,
+            NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT,
+            PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS, PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS,
+            PROCESSOR_ERRORS_COUNT, PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
@@ -342,6 +342,11 @@ impl Worker {
                 .unwrap()
                 .timestamp
                 .clone();
+            GRPC_LATENCY_BY_PROCESSOR_IN_SECS
+                .with_label_values(&[processor_name])
+                .set(time_diff_since_pb_timestamp_in_secs(
+                    batch_end_txn_timestamp.as_ref().unwrap(),
+                ));
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
