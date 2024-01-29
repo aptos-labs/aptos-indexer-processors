@@ -205,15 +205,17 @@ where
 }
 
 pub async fn execute_in_chunks<U, T>(
-    conn: PgDbPool,
-    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
-    items_to_insert: &[T],
-    chunk_size: usize,
+    _conn: PgDbPool,
+    _build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    _items_to_insert: &[T],
+    _chunk_size: usize,
 ) -> Result<(), diesel::result::Error>
 where
     U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
 {
+    // TEMPORARILY SKIP ACTUALLY WRITING, SO WE CAN TEST THE FETCHING SPEED
+    /*
     let chunks = get_chunks(items_to_insert.len(), chunk_size);
 
     let futures = chunks.into_iter().map(|(start_ind, end_ind)| {
@@ -230,10 +232,11 @@ where
     });
     for res in futures_util::future::join_all(futures).await {
         res?;
-    }
+    }*/
     Ok(())
 }
 
+#[allow(dead_code)]
 async fn execute_or_retry_cleaned<U, T>(
     conn: PgDbPool,
     build_query: fn(Vec<T>) -> (U, Option<&'static str>),
