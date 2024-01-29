@@ -10,22 +10,52 @@ use crate::{
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
+use chrono::NaiveDateTime;
 use diesel::{
     pg::{upsert::excluded, Pg},
     query_builder::QueryFragment,
     ExpressionMethods,
 };
 use field_count::FieldCount;
+use google_cloud_googleapis::pubsub::v1::PubsubMessage;
+use google_cloud_pubsub::{
+    client::{Client, ClientConfig},
+    publisher::PublisherConfig,
+};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct EventStreamSchema {
+    chain_id: u64,
+    events: Vec<String>,
+    transaction_version: i64,
+    timestamp: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventProcessorConfig {
+    pub pubsub_topic_name: String,
+    pub google_application_credentials: Option<String>,
+}
+
 pub struct EventsProcessor {
     connection_pool: PgDbPool,
+    config: EventProcessorConfig,
 }
 
 impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, config: EventProcessorConfig) -> Self {
+        if let Some(credentials) = config.google_application_credentials.clone() {
+            std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+        }
+
+        Self {
+            connection_pool,
+            config,
+        }
     }
 }
 
@@ -88,9 +118,19 @@ impl ProcessorTrait for EventsProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-        _: Option<u64>,
+        db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+
+        // Initialize pubsub client
+        let config = ClientConfig::default().with_auth().await?;
+        let client = Client::new(config).await?;
+        let topic = client.topic(&self.config.pubsub_topic_name.clone());
+        let publisher = topic.new_publisher(Some(PublisherConfig {
+            workers: 10,
+            ..Default::default()
+        }));
+
         let mut conn = self.get_conn().await;
         let mut events = vec![];
         for txn in &transactions {
@@ -106,6 +146,13 @@ impl ProcessorTrait for EventsProcessor {
             };
 
             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
+
+            if let Ok(pubsub_message) =
+                events_to_pubsub_message(db_chain_id.unwrap(), &txn_events, txn)
+            {
+                publisher.publish(pubsub_message).await.get().await?;
+            };
+
             events.extend(txn_events);
         }
 
@@ -139,4 +186,40 @@ impl ProcessorTrait for EventsProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
+}
+
+pub fn events_to_pubsub_message(
+    chain_id: u64,
+    events: &Vec<EventModel>,
+    txn: &Transaction,
+) -> anyhow::Result<PubsubMessage> {
+    if events.len() == 0 {
+        return Err(anyhow::anyhow!("No events to publish!"));
+    }
+
+    let transaction_version = txn.version as i64;
+    let txn_timestamp = txn
+        .timestamp
+        .as_ref()
+        .expect("Transaction timestamp doesn't exist!")
+        .seconds;
+    let pubsub_message = EventStreamSchema {
+        chain_id,
+        events: events
+            .iter()
+            .map(|event| serde_json::to_string(event).unwrap_or_default())
+            .collect(),
+        transaction_version,
+        timestamp: NaiveDateTime::from_timestamp_opt(txn_timestamp, 0)
+            .unwrap_or_default()
+            .to_string(),
+    };
+
+    Ok(PubsubMessage {
+        data: serde_json::to_string(&pubsub_message)
+            .unwrap_or_default()
+            .into(),
+        ordering_key: transaction_version.to_string(),
+        ..Default::default()
+    })
 }
