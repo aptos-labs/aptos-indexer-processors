@@ -146,13 +146,8 @@ impl ProcessorTrait for EventsProcessor {
             };
 
             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-
-            if let Ok(pubsub_message) =
-                events_to_pubsub_message(db_chain_id.unwrap(), &txn_events, txn)
-            {
-                publisher.publish(pubsub_message).await.get().await?;
-            };
-
+            let pubsub_message = events_to_pubsub_message(db_chain_id.unwrap(), &txn_events, txn);
+            publisher.publish(pubsub_message).await.get().await?;
             events.extend(txn_events);
         }
 
@@ -192,11 +187,7 @@ pub fn events_to_pubsub_message(
     chain_id: u64,
     events: &Vec<EventModel>,
     txn: &Transaction,
-) -> anyhow::Result<PubsubMessage> {
-    if events.len() == 0 {
-        return Err(anyhow::anyhow!("No events to publish!"));
-    }
-
+) -> PubsubMessage {
     let transaction_version = txn.version as i64;
     let txn_timestamp = txn
         .timestamp
@@ -215,11 +206,11 @@ pub fn events_to_pubsub_message(
             .to_string(),
     };
 
-    Ok(PubsubMessage {
+    PubsubMessage {
         data: serde_json::to_string(&pubsub_message)
             .unwrap_or_default()
             .into(),
         ordering_key: transaction_version.to_string(),
         ..Default::default()
-    })
+    }
 }
