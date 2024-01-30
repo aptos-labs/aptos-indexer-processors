@@ -239,7 +239,7 @@ impl Worker {
             let ma_clone = ma.clone();
             let receiver_clone = receiver.clone();
 
-            let join_handle = tokio::spawn(async move {
+            let join_handle = tokio::task::spawn_blocking(async move {
                 loop {
                     let pb_channel_fetch_time = std::time::Instant::now();
                     let txn_pb_res = timeout(
