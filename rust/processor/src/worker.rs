@@ -201,50 +201,19 @@ impl Worker {
                 "[Parser] Starting fetcher thread"
             );
 
-            let chunk_size = 1_000_000;
-
-            let loop1 = crate::grpc_stream::create_fetcher_loop(
+            crate::grpc_stream::create_fetcher_loop(
                 tx.clone(),
                 indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
                 starting_version,
-                request_ending_version.or(Some(starting_version + chunk_size)),
+                request_ending_version,
                 auth_token.clone(),
                 processor_name.to_string(),
                 starting_version,
                 BUFFER_SIZE,
-            );
-
-            let loop2 = crate::grpc_stream::create_fetcher_loop(
-                tx.clone(),
-                indexer_grpc_data_service_address.clone(),
-                indexer_grpc_http2_ping_interval,
-                indexer_grpc_http2_ping_timeout,
-                starting_version + chunk_size,
-                Some(starting_version + chunk_size + chunk_size),
-                auth_token.clone(),
-                processor_name.to_string(),
-                starting_version,
-                BUFFER_SIZE,
-            );
-
-            let loop3 = crate::grpc_stream::create_fetcher_loop(
-                tx.clone(),
-                indexer_grpc_data_service_address.clone(),
-                indexer_grpc_http2_ping_interval,
-                indexer_grpc_http2_ping_timeout,
-                starting_version + chunk_size + chunk_size,
-                None,
-                auth_token.clone(),
-                processor_name.to_string(),
-                starting_version,
-                BUFFER_SIZE,
-            );
-
-            // join all 3 tasks
-            let _ = futures::future::join_all(vec![loop1, loop2, loop3]).await;
-            unreachable!("At least one PB fetcher tasks should run forever");
+            )
+            .await
         });
 
         // This is the consumer side of the channel. These are the major states:
