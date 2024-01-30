@@ -215,6 +215,9 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
+            TxnData::Validator(_validator_txn) => {
+                panic!("Validator transaction is not supported yet!")
+            },
         }
     }
 
