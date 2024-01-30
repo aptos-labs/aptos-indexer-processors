@@ -8,10 +8,11 @@ use crate::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-        nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor,
-        stake_processor::StakeProcessor, token_processor::TokenProcessor,
-        token_v2_processor::TokenV2Processor, user_transaction_processor::UserTransactionProcessor,
-        ProcessingResult, Processor, ProcessorConfig, ProcessorTrait,
+        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
+        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
+        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
+        ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
@@ -769,6 +770,7 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
         },
+        ProcessorConfig::MonitoringProcessor => Processor::from(MonitoringProcessor::new(db_pool)),
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
         },
