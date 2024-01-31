@@ -215,6 +215,21 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
+            TxnData::Validator(_validator_txn) => (
+                Self::from_transaction_info(
+                    transaction_info,
+                    None,
+                    None,
+                    version,
+                    transaction_type,
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+            ),
         }
     }
 
