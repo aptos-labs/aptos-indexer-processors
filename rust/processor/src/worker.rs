@@ -35,6 +35,7 @@ use aptos_protos::{
     transaction::v1::Transaction,
 };
 use futures::StreamExt;
+use google_cloud_pubsub::client::{Client, ClientConfig};
 use prost::Message;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
@@ -178,7 +179,7 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // Build the processor based on the config.
-        let processor = build_processor(&self.processor_config, self.db_pool.clone());
+        let processor = build_processor(&self.processor_config, self.db_pool.clone()).await;
         let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
@@ -755,7 +756,7 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
+pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
@@ -766,7 +767,15 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
         ProcessorConfig::EventsProcessor(config) => {
-            Processor::from(EventsProcessor::new(db_pool, config.clone()))
+            if let Some(credentials) = config.google_application_credentials.clone() {
+                std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+            }
+
+            let pubsub_config = ClientConfig::default().with_auth().await.unwrap();
+            let client = Client::new(pubsub_config).await.unwrap();
+            let topic = client.topic(&config.pubsub_topic_name);
+            let publisher = topic.new_publisher(None);
+            Processor::from(EventsProcessor::new(db_pool, publisher))
         },
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))

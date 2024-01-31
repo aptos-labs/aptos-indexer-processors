@@ -18,10 +18,7 @@ use diesel::{
 };
 use field_count::FieldCount;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
-use google_cloud_pubsub::{
-    client::{Client, ClientConfig},
-    publisher::PublisherConfig,
-};
+use google_cloud_pubsub::publisher::Publisher;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
@@ -42,19 +39,15 @@ pub struct EventProcessorConfig {
 }
 
 pub struct EventsProcessor {
+    publisher: Publisher,
     connection_pool: PgDbPool,
-    config: EventProcessorConfig,
 }
 
 impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool, config: EventProcessorConfig) -> Self {
-        if let Some(credentials) = config.google_application_credentials.clone() {
-            std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
-        }
-
+    pub fn new(connection_pool: PgDbPool, publisher: Publisher) -> Self {
         Self {
             connection_pool,
-            config,
+            publisher,
         }
     }
 }
@@ -121,16 +114,6 @@ impl ProcessorTrait for EventsProcessor {
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-
-        // Initialize pubsub client
-        let config = ClientConfig::default().with_auth().await?;
-        let client = Client::new(config).await?;
-        let topic = client.topic(&self.config.pubsub_topic_name.clone());
-        let publisher = topic.new_publisher(Some(PublisherConfig {
-            workers: 10,
-            ..Default::default()
-        }));
-
         let mut conn = self.get_conn().await;
         let mut events = vec![];
         for txn in &transactions {
@@ -147,7 +130,21 @@ impl ProcessorTrait for EventsProcessor {
 
             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
             let pubsub_message = events_to_pubsub_message(db_chain_id.unwrap(), &txn_events, txn);
-            publisher.publish(pubsub_message).await.get().await?;
+            self.publisher
+                .publish(pubsub_message)
+                .await
+                .get()
+                .await
+                .unwrap_or_else(|e| {
+                    error!(
+                        start_version = start_version,
+                        end_version = end_version,
+                        processor_name = self.name(),
+                        error = ?e,
+                        "Error publishing to pubsub",
+                    );
+                    panic!();
+                });
             events.extend(txn_events);
         }
 
@@ -210,7 +207,6 @@ pub fn events_to_pubsub_message(
         data: serde_json::to_string(&pubsub_message)
             .unwrap_or_default()
             .into(),
-        ordering_key: transaction_version.to_string(),
         ..Default::default()
     }
 }
