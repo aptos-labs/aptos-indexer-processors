@@ -483,7 +483,7 @@ async fn parse_v2_token(
                                 object,
                                 unlimited_supply: None,
                                 property_map: None,
-                                transfer_event: None,
+                                transfer_events: vec![],
                                 token: None,
                                 fungible_asset_metadata: None,
                                 fungible_asset_supply: None,
@@ -549,18 +549,22 @@ async fn parse_v2_token(
                 if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address());
                 }
-                if let Some(transfer_event) = TransferEvent::from_event(event, txn_version).unwrap()
+                if let Some(transfer_events) =
+                    TransferEvent::from_event(event, txn_version).unwrap()
                 {
                     if let Some(aggregated_data) =
-                        token_v2_metadata_helper.get_mut(&transfer_event.get_object_address())
+                        token_v2_metadata_helper.get_mut(&transfer_events.get_object_address())
                     {
                         // we don't want index to be 0 otherwise we might have collision with write set change index
+                        // note that these will be multiplied by -1 so that it doesn't conflict with wsc index
                         let index = if index == 0 {
                             user_txn.events.len()
                         } else {
                             index
                         };
-                        aggregated_data.transfer_event = Some((index as i64, transfer_event));
+                        aggregated_data
+                            .transfer_events
+                            .push((index as i64, transfer_events));
                     }
                 }
                 // handling all the token v1 events
@@ -737,53 +741,31 @@ async fn parse_v2_token(
                             .unwrap()
                         {
                             // Add NFT ownership
-                            if let Some(inner) = TokenOwnershipV2::get_nft_v2_from_token_data(
-                                &token_data,
-                                &token_v2_metadata_helper,
-                            )
-                            .unwrap()
-                            {
-                                let (
-                                    nft_ownership,
-                                    current_nft_ownership,
-                                    from_nft_ownership,
-                                    from_current_nft_ownership,
-                                ) = inner;
-                                token_ownerships_v2.push(nft_ownership);
-                                // this is used to persist latest owner for burn event handling
+                            let (mut ownerships, current_ownerships) =
+                                TokenOwnershipV2::get_nft_v2_from_token_data(
+                                    &token_data,
+                                    &token_v2_metadata_helper,
+                                )
+                                .unwrap();
+                            if let Some(current_nft_ownership) = ownerships.first() {
+                                // Note that the first element in ownerships is the current ownership. We need to cache
+                                // it in prior_nft_ownership so that moving forward if we see a burn we'll know
+                                // where it came from.
                                 prior_nft_ownership.insert(
                                     current_nft_ownership.token_data_id.clone(),
                                     NFTOwnershipV2 {
                                         token_data_id: current_nft_ownership.token_data_id.clone(),
-                                        owner_address: current_nft_ownership.owner_address.clone(),
+                                        owner_address: current_nft_ownership
+                                            .owner_address
+                                            .as_ref()
+                                            .unwrap()
+                                            .clone(),
                                         is_soulbound: current_nft_ownership.is_soulbound_v2,
                                     },
                                 );
-                                current_token_ownerships_v2.insert(
-                                    (
-                                        current_nft_ownership.token_data_id.clone(),
-                                        current_nft_ownership.property_version_v1.clone(),
-                                        current_nft_ownership.owner_address.clone(),
-                                        current_nft_ownership.storage_id.clone(),
-                                    ),
-                                    current_nft_ownership,
-                                );
-                                // Add the previous owner of the token transfer
-                                if let Some(from_nft_ownership) = from_nft_ownership {
-                                    let from_current_nft_ownership =
-                                        from_current_nft_ownership.unwrap();
-                                    token_ownerships_v2.push(from_nft_ownership);
-                                    current_token_ownerships_v2.insert(
-                                        (
-                                            from_current_nft_ownership.token_data_id.clone(),
-                                            from_current_nft_ownership.property_version_v1.clone(),
-                                            from_current_nft_ownership.owner_address.clone(),
-                                            from_current_nft_ownership.storage_id.clone(),
-                                        ),
-                                        from_current_nft_ownership,
-                                    );
-                                }
                             }
+                            token_ownerships_v2.append(&mut ownerships);
+                            current_token_ownerships_v2.extend(current_ownerships);
                             token_datas_v2.push(token_data);
                             current_token_datas_v2.insert(
                                 current_token_data.token_data_id.clone(),

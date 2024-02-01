@@ -216,7 +216,7 @@ async fn parse_v2_token(
                             object,
                             unlimited_supply: None,
                             property_map: None,
-                            transfer_event: None,
+                            transfer_events: vec![],
                             token: None,
                             fungible_asset_metadata: None,
                             fungible_asset_supply: None,

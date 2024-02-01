@@ -181,7 +181,7 @@ impl ProcessorTrait for ObjectsProcessor {
                             fixed_supply: None,
                             unlimited_supply: None,
                             property_map: None,
-                            transfer_event: None,
+                            transfer_events: vec![],
                             fungible_asset_supply: None,
                         });
                     }

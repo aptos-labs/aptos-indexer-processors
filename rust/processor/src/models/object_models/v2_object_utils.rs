@@ -36,7 +36,8 @@ pub type EventIndex = i64;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectAggregatedData {
     pub object: ObjectWithMetadata,
-    pub transfer_event: Option<(EventIndex, TransferEvent)>,
+    // There could be more than one transfers on the same transaction
+    pub transfer_events: Vec<(EventIndex, TransferEvent)>,
     // Fungible asset structs
     pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
     pub fungible_asset_supply: Option<FungibleAssetSupply>,

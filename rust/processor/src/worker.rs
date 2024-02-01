@@ -450,28 +450,28 @@ impl Worker {
 
                     LATEST_PROCESSED_VERSION
                         .with_label_values(&[
-                            &processor_name,
+                            processor_name,
                             ProcessorStep::ProcessedBatch.get_step(),
                             ProcessorStep::ProcessedBatch.get_label(),
                         ])
                         .set(end_version as i64);
                     TRANSACTION_UNIX_TIMESTAMP
                         .with_label_values(&[
-                            &processor_name,
+                            processor_name,
                             ProcessorStep::ProcessedBatch.get_step(),
                             ProcessorStep::ProcessedBatch.get_label(),
                         ])
                         .set(start_txn_timestamp_unix);
                     PROCESSED_BYTES_COUNT
                         .with_label_values(&[
-                            &processor_name,
+                            processor_name,
                             ProcessorStep::ProcessedBatch.get_step(),
                             ProcessorStep::ProcessedBatch.get_label(),
                         ])
                         .inc_by(transactions_pb.size_in_bytes);
                     NUM_TRANSACTIONS_PROCESSED_COUNT
                         .with_label_values(&[
-                            &processor_name,
+                            processor_name,
                             ProcessorStep::ProcessedBatch.get_step(),
                             ProcessorStep::ProcessedBatch.get_label(),
                         ])
@@ -479,13 +479,13 @@ impl Worker {
 
                     if let Ok(res) = processed_result {
                         SINGLE_BATCH_PROCESSING_TIME_IN_SECS
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[processor_name])
                             .set(processing_duration.elapsed().as_secs_f64());
                         SINGLE_BATCH_PARSING_TIME_IN_SECS
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[processor_name])
                             .set(res.processing_duration_in_secs);
                         SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[processor_name])
                             .set(res.db_insertion_duration_in_secs);
 
                         if enable_verbose_logging {
@@ -651,14 +651,14 @@ impl Worker {
             );
             LATEST_PROCESSED_VERSION
                 .with_label_values(&[
-                    &processor_name,
+                    processor_name,
                     ProcessorStep::ProcessedMultipleBatches.get_step(),
                     ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
                 .set(batch_end as i64);
             TRANSACTION_UNIX_TIMESTAMP
                 .with_label_values(&[
-                    &processor_name,
+                    processor_name,
                     ProcessorStep::ProcessedMultipleBatches.get_step(),
                     ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
@@ -669,20 +669,20 @@ impl Worker {
                 );
             PROCESSED_BYTES_COUNT
                 .with_label_values(&[
-                    &processor_name,
+                    processor_name,
                     ProcessorStep::ProcessedMultipleBatches.get_step(),
                     ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
                 .inc_by(size_in_bytes as u64);
             NUM_TRANSACTIONS_PROCESSED_COUNT
                 .with_label_values(&[
-                    &processor_name,
+                    processor_name,
                     ProcessorStep::ProcessedMultipleBatches.get_step(),
                     ProcessorStep::ProcessedMultipleBatches.get_label(),
                 ])
                 .inc_by(batch_end - batch_start + 1);
             MULTI_BATCH_PROCESSING_TIME_IN_SECS
-                .with_label_values(&[&processor_name])
+                .with_label_values(&[processor_name])
                 .set(processing_time.elapsed().as_secs_f64());
         }
     }
