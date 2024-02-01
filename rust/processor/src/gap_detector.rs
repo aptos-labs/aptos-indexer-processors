@@ -10,8 +10,8 @@ use ahash::AHashMap;
 use kanal::AsyncReceiver;
 use tracing::{error, info};
 
-// Size of a gap (in txn version) before gap detected
-pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 500;
+// Number of batches processed before gap detected
+pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 100;
 // Number of seconds between each processor status update
 const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
