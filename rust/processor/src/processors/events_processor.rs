@@ -7,9 +7,10 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
@@ -18,17 +19,20 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
 pub struct EventsProcessor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -48,7 +52,8 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    events: Vec<EventModel>,
+    events: &[EventModel],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -56,7 +61,13 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    execute_in_chunks(conn, insert_events_query, events, EventModel::field_count()).await?;
+    execute_in_chunks(
+        conn,
+        insert_events_query,
+        events,
+        get_config_table_chunk_size::<EventModel>("events", per_table_chunk_sizes),
+    )
+    .await?;
     Ok(())
 }
 
@@ -94,6 +105,8 @@ impl ProcessorTrait for EventsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut events = vec![];
         for txn in &transactions {
             let txn_version = txn.version as i64;
@@ -131,7 +144,8 @@ impl ProcessorTrait for EventsProcessor {
             self.name(),
             start_version,
             end_version,
-            events,
+            &events,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
@@ -142,7 +156,7 @@ impl ProcessorTrait for EventsProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(
