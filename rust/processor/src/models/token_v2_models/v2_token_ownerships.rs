@@ -289,8 +289,7 @@ impl TokenOwnershipV2 {
         if let Some(token_address) =
             tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
         {
-            let latest_nft_ownership: NFTOwnershipV2 = match prior_nft_ownership.get(token_address)
-            {
+            let latest_nft_ownership = match prior_nft_ownership.get(token_address) {
                 Some(inner) => inner.clone(),
                 None => {
                     match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
