@@ -42,7 +42,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    account_transactions: Vec<AccountTransaction>,
+    account_transactions: &[AccountTransaction],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -113,7 +113,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
             self.name(),
             start_version,
             end_version,
-            account_transactions,
+            &account_transactions,
         )
         .await;
 

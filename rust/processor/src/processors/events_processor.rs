@@ -45,7 +45,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    events: Vec<EventModel>,
+    events: &[EventModel],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -122,7 +122,7 @@ impl ProcessorTrait for EventsProcessor {
             self.name(),
             start_version,
             end_version,
-            events,
+            &events,
         )
         .await;
 

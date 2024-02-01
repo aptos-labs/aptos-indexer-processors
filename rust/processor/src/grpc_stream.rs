@@ -15,6 +15,7 @@ use futures_util::StreamExt;
 use kanal::AsyncSender;
 use prost::Message;
 use std::time::Duration;
+use tokio::time::timeout;
 use tonic::{Response, Streaming};
 use tracing::{error, info};
 use url::Url;
@@ -99,7 +100,13 @@ pub async fn get_stream(
         end_version = ending_version,
         "[Parser] Setting up GRPC client"
     );
-    let mut rpc_client = match RawDataClient::connect(channel).await {
+
+    // Use tokio::time::timeout to set a timeout for the request
+    let connect_res = timeout(Duration::from_secs(1), RawDataClient::connect(channel))
+        .await
+        .expect("[Parser] Timeout connecting to GRPC server");
+
+    let mut rpc_client = match connect_res {
         Ok(client) => client
             .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
             .send_compressed(tonic::codec::CompressionEncoding::Gzip)
@@ -312,6 +319,7 @@ pub async fn create_fetcher_loop(
                         &processor_name,
                         ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
                         ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                        "-",
                     ])
                     .set(end_version as i64);
                 TRANSACTION_UNIX_TIMESTAMP
@@ -319,6 +327,7 @@ pub async fn create_fetcher_loop(
                         &processor_name,
                         ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
                         ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                        "-",
                     ])
                     .set(
                         start_txn_timestamp
@@ -330,6 +339,7 @@ pub async fn create_fetcher_loop(
                         &processor_name,
                         ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
                         ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                        "-",
                     ])
                     .inc_by(size_in_bytes);
                 NUM_TRANSACTIONS_PROCESSED_COUNT
@@ -337,6 +347,7 @@ pub async fn create_fetcher_loop(
                         &processor_name,
                         ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
                         ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                        "-",
                     ])
                     .inc_by(end_version - start_version + 1);
 
@@ -347,12 +358,7 @@ pub async fn create_fetcher_loop(
                     size_in_bytes,
                 };
                 let size_in_bytes = txn_pb.size_in_bytes;
-                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-                let tps = (txn_pb.transactions.len() as f64
-                    / txn_channel_send_latency.elapsed().as_secs_f64())
-                    as u64;
-                let bytes_per_sec =
-                    txn_pb.size_in_bytes as f64 / txn_channel_send_latency.elapsed().as_secs_f64();
+                let num_txns = txn_pb.transactions.len();
 
                 match txn_sender.send(txn_pb).await {
                     Ok(()) => {},
@@ -368,6 +374,11 @@ pub async fn create_fetcher_loop(
                         panic!("[Parser] Error sending GRPC response to channel.")
                     },
                 }
+
+                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
+                let tps = (num_txns as f64 / duration_in_secs) as u64;
+                let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
+
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,

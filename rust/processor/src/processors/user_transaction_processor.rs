@@ -47,8 +47,8 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    user_transactions: Vec<UserTransactionModel>,
-    signatures: Vec<Signature>,
+    user_transactions: &[UserTransactionModel],
+    signatures: &[Signature],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -57,21 +57,23 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let ut = execute_in_chunks(
         conn.clone(),
         insert_user_transactions_query,
         user_transactions,
         UserTransactionModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+    );
+    let is = execute_in_chunks(
+        conn,
         insert_signatures_query,
         signatures,
         Signature::field_count(),
-    )
-    .await?;
+    );
 
+    let (ut_res, is_res) = futures::join!(ut, is);
+    for res in [ut_res, is_res] {
+        res?;
+    }
     Ok(())
 }
 
@@ -163,8 +165,8 @@ impl ProcessorTrait for UserTransactionProcessor {
             self.name(),
             start_version,
             end_version,
-            user_transactions,
-            signatures,
+            &user_transactions,
+            &signatures,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

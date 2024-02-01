@@ -12,6 +12,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }

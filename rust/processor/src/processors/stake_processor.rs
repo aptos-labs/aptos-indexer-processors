@@ -61,15 +61,15 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_stake_pool_voters: Vec<CurrentStakingPoolVoter>,
-    proposal_votes: Vec<ProposalVote>,
-    delegator_actvities: Vec<DelegatedStakingActivity>,
-    delegator_balances: Vec<DelegatorBalance>,
-    current_delegator_balances: Vec<CurrentDelegatorBalance>,
-    delegator_pools: Vec<DelegatorPool>,
-    delegator_pool_balances: Vec<DelegatorPoolBalance>,
-    current_delegator_pool_balances: Vec<CurrentDelegatorPoolBalance>,
-    current_delegated_voter: Vec<CurrentDelegatedVoter>,
+    current_stake_pool_voters: &[CurrentStakingPoolVoter],
+    proposal_votes: &[ProposalVote],
+    delegator_actvities: &[DelegatedStakingActivity],
+    delegator_balances: &[DelegatorBalance],
+    current_delegator_balances: &[CurrentDelegatorBalance],
+    delegator_pools: &[DelegatorPool],
+    delegator_pool_balances: &[DelegatorPoolBalance],
+    current_delegator_pool_balances: &[CurrentDelegatorPoolBalance],
+    current_delegated_voter: &[CurrentDelegatedVoter],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -78,69 +78,68 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let cspv = execute_in_chunks(
         conn.clone(),
         insert_current_stake_pool_voter_query,
         current_stake_pool_voters,
         CurrentStakingPoolVoter::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let pv = execute_in_chunks(
         conn.clone(),
         insert_proposal_votes_query,
         proposal_votes,
         ProposalVote::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let da = execute_in_chunks(
         conn.clone(),
         insert_delegator_activities_query,
         delegator_actvities,
         DelegatedStakingActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let db = execute_in_chunks(
         conn.clone(),
         insert_delegator_balances_query,
         delegator_balances,
         DelegatorBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cdb = execute_in_chunks(
         conn.clone(),
         insert_current_delegator_balances_query,
         current_delegator_balances,
         CurrentDelegatorBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let dp = execute_in_chunks(
         conn.clone(),
         insert_delegator_pools_query,
         delegator_pools,
         DelegatorPool::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let dpb = execute_in_chunks(
         conn.clone(),
         insert_delegator_pool_balances_query,
         delegator_pool_balances,
         DelegatorPoolBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cdpb = execute_in_chunks(
         conn.clone(),
         insert_current_delegator_pool_balances_query,
         current_delegator_pool_balances,
         CurrentDelegatorPoolBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+    );
+    let cdv = execute_in_chunks(
+        conn,
         insert_current_delegated_voter_query,
         current_delegated_voter,
         CurrentDelegatedVoter::field_count(),
-    )
-    .await?;
+    );
+
+    let (cspv_res, pv_res, da_res, db_res, cdb_res, dp_res, dpb_res, cdpb_res, cdv_res) =
+        futures::join!(cspv, pv, da, db, cdb, dp, dpb, cdpb, cdv);
+    for res in [
+        cspv_res, pv_res, da_res, db_res, cdb_res, dp_res, dpb_res, cdpb_res, cdv_res,
+    ] {
+        res?;
+    }
 
     Ok(())
 }
@@ -510,15 +509,15 @@ impl ProcessorTrait for StakeProcessor {
             self.name(),
             start_version,
             end_version,
-            all_current_stake_pool_voters,
-            all_proposal_votes,
-            all_delegator_activities,
-            all_delegator_balances,
-            all_current_delegator_balances,
-            all_delegator_pools,
-            all_delegator_pool_balances,
-            all_current_delegator_pool_balances,
-            all_current_delegated_voter,
+            &all_current_stake_pool_voters,
+            &all_proposal_votes,
+            &all_delegator_activities,
+            &all_delegator_balances,
+            &all_current_delegator_balances,
+            &all_delegator_pools,
+            &all_delegator_pool_balances,
+            &all_current_delegator_pool_balances,
+            &all_current_delegated_voter,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

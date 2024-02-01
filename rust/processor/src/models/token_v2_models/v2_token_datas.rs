@@ -107,7 +107,7 @@ impl TokenDataV2 {
                 }
                 token_properties = metadata
                     .property_map
-                    .clone()
+                    .as_ref()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
                 // In aggregator V2 name is now derived from a separate struct

@@ -76,14 +76,14 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_ans_lookups: Vec<CurrentAnsLookup>,
-    ans_lookups: Vec<AnsLookup>,
-    current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
-    ans_primary_names: Vec<AnsPrimaryName>,
-    current_ans_lookups_v2: Vec<CurrentAnsLookupV2>,
-    ans_lookups_v2: Vec<AnsLookupV2>,
-    current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2>,
-    ans_primary_names_v2: Vec<AnsPrimaryNameV2>,
+    current_ans_lookups: &[CurrentAnsLookup],
+    ans_lookups: &[AnsLookup],
+    current_ans_primary_names: &[CurrentAnsPrimaryName],
+    ans_primary_names: &[AnsPrimaryName],
+    current_ans_lookups_v2: &[CurrentAnsLookupV2],
+    ans_lookups_v2: &[AnsLookupV2],
+    current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
+    ans_primary_names_v2: &[AnsPrimaryNameV2],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -91,62 +91,71 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    execute_in_chunks(
+    let cal = execute_in_chunks(
         conn.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
         CurrentAnsLookup::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let al = execute_in_chunks(
         conn.clone(),
         insert_ans_lookups_query,
         ans_lookups,
         AnsLookup::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let capn = execute_in_chunks(
         conn.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
         CurrentAnsPrimaryName::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let apn = execute_in_chunks(
         conn.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
         AnsPrimaryName::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cal_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
         CurrentAnsLookupV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let al_v2 = execute_in_chunks(
         conn.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
         AnsLookupV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let capn_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
         CurrentAnsPrimaryNameV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+    );
+    let apn_v2 = execute_in_chunks(
+        conn,
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,
         AnsPrimaryNameV2::field_count(),
-    )
-    .await?;
+    );
+
+    let (cal_res, al_res, capn_res, apn_res, cal_v2_res, al_v2_res, capn_v2_res, apn_v2_res) =
+        tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
+
+    for res in vec![
+        cal_res,
+        al_res,
+        capn_res,
+        apn_res,
+        cal_v2_res,
+        al_v2_res,
+        capn_v2_res,
+        apn_v2_res,
+    ] {
+        res?;
+    }
+
     Ok(())
 }
 
@@ -358,14 +367,14 @@ impl ProcessorTrait for AnsProcessor {
             self.name(),
             start_version,
             end_version,
-            all_current_ans_lookups,
-            all_ans_lookups,
-            all_current_ans_primary_names,
-            all_ans_primary_names,
-            all_current_ans_lookups_v2,
-            all_ans_lookups_v2,
-            all_current_ans_primary_names_v2,
-            all_ans_primary_names_v2,
+            &all_current_ans_lookups,
+            &all_ans_lookups,
+            &all_current_ans_primary_names,
+            &all_ans_primary_names,
+            &all_current_ans_lookups_v2,
+            &all_ans_lookups_v2,
+            &all_current_ans_primary_names_v2,
+            &all_ans_primary_names_v2,
         )
         .await;
 

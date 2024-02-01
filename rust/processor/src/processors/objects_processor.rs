@@ -58,7 +58,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
+    (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -67,20 +67,22 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let io = execute_in_chunks(
         conn.clone(),
         insert_objects_query,
         objects,
         Object::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let co = execute_in_chunks(
         conn,
         insert_current_objects_query,
         current_objects,
         CurrentObject::field_count(),
-    )
-    .await?;
+    );
+    let (io_res, co_res) = tokio::join!(io, co);
+    for res in [io_res, co_res] {
+        res?;
+    }
 
     Ok(())
 }
@@ -274,7 +276,7 @@ impl ProcessorTrait for ObjectsProcessor {
             self.name(),
             start_version,
             end_version,
-            (all_objects, all_current_objects),
+            (&all_objects, &all_current_objects),
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

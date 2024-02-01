@@ -65,10 +65,10 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    fungible_asset_activities: Vec<FungibleAssetActivity>,
-    fungible_asset_metadata: Vec<FungibleAssetMetadataModel>,
-    fungible_asset_balances: Vec<FungibleAssetBalance>,
-    current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance>,
+    fungible_asset_activities: &[FungibleAssetActivity],
+    fungible_asset_metadata: &[FungibleAssetMetadataModel],
+    fungible_asset_balances: &[FungibleAssetBalance],
+    current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -77,34 +77,34 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let faa = execute_in_chunks(
         conn.clone(),
         insert_fungible_asset_activities_query,
         fungible_asset_activities,
         FungibleAssetActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let fam = execute_in_chunks(
         conn.clone(),
         insert_fungible_asset_metadata_query,
         fungible_asset_metadata,
         FungibleAssetMetadataModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let fab = execute_in_chunks(
         conn.clone(),
         insert_fungible_asset_balances_query,
         fungible_asset_balances,
         FungibleAssetBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+    );
+    let cfab = execute_in_chunks(
+        conn,
         insert_current_fungible_asset_balances_query,
         current_fungible_asset_balances,
         CurrentFungibleAssetBalance::field_count(),
-    )
-    .await?;
+    );
+    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
+    for res in [faa_res, fam_res, fab_res, cfab_res] {
+        res?;
+    }
 
     Ok(())
 }
@@ -240,10 +240,10 @@ impl ProcessorTrait for FungibleAssetProcessor {
             self.name(),
             start_version,
             end_version,
-            fungible_asset_activities,
-            fungible_asset_metadata,
-            fungible_asset_balances,
-            current_fungible_asset_balances,
+            &fungible_asset_activities,
+            &fungible_asset_metadata,
+            &fungible_asset_balances,
+            &current_fungible_asset_balances,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

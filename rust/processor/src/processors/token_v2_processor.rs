@@ -72,14 +72,14 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    collections_v2: Vec<CollectionV2>,
-    token_datas_v2: Vec<TokenDataV2>,
-    token_ownerships_v2: Vec<TokenOwnershipV2>,
-    current_collections_v2: Vec<CurrentCollectionV2>,
-    current_token_datas_v2: Vec<CurrentTokenDataV2>,
-    current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
-    token_activities_v2: Vec<TokenActivityV2>,
-    current_token_v2_metadata: Vec<CurrentTokenV2Metadata>,
+    collections_v2: &[CollectionV2],
+    token_datas_v2: &[TokenDataV2],
+    token_ownerships_v2: &[TokenOwnershipV2],
+    current_collections_v2: &[CurrentCollectionV2],
+    current_token_datas_v2: &[CurrentTokenDataV2],
+    current_token_ownerships_v2: &[CurrentTokenOwnershipV2],
+    token_activities_v2: &[TokenActivityV2],
+    current_token_v2_metadata: &[CurrentTokenV2Metadata],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -88,62 +88,79 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let coll_v2 = execute_in_chunks(
         conn.clone(),
         insert_collections_v2_query,
         collections_v2,
         CollectionV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let td_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_datas_v2_query,
         token_datas_v2,
         TokenDataV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let to_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_ownerships_v2_query,
         token_ownerships_v2,
         TokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cc_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_collections_v2_query,
         current_collections_v2,
         CurrentCollectionV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let ctd_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_token_datas_v2_query,
         current_token_datas_v2,
         CurrentTokenDataV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cto_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
         CurrentTokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let ta_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_activities_v2_query,
         token_activities_v2,
         TokenActivityV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+    );
+    let ct_v2 = execute_in_chunks(
+        conn,
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
         CurrentTokenV2Metadata::field_count(),
-    )
-    .await?;
+    );
+
+    let (
+        coll_v2_res,
+        td_v2_res,
+        to_v2_res,
+        cc_v2_res,
+        ctd_v2_res,
+        cto_v2_res,
+        ta_v2_res,
+        ct_v2_res,
+    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, ta_v2, ct_v2,);
+
+    for res in [
+        coll_v2_res,
+        td_v2_res,
+        to_v2_res,
+        cc_v2_res,
+        ctd_v2_res,
+        cto_v2_res,
+        ta_v2_res,
+        ct_v2_res,
+    ] {
+        res?;
+    }
+
     Ok(())
 }
 
@@ -377,14 +394,14 @@ impl ProcessorTrait for TokenV2Processor {
             self.name(),
             start_version,
             end_version,
-            collections_v2,
-            token_datas_v2,
-            token_ownerships_v2,
-            current_collections_v2,
-            current_token_ownerships_v2,
-            current_token_datas_v2,
-            token_activities_v2,
-            current_token_v2_metadata,
+            &collections_v2,
+            &token_datas_v2,
+            &token_ownerships_v2,
+            &current_collections_v2,
+            &current_token_ownerships_v2,
+            &current_token_datas_v2,
+            &token_activities_v2,
+            &current_token_v2_metadata,
         )
         .await;
 
