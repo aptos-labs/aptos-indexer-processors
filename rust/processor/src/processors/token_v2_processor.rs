@@ -30,7 +30,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
 };
@@ -43,17 +43,20 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
 pub struct TokenV2Processor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl TokenV2Processor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -73,15 +76,16 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    collections_v2: Vec<CollectionV2>,
-    token_datas_v2: Vec<TokenDataV2>,
-    token_ownerships_v2: Vec<TokenOwnershipV2>,
-    current_collections_v2: Vec<CurrentCollectionV2>,
-    current_token_datas_v2: Vec<CurrentTokenDataV2>,
-    current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
-    current_burned_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
-    token_activities_v2: Vec<TokenActivityV2>,
-    current_token_v2_metadata: Vec<CurrentTokenV2Metadata>,
+    collections_v2: &[CollectionV2],
+    token_datas_v2: &[TokenDataV2],
+    token_ownerships_v2: &[TokenOwnershipV2],
+    current_collections_v2: &[CurrentCollectionV2],
+    current_token_datas_v2: &[CurrentTokenDataV2],
+    current_token_ownerships_v2: &[CurrentTokenOwnershipV2],
+    current_burned_token_ownerships_v2: &[CurrentTokenOwnershipV2],
+    token_activities_v2: &[TokenActivityV2],
+    current_token_v2_metadata: &[CurrentTokenV2Metadata],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -90,69 +94,108 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let coll_v2 = execute_in_chunks(
         conn.clone(),
         insert_collections_v2_query,
         collections_v2,
-        CollectionV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CollectionV2>("collections_v2", per_table_chunk_sizes),
+    );
+    let td_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_datas_v2_query,
         token_datas_v2,
-        TokenDataV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TokenDataV2>("token_datas_v2", per_table_chunk_sizes),
+    );
+    let to_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_ownerships_v2_query,
         token_ownerships_v2,
-        TokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TokenOwnershipV2>(
+            "token_ownerships_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let cc_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_collections_v2_query,
         current_collections_v2,
-        CurrentCollectionV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentCollectionV2>(
+            "current_collections_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ctd_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_token_datas_v2_query,
         current_token_datas_v2,
-        CurrentTokenDataV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentTokenDataV2>(
+            "current_token_datas_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let cto_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
-        CurrentTokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
+            "current_token_ownerships_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let cbto_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_burned_token_ownerships_v2_query,
         current_burned_token_ownerships_v2,
-        CurrentTokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
+            "current_token_ownerships_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ta_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_activities_v2_query,
         token_activities_v2,
-        TokenActivityV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+        get_config_table_chunk_size::<TokenActivityV2>(
+            "token_activities_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ct_v2 = execute_in_chunks(
+        conn,
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
-        CurrentTokenV2Metadata::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<CurrentTokenV2Metadata>(
+            "current_token_v2_metadata",
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let (
+        coll_v2_res,
+        td_v2_res,
+        to_v2_res,
+        cc_v2_res,
+        ctd_v2_res,
+        cto_v2_res,
+        cbto_v2_res,
+        ta_v2_res,
+        ct_v2_res,
+    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, cbto_v2, ta_v2, ct_v2,);
+
+    for res in [
+        coll_v2_res,
+        td_v2_res,
+        to_v2_res,
+        cc_v2_res,
+        ctd_v2_res,
+        cto_v2_res,
+        cbto_v2_res,
+        ta_v2_res,
+        ct_v2_res,
+    ] {
+        res?;
+    }
+
     Ok(())
 }
 
@@ -382,6 +425,8 @@ impl ProcessorTrait for TokenV2Processor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
 
         // First get all token related table metadata from the batch of transactions. This is in case
@@ -410,15 +455,16 @@ impl ProcessorTrait for TokenV2Processor {
             self.name(),
             start_version,
             end_version,
-            collections_v2,
-            token_datas_v2,
-            token_ownerships_v2,
-            current_collections_v2,
-            current_token_ownerships_v2,
-            current_burned_token_ownerships_v2,
-            current_token_datas_v2,
-            token_activities_v2,
-            current_token_v2_metadata,
+            &collections_v2,
+            &token_datas_v2,
+            &token_ownerships_v2,
+            &current_collections_v2,
+            &current_token_ownerships_v2,
+            &current_burned_token_ownerships_v2,
+            &current_token_datas_v2,
+            &token_activities_v2,
+            &current_token_v2_metadata,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
@@ -429,7 +475,7 @@ impl ProcessorTrait for TokenV2Processor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(
