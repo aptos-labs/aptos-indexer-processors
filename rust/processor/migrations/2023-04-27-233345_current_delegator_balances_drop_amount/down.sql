@@ -1,0 +1,2 @@
+ALTER TABLE current_delegator_balances
+ADD COLUMN IF NOT EXISTS amount NUMERIC NOT NULL DEFAULT 0;

@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS fungible_asset_metadata (
   creator_address VARCHAR(66) NOT NULL,
   "name" VARCHAR(32) NOT NULL,
   symbol VARCHAR(10) NOT NULL,
-  decimals INT NOT NULL,
+  decimals INT4 NOT NULL,
   icon_uri VARCHAR(512),
   project_uri VARCHAR(512),
   last_transaction_version BIGINT NOT NULL,
