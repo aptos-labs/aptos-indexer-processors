@@ -93,6 +93,8 @@ impl ProcessorTrait for NftMetadataProcessor {
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
 
         // First get all token related table metadata from the batch of transactions. This is in case
@@ -178,7 +180,7 @@ impl ProcessorTrait for NftMetadataProcessor {
             end_version,
             processing_duration_in_secs,
             db_insertion_duration_in_secs,
-            last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+            last_transaction_timestamp,
         })
     }
 
