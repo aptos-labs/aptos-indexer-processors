@@ -1,11 +1,15 @@
 -- This file should undo anything in `up.sql`
-ALTER TABLE current_delegated_staking_pool_balances DROP COLUMN IF EXISTS operator_commission_percentage,
-  DROP COLUMN IF EXISTS inactive_table_handle,
-  DROP COLUMN IF EXISTS active_table_handle;
+ALTER TABLE current_delegated_staking_pool_balances
+    DROP COLUMN IF EXISTS operator_commission_percentage,
+    DROP COLUMN IF EXISTS inactive_table_handle,
+    DROP COLUMN IF EXISTS active_table_handle;
+
 DROP INDEX IF EXISTS cdspb_inactive_index;
-ALTER TABLE delegated_staking_pool_balances DROP COLUMN IF EXISTS operator_commission_percentage,
+ALTER TABLE delegated_staking_pool_balances
+  DROP COLUMN IF EXISTS operator_commission_percentage,
   DROP COLUMN IF EXISTS inactive_table_handle,
   DROP COLUMN IF EXISTS active_table_handle;
+
 ALTER TABLE current_delegator_balances DROP COLUMN IF EXISTS parent_table_handle;
 ALTER TABLE current_delegator_balances DROP CONSTRAINT current_delegator_balances_pkey;
 ALTER TABLE current_delegator_balances
@@ -14,6 +18,7 @@ ADD CONSTRAINT current_delegator_balances_pkey PRIMARY KEY (
     pool_address,
     pool_type
   );
+
 CREATE OR REPLACE VIEW num_active_delegator_per_pool AS
 SELECT pool_address,
   COUNT(DISTINCT delegator_address) AS num_active_delegator

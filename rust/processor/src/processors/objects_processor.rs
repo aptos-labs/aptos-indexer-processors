@@ -15,10 +15,11 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -28,7 +29,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub struct ObjectsProcessor {
@@ -53,11 +54,11 @@ impl Debug for ObjectsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
+    (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -66,14 +67,22 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(conn, insert_objects_query, objects, Object::field_count()).await?;
-    execute_in_chunks(
+    let io = execute_in_chunks(
+        conn.clone(),
+        insert_objects_query,
+        objects,
+        Object::field_count(),
+    );
+    let co = execute_in_chunks(
         conn,
         insert_current_objects_query,
         current_objects,
         CurrentObject::field_count(),
-    )
-    .await?;
+    );
+    let (io_res, co_res) = tokio::join!(io, co);
+    for res in [io_res, co_res] {
+        res?;
+    }
 
     Ok(())
 }
@@ -136,7 +145,7 @@ impl ProcessorTrait for ObjectsProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -147,8 +156,8 @@ impl ProcessorTrait for ObjectsProcessor {
         // Moving object handling here because we need a single object
         // map through transactions for lookups
         let mut all_objects = vec![];
-        let mut all_current_objects = HashMap::new();
-        let mut object_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
+        let mut all_current_objects = AHashMap::new();
+        let mut object_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
 
         for txn in &transactions {
             let txn_version = txn.version as i64;
@@ -263,11 +272,11 @@ impl ProcessorTrait for ObjectsProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            (all_objects, all_current_objects),
+            (&all_objects, &all_current_objects),
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

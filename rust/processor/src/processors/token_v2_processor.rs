@@ -33,6 +33,7 @@ use crate::{
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
 };
+use ahash::{AHashMap, AHashSet};
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -42,10 +43,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub struct TokenV2Processor {
@@ -70,18 +68,18 @@ impl Debug for TokenV2Processor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    collections_v2: Vec<CollectionV2>,
-    token_datas_v2: Vec<TokenDataV2>,
-    token_ownerships_v2: Vec<TokenOwnershipV2>,
-    current_collections_v2: Vec<CurrentCollectionV2>,
-    current_token_datas_v2: Vec<CurrentTokenDataV2>,
-    current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
-    token_activities_v2: Vec<TokenActivityV2>,
-    current_token_v2_metadata: Vec<CurrentTokenV2Metadata>,
+    collections_v2: &[CollectionV2],
+    token_datas_v2: &[TokenDataV2],
+    token_ownerships_v2: &[TokenOwnershipV2],
+    current_collections_v2: &[CurrentCollectionV2],
+    current_token_datas_v2: &[CurrentTokenDataV2],
+    current_token_ownerships_v2: &[CurrentTokenOwnershipV2],
+    token_activities_v2: &[TokenActivityV2],
+    current_token_v2_metadata: &[CurrentTokenV2Metadata],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -90,62 +88,79 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
-        conn,
+    let coll_v2 = execute_in_chunks(
+        conn.clone(),
         insert_collections_v2_query,
         collections_v2,
         CollectionV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let td_v2 = execute_in_chunks(
+        conn.clone(),
         insert_token_datas_v2_query,
         token_datas_v2,
         TokenDataV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let to_v2 = execute_in_chunks(
+        conn.clone(),
         insert_token_ownerships_v2_query,
         token_ownerships_v2,
         TokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cc_v2 = execute_in_chunks(
+        conn.clone(),
         insert_current_collections_v2_query,
         current_collections_v2,
         CurrentCollectionV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let ctd_v2 = execute_in_chunks(
+        conn.clone(),
         insert_current_token_datas_v2_query,
         current_token_datas_v2,
         CurrentTokenDataV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cto_v2 = execute_in_chunks(
+        conn.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
         CurrentTokenOwnershipV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let ta_v2 = execute_in_chunks(
+        conn.clone(),
         insert_token_activities_v2_query,
         token_activities_v2,
         TokenActivityV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let ct_v2 = execute_in_chunks(
         conn,
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
         CurrentTokenV2Metadata::field_count(),
-    )
-    .await?;
+    );
+
+    let (
+        coll_v2_res,
+        td_v2_res,
+        to_v2_res,
+        cc_v2_res,
+        ctd_v2_res,
+        cto_v2_res,
+        ta_v2_res,
+        ct_v2_res,
+    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, ta_v2, ct_v2,);
+
+    for res in [
+        coll_v2_res,
+        td_v2_res,
+        to_v2_res,
+        cc_v2_res,
+        ctd_v2_res,
+        cto_v2_res,
+        ta_v2_res,
+        ct_v2_res,
+    ] {
+        res?;
+    }
+
     Ok(())
 }
 
@@ -209,25 +224,25 @@ fn insert_current_collections_v2_query(
 
     (
         diesel::insert_into(schema::current_collections_v2::table)
-        .values(items_to_insert)
-        .on_conflict(collection_id)
-        .do_update()
-        .set((
-            creator_address.eq(excluded(creator_address)),
-            collection_name.eq(excluded(collection_name)),
-            description.eq(excluded(description)),
-            uri.eq(excluded(uri)),
-            current_supply.eq(excluded(current_supply)),
-            max_supply.eq(excluded(max_supply)),
-            total_minted_v2.eq(excluded(total_minted_v2)),
-            mutable_description.eq(excluded(mutable_description)),
-            mutable_uri.eq(excluded(mutable_uri)),
-            table_handle_v1.eq(excluded(table_handle_v1)),
-            token_standard.eq(excluded(token_standard)),
-            last_transaction_version.eq(excluded(last_transaction_version)),
-            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-            inserted_at.eq(excluded(inserted_at)),
-        )),
+            .values(items_to_insert)
+            .on_conflict(collection_id)
+            .do_update()
+            .set((
+                creator_address.eq(excluded(creator_address)),
+                collection_name.eq(excluded(collection_name)),
+                description.eq(excluded(description)),
+                uri.eq(excluded(uri)),
+                current_supply.eq(excluded(current_supply)),
+                max_supply.eq(excluded(max_supply)),
+                total_minted_v2.eq(excluded(total_minted_v2)),
+                mutable_description.eq(excluded(mutable_description)),
+                mutable_uri.eq(excluded(mutable_uri)),
+                table_handle_v1.eq(excluded(table_handle_v1)),
+                token_standard.eq(excluded(token_standard)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
         Some(" WHERE current_collections_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -242,25 +257,25 @@ fn insert_current_token_datas_v2_query(
 
     (
         diesel::insert_into(schema::current_token_datas_v2::table)
-        .values(items_to_insert)
-        .on_conflict(token_data_id)
-        .do_update()
-        .set((
-            collection_id.eq(excluded(collection_id)),
-            token_name.eq(excluded(token_name)),
-            maximum.eq(excluded(maximum)),
-            supply.eq(excluded(supply)),
-            largest_property_version_v1.eq(excluded(largest_property_version_v1)),
-            token_uri.eq(excluded(token_uri)),
-            description.eq(excluded(description)),
-            token_properties.eq(excluded(token_properties)),
-            token_standard.eq(excluded(token_standard)),
-            is_fungible_v2.eq(excluded(is_fungible_v2)),
-            last_transaction_version.eq(excluded(last_transaction_version)),
-            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-            inserted_at.eq(excluded(inserted_at)),
-            decimals.eq(excluded(decimals)),
-        )),
+            .values(items_to_insert)
+            .on_conflict(token_data_id)
+            .do_update()
+            .set((
+                collection_id.eq(excluded(collection_id)),
+                token_name.eq(excluded(token_name)),
+                maximum.eq(excluded(maximum)),
+                supply.eq(excluded(supply)),
+                largest_property_version_v1.eq(excluded(largest_property_version_v1)),
+                token_uri.eq(excluded(token_uri)),
+                description.eq(excluded(description)),
+                token_properties.eq(excluded(token_properties)),
+                token_standard.eq(excluded(token_standard)),
+                is_fungible_v2.eq(excluded(is_fungible_v2)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+                decimals.eq(excluded(decimals)),
+            )),
         Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -275,21 +290,21 @@ fn insert_current_token_ownerships_v2_query(
 
     (
         diesel::insert_into(schema::current_token_ownerships_v2::table)
-        .values(items_to_insert)
-        .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
-        .do_update()
-        .set((
-            amount.eq(excluded(amount)),
-            table_type_v1.eq(excluded(table_type_v1)),
-            token_properties_mutated_v1.eq(excluded(token_properties_mutated_v1)),
-            is_soulbound_v2.eq(excluded(is_soulbound_v2)),
-            token_standard.eq(excluded(token_standard)),
-            is_fungible_v2.eq(excluded(is_fungible_v2)),
-            last_transaction_version.eq(excluded(last_transaction_version)),
-            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-            inserted_at.eq(excluded(inserted_at)),
-            non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
-        )),
+            .values(items_to_insert)
+            .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
+            .do_update()
+            .set((
+                amount.eq(excluded(amount)),
+                table_type_v1.eq(excluded(table_type_v1)),
+                token_properties_mutated_v1.eq(excluded(token_properties_mutated_v1)),
+                is_soulbound_v2.eq(excluded(is_soulbound_v2)),
+                token_standard.eq(excluded(token_standard)),
+                is_fungible_v2.eq(excluded(is_fungible_v2)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+                non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
+            )),
         Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -346,7 +361,7 @@ impl ProcessorTrait for TokenV2Processor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -375,18 +390,18 @@ impl ProcessorTrait for TokenV2Processor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            collections_v2,
-            token_datas_v2,
-            token_ownerships_v2,
-            current_collections_v2,
-            current_token_ownerships_v2,
-            current_token_datas_v2,
-            token_activities_v2,
-            current_token_v2_metadata,
+            &collections_v2,
+            &token_datas_v2,
+            &token_ownerships_v2,
+            &current_collections_v2,
+            &current_token_ownerships_v2,
+            &current_token_datas_v2,
+            &token_activities_v2,
+            &current_token_v2_metadata,
         )
         .await;
 
@@ -417,7 +432,7 @@ impl ProcessorTrait for TokenV2Processor {
 }
 
 async fn parse_v2_token(
-    transactions: &[Transaction],
+    transactions: &Vec<Arc<Transaction>>,
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
 ) -> (
@@ -435,23 +450,23 @@ async fn parse_v2_token(
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
     let mut token_activities_v2 = vec![];
-    let mut current_collections_v2: HashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
-        HashMap::new();
-    let mut current_token_datas_v2: HashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
-        HashMap::new();
-    let mut current_token_ownerships_v2: HashMap<
+    let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
+        AHashMap::new();
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+        AHashMap::new();
+    let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
         CurrentTokenOwnershipV2,
-    > = HashMap::new();
+    > = AHashMap::new();
     // Tracks prior ownership in case a token gets burned
-    let mut prior_nft_ownership: HashMap<String, NFTOwnershipV2> = HashMap::new();
+    let mut prior_nft_ownership: AHashMap<String, NFTOwnershipV2> = AHashMap::new();
     // Get Metadata for token v2 by object
     // We want to persist this through the entire batch so that even if a token is burned,
     // we can still get the object core metadata for it
-    let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
+    let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
     // Basically token properties
-    let mut current_token_v2_metadata: HashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
-        HashMap::new();
+    let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
+        AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
@@ -468,7 +483,7 @@ async fn parse_v2_token(
             let entry_function_id_str = get_entry_function_from_user_request(user_request);
 
             // Get burn events for token v2 by object
-            let mut tokens_burned: TokenV2Burned = HashSet::new();
+            let mut tokens_burned: TokenV2Burned = AHashSet::new();
 
             // Need to do a first pass to get all the objects
             for wsc in transaction_info.changes.iter() {

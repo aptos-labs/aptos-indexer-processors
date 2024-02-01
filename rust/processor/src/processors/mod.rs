@@ -36,24 +36,19 @@ use self::{
     token_v2_processor::TokenV2Processor,
     user_transaction_processor::UserTransactionProcessor,
 };
-use crate::{
-    models::processor_status::ProcessorStatus,
-    schema::processor_status,
-    utils::{
-        counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
-        database::{execute_with_better_error, PgDbPool, PgPoolConnection},
-        util::parse_timestamp,
-    },
+use crate::utils::{
+    counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
+    database::{PgDbPool, PgPoolConnection},
 };
 use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, prelude::*};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 type StartVersion = u64;
 type EndVersion = u64;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ProcessingResult {
     pub start_version: StartVersion,
@@ -71,7 +66,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     /// Process all transactions including writing to the database
     async fn process_transactions(
         &self,
-        transactions: Vec<ProtoTransaction>,
+        transactions: Vec<Arc<ProtoTransaction>>,
         start_version: u64,
         end_version: u64,
         db_chain_id: Option<u64>,
@@ -107,14 +102,19 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         }
     }
 
+    fn get_pool(&self) -> PgDbPool {
+        let pool = self.connection_pool();
+        pool.clone()
+    }
+
     /// Store last processed version from database. We can assume that all previously processed
     /// versions are successful because any gap would cause the processor to panic
     async fn update_last_processed_version(
         &self,
-        version: u64,
-        last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
+        _version: u64,
+        _last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     ) -> anyhow::Result<()> {
-        let mut conn = self.get_conn().await;
+        /*
         let timestamp = last_transaction_timestamp.map(|t| parse_timestamp(&t, version as i64));
         let status = ProcessorStatus {
             processor: self.name().to_string(),
@@ -122,7 +122,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
             last_transaction_timestamp: timestamp,
         };
         execute_with_better_error(
-            &mut conn,
+            self.get_pool(),
             diesel::insert_into(processor_status::table)
                 .values(&status)
                 .on_conflict(processor_status::processor)
@@ -136,7 +136,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                 )),
             Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
         )
-        .await?;
+        .await?;*/
         Ok(())
     }
 }

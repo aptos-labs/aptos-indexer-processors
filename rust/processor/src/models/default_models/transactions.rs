@@ -23,8 +23,9 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Debug, Clone, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = transactions)]
 pub struct Transaction {
@@ -219,7 +220,7 @@ impl Transaction {
     }
 
     pub fn from_transactions(
-        transactions: &[TransactionPB],
+        transactions: &Vec<Arc<TransactionPB>>,
     ) -> (
         Vec<Self>,
         Vec<BlockMetadataTransaction>,

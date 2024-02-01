@@ -13,8 +13,9 @@ use crate::{
         fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
@@ -24,10 +25,11 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
 pub struct CoinProcessor {
     connection_pool: PgDbPool,
 }
@@ -50,15 +52,15 @@ impl Debug for CoinProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    coin_activities: Vec<CoinActivity>,
-    coin_infos: Vec<CoinInfo>,
-    coin_balances: Vec<CoinBalance>,
-    current_coin_balances: Vec<CurrentCoinBalance>,
-    coin_supply: Vec<CoinSupply>,
+    coin_activities: &[CoinActivity],
+    coin_infos: &[CoinInfo],
+    coin_balances: &[CoinBalance],
+    current_coin_balances: &[CurrentCoinBalance],
+    coin_supply: &[CoinSupply],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -67,42 +69,41 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
-        conn,
+    let ca = execute_in_chunks(
+        conn.clone(),
         insert_coin_activities_query,
         coin_activities,
         CoinActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let ci = execute_in_chunks(
+        conn.clone(),
         insert_coin_infos_query,
         coin_infos,
         CoinInfo::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cb = execute_in_chunks(
+        conn.clone(),
         insert_coin_balances_query,
         coin_balances,
         CoinBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let ccb = execute_in_chunks(
+        conn.clone(),
         insert_current_coin_balances_query,
         current_coin_balances,
         CurrentCoinBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cs = execute_in_chunks(
         conn,
         inset_coin_supply_query,
         coin_supply,
         CoinSupply::field_count(),
-    )
-    .await?;
+    );
 
+    let (ca_res, ci_res, cb_res, ccb_res, cs_res) = tokio::join!(ca, ci, cb, ccb, cs);
+    for res in [ca_res, ci_res, cb_res, ccb_res, cs_res] {
+        res?;
+    }
     Ok(())
 }
 
@@ -142,21 +143,21 @@ fn insert_coin_infos_query(
 
     (
         diesel::insert_into(schema::coin_infos::table)
-                .values(items_to_insert)
-                .on_conflict(coin_type_hash)
-                .do_update()
-                .set((
-                    transaction_version_created.eq(excluded(transaction_version_created)),
-                    creator_address.eq(excluded(creator_address)),
-                    name.eq(excluded(name)),
-                    symbol.eq(excluded(symbol)),
-                    decimals.eq(excluded(decimals)),
-                    transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
-                    supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
-                    supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
+            .values(items_to_insert)
+            .on_conflict(coin_type_hash)
+            .do_update()
+            .set((
+                transaction_version_created.eq(excluded(transaction_version_created)),
+                creator_address.eq(excluded(creator_address)),
+                name.eq(excluded(name)),
+                symbol.eq(excluded(symbol)),
+                decimals.eq(excluded(decimals)),
+                transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+                supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+                supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
     )
 }
 
@@ -225,19 +226,18 @@ impl ProcessorTrait for CoinProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
-        let mut all_coin_infos: HashMap<String, CoinInfo> = HashMap::new();
-        let mut all_current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
-            HashMap::new();
+        let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
+        let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
+            AHashMap::new();
         let mut all_coin_supply = vec![];
 
         for txn in &transactions {
@@ -272,15 +272,15 @@ impl ProcessorTrait for CoinProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            all_coin_activities,
-            all_coin_infos,
-            all_coin_balances,
-            all_current_coin_balances,
-            all_coin_supply,
+            &all_coin_activities,
+            &all_coin_infos,
+            &all_coin_balances,
+            &all_current_coin_balances,
+            &all_coin_supply,
         )
         .await;
 

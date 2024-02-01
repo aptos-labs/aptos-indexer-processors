@@ -13,12 +13,12 @@ use crate::{
     schema::current_delegated_voter,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteTableItem;
 use diesel::{prelude::*, ExpressionMethods};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Identifiable, Queryable)]
 #[diesel(primary_key(delegator_address, delegation_pool_address))]
@@ -51,9 +51,9 @@ pub struct CurrentDelegatedVoter {
 
 // (delegation_pool_address, delegator_address)
 type CurrentDelegatedVoterPK = (String, String);
-type CurrentDelegatedVoterMap = HashMap<CurrentDelegatedVoterPK, CurrentDelegatedVoter>;
+type CurrentDelegatedVoterMap = AHashMap<CurrentDelegatedVoterPK, CurrentDelegatedVoter>;
 // table handle to delegation pool address mapping
-type VoteDelegationTableHandleToPool = HashMap<String, String>;
+type VoteDelegationTableHandleToPool = AHashMap<String, String>;
 
 impl CurrentDelegatedVoter {
     pub fn pk(&self) -> CurrentDelegatedVoterPK {
@@ -75,7 +75,7 @@ impl CurrentDelegatedVoter {
         vote_delegation_handle_to_pool_address: &VoteDelegationTableHandleToPool,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<CurrentDelegatedVoterMap> {
-        let mut delegated_voter_map: CurrentDelegatedVoterMap = HashMap::new();
+        let mut delegated_voter_map: CurrentDelegatedVoterMap = AHashMap::new();
 
         let table_item_data = write_table_item.data.as_ref().unwrap();
         let table_handle = standardize_address(&write_table_item.handle);

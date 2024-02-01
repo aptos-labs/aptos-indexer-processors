@@ -5,7 +5,7 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::utils::database::PgDbPool;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 pub struct MonitoringProcessor {
     connection_pool: PgDbPool,
@@ -36,7 +36,7 @@ impl ProcessorTrait for MonitoringProcessor {
 
     async fn process_transactions(
         &self,
-        _transactions: Vec<Transaction>,
+        _transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,

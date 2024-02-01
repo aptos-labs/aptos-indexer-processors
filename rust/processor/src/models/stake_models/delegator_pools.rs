@@ -12,20 +12,20 @@ use crate::{
     },
     utils::util::standardize_address,
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 type StakingPoolAddress = String;
-pub type DelegatorPoolMap = HashMap<StakingPoolAddress, DelegatorPool>;
-pub type DelegatorPoolBalanceMap = HashMap<StakingPoolAddress, CurrentDelegatorPoolBalance>;
+pub type DelegatorPoolMap = AHashMap<StakingPoolAddress, DelegatorPool>;
+pub type DelegatorPoolBalanceMap = AHashMap<StakingPoolAddress, CurrentDelegatorPoolBalance>;
 
 // All pools
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = delegated_staking_pools)]
 pub struct DelegatorPool {
@@ -58,7 +58,7 @@ pub struct PoolBalanceMetadata {
 }
 
 // Pools balances
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, staking_pool_address))]
 #[diesel(table_name = delegated_staking_pool_balances)]
 pub struct DelegatorPoolBalance {
@@ -72,7 +72,7 @@ pub struct DelegatorPoolBalance {
 }
 
 // All pools w latest balances (really a more comprehensive version than DelegatorPool)
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = current_delegated_staking_pool_balances)]
 pub struct CurrentDelegatorPoolBalance {
@@ -93,9 +93,9 @@ impl DelegatorPool {
         Vec<DelegatorPoolBalance>,
         DelegatorPoolBalanceMap,
     )> {
-        let mut delegator_pool_map = HashMap::new();
+        let mut delegator_pool_map = AHashMap::new();
         let mut delegator_pool_balances = vec![];
-        let mut delegator_pool_balances_map = HashMap::new();
+        let mut delegator_pool_balances_map = AHashMap::new();
         let txn_data = transaction
             .txn_data
             .as_ref()

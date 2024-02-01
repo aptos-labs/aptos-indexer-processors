@@ -23,6 +23,7 @@ use crate::{
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -33,10 +34,11 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
 pub struct FungibleAssetProcessor {
     connection_pool: PgDbPool,
 }
@@ -59,14 +61,14 @@ impl Debug for FungibleAssetProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    fungible_asset_activities: Vec<FungibleAssetActivity>,
-    fungible_asset_metadata: Vec<FungibleAssetMetadataModel>,
-    fungible_asset_balances: Vec<FungibleAssetBalance>,
-    current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance>,
+    fungible_asset_activities: &[FungibleAssetActivity],
+    fungible_asset_metadata: &[FungibleAssetMetadataModel],
+    fungible_asset_balances: &[FungibleAssetBalance],
+    current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -75,34 +77,34 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
-        conn,
+    let faa = execute_in_chunks(
+        conn.clone(),
         insert_fungible_asset_activities_query,
         fungible_asset_activities,
         FungibleAssetActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let fam = execute_in_chunks(
+        conn.clone(),
         insert_fungible_asset_metadata_query,
         fungible_asset_metadata,
         FungibleAssetMetadataModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let fab = execute_in_chunks(
+        conn.clone(),
         insert_fungible_asset_balances_query,
         fungible_asset_balances,
         FungibleAssetBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cfab = execute_in_chunks(
         conn,
         insert_current_fungible_asset_balances_query,
         current_fungible_asset_balances,
         CurrentFungibleAssetBalance::field_count(),
-    )
-    .await?;
+    );
+    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
+    for res in [faa_res, fam_res, fab_res, cfab_res] {
+        res?;
+    }
 
     Ok(())
 }
@@ -133,28 +135,28 @@ fn insert_fungible_asset_metadata_query(
     use schema::fungible_asset_metadata::dsl::*;
 
     (
-            diesel::insert_into(schema::fungible_asset_metadata::table)
-                .values(items_to_insert)
-                .on_conflict(asset_type)
-                .do_update()
-                .set(
-                    (
-                        creator_address.eq(excluded(creator_address)),
-                        name.eq(excluded(name)),
-                        symbol.eq(excluded(symbol)),
-                        decimals.eq(excluded(decimals)),
-                        icon_uri.eq(excluded(icon_uri)),
-                        project_uri.eq(excluded(project_uri)),
-                        last_transaction_version.eq(excluded(last_transaction_version)),
-                        last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                        supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
-                        supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
-                        token_standard.eq(excluded(token_standard)),
-                        inserted_at.eq(excluded(inserted_at)),
-                    )
-                ),
-            Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
-        )
+        diesel::insert_into(schema::fungible_asset_metadata::table)
+            .values(items_to_insert)
+            .on_conflict(asset_type)
+            .do_update()
+            .set(
+                (
+                    creator_address.eq(excluded(creator_address)),
+                    name.eq(excluded(name)),
+                    symbol.eq(excluded(symbol)),
+                    decimals.eq(excluded(decimals)),
+                    icon_uri.eq(excluded(icon_uri)),
+                    project_uri.eq(excluded(project_uri)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
+                    supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
+                    token_standard.eq(excluded(token_standard)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )
+            ),
+        Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_fungible_asset_balances_query(
@@ -187,25 +189,25 @@ fn insert_current_fungible_asset_balances_query(
     use schema::current_fungible_asset_balances::dsl::*;
 
     (
-            diesel::insert_into(schema::current_fungible_asset_balances::table)
-                .values(items_to_insert)
-                .on_conflict(storage_id)
-                .do_update()
-                .set(
-                    (
-                        owner_address.eq(excluded(owner_address)),
-                        asset_type.eq(excluded(asset_type)),
-                        is_primary.eq(excluded(is_primary)),
-                        is_frozen.eq(excluded(is_frozen)),
-                        amount.eq(excluded(amount)),
-                        last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                        last_transaction_version.eq(excluded(last_transaction_version)),
-                        token_standard.eq(excluded(token_standard)),
-                        inserted_at.eq(excluded(inserted_at)),
-                    )
-                ),
-            Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
-        )
+        diesel::insert_into(schema::current_fungible_asset_balances::table)
+            .values(items_to_insert)
+            .on_conflict(storage_id)
+            .do_update()
+            .set(
+                (
+                    owner_address.eq(excluded(owner_address)),
+                    asset_type.eq(excluded(asset_type)),
+                    is_primary.eq(excluded(is_primary)),
+                    is_frozen.eq(excluded(is_frozen)),
+                    amount.eq(excluded(amount)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    token_standard.eq(excluded(token_standard)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )
+            ),
+        Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 #[async_trait]
@@ -216,7 +218,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -234,14 +236,14 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            fungible_asset_activities,
-            fungible_asset_metadata,
-            fungible_asset_balances,
-            current_fungible_asset_balances,
+            &fungible_asset_activities,
+            &fungible_asset_metadata,
+            &fungible_asset_balances,
+            &current_fungible_asset_balances,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
@@ -272,7 +274,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
 async fn parse_v2_coin(
-    transactions: &[Transaction],
+    transactions: &Vec<Arc<Transaction>>,
     conn: &mut PgPoolConnection<'_>,
 ) -> (
     Vec<FungibleAssetActivity>,
@@ -282,11 +284,11 @@ async fn parse_v2_coin(
 ) {
     let mut fungible_asset_activities = vec![];
     let mut fungible_asset_balances = vec![];
-    let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = HashMap::new();
-    let mut fungible_asset_metadata: FungibleAssetMetadataMapping = HashMap::new();
+    let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = AHashMap::new();
+    let mut fungible_asset_metadata: FungibleAssetMetadataMapping = AHashMap::new();
 
     // Get Metadata for fungible assets by object
-    let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = HashMap::new();
+    let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = AHashMap::new();
 
     for txn in transactions {
         let txn_version = txn.version as i64;
@@ -318,7 +320,7 @@ async fn parse_v2_coin(
 
         // This is because v1 events (deposit/withdraw) don't have coin type so the only way is to match
         // the event to the resource using the event guid
-        let mut event_to_v1_coin_type: EventToCoinType = HashMap::new();
+        let mut event_to_v1_coin_type: EventToCoinType = AHashMap::new();
 
         // First loop to get all objects
         // Need to do a first pass to get all the objects

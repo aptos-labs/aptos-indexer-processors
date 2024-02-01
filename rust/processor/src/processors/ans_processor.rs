@@ -12,10 +12,11 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
@@ -28,7 +29,7 @@ use diesel::{
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -71,18 +72,18 @@ impl Debug for AnsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_ans_lookups: Vec<CurrentAnsLookup>,
-    ans_lookups: Vec<AnsLookup>,
-    current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
-    ans_primary_names: Vec<AnsPrimaryName>,
-    current_ans_lookups_v2: Vec<CurrentAnsLookupV2>,
-    ans_lookups_v2: Vec<AnsLookupV2>,
-    current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2>,
-    ans_primary_names_v2: Vec<AnsPrimaryNameV2>,
+    current_ans_lookups: &[CurrentAnsLookup],
+    ans_lookups: &[AnsLookup],
+    current_ans_primary_names: &[CurrentAnsPrimaryName],
+    ans_primary_names: &[AnsPrimaryName],
+    current_ans_lookups_v2: &[CurrentAnsLookupV2],
+    ans_lookups_v2: &[AnsLookupV2],
+    current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
+    ans_primary_names_v2: &[AnsPrimaryNameV2],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -90,62 +91,71 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    execute_in_chunks(
-        conn,
+    let cal = execute_in_chunks(
+        conn.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
         CurrentAnsLookup::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let al = execute_in_chunks(
+        conn.clone(),
         insert_ans_lookups_query,
         ans_lookups,
         AnsLookup::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let capn = execute_in_chunks(
+        conn.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
         CurrentAnsPrimaryName::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let apn = execute_in_chunks(
+        conn.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
         AnsPrimaryName::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cal_v2 = execute_in_chunks(
+        conn.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
         CurrentAnsLookupV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let al_v2 = execute_in_chunks(
+        conn.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
         AnsLookupV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let capn_v2 = execute_in_chunks(
+        conn.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
         CurrentAnsPrimaryNameV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let apn_v2 = execute_in_chunks(
         conn,
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,
         AnsPrimaryNameV2::field_count(),
-    )
-    .await?;
+    );
+
+    let (cal_res, al_res, capn_res, apn_res, cal_v2_res, al_v2_res, capn_v2_res, apn_v2_res) =
+        tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
+
+    for res in vec![
+        cal_res,
+        al_res,
+        capn_res,
+        apn_res,
+        cal_v2_res,
+        al_v2_res,
+        capn_v2_res,
+        apn_v2_res,
+    ] {
+        res?;
+    }
+
     Ok(())
 }
 
@@ -325,13 +335,12 @@ impl ProcessorTrait for AnsProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
 
         let (
             all_current_ans_lookups,
@@ -354,18 +363,18 @@ impl ProcessorTrait for AnsProcessor {
 
         // Insert values to db
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            all_current_ans_lookups,
-            all_ans_lookups,
-            all_current_ans_primary_names,
-            all_ans_primary_names,
-            all_current_ans_lookups_v2,
-            all_ans_lookups_v2,
-            all_current_ans_primary_names_v2,
-            all_ans_primary_names_v2,
+            &all_current_ans_lookups,
+            &all_ans_lookups,
+            &all_current_ans_primary_names,
+            &all_ans_primary_names,
+            &all_current_ans_lookups_v2,
+            &all_ans_lookups_v2,
+            &all_current_ans_primary_names_v2,
+            &all_ans_primary_names_v2,
         )
         .await;
 
@@ -397,7 +406,7 @@ impl ProcessorTrait for AnsProcessor {
 }
 
 fn parse_ans(
-    transactions: &[Transaction],
+    transactions: &[Arc<Transaction>],
     ans_v1_primary_names_table_handle: String,
     ans_v1_name_records_table_handle: String,
     ans_v2_contract_address: String,
@@ -411,13 +420,13 @@ fn parse_ans(
     Vec<CurrentAnsPrimaryNameV2>,
     Vec<AnsPrimaryNameV2>,
 ) {
-    let mut all_current_ans_lookups = HashMap::new();
+    let mut all_current_ans_lookups = AHashMap::new();
     let mut all_ans_lookups = vec![];
-    let mut all_current_ans_primary_names = HashMap::new();
+    let mut all_current_ans_primary_names = AHashMap::new();
     let mut all_ans_primary_names = vec![];
-    let mut all_current_ans_lookups_v2 = HashMap::new();
+    let mut all_current_ans_lookups_v2 = AHashMap::new();
     let mut all_ans_lookups_v2 = vec![];
-    let mut all_current_ans_primary_names_v2 = HashMap::new();
+    let mut all_current_ans_primary_names_v2 = AHashMap::new();
     let mut all_ans_primary_names_v2 = vec![];
 
     for transaction in transactions {
@@ -436,7 +445,7 @@ fn parse_ans(
         if let TxnData::User(user_txn) = txn_data {
             // TODO: Use the v2_renew_name_events to preserve metadata once we switch to a single ANS table to store everything
             let mut v2_renew_name_events = vec![];
-            let mut v2_address_to_subdomain_ext = HashMap::new();
+            let mut v2_address_to_subdomain_ext = AHashMap::new();
 
             // Parse V2 ANS Events. We only care about the following events:
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
@@ -516,31 +525,31 @@ fn parse_ans(
                             all_ans_lookups_v2.push(ans_lookup_v2);
                         }
                         if let Some((current_primary_name, primary_name)) =
-                        CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
-                            table_item,
-                            &ans_v1_primary_names_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
+                            CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
+                                table_item,
+                                &ans_v1_primary_names_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                                .unwrap_or_else(|e| {
+                                    error!(
                                 error = ?e,
                                 "Error parsing ANS v1 primary name from write table item"
                             );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_primary_name.pk(), current_primary_name.clone());
-                        all_ans_primary_names.push(primary_name.clone());
+                                    panic!();
+                                })
+                        {
+                            all_current_ans_primary_names
+                                .insert(current_primary_name.pk(), current_primary_name.clone());
+                            all_ans_primary_names.push(primary_name.clone());
 
-                        // Include all v1 primary names in v2 data
-                        let (current_primary_name_v2, primary_name_v2) =
-                            CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
-                        all_current_ans_primary_names_v2
-                            .insert(current_primary_name_v2.pk(), current_primary_name_v2);
-                        all_ans_primary_names_v2.push(primary_name_v2);
-                    }
+                            // Include all v1 primary names in v2 data
+                            let (current_primary_name_v2, primary_name_v2) =
+                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
+                            all_current_ans_primary_names_v2
+                                .insert(current_primary_name_v2.pk(), current_primary_name_v2);
+                            all_ans_primary_names_v2.push(primary_name_v2);
+                        }
                     },
                     WriteSetChange::DeleteTableItem(table_item) => {
                         if let Some((current_ans_lookup, ans_lookup)) =
@@ -570,31 +579,31 @@ fn parse_ans(
                             all_ans_lookups_v2.push(ans_lookup_v2);
                         }
                         if let Some((current_primary_name, primary_name)) =
-                        CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
-                            table_item,
-                            &ans_v1_primary_names_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
+                            CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
+                                table_item,
+                                &ans_v1_primary_names_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                                .unwrap_or_else(|e| {
+                                    error!(
                                 error = ?e,
                                 "Error parsing ANS v1 primary name from delete table item"
                             );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_primary_name.pk(), current_primary_name.clone());
-                        all_ans_primary_names.push(primary_name.clone());
+                                    panic!();
+                                })
+                        {
+                            all_current_ans_primary_names
+                                .insert(current_primary_name.pk(), current_primary_name.clone());
+                            all_ans_primary_names.push(primary_name.clone());
 
-                        // Include all v1 primary names in v2 data
-                        let (current_primary_name_v2, primary_name_v2) =
-                            CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
-                        all_current_ans_primary_names_v2
-                            .insert(current_primary_name_v2.pk(), current_primary_name_v2);
-                        all_ans_primary_names_v2.push(primary_name_v2);
-                    }
+                            // Include all v1 primary names in v2 data
+                            let (current_primary_name_v2, primary_name_v2) =
+                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
+                            all_current_ans_primary_names_v2
+                                .insert(current_primary_name_v2.pk(), current_primary_name_v2);
+                            all_ans_primary_names_v2.push(primary_name_v2);
+                        }
                     },
                     WriteSetChange::WriteResource(write_resource) => {
                         if let Some((current_ans_lookup_v2, ans_lookup_v2)) =
