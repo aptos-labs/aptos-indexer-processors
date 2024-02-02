@@ -133,7 +133,10 @@ pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
     };
     let pool = Pool::builder()
         // TODO: MAKE THIS CONFIGURABLE!
-        .max_size(800)
+        // TODO: MAKE THIS CONFIGURABLE!
+        // TODO: MAKE THIS CONFIGURABLE!
+        // TODO: MAKE THIS CONFIGURABLE!
+        .max_size(100)
         .build(config)
         .await?;
     Ok(Arc::new(pool))

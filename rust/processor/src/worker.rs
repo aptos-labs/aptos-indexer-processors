@@ -17,13 +17,22 @@ use crate::{
     schema::ledger_infos,
     utils::{
         counters::{
-            ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
-            MULTI_BATCH_PROCESSING_TIME_IN_SECS, NUM_TRANSACTIONS_PROCESSED_COUNT,
-            PB_CHANNEL_FETCH_WAIT_TIME_SECS, PROCESSED_BYTES_COUNT,
-            PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS, PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS,
-            PROCESSOR_ERRORS_COUNT, PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
-            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
-            SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
+            // TODO: where do I stick `GRPC_LATENCY_BY_PROCESSOR_IN_SECS` now?
+            ProcessorStep,
+            LATEST_PROCESSED_VERSION,
+            MULTI_BATCH_PROCESSING_TIME_IN_SECS,
+            NUM_TRANSACTIONS_PROCESSED_COUNT,
+            PB_CHANNEL_FETCH_WAIT_TIME_SECS,
+            PROCESSED_BYTES_COUNT,
+            PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
+            PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS,
+            PROCESSOR_ERRORS_COUNT,
+            PROCESSOR_INVOCATIONS_COUNT,
+            PROCESSOR_SUCCESSES_COUNT,
+            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS,
+            SINGLE_BATCH_PARSING_TIME_IN_SECS,
+            SINGLE_BATCH_PROCESSING_TIME_IN_SECS,
+            TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
@@ -729,7 +738,7 @@ pub async fn do_processor(
 // couple processors together based on their args) makes sense.
 pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
     match config {
-        ProcessorConfig::AccountTransactionsProcessor => {
+            ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
         },
         ProcessorConfig::AnsProcessor(config) => {
