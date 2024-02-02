@@ -136,7 +136,7 @@ pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
         // TODO: MAKE THIS CONFIGURABLE!
         // TODO: MAKE THIS CONFIGURABLE!
         // TODO: MAKE THIS CONFIGURABLE!
-        .max_size(100)
+        .max_size(200)
         .build(config)
         .await?;
     Ok(Arc::new(pool))
