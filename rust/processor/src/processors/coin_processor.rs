@@ -10,7 +10,7 @@ use crate::{
             coin_infos::CoinInfo,
             coin_supply::CoinSupply,
         },
-        fungible_asset_models::v2_fungible_asset_activities::{CoinType, CurrentCoinBalancePK},
+        fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
     schema,
     utils::database::{execute_in_chunks, PgDbPool},
@@ -241,37 +241,66 @@ impl ProcessorTrait for CoinProcessor {
             all_current_coin_balances,
             all_coin_supply,
         ) = tokio::task::spawn_blocking(move || {
+            // TODO: benchmark this with reduce vs map
+            let res = crate::processors::RAYON_EXEC_POOL.install(|| {
+                transactions
+                    .into_par_iter()
+                    .chunks(100)
+                    .map(|transactions| {
+                        let mut all_coin_activities = vec![];
+                        let mut all_coin_balances = vec![];
+                        let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
+                        let mut all_current_coin_balances: AHashMap<
+                            CurrentCoinBalancePK,
+                            CurrentCoinBalance,
+                        > = AHashMap::new();
+                        let mut all_coin_supply = vec![];
+                        for txn in &transactions {
+                            let (
+                                mut coin_activities,
+                                mut coin_balances,
+                                coin_infos,
+                                current_coin_balances,
+                                mut coin_supply,
+                            ) = CoinActivity::from_transaction(txn);
+                            all_coin_activities.append(&mut coin_activities);
+                            all_coin_balances.append(&mut coin_balances);
+                            all_coin_supply.append(&mut coin_supply);
+                            // For coin infos, we only want to keep the first version, so insert only if key is not present already
+                            for (key, value) in coin_infos {
+                                all_coin_infos.entry(key).or_insert(value);
+                            }
+                            all_current_coin_balances.extend(current_coin_balances);
+                        }
+                        (
+                            all_coin_activities,
+                            all_coin_balances,
+                            all_coin_infos,
+                            all_current_coin_balances,
+                            all_coin_supply,
+                        )
+                    })
+                    .collect::<Vec<(
+                        Vec<CoinActivity>,
+                        Vec<CoinBalance>,
+                        AHashMap<String, CoinInfo>,
+                        AHashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
+                        Vec<CoinSupply>,
+                    )>>()
+            });
+
             let mut all_coin_activities = vec![];
             let mut all_coin_balances = vec![];
             let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
             let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
                 AHashMap::new();
             let mut all_coin_supply = vec![];
-
-            // TODO: benchmark this with reduce vs map
-            let res = crate::processors::RAYON_EXEC_POOL.install(|| {
-                transactions
-                    .into_par_iter()
-                    .map(|txn| CoinActivity::from_transaction(&txn))
-                    .collect::<Vec<(
-                        Vec<CoinActivity>,
-                        Vec<CoinBalance>,
-                        AHashMap<CoinType, CoinInfo>,
-                        AHashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
-                        Vec<CoinSupply>,
-                    )>>()
-            });
-            for (
-                mut coin_activities,
-                mut coin_balances,
-                coin_infos,
-                current_coin_balances,
-                mut coin_supply,
-            ) in res
+            for (coin_activities, coin_balances, coin_infos, current_coin_balances, coin_supply) in
+                res
             {
-                all_coin_activities.append(&mut coin_activities);
-                all_coin_balances.append(&mut coin_balances);
-                all_coin_supply.append(&mut coin_supply);
+                all_coin_activities.extend(coin_activities);
+                all_coin_balances.extend(coin_balances);
+                all_coin_supply.extend(coin_supply);
                 // For coin infos, we only want to keep the first version, so insert only if key is not present already
                 for (key, value) in coin_infos {
                     all_coin_infos.entry(key).or_insert(value);
