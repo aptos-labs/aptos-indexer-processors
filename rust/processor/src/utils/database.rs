@@ -120,7 +120,7 @@ fn establish_connection(database_url: &str) -> BoxFuture<ConnectionResult<AsyncP
     .boxed()
 }
 
-pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
+pub async fn new_db_pool(database_url: &str, max_pool_size: u32) -> Result<PgDbPool, PoolError> {
     let (_url, cert_path) = parse_and_clean_db_url(database_url);
 
     let config = if cert_path.is_some() {
@@ -132,11 +132,7 @@ pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
         AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
     };
     let pool = Pool::builder()
-        // TODO: MAKE THIS CONFIGURABLE!
-        // TODO: MAKE THIS CONFIGURABLE!
-        // TODO: MAKE THIS CONFIGURABLE!
-        // TODO: MAKE THIS CONFIGURABLE!
-        .max_size(200)
+        .max_size(max_pool_size)
         .build(config)
         .await?;
     Ok(Arc::new(pool))

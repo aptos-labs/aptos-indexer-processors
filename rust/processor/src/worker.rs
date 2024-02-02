@@ -95,7 +95,11 @@ impl Worker {
             service_type = PROCESSOR_SERVICE_TYPE,
             "[Parser] Creating connection pool"
         );
-        let conn_pool = new_db_pool(&postgres_connection_string)
+        // TODO: MAKE THIS POOL SIZE CONFIGURABLE!
+        // TODO: MAKE THIS POOL SIZE  CONFIGURABLE!
+        // TODO: MAKE THIS POOL SIZE  CONFIGURABLE!
+        // TODO: MAKE THIS POOL SIZE  CONFIGURABLE!
+        let conn_pool = new_db_pool(&postgres_connection_string, 200)
             .await
             .context("Failed to create connection pool")?;
         info!(
