@@ -10,7 +10,7 @@ use crate::{
             coin_infos::CoinInfo,
             coin_supply::CoinSupply,
         },
-        fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
+        fungible_asset_models::v2_fungible_asset_activities::{CoinType, CurrentCoinBalancePK},
     },
     schema,
     utils::database::{execute_in_chunks, PgDbPool},
@@ -25,6 +25,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
+use rayon::prelude::*;
 use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
@@ -247,14 +248,27 @@ impl ProcessorTrait for CoinProcessor {
                 AHashMap::new();
             let mut all_coin_supply = vec![];
 
-            for txn in &transactions {
-                let (
-                    mut coin_activities,
-                    mut coin_balances,
-                    coin_infos,
-                    current_coin_balances,
-                    mut coin_supply,
-                ) = CoinActivity::from_transaction(txn);
+            // TODO: benchmark this with reduce vs map
+            let res = crate::processors::RAYON_EXEC_POOL.install(|| {
+                transactions
+                    .into_par_iter()
+                    .map(|txn| CoinActivity::from_transaction(&txn))
+                    .collect::<Vec<(
+                        Vec<CoinActivity>,
+                        Vec<CoinBalance>,
+                        AHashMap<CoinType, CoinInfo>,
+                        AHashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
+                        Vec<CoinSupply>,
+                    )>>()
+            });
+            for (
+                mut coin_activities,
+                mut coin_balances,
+                coin_infos,
+                current_coin_balances,
+                mut coin_supply,
+            ) in res
+            {
                 all_coin_activities.append(&mut coin_activities);
                 all_coin_balances.append(&mut coin_balances);
                 all_coin_supply.append(&mut coin_supply);

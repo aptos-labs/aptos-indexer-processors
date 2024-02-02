@@ -49,8 +49,19 @@ use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, sync::Arc};
+
+pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .thread_name(|index| format!("rayon-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 type StartVersion = u64;
 type EndVersion = u64;
