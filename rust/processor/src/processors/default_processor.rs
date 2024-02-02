@@ -299,47 +299,72 @@ impl ProcessorTrait for DefaultProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let (txns, block_metadata_txns, write_set_changes, wsc_details) =
-            TransactionModel::from_transactions(&transactions);
 
-        let mut block_metadata_transactions = vec![];
-        for block_metadata_txn in block_metadata_txns {
-            block_metadata_transactions.push(block_metadata_txn.clone());
-        }
-        let mut move_modules = vec![];
-        let mut move_resources = vec![];
-        let mut table_items = vec![];
-        let mut current_table_items = AHashMap::new();
-        let mut table_metadata = AHashMap::new();
-        for detail in wsc_details {
-            match detail {
-                WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
-                WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
-                WriteSetChangeDetail::Table(item, current_item, metadata) => {
-                    table_items.push(item.clone());
-                    current_table_items.insert(
-                        (
-                            current_item.table_handle.clone(),
-                            current_item.key_hash.clone(),
-                        ),
-                        current_item.clone(),
-                    );
-                    if let Some(meta) = metadata {
-                        table_metadata.insert(meta.handle.clone(), meta.clone());
-                    }
-                },
+        let (
+            txns,
+            block_metadata_transactions,
+            write_set_changes,
+            (move_modules, move_resources, table_items, current_table_items, table_metadata),
+        ) = tokio::task::spawn_blocking(move || {
+            let (txns, block_metadata_txns, write_set_changes, wsc_details) =
+                TransactionModel::from_transactions(&transactions);
+            let mut block_metadata_transactions = vec![];
+            for block_metadata_txn in block_metadata_txns {
+                block_metadata_transactions.push(block_metadata_txn.clone());
             }
-        }
+            let mut move_modules = vec![];
+            let mut move_resources = vec![];
+            let mut table_items = vec![];
+            let mut current_table_items = AHashMap::new();
+            let mut table_metadata = AHashMap::new();
+            for detail in wsc_details {
+                match detail {
+                    WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
+                    WriteSetChangeDetail::Resource(resource) => {
+                        move_resources.push(resource.clone())
+                    },
+                    WriteSetChangeDetail::Table(item, current_item, metadata) => {
+                        table_items.push(item.clone());
+                        current_table_items.insert(
+                            (
+                                current_item.table_handle.clone(),
+                                current_item.key_hash.clone(),
+                            ),
+                            current_item.clone(),
+                        );
+                        if let Some(meta) = metadata {
+                            table_metadata.insert(meta.handle.clone(), meta.clone());
+                        }
+                    },
+                }
+            }
 
-        // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
-        let mut current_table_items = current_table_items
-            .into_values()
-            .collect::<Vec<CurrentTableItem>>();
-        let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
-        // Sort by PK
-        current_table_items
-            .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
-        table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+            // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
+            let mut current_table_items = current_table_items
+                .into_values()
+                .collect::<Vec<CurrentTableItem>>();
+            let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+            // Sort by PK
+            current_table_items.sort_by(|a, b| {
+                (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash))
+            });
+            table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
+            (
+                txns,
+                block_metadata_transactions,
+                write_set_changes,
+                (
+                    move_modules,
+                    move_resources,
+                    table_items,
+                    current_table_items,
+                    table_metadata,
+                ),
+            )
+        })
+        .await
+        .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
