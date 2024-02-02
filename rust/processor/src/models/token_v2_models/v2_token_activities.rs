@@ -158,7 +158,9 @@ impl TokenActivityV2 {
             // burn and mint events are attached to the collection. The rest should be attached to the token
             let token_data_id = match token_event {
                 V2TokenEvent::MintEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::ConcurrentMintEvent(inner) => inner.get_token_address(),
                 V2TokenEvent::BurnEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::ConcurrentBurnEvent(inner) => inner.get_token_address(),
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
@@ -173,6 +175,13 @@ impl TokenActivityV2 {
                         before_value: None,
                         after_value: None,
                     },
+                    V2TokenEvent::ConcurrentMintEvent(_) => TokenActivityHelperV2 {
+                        from_address: Some(object_core.get_owner_address()),
+                        to_address: None,
+                        token_amount: BigDecimal::one(),
+                        before_value: None,
+                        after_value: None,
+                    },
                     V2TokenEvent::TokenMutationEvent(inner) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
                         to_address: None,
@@ -181,6 +190,13 @@ impl TokenActivityV2 {
                         after_value: Some(inner.new_value.clone()),
                     },
                     V2TokenEvent::BurnEvent(_) => TokenActivityHelperV2 {
+                        from_address: Some(object_core.get_owner_address()),
+                        to_address: None,
+                        token_amount: BigDecimal::one(),
+                        before_value: None,
+                        after_value: None,
+                    },
+                    V2TokenEvent::ConcurrentBurnEvent(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
                         to_address: None,
                         token_amount: BigDecimal::one(),

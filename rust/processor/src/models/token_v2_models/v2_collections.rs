@@ -122,6 +122,16 @@ impl CollectionV2 {
                     );
                 }
 
+                // Aggregator V2 enables a separate struct for supply
+                let concurrent_supply = metadata.concurrent_supply.as_ref();
+                if let Some(supply) = concurrent_supply {
+                    (current_supply, max_supply, total_minted_v2) = (
+                        supply.current_supply.value.clone(),
+                        Some(supply.current_supply.max_value.clone()),
+                        Some(supply.total_minted.value.clone()),
+                    );
+                }
+
                 // Getting collection mutability config from AptosCollection
                 let collection = metadata.aptos_collection.as_ref();
                 if let Some(collection) = collection {

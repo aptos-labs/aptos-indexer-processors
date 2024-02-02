@@ -21,7 +21,8 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, FixedSupply, PropertyMapModel, TokenV2, TokenV2Burned,
+                AptosCollection, BurnEvent, ConcurrentBurnEvent, ConcurrentSupply,
+                ConcurrentTokenIdentifiers, FixedSupply, PropertyMapModel, TokenV2, TokenV2Burned,
                 TransferEvent, UnlimitedSupply,
             },
         },
@@ -482,12 +483,14 @@ async fn parse_v2_token(
                                 fixed_supply: None,
                                 object,
                                 unlimited_supply: None,
+                                concurrent_supply: None,
                                 property_map: None,
                                 transfer_events: vec![],
                                 token: None,
                                 fungible_asset_metadata: None,
                                 fungible_asset_supply: None,
                                 fungible_asset_store: None,
+                                concurrent_token_identifier: None,
                             },
                         );
                     }
@@ -519,6 +522,11 @@ async fn parse_v2_token(
                         {
                             aggregated_data.property_map = Some(property_map);
                         }
+                        if let Some(concurrent_supply) =
+                            ConcurrentSupply::from_write_resource(wr, txn_version).unwrap()
+                        {
+                            aggregated_data.concurrent_supply = Some(concurrent_supply);
+                        }
                         if let Some(token) = TokenV2::from_write_resource(wr, txn_version).unwrap()
                         {
                             aggregated_data.token = Some(token);
@@ -538,6 +546,13 @@ async fn parse_v2_token(
                         {
                             aggregated_data.fungible_asset_store = Some(fungible_asset_store);
                         }
+                        if let Some(concurrent_token_identifier) =
+                            ConcurrentTokenIdentifiers::from_write_resource(wr, txn_version)
+                                .unwrap()
+                        {
+                            aggregated_data.concurrent_token_identifier =
+                                Some(concurrent_token_identifier);
+                        }
                     }
                 }
             }
@@ -546,6 +561,11 @@ async fn parse_v2_token(
             // This needs to be here because we need the metadata above for token activities
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
+                if let Some(burn_event) =
+                    ConcurrentBurnEvent::from_event(event, txn_version).unwrap()
+                {
+                    tokens_burned.insert(burn_event.get_token_address());
+                }
                 if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address());
                 }
