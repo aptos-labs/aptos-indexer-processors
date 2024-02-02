@@ -438,6 +438,12 @@ pub struct AggregatorU64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AggregatorSnapshotU64 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub value: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DerivedStringSnapshot {
     pub value: String,
 }

@@ -13,7 +13,8 @@ use crate::{
     },
     utils::util::{
         deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,
-        standardize_address, truncate_str, AggregatorU64, DerivedStringSnapshot,
+        standardize_address, truncate_str, AggregatorSnapshotU64, AggregatorU64,
+        DerivedStringSnapshot,
     },
 };
 use anyhow::{Context, Result};
@@ -291,6 +292,7 @@ impl MintEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConcurrentMintEvent {
     collection_addr: String,
+    pub index: AggregatorSnapshotU64,
     token: String,
 }
 
@@ -333,6 +335,8 @@ impl BurnEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConcurrentBurnEvent {
     collection_addr: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    index: BigDecimal,
     token: String,
 }
 
