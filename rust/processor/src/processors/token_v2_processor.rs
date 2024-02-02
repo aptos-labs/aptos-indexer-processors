@@ -21,9 +21,9 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, ConcurrentBurnEvent, ConcurrentSupply,
-                ConcurrentTokenIdentifiers, FixedSupply, PropertyMapModel, TokenV2, TokenV2Burned,
-                TransferEvent, UnlimitedSupply,
+                AptosCollection, BurnEvent, ConcurrentBurnEvent, ConcurrentSupply, FixedSupply,
+                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TransferEvent,
+                UnlimitedSupply,
             },
         },
     },
@@ -490,7 +490,7 @@ async fn parse_v2_token(
                                 fungible_asset_metadata: None,
                                 fungible_asset_supply: None,
                                 fungible_asset_store: None,
-                                concurrent_token_identifier: None,
+                                token_identifier: None,
                             },
                         );
                     }
@@ -546,12 +546,10 @@ async fn parse_v2_token(
                         {
                             aggregated_data.fungible_asset_store = Some(fungible_asset_store);
                         }
-                        if let Some(concurrent_token_identifier) =
-                            ConcurrentTokenIdentifiers::from_write_resource(wr, txn_version)
-                                .unwrap()
+                        if let Some(oken_identifier) =
+                            TokenIdentifiers::from_write_resource(wr, txn_version).unwrap()
                         {
-                            aggregated_data.concurrent_token_identifier =
-                                Some(concurrent_token_identifier);
+                            aggregated_data.token_identifier = Some(oken_identifier);
                         }
                     }
                 }

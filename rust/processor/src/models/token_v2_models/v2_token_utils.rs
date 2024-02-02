@@ -13,7 +13,7 @@ use crate::{
     },
     utils::util::{
         deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,
-        standardize_address, truncate_str, AggregatorSnapshotString, AggregatorU64,
+        standardize_address, truncate_str, AggregatorU64, DerivedStringSnapshot,
     },
 };
 use anyhow::{Context, Result};
@@ -144,12 +144,11 @@ impl TokenV2 {
         if let V2TokenResource::TokenV2(inner) =
             V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
         {
-            if let Some(concurrent_token_identifiers) =
-                ConcurrentTokenIdentifiers::from_write_resource(write_resource, txn_version)
-                    .unwrap()
+            if let Some(token_identifiers) =
+                TokenIdentifiers::from_write_resource(write_resource, txn_version).unwrap()
             {
                 Ok(Some(TokenV2 {
-                    name: concurrent_token_identifiers.name.value,
+                    name: token_identifiers.name.value,
                     ..inner
                 }))
             } else {
@@ -418,11 +417,11 @@ impl PropertyMapModel {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConcurrentTokenIdentifiers {
-    name: AggregatorSnapshotString,
+pub struct TokenIdentifiers {
+    name: DerivedStringSnapshot,
 }
 
-impl ConcurrentTokenIdentifiers {
+impl TokenIdentifiers {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
@@ -438,7 +437,7 @@ impl ConcurrentTokenIdentifiers {
             0, // Placeholder, this isn't used anyway
         );
 
-        if let V2TokenResource::ConcurrentTokenIdentifiers(inner) =
+        if let V2TokenResource::TokenIdentifiers(inner) =
             V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
         {
             Ok(Some(inner))
@@ -462,7 +461,7 @@ pub enum V2TokenResource {
     UnlimitedSupply(UnlimitedSupply),
     TokenV2(TokenV2),
     PropertyMapModel(PropertyMapModel),
-    ConcurrentTokenIdentifiers(ConcurrentTokenIdentifiers),
+    TokenIdentifiers(TokenIdentifiers),
 }
 
 impl V2TokenResource {
@@ -476,7 +475,7 @@ impl V2TokenResource {
             format!("{}::aptos_token::AptosCollection", TOKEN_V2_ADDR),
             format!("{}::token::Token", TOKEN_V2_ADDR),
             format!("{}::property_map::PropertyMap", TOKEN_V2_ADDR),
-            format!("{}::token::ConcurrentTokenIdentifiers", TOKEN_V2_ADDR),
+            format!("{}::token::TokenIdentifiers", TOKEN_V2_ADDR),
         ]
         .contains(&data_type.to_string())
     }
@@ -509,9 +508,9 @@ impl V2TokenResource {
             x if x == format!("{}::token::Token", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::TokenV2(inner)))
             },
-            x if x == format!("{}::token::ConcurrentTokenIdentifiers", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::token::TokenIdentifiers", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone())
-                    .map(|inner| Some(Self::ConcurrentTokenIdentifiers(inner)))
+                    .map(|inner| Some(Self::TokenIdentifiers(inner)))
             },
             x if x == format!("{}::property_map::PropertyMap", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone())

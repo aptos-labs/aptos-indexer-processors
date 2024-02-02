@@ -111,8 +111,8 @@ impl TokenDataV2 {
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
                 // In aggregator V2 name is now derived from a separate struct
-                if let Some(concurrent_identifier) = metadata.concurrent_token_identifier.as_ref() {
-                    token_name = concurrent_identifier.get_name_trunc();
+                if let Some(token_identifier) = metadata.token_identifier.as_ref() {
+                    token_name = token_identifier.get_name_trunc();
                 }
             } else {
                 // ObjectCore should not be missing, returning from entire function early

@@ -222,7 +222,7 @@ async fn parse_v2_token(
                             fungible_asset_metadata: None,
                             fungible_asset_supply: None,
                             fungible_asset_store: None,
-                            concurrent_token_identifier: None,
+                            token_identifier: None,
                         },
                     );
                 }

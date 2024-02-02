@@ -438,10 +438,9 @@ pub struct AggregatorU64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AggregatorSnapshotString {
+pub struct DerivedStringSnapshot {
     pub value: String,
 }
-
 
 #[cfg(test)]
 mod tests {

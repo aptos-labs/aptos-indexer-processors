@@ -342,7 +342,7 @@ async fn parse_v2_coin(
                             property_map: None,
                             transfer_events: vec![],
                             fungible_asset_supply: None,
-                            concurrent_token_identifier: None,
+                            token_identifier: None,
                         },
                     );
                 }

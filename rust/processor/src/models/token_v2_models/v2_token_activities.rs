@@ -165,6 +165,12 @@ impl TokenActivityV2 {
                 _ => event_account_address.clone(),
             };
 
+            let event_type_override = match event_type.as_str() {
+                "0x4::collection::ConcurrentMintEvent" => "0x4::collection::MintEvent".to_string(),
+                "0x4::collection::ConcurrentBurnEvent" => "0x4::collection::BurnEvent".to_string(),
+                _ => event_type.clone(),
+            };
+
             if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
                 let object_core = &metadata.object.object_core;
                 let token_activity_helper = match token_event {
@@ -217,7 +223,7 @@ impl TokenActivityV2 {
                     event_account_address,
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
-                    type_: event_type,
+                    type_: event_type_override,
                     from_address: token_activity_helper.from_address,
                     to_address: token_activity_helper.to_address,
                     token_amount: token_activity_helper.token_amount,
