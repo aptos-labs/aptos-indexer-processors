@@ -738,7 +738,7 @@ pub async fn do_processor(
 // couple processors together based on their args) makes sense.
 pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
     match config {
-            ProcessorConfig::AccountTransactionsProcessor => {
+        ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
         },
         ProcessorConfig::AnsProcessor(config) => {
