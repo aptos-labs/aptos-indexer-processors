@@ -180,9 +180,11 @@ impl ProcessorTrait for ObjectsProcessor {
                             aptos_collection: None,
                             fixed_supply: None,
                             unlimited_supply: None,
+                            concurrent_supply: None,
                             property_map: None,
                             transfer_events: vec![],
                             fungible_asset_supply: None,
+                            token_identifier: None,
                         });
                     }
                 }

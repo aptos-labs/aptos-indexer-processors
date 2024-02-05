@@ -428,6 +428,26 @@ pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
     t.last().unwrap()
 }
 
+/* COMMON STRUCTS */
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AggregatorU64 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub value: BigDecimal,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub max_value: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AggregatorSnapshotU64 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub value: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DerivedStringSnapshot {
+    pub value: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

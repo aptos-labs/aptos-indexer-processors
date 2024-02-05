@@ -214,6 +214,7 @@ async fn parse_v2_token(
                             aptos_collection: None,
                             fixed_supply: None,
                             object,
+                            concurrent_supply: None,
                             unlimited_supply: None,
                             property_map: None,
                             transfer_events: vec![],
@@ -221,6 +222,7 @@ async fn parse_v2_token(
                             fungible_asset_metadata: None,
                             fungible_asset_supply: None,
                             fungible_asset_store: None,
+                            token_identifier: None,
                         },
                     );
                 }

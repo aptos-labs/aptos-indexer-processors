@@ -61,6 +61,7 @@ struct TokenActivityHelperV2 {
     pub token_amount: BigDecimal,
     pub before_value: Option<String>,
     pub after_value: Option<String>,
+    pub event_type: String,
 }
 
 impl TokenActivityV2 {
@@ -106,6 +107,7 @@ impl TokenActivityV2 {
                         token_amount: inner.amount.clone(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
                     },
                     FungibleAssetEvent::DepositEvent(inner) => TokenActivityHelperV2 {
                         from_address: None,
@@ -113,6 +115,7 @@ impl TokenActivityV2 {
                         token_amount: inner.amount.clone(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
                     },
                     _ => return Ok(None),
                 };
@@ -123,7 +126,7 @@ impl TokenActivityV2 {
                     event_account_address,
                     token_data_id: token_data_id.clone(),
                     property_version_v1: BigDecimal::zero(),
-                    type_: event_type.to_string(),
+                    type_: token_activity_helper.event_type,
                     from_address: token_activity_helper.from_address,
                     to_address: token_activity_helper.to_address,
                     token_amount: token_activity_helper.token_amount,
@@ -158,7 +161,9 @@ impl TokenActivityV2 {
             // burn and mint events are attached to the collection. The rest should be attached to the token
             let token_data_id = match token_event {
                 V2TokenEvent::MintEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::ConcurrentMintEvent(inner) => inner.get_token_address(),
                 V2TokenEvent::BurnEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::ConcurrentBurnEvent(inner) => inner.get_token_address(),
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
@@ -172,6 +177,15 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::one(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
+                    },
+                    V2TokenEvent::ConcurrentMintEvent(_) => TokenActivityHelperV2 {
+                        from_address: Some(object_core.get_owner_address()),
+                        to_address: None,
+                        token_amount: BigDecimal::one(),
+                        before_value: None,
+                        after_value: None,
+                        event_type: "0x4::collection::MintEvent".to_string(),
                     },
                     V2TokenEvent::TokenMutationEvent(inner) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
@@ -179,6 +193,7 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::zero(),
                         before_value: Some(inner.old_value.clone()),
                         after_value: Some(inner.new_value.clone()),
+                        event_type: event_type.clone(),
                     },
                     V2TokenEvent::BurnEvent(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
@@ -186,6 +201,15 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::one(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
+                    },
+                    V2TokenEvent::ConcurrentBurnEvent(_) => TokenActivityHelperV2 {
+                        from_address: Some(object_core.get_owner_address()),
+                        to_address: None,
+                        token_amount: BigDecimal::one(),
+                        before_value: None,
+                        after_value: None,
+                        event_type: "0x4::collection::BurnEvent".to_string(),
                     },
                     V2TokenEvent::TransferEvent(inner) => TokenActivityHelperV2 {
                         from_address: Some(inner.get_from_address()),
@@ -193,6 +217,7 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::one(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
                     },
                 };
                 return Ok(Some(Self {
@@ -201,7 +226,7 @@ impl TokenActivityV2 {
                     event_account_address,
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
-                    type_: event_type,
+                    type_: token_activity_helper.event_type,
                     from_address: token_activity_helper.from_address,
                     to_address: token_activity_helper.to_address,
                     token_amount: token_activity_helper.token_amount,

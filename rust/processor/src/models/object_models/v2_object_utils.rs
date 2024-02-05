@@ -12,8 +12,8 @@ use crate::{
             FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
         },
         token_v2_models::v2_token_utils::{
-            AptosCollection, FixedSupply, PropertyMapModel, TokenV2, TransferEvent,
-            UnlimitedSupply, V2TokenResource,
+            AptosCollection, ConcurrentSupply, FixedSupply, PropertyMapModel, TokenIdentifiers,
+            TokenV2, TransferEvent, UnlimitedSupply, V2TokenResource,
         },
     },
     utils::util::{deserialize_from_string, standardize_address},
@@ -48,6 +48,8 @@ pub struct ObjectAggregatedData {
     pub property_map: Option<PropertyMapModel>,
     pub token: Option<TokenV2>,
     pub unlimited_supply: Option<UnlimitedSupply>,
+    pub concurrent_supply: Option<ConcurrentSupply>,
+    pub token_identifier: Option<TokenIdentifiers>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -88,6 +88,7 @@ impl TokenDataV2 {
     ) -> anyhow::Result<Option<(Self, CurrentTokenDataV2)>> {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
+            let mut token_name = inner.get_name_trunc();
             // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
             let (mut maximum, mut supply, mut decimals, mut is_fungible_v2) =
                 (None, BigDecimal::zero(), 0, Some(false));
@@ -109,13 +110,16 @@ impl TokenDataV2 {
                     .clone()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
+                // In aggregator V2 name is now derived from a separate struct
+                if let Some(token_identifier) = metadata.token_identifier.as_ref() {
+                    token_name = token_identifier.get_name_trunc();
+                }
             } else {
                 // ObjectCore should not be missing, returning from entire function early
                 return Ok(None);
             }
 
             let collection_id = inner.get_collection_address();
-            let token_name = inner.get_name_trunc();
             let token_uri = inner.get_uri_trunc();
 
             Ok(Some((
