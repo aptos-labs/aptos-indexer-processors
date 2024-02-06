@@ -16,8 +16,9 @@ use crate::{
         },
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
@@ -28,7 +29,7 @@ use diesel::{
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -63,24 +64,24 @@ impl Debug for TokenProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
     (tokens, token_ownerships, token_datas, collection_datas): (
-        Vec<Token>,
-        Vec<TokenOwnership>,
-        Vec<TokenData>,
-        Vec<CollectionData>,
+        &[Token],
+        &[TokenOwnership],
+        &[TokenData],
+        &[CollectionData],
     ),
     (current_token_ownerships, current_token_datas, current_collection_datas): (
-        Vec<CurrentTokenOwnership>,
-        Vec<CurrentTokenData>,
-        Vec<CurrentCollectionData>,
+        &[CurrentTokenOwnership],
+        &[CurrentTokenData],
+        &[CurrentCollectionData],
     ),
-    token_activities: Vec<TokenActivity>,
-    current_token_claims: Vec<CurrentTokenPendingClaim>,
-    nft_points: Vec<NftPoints>,
+    token_activities: &[TokenActivity],
+    current_token_claims: &[CurrentTokenPendingClaim],
+    nft_points: &[NftPoints],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -89,71 +90,78 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(conn, insert_tokens_query, tokens, Token::field_count()).await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
+        insert_tokens_query,
+        tokens,
+        Token::field_count(),
+    )
+    .await?;
+    let to = execute_in_chunks(
+        conn.clone(),
         insert_token_ownerships_query,
         token_ownerships,
         TokenOwnership::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let td = execute_in_chunks(
+        conn.clone(),
         insert_token_datas_query,
         token_datas,
         TokenData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cd = execute_in_chunks(
+        conn.clone(),
         insert_collection_datas_query,
         collection_datas,
         CollectionData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cto = execute_in_chunks(
+        conn.clone(),
         insert_current_token_ownerships_query,
         current_token_ownerships,
         CurrentTokenOwnership::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let ctd = execute_in_chunks(
+        conn.clone(),
         insert_current_token_datas_query,
         current_token_datas,
         CurrentTokenData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let ccd = execute_in_chunks(
+        conn.clone(),
         insert_current_collection_datas_query,
         current_collection_datas,
         CurrentCollectionData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+
+    let ta = execute_in_chunks(
+        conn.clone(),
         insert_token_activities_query,
         token_activities,
         TokenActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+
+    let ctc = execute_in_chunks(
+        conn.clone(),
         insert_current_token_claims_query,
         current_token_claims,
         CurrentTokenPendingClaim::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let np = execute_in_chunks(
         conn,
         insert_nft_points_query,
         nft_points,
         NftPoints::field_count(),
-    )
-    .await?;
+    );
 
+    let (to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, ctc_res, np) =
+        tokio::join!(to, td, cd, cto, ctd, ccd, ta, ctc, np);
+
+    for res in [
+        to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, ctc_res, np,
+    ] {
+        res?;
+    }
     Ok(())
 }
 
@@ -237,22 +245,22 @@ fn insert_current_token_ownerships_query(
     use schema::current_token_ownerships::dsl::*;
 
     (diesel::insert_into(schema::current_token_ownerships::table)
-            .values(items_to_insert)
-                .on_conflict((token_data_id_hash, property_version, owner_address))
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    amount.eq(excluded(amount)),
-                    token_properties.eq(excluded(token_properties)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    table_type.eq(excluded(table_type)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
-            )
+         .values(items_to_insert)
+         .on_conflict((token_data_id_hash, property_version, owner_address))
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             amount.eq(excluded(amount)),
+             token_properties.eq(excluded(token_properties)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             table_type.eq(excluded(table_type)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_current_token_datas_query(
@@ -263,33 +271,33 @@ fn insert_current_token_datas_query(
 ) {
     use schema::current_token_datas::dsl::*;
     (diesel::insert_into(schema::current_token_datas::table)
-            .values(items_to_insert)
-                .on_conflict(token_data_id_hash)
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    maximum.eq(excluded(maximum)),
-                    supply.eq(excluded(supply)),
-                    largest_property_version.eq(excluded(largest_property_version)),
-                    metadata_uri.eq(excluded(metadata_uri)),
-                    payee_address.eq(excluded(payee_address)),
-                    royalty_points_numerator.eq(excluded(royalty_points_numerator)),
-                    royalty_points_denominator.eq(excluded(royalty_points_denominator)),
-                    maximum_mutable.eq(excluded(maximum_mutable)),
-                    uri_mutable.eq(excluded(uri_mutable)),
-                    description_mutable.eq(excluded(description_mutable)),
-                    properties_mutable.eq(excluded(properties_mutable)),
-                    royalty_mutable.eq(excluded(royalty_mutable)),
-                    default_properties.eq(excluded(default_properties)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    description.eq(excluded(description)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
-            )
+         .values(items_to_insert)
+         .on_conflict(token_data_id_hash)
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             maximum.eq(excluded(maximum)),
+             supply.eq(excluded(supply)),
+             largest_property_version.eq(excluded(largest_property_version)),
+             metadata_uri.eq(excluded(metadata_uri)),
+             payee_address.eq(excluded(payee_address)),
+             royalty_points_numerator.eq(excluded(royalty_points_numerator)),
+             royalty_points_denominator.eq(excluded(royalty_points_denominator)),
+             maximum_mutable.eq(excluded(maximum_mutable)),
+             uri_mutable.eq(excluded(uri_mutable)),
+             description_mutable.eq(excluded(description_mutable)),
+             properties_mutable.eq(excluded(properties_mutable)),
+             royalty_mutable.eq(excluded(royalty_mutable)),
+             default_properties.eq(excluded(default_properties)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             description.eq(excluded(description)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_current_collection_datas_query(
@@ -301,25 +309,25 @@ fn insert_current_collection_datas_query(
     use schema::current_collection_datas::dsl::*;
 
     (diesel::insert_into(schema::current_collection_datas::table)
-            .values(items_to_insert)
-                .on_conflict(collection_data_id_hash)
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    description.eq(excluded(description)),
-                    metadata_uri.eq(excluded(metadata_uri)),
-                    supply.eq(excluded(supply)),
-                    maximum.eq(excluded(maximum)),
-                    maximum_mutable.eq(excluded(maximum_mutable)),
-                    uri_mutable.eq(excluded(uri_mutable)),
-                    description_mutable.eq(excluded(description_mutable)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    table_handle.eq(excluded(table_handle)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
-            )
+         .values(items_to_insert)
+         .on_conflict(collection_data_id_hash)
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             description.eq(excluded(description)),
+             metadata_uri.eq(excluded(metadata_uri)),
+             supply.eq(excluded(supply)),
+             maximum.eq(excluded(maximum)),
+             maximum_mutable.eq(excluded(maximum_mutable)),
+             uri_mutable.eq(excluded(uri_mutable)),
+             description_mutable.eq(excluded(description_mutable)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             table_handle.eq(excluded(table_handle)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_token_activities_query(
@@ -352,26 +360,27 @@ fn insert_current_token_claims_query(
 ) {
     use schema::current_token_pending_claims::dsl::*;
 
-    (            diesel::insert_into(schema::current_token_pending_claims::table)
-.values(items_to_insert)
-                .on_conflict((
-                    token_data_id_hash, property_version, from_address, to_address
-                ))
-                .do_update()
-                .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    amount.eq(excluded(amount)),
-                    table_handle.eq(excluded(table_handle)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    token_data_id.eq(excluded(token_data_id)),
-                    collection_id.eq(excluded(collection_id)),
-                )),
-            Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
-)
+    (
+        diesel::insert_into(schema::current_token_pending_claims::table)
+            .values(items_to_insert)
+            .on_conflict((
+                token_data_id_hash, property_version, from_address, to_address
+            ))
+            .do_update()
+            .set((
+                collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                creator_address.eq(excluded(creator_address)),
+                collection_name.eq(excluded(collection_name)),
+                name.eq(excluded(name)),
+                amount.eq(excluded(amount)),
+                table_handle.eq(excluded(table_handle)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+                token_data_id.eq(excluded(token_data_id)),
+                collection_id.eq(excluded(collection_id)),
+            )),
+        Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_nft_points_query(
@@ -399,7 +408,7 @@ impl ProcessorTrait for TokenProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -419,19 +428,19 @@ impl ProcessorTrait for TokenProcessor {
         let mut all_collection_datas = vec![];
         let mut all_token_activities = vec![];
 
-        // Hashmap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
-        let mut all_current_token_ownerships: HashMap<
+        // AHashMap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
+        let mut all_current_token_ownerships: AHashMap<
             CurrentTokenOwnershipPK,
             CurrentTokenOwnership,
-        > = HashMap::new();
-        let mut all_current_token_datas: HashMap<TokenDataIdHash, CurrentTokenData> =
-            HashMap::new();
-        let mut all_current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
-            HashMap::new();
-        let mut all_current_token_claims: HashMap<
+        > = AHashMap::new();
+        let mut all_current_token_datas: AHashMap<TokenDataIdHash, CurrentTokenData> =
+            AHashMap::new();
+        let mut all_current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
+            AHashMap::new();
+        let mut all_current_token_claims: AHashMap<
             CurrentTokenPendingClaimPK,
             CurrentTokenPendingClaim,
-        > = HashMap::new();
+        > = AHashMap::new();
 
         // This is likely temporary
         let mut all_nft_points = vec![];
@@ -515,24 +524,24 @@ impl ProcessorTrait for TokenProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
             (
-                all_tokens,
-                all_token_ownerships,
-                all_token_datas,
-                all_collection_datas,
+                &all_tokens,
+                &all_token_ownerships,
+                &all_token_datas,
+                &all_collection_datas,
             ),
             (
-                all_current_token_ownerships,
-                all_current_token_datas,
-                all_current_collection_datas,
+                &all_current_token_ownerships,
+                &all_current_token_datas,
+                &all_current_collection_datas,
             ),
-            all_token_activities,
-            all_current_token_claims,
-            all_nft_points,
+            &all_token_activities,
+            &all_current_token_claims,
+            &all_nft_points,
         )
         .await;
 

@@ -14,13 +14,13 @@ use crate::{
     schema::{current_objects, objects},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -122,7 +122,7 @@ impl Object {
         delete_resource: &DeleteResource,
         txn_version: i64,
         write_set_change_index: i64,
-        object_mapping: &HashMap<CurrentObjectPK, CurrentObject>,
+        object_mapping: &AHashMap<CurrentObjectPK, CurrentObject>,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
         if delete_resource.type_str == "0x1::object::ObjectGroup" {
@@ -200,7 +200,8 @@ impl Object {
                     })
                 },
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

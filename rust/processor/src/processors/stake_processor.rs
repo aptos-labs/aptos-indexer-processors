@@ -18,10 +18,11 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, PgDbPool},
         util::{parse_timestamp, standardize_address},
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -31,7 +32,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::{fmt::Debug, sync::Arc};
 use tracing::error;
 
 pub struct StakeProcessor {
@@ -56,19 +57,19 @@ impl Debug for StakeProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_stake_pool_voters: Vec<CurrentStakingPoolVoter>,
-    proposal_votes: Vec<ProposalVote>,
-    delegator_actvities: Vec<DelegatedStakingActivity>,
-    delegator_balances: Vec<DelegatorBalance>,
-    current_delegator_balances: Vec<CurrentDelegatorBalance>,
-    delegator_pools: Vec<DelegatorPool>,
-    delegator_pool_balances: Vec<DelegatorPoolBalance>,
-    current_delegator_pool_balances: Vec<CurrentDelegatorPoolBalance>,
-    current_delegated_voter: Vec<CurrentDelegatedVoter>,
+    current_stake_pool_voters: &[CurrentStakingPoolVoter],
+    proposal_votes: &[ProposalVote],
+    delegator_actvities: &[DelegatedStakingActivity],
+    delegator_balances: &[DelegatorBalance],
+    current_delegator_balances: &[CurrentDelegatorBalance],
+    delegator_pools: &[DelegatorPool],
+    delegator_pool_balances: &[DelegatorPoolBalance],
+    current_delegator_pool_balances: &[CurrentDelegatorPoolBalance],
+    current_delegated_voter: &[CurrentDelegatedVoter],
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -77,69 +78,68 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
-        conn,
+    let cspv = execute_in_chunks(
+        conn.clone(),
         insert_current_stake_pool_voter_query,
         current_stake_pool_voters,
         CurrentStakingPoolVoter::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let pv = execute_in_chunks(
+        conn.clone(),
         insert_proposal_votes_query,
         proposal_votes,
         ProposalVote::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let da = execute_in_chunks(
+        conn.clone(),
         insert_delegator_activities_query,
         delegator_actvities,
         DelegatedStakingActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let db = execute_in_chunks(
+        conn.clone(),
         insert_delegator_balances_query,
         delegator_balances,
         DelegatorBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cdb = execute_in_chunks(
+        conn.clone(),
         insert_current_delegator_balances_query,
         current_delegator_balances,
         CurrentDelegatorBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let dp = execute_in_chunks(
+        conn.clone(),
         insert_delegator_pools_query,
         delegator_pools,
         DelegatorPool::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let dpb = execute_in_chunks(
+        conn.clone(),
         insert_delegator_pool_balances_query,
         delegator_pool_balances,
         DelegatorPoolBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
+    );
+    let cdpb = execute_in_chunks(
+        conn.clone(),
         insert_current_delegator_pool_balances_query,
         current_delegator_pool_balances,
         CurrentDelegatorPoolBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+    );
+    let cdv = execute_in_chunks(
         conn,
         insert_current_delegated_voter_query,
         current_delegated_voter,
         CurrentDelegatedVoter::field_count(),
-    )
-    .await?;
+    );
+
+    let (cspv_res, pv_res, da_res, db_res, cdb_res, dp_res, dpb_res, cdpb_res, cdv_res) =
+        futures::join!(cspv, pv, da, db, cdb, dp, dpb, cdpb, cdv);
+    for res in [
+        cspv_res, pv_res, da_res, db_res, cdb_res, dp_res, dpb_res, cdpb_res, cdv_res,
+    ] {
+        res?;
+    }
 
     Ok(())
 }
@@ -153,20 +153,20 @@ fn insert_current_stake_pool_voter_query(
     use schema::current_staking_pool_voter::dsl::*;
 
     (diesel::insert_into(schema::current_staking_pool_voter::table)
-    .values(items_to_insert)
-                .on_conflict(staking_pool_address)
-                .do_update()
-                .set((
-                    staking_pool_address.eq(excluded(staking_pool_address)),
-                    voter_address.eq(excluded(voter_address)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    operator_address.eq(excluded(operator_address)),
-                )),
-            Some(
-                " WHERE current_staking_pool_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
-            ),
-        )
+         .values(items_to_insert)
+         .on_conflict(staking_pool_address)
+         .do_update()
+         .set((
+             staking_pool_address.eq(excluded(staking_pool_address)),
+             voter_address.eq(excluded(voter_address)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             inserted_at.eq(excluded(inserted_at)),
+             operator_address.eq(excluded(operator_address)),
+         )),
+     Some(
+         " WHERE current_staking_pool_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
+     ),
+    )
 }
 
 fn insert_proposal_votes_query(
@@ -229,19 +229,19 @@ fn insert_current_delegator_balances_query(
     use schema::current_delegator_balances::dsl::*;
 
     (diesel::insert_into(schema::current_delegator_balances::table)
-            .values(items_to_insert)
-                .on_conflict((delegator_address, pool_address, pool_type, table_handle))
-                .do_update()
-                .set((
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    shares.eq(excluded(shares)),
-                    parent_table_handle.eq(excluded(parent_table_handle)),
-                )),
-            Some(
-                " WHERE current_delegator_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
-            ),
-        )
+         .values(items_to_insert)
+         .on_conflict((delegator_address, pool_address, pool_type, table_handle))
+         .do_update()
+         .set((
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             inserted_at.eq(excluded(inserted_at)),
+             shares.eq(excluded(shares)),
+             parent_table_handle.eq(excluded(parent_table_handle)),
+         )),
+     Some(
+         " WHERE current_delegator_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
+     ),
+    )
 }
 
 fn insert_delegator_pools_query(
@@ -253,17 +253,17 @@ fn insert_delegator_pools_query(
     use schema::delegated_staking_pools::dsl::*;
 
     (diesel::insert_into(schema::delegated_staking_pools::table)
-            .values(items_to_insert)
-                .on_conflict(staking_pool_address)
-                .do_update()
-                .set((
-                    first_transaction_version.eq(excluded(first_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(
-                " WHERE delegated_staking_pools.first_transaction_version >= EXCLUDED.first_transaction_version ",
-            ),
-        )
+         .values(items_to_insert)
+         .on_conflict(staking_pool_address)
+         .do_update()
+         .set((
+             first_transaction_version.eq(excluded(first_transaction_version)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(
+         " WHERE delegated_staking_pools.first_transaction_version >= EXCLUDED.first_transaction_version ",
+     ),
+    )
 }
 
 fn insert_delegator_pool_balances_query(
@@ -292,22 +292,22 @@ fn insert_current_delegator_pool_balances_query(
     use schema::current_delegated_staking_pool_balances::dsl::*;
 
     (diesel::insert_into(schema::current_delegated_staking_pool_balances::table)
-            .values(items_to_insert)
-                .on_conflict(staking_pool_address)
-                .do_update()
-                .set((
-                    total_coins.eq(excluded(total_coins)),
-                    total_shares.eq(excluded(total_shares)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    operator_commission_percentage.eq(excluded(operator_commission_percentage)),
-                    inactive_table_handle.eq(excluded(inactive_table_handle)),
-                    active_table_handle.eq(excluded(active_table_handle)),
-                )),
-            Some(
-                " WHERE current_delegated_staking_pool_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
-            ),
-        )
+         .values(items_to_insert)
+         .on_conflict(staking_pool_address)
+         .do_update()
+         .set((
+             total_coins.eq(excluded(total_coins)),
+             total_shares.eq(excluded(total_shares)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             inserted_at.eq(excluded(inserted_at)),
+             operator_commission_percentage.eq(excluded(operator_commission_percentage)),
+             inactive_table_handle.eq(excluded(inactive_table_handle)),
+             active_table_handle.eq(excluded(active_table_handle)),
+         )),
+     Some(
+         " WHERE current_delegated_staking_pool_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
+     ),
+    )
 }
 
 fn insert_current_delegated_voter_query(
@@ -319,21 +319,21 @@ fn insert_current_delegated_voter_query(
     use schema::current_delegated_voter::dsl::*;
 
     (diesel::insert_into(schema::current_delegated_voter::table)
-            .values(item_to_insert)
-                .on_conflict((delegation_pool_address, delegator_address))
-                .do_update()
-                .set((
-                    voter.eq(excluded(voter)),
-                    pending_voter.eq(excluded(pending_voter)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    table_handle.eq(excluded(table_handle)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-                Some(
-                    " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
-                ),
-            )
+         .values(item_to_insert)
+         .on_conflict((delegation_pool_address, delegator_address))
+         .do_update()
+         .set((
+             voter.eq(excluded(voter)),
+             pending_voter.eq(excluded(pending_voter)),
+             last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             table_handle.eq(excluded(table_handle)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(
+         " WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version ",
+     ),
+    )
 }
 
 #[async_trait]
@@ -344,7 +344,7 @@ impl ProcessorTrait for StakeProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Arc<Transaction>>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -352,19 +352,19 @@ impl ProcessorTrait for StakeProcessor {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
 
-        let mut all_current_stake_pool_voters: StakingPoolVoterMap = HashMap::new();
+        let mut all_current_stake_pool_voters: StakingPoolVoterMap = AHashMap::new();
         let mut all_proposal_votes = vec![];
         let mut all_delegator_activities = vec![];
         let mut all_delegator_balances = vec![];
-        let mut all_current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
-        let mut all_delegator_pools: DelegatorPoolMap = HashMap::new();
+        let mut all_current_delegator_balances: CurrentDelegatorBalanceMap = AHashMap::new();
+        let mut all_delegator_pools: DelegatorPoolMap = AHashMap::new();
         let mut all_delegator_pool_balances = vec![];
-        let mut all_current_delegator_pool_balances = HashMap::new();
+        let mut all_current_delegator_pool_balances = AHashMap::new();
 
-        let mut active_pool_to_staking_pool = HashMap::new();
+        let mut active_pool_to_staking_pool = AHashMap::new();
         // structs needed to get delegated voters
-        let mut all_current_delegated_voter = HashMap::new();
-        let mut all_vote_delegation_handle_to_pool_address = HashMap::new();
+        let mut all_current_delegated_voter = AHashMap::new();
+        let mut all_vote_delegation_handle_to_pool_address = AHashMap::new();
 
         for txn in &transactions {
             // Add votes data
@@ -505,19 +505,19 @@ impl ProcessorTrait for StakeProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            all_current_stake_pool_voters,
-            all_proposal_votes,
-            all_delegator_activities,
-            all_delegator_balances,
-            all_current_delegator_balances,
-            all_delegator_pools,
-            all_delegator_pool_balances,
-            all_current_delegator_pool_balances,
-            all_current_delegated_voter,
+            &all_current_stake_pool_voters,
+            &all_proposal_votes,
+            &all_delegator_activities,
+            &all_delegator_balances,
+            &all_current_delegator_balances,
+            &all_delegator_pools,
+            &all_delegator_pool_balances,
+            &all_current_delegator_pool_balances,
+            &all_current_delegated_voter,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

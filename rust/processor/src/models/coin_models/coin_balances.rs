@@ -11,13 +11,13 @@ use crate::{
     schema::{coin_balances, current_coin_balances},
     utils::util::standardize_address,
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, owner_address, coin_type))]
 #[diesel(table_name = coin_balances)]
 pub struct CoinBalance {
@@ -29,7 +29,7 @@ pub struct CoinBalance {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(owner_address, coin_type))]
 #[diesel(table_name = current_coin_balances)]
 pub struct CurrentCoinBalance {
@@ -72,7 +72,7 @@ impl CoinBalance {
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
                 };
-                let event_to_coin_mapping: EventToCoinType = HashMap::from([
+                let event_to_coin_mapping: EventToCoinType = AHashMap::from([
                     (
                         inner.withdraw_events.guid.id.get_standardized(),
                         coin_balance.coin_type.clone(),

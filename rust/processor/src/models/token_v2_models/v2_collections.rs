@@ -29,7 +29,8 @@ use serde::{Deserialize, Serialize};
 
 // PK of current_collections_v2, i.e. collection_id
 pub type CurrentCollectionV2PK = String;
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = collections_v2)]
 pub struct CollectionV2 {
@@ -50,7 +51,7 @@ pub struct CollectionV2 {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_id))]
 #[diesel(table_name = current_collections_v2)]
 pub struct CurrentCollectionV2 {
@@ -304,7 +305,8 @@ impl CollectionV2 {
             match Self::get_by_table_handle(conn, table_handle).await {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

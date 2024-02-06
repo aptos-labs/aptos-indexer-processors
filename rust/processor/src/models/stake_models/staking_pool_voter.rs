@@ -6,15 +6,15 @@
 
 use super::stake_utils::StakeResource;
 use crate::{schema::current_staking_pool_voter, utils::util::standardize_address};
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 type StakingPoolAddress = String;
-pub type StakingPoolVoterMap = HashMap<StakingPoolAddress, CurrentStakingPoolVoter>;
+pub type StakingPoolVoterMap = AHashMap<StakingPoolAddress, CurrentStakingPoolVoter>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = current_staking_pool_voter)]
 pub struct CurrentStakingPoolVoter {
@@ -26,7 +26,7 @@ pub struct CurrentStakingPoolVoter {
 
 impl CurrentStakingPoolVoter {
     pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<StakingPoolVoterMap> {
-        let mut staking_pool_voters = HashMap::new();
+        let mut staking_pool_voters = AHashMap::new();
 
         let txn_version = transaction.version as i64;
         for wsc in &transaction.info.as_ref().unwrap().changes {
