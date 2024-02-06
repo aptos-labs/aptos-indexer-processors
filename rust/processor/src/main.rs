@@ -26,6 +26,7 @@ fn main() -> Result<()> {
         })
         .enable_all()
         .worker_threads(worker_threads)
+        .disable_lifo_slot()
         .build()
         .unwrap()
         .block_on(async {
