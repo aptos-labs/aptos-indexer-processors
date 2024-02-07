@@ -7,7 +7,8 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        event_stream_processor::EventStreamProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
         nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor,
         stake_processor::StakeProcessor, token_processor::TokenProcessor,
         token_v2_processor::TokenV2Processor, user_transaction_processor::UserTransactionProcessor,
@@ -766,7 +767,7 @@ pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Pro
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
-        ProcessorConfig::EventsProcessor(config) => {
+        ProcessorConfig::EventStreamProcessor(config) => {
             if let Some(credentials) = config.google_application_credentials.clone() {
                 std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
             }
@@ -775,8 +776,9 @@ pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Pro
             let client = Client::new(pubsub_config).await.unwrap();
             let topic = client.topic(&config.pubsub_topic_name);
             let publisher = topic.new_publisher(None);
-            Processor::from(EventsProcessor::new(db_pool, publisher))
+            Processor::from(EventStreamProcessor::new(db_pool, publisher))
         },
+        ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
         },
