@@ -41,7 +41,9 @@ use crate::{
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
-        database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+        database::{
+            execute_with_better_error, PgDbPool, PgPoolConnection, ProcessorPgQueryInsertable,
+        },
         util::parse_timestamp,
     },
 };
@@ -62,6 +64,14 @@ pub struct ProcessingResult {
     pub db_insertion_duration_in_secs: f64,
 }
 
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProcessingParseResult {
+    pub start_version: StartVersion,
+    pub end_version: EndVersion,
+    pub insertable_models: Vec<Box<dyn ProcessorPgQueryInsertable>>,
+    pub processing_duration_in_secs: f64,
+}
+
 /// Base trait for all processors
 #[async_trait]
 #[enum_dispatch]
@@ -76,6 +86,16 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         end_version: u64,
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult>;
+
+    fn parse_transactions(
+        &self,
+        transactions: Vec<ProtoTransaction>,
+        start_version: u64,
+        end_version: u64,
+        db_chain_id: Option<u64>,
+    ) -> anyhow::Result<Option<ProcessingParseResult>> {
+        Ok(None)
+    }
 
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below

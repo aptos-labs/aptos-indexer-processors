@@ -11,9 +11,12 @@ use super::{
 };
 use crate::{
     schema::transactions,
-    utils::util::{
-        get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
-        u64_to_bigdecimal,
+    utils::{
+        database::ProcessorPgQueryInsertable,
+        util::{
+            get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
+            u64_to_bigdecimal,
+        },
     },
 };
 use aptos_protos::transaction::v1::{

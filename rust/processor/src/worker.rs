@@ -11,21 +11,25 @@ use crate::{
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        user_transaction_processor::UserTransactionProcessor, ProcessingParseResult,
+        ProcessingResult, Processor, ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
         counters::{
-            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, GRPC_LATENCY_BY_PROCESSOR_IN_SECS,
-            LATEST_PROCESSED_VERSION, MULTI_BATCH_PROCESSING_TIME_IN_SECS,
-            NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT,
-            PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS, PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS,
-            PROCESSOR_ERRORS_COUNT, PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, GOT_CONNECTION_COUNT,
+            GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
+            MULTI_BATCH_PROCESSING_TIME_IN_SECS, NUM_TRANSACTIONS_PROCESSED_COUNT,
+            PROCESSED_BYTES_COUNT, PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
+            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
+            UNABLE_TO_GET_CONNECTION_COUNT,
         },
-        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{
+            execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool,
+            PgPoolConnection, ProcessorPgQueryInsertable,
+        },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -61,6 +65,8 @@ const RECONNECTION_MAX_RETRIES: u64 = 100;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 const PROCESSOR_SERVICE_TYPE: &str = "processor";
+// Size of channel that contains DB queries to be run
+const DB_QUERY_CHANNEL_SIZE: usize = 1000;
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
@@ -220,6 +226,18 @@ impl Worker {
             .await
         });
 
+        let (db_executor_sender, mut db_executor_receiver) =
+            tokio::sync::mpsc::channel::<ProcessingParseResult>(DB_QUERY_CHANNEL_SIZE);
+        let db_pool = self.db_pool.clone();
+        tokio::spawn(async move {
+            info!(
+                processor_name = processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                "[Parser] Starting db query thread"
+            );
+            create_db_executor_task(db_executor_receiver, db_pool, processor_name.to_string()).await
+        });
+
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
         // 2. We're caught up so we should expect a single thread to process transactions
@@ -366,6 +384,7 @@ impl Worker {
             let mut tasks = vec![];
             for transactions_pb in transactions_batches {
                 let processor_clone = processor.clone();
+                let db_executor_sender = db_executor_sender.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
                     let start_version = transactions_pb
@@ -423,6 +442,36 @@ impl Worker {
 
                     let processing_duration = std::time::Instant::now();
 
+                    let parsed_result = processor_clone.parse_transactions(
+                        transactions_pb.transactions.clone(),
+                        start_version,
+                        end_version,
+                        db_chain_id,
+                    );
+
+                    // TODO: Clean this up
+                    if let Ok(Some(res)) = parsed_result {
+                        match db_executor_sender.send(res.clone()).await {
+                            Ok(_) => {
+                                // TODO: Log this and add metrics
+                            },
+                            Err(e) => {
+                                error!(
+                                    processor_name = processor_name,
+                                    error = ?e,
+                                    "[Parser] Error sending parsed transactions to db executor"
+                                );
+                                panic!();
+                            },
+                        }
+                        return Ok(ProcessingResult {
+                            start_version: res.start_version,
+                            end_version: res.end_version,
+                            processing_duration_in_secs: 0.0,
+                            db_insertion_duration_in_secs: 0.0,
+                        });
+                    }
+
                     let processed_result = processor_clone
                         .process_transactions(
                             transactions_pb.transactions,
@@ -431,11 +480,6 @@ impl Worker {
                             db_chain_id,
                         ) // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
                         .await;
-                    if let Some(ref t) = txn_time {
-                        PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
-                            .with_label_values(&[auth_token.as_str(), processor_name])
-                            .set(time_diff_since_pb_timestamp_in_secs(t));
-                    }
 
                     let start_txn_timestamp_unix = start_txn_timestamp
                         .clone()
@@ -1180,5 +1224,52 @@ pub async fn create_fetcher_loop(
                 "[Parser] Successfully reconnected to GRPC stream"
             );
         }
+    }
+}
+
+/// DB executor task
+/// 1. Pulls from DB executor channel
+/// 2. Chunks and builds the query
+/// 3. Executes batch of DB queries in tasks
+/// 4. Push processed start and end version to gap detector channel
+pub async fn create_db_executor_task(
+    receiver: tokio::sync::mpsc::Receiver<ProcessingParseResult>,
+    _pool: PgDbPool,
+    _processor_name: String,
+) {
+    while let Some(result) = receiver.recv().await {}
+}
+
+/// Gap detector task
+/// 1. Pull from gap detector channel
+/// 2. Checks for any gaps
+pub async fn create_gap_detector_task(
+    _receiver: tokio::sync::mpsc::Receiver<ProcessingParseResult>,
+    _pool: PgDbPool,
+    _processor_name: String,
+) {
+    // TODO: Do something
+}
+
+/// Gets the connection.
+/// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
+async fn get_conn(connection_pool: &PgDbPool) -> PgPoolConnection {
+    loop {
+        match connection_pool.get().await {
+            Ok(conn) => {
+                GOT_CONNECTION_COUNT.inc();
+                return conn;
+            },
+            Err(err) => {
+                UNABLE_TO_GET_CONNECTION_COUNT.inc();
+                tracing::error!(
+                    // todo bb8 doesn't let you read the connection timeout.
+                    //"Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
+                    //pool.connection_timeout(),
+                    "Could not get DB connection from pool, will retry. Err: {:?}",
+                    err
+                );
+            },
+        };
     }
 }
