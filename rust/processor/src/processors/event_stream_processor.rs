@@ -6,11 +6,13 @@ use crate::{models::events_models::events::EventModel, utils::database::PgDbPool
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
+use futures_util::future::try_join_all;
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::publisher::Publisher;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use tracing::error;
+
+pub const CHUNK_SIZE: usize = 1000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct EventStreamSchema {
@@ -66,6 +68,7 @@ impl ProcessorTrait for EventStreamProcessor {
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let mut pubsub_messages = vec![];
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
@@ -79,25 +82,31 @@ impl ProcessorTrait for EventStreamProcessor {
             };
 
             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-            let pubsub_message = events_to_pubsub_message(db_chain_id.unwrap(), &txn_events, txn);
-            self.publisher
-                .publish(pubsub_message)
-                .await
-                .get()
-                .await
-                .unwrap_or_else(|e| {
-                    error!(
-                        start_version = start_version,
-                        end_version = end_version,
-                        processor_name = self.name(),
-                        error = ?e,
-                        "Error publishing to pubsub",
-                    );
-                    panic!();
-                });
+            pubsub_messages.push(events_to_pubsub_message(
+                db_chain_id.unwrap(),
+                &txn_events,
+                txn,
+            ));
+        }
+
+        let chunks: Vec<Vec<PubsubMessage>> = pubsub_messages
+            .chunks(CHUNK_SIZE)
+            .map(|chunk| chunk.to_vec())
+            .collect();
+
+        for chunk in chunks {
+            try_join_all(
+                self.publisher
+                    .publish_bulk(chunk)
+                    .await
+                    .into_iter()
+                    .map(|awaiter| awaiter.get()),
+            )
+            .await?;
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
+        println!("Processing duration: {:?}", processing_duration_in_secs);
         Ok(ProcessingResult {
             start_version,
             end_version,
