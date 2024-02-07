@@ -3,7 +3,7 @@
 
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::utils::util::remove_null_bytes;
+use crate::utils::{counters::UNABLE_TO_GET_CONNECTION_COUNT, util::remove_null_bytes};
 use diesel::{
     pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
@@ -21,6 +21,8 @@ use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
 use futures_util::{future::BoxFuture, FutureExt};
 use once_cell::sync::Lazy;
 use std::{cmp::min, sync::Arc};
+
+use super::counters::GOT_CONNECTION_COUNT;
 
 pub type MyDbConnection = AsyncPgConnection;
 pub type PgPool = Pool<MyDbConnection>;
@@ -146,6 +148,29 @@ pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<Asyn
 }
 */
 
+/// Gets the connection.
+/// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
+pub async fn get_conn(db_pool: &PgDbPool) -> PgPoolConnection {
+    loop {
+        match db_pool.get().await {
+            Ok(conn) => {
+                GOT_CONNECTION_COUNT.inc();
+                return conn;
+            },
+            Err(err) => {
+                UNABLE_TO_GET_CONNECTION_COUNT.inc();
+                tracing::error!(
+                    // todo bb8 doesn't let you read the connection timeout.
+                    //"Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
+                    //pool.connection_timeout(),
+                    "Could not get DB connection from pool, will retry. Err: {:?}",
+                    err
+                );
+            },
+        };
+    }
+}
+
 pub async fn execute_in_chunks<U, T>(
     conn: PgDbPool,
     build_query: fn(Vec<T>) -> (U, Option<&'static str>),
@@ -255,27 +280,32 @@ mod test {
     #[tokio::test]
     async fn test_get_chunks_logic() {
         assert_eq!(get_chunks(10, 5), vec![(0, 10)]);
-        assert_eq!(get_chunks(65535, 1), vec![
-            (0, 32767),
-            (32767, 65534),
-            (65534, 65535)
-        ]);
+        assert_eq!(
+            get_chunks(65535, 1),
+            vec![(0, 32767), (32767, 65534), (65534, 65535)]
+        );
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
-        assert_eq!(get_chunks(10000, 20), vec![
-            (0, 1638),
-            (1638, 3276),
-            (3276, 4914),
-            (4914, 6552),
-            (6552, 8190),
-            (8190, 9828),
-            (9828, 10000)
-        ]);
-        assert_eq!(get_chunks(65535, 2), vec![
-            (0, 16383),
-            (16383, 32766),
-            (32766, 49149),
-            (49149, 65532),
-            (65532, 65535)
-        ]);
+        assert_eq!(
+            get_chunks(10000, 20),
+            vec![
+                (0, 1638),
+                (1638, 3276),
+                (3276, 4914),
+                (4914, 6552),
+                (6552, 8190),
+                (8190, 9828),
+                (9828, 10000)
+            ]
+        );
+        assert_eq!(
+            get_chunks(65535, 2),
+            vec![
+                (0, 16383),
+                (16383, 32766),
+                (32766, 49149),
+                (49149, 65532),
+                (65532, 65535)
+            ]
+        );
     }
 }
