@@ -3,7 +3,10 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    models::{
+        ledger_info::LedgerInfo,
+        processor_status::{ProcessorStatus, ProcessorStatusQuery},
+    },
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
@@ -15,6 +18,7 @@ use crate::{
         ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
+    schema::processor_status,
     utils::{
         counters::{
             ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
@@ -25,13 +29,23 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
-        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{
+            execute_with_better_error, get_conn, new_db_pool, run_pending_migrations, PgDbPool,
+        },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::{
+    indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
+    transaction::v1::Transaction,
+};
+use diesel::{upsert::excluded, ExpressionMethods};
+use futures::StreamExt;
+use prost::Message;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 use tracing::{error, info};
@@ -44,6 +58,10 @@ const BUFFER_SIZE: usize = 50;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
+// Number of batches processed before gap detected
+const GAP_DETECTION_BATCH_COUNT: u64 = 50;
+// Number of batches to process before updating processor status
+const PROCESSOR_STATUS_UPDATE_BATCH_COUNT: u64 = 10;
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
@@ -205,6 +223,25 @@ impl Worker {
             .await
         });
 
+        // Create a gap detector task that will panic if there is a gap in the processing
+        let (gap_detector_sender, gap_detector_receiver) =
+            tokio::sync::mpsc::channel::<ProcessingResult>(BUFFER_SIZE);
+        let db_pool = self.db_pool.clone();
+        tokio::spawn(async move {
+            info!(
+                processor_name = processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                "[Parser] Starting gap detector thread"
+            );
+            create_gap_detector_task(
+                gap_detector_receiver,
+                db_pool,
+                processor_name.to_string(),
+                starting_version,
+            )
+            .await
+        });
+
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
         // 2. We're caught up so we should expect a single thread to process transactions
@@ -353,6 +390,7 @@ impl Worker {
             let mut tasks = vec![];
             for transactions_pb in transactions_batches {
                 let processor_clone = processor.clone();
+                let gap_detector_sender = gap_detector_sender.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
                     let start_version = transactions_pb
@@ -465,6 +503,12 @@ impl Worker {
                         .inc_by(end_version - start_version + 1);
 
                     if let Ok(res) = processed_result {
+                        gap_detector_sender
+                            .send(res.clone())
+                            .await
+                            .expect("[Parser] Gap detector thread has panicked");
+
+                        // Logging and metrics
                         SINGLE_BATCH_PROCESSING_TIME_IN_SECS
                             .with_label_values(&[processor_name])
                             .set(processing_duration.elapsed().as_secs_f64());
@@ -568,50 +612,10 @@ impl Worker {
 
             // Make sure there are no gaps and advance states
             processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
-            let mut prev_start = None;
-            let mut prev_end = None;
-            let mut max_processing_duration_in_secs: f64 = 0.0;
-            let mut max_db_insertion_duration_in_secs: f64 = 0.0;
             let processed_versions_sorted = processed_versions.clone();
-            for processing_result in processed_versions {
-                let start = processing_result.start_version;
-                let end = processing_result.end_version;
-                max_processing_duration_in_secs = max_processing_duration_in_secs
-                    .max(processing_result.processing_duration_in_secs);
-                max_db_insertion_duration_in_secs = max_db_insertion_duration_in_secs
-                    .max(processing_result.db_insertion_duration_in_secs);
-                if prev_start.is_none() {
-                    prev_start = Some(start);
-                    prev_end = Some(end);
-                } else {
-                    if prev_end.unwrap() + 1 != start {
-                        error!(
-                            processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
-                            processed_versions = processed_versions_sorted
-                                .iter()
-                                .map(|result| format!(
-                                    "{}-{}",
-                                    result.start_version, result.end_version
-                                ))
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                            "[Parser] Gaps in processing stream"
-                        );
-                        panic!();
-                    }
-                    prev_start = Some(start);
-                    prev_end = Some(end);
-                }
-            }
             let batch_start = processed_versions_sorted.first().unwrap().start_version;
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
-
-            processor
-                .update_last_processed_version(batch_end, batch_end_txn_timestamp.clone())
-                .await
-                .unwrap();
 
             ma.tick_now(batch_end - batch_start + 1);
             info!(
@@ -770,5 +774,104 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
         },
+    }
+}
+
+/// Gap detector task
+/// 1. Pull from gap detector channel
+/// 2. Checks for any gaps. We detect a gap when GAP_DETECTION_BATCH_COUNT batches are processed and there is no advancement of prev_end version
+pub async fn create_gap_detector_task(
+    mut receiver: tokio::sync::mpsc::Receiver<ProcessingResult>,
+    db_pool: PgDbPool,
+    processor_name: String,
+    starting_version: u64,
+) {
+    // Keep track of the start versions we've seen
+    let mut seen_versions = HashMap::new();
+    // Keep track of the latest end version without gaps
+    let mut maybe_prev_end = None;
+    // Counter of how many batches have been processed with no gaps
+    let mut num_batches_processed_without_gap = 0;
+    // Counter of how many batches have been processed with a gap from prev_end
+    let mut num_batches_processed_with_gap = 0;
+
+    loop {
+        match receiver.recv().await {
+            Some(result) => {
+                if let Some(prev_end) = maybe_prev_end {
+                    // If result isn't the first version processed, check for gaps
+                    if prev_end + 1 != result.start_version {
+                        seen_versions.insert(result.start_version, result);
+                        num_batches_processed_with_gap += 1;
+                    } else {
+                        let mut new_prev_end = result.end_version;
+                        num_batches_processed_without_gap += 1;
+                        while let Some(next_batch_processed) =
+                            seen_versions.remove(&(new_prev_end + 1))
+                        {
+                            new_prev_end = next_batch_processed.end_version;
+                            num_batches_processed_without_gap += 1;
+                        }
+                        maybe_prev_end = Some(new_prev_end);
+                        num_batches_processed_with_gap = 0;
+                    }
+                } else {
+                    // The first version processed should be equal to starting_version
+                    if result.start_version == starting_version {
+                        maybe_prev_end = Some(result.end_version);
+                        num_batches_processed_without_gap += 1;
+                        num_batches_processed_with_gap = 0;
+                    } else {
+                        seen_versions.insert(result.start_version, result);
+                        num_batches_processed_with_gap += 1;
+                    }
+                }
+            },
+            None => {
+                error!(
+                    processor_name = processor_name,
+                    "[Parser] Gap detector channel has been closed"
+                );
+                panic!("[Parser] Gap detector channel has been closed");
+            },
+        };
+
+        // If there's a gap detected, panic
+        if num_batches_processed_with_gap > GAP_DETECTION_BATCH_COUNT {
+            error!(
+                processor_name = processor_name,
+                gap_start_version = maybe_prev_end.unwrap() + 1,
+                "[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking."
+            );
+            panic!("[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking.");
+        }
+
+        // Check if need to update processor status
+        if num_batches_processed_without_gap == PROCESSOR_STATUS_UPDATE_BATCH_COUNT {
+            let status = ProcessorStatus {
+                processor: processor_name.clone(),
+                last_success_version: maybe_prev_end.unwrap() as i64,
+                last_transaction_timestamp: None,
+            };
+            let mut conn = get_conn(&db_pool).await;
+            execute_with_better_error(
+                &mut conn,
+                diesel::insert_into(processor_status::table)
+                    .values(&status)
+                    .on_conflict(processor_status::processor)
+                    .do_update()
+                    .set((
+                        processor_status::last_success_version
+                            .eq(excluded(processor_status::last_success_version)),
+                        processor_status::last_updated.eq(excluded(processor_status::last_updated)),
+                        processor_status::last_transaction_timestamp
+                            .eq(excluded(processor_status::last_transaction_timestamp)),
+                    )),
+                Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
+            )
+            .await
+            .expect("[Parser] Error updating processor status");
+            num_batches_processed_without_gap = 0;
+        }
     }
 }
