@@ -16,7 +16,7 @@ use crate::{
         },
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -64,7 +64,7 @@ impl Debug for TokenProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -90,58 +90,64 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(conn, insert_tokens_query, tokens, Token::field_count()).await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
+        insert_tokens_query,
+        tokens,
+        Token::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
         insert_token_ownerships_query,
         token_ownerships,
         TokenOwnership::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_token_datas_query,
         token_datas,
         TokenData::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_collection_datas_query,
         collection_datas,
         CollectionData::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_ownerships_query,
         current_token_ownerships,
         CurrentTokenOwnership::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_datas_query,
         current_token_datas,
         CurrentTokenData::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_collection_datas_query,
         current_collection_datas,
         CurrentCollectionData::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_token_activities_query,
         token_activities,
         TokenActivity::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_claims_query,
         current_token_claims,
         CurrentTokenPendingClaim::field_count(),
@@ -516,7 +522,7 @@ impl ProcessorTrait for TokenProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

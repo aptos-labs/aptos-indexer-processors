@@ -7,7 +7,7 @@ use crate::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
@@ -43,7 +43,7 @@ impl Debug for UserTransactionProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -58,14 +58,14 @@ async fn insert_to_db(
     );
 
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_user_transactions_query,
         user_transactions,
         UserTransactionModel::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_signatures_query,
         signatures,
         Signature::field_count(),
@@ -130,7 +130,6 @@ impl ProcessorTrait for UserTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
         let mut signatures = vec![];
         let mut user_transactions = vec![];
         for txn in transactions {
@@ -154,7 +153,7 @@ impl ProcessorTrait for UserTransactionProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

@@ -18,7 +18,7 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, PgDbPool},
         util::{parse_timestamp, standardize_address},
     },
 };
@@ -57,7 +57,7 @@ impl Debug for StakeProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -79,63 +79,63 @@ async fn insert_to_db(
     );
 
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_stake_pool_voter_query,
         current_stake_pool_voters,
         CurrentStakingPoolVoter::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_proposal_votes_query,
         proposal_votes,
         ProposalVote::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_delegator_activities_query,
         delegator_actvities,
         DelegatedStakingActivity::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_delegator_balances_query,
         delegator_balances,
         DelegatorBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_delegator_balances_query,
         current_delegator_balances,
         CurrentDelegatorBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_delegator_pools_query,
         delegator_pools,
         DelegatorPool::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_delegator_pool_balances_query,
         delegator_pool_balances,
         DelegatorPoolBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_delegator_pool_balances_query,
         current_delegator_pool_balances,
         CurrentDelegatorPoolBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_delegated_voter_query,
         current_delegated_voter,
         CurrentDelegatedVoter::field_count(),
@@ -506,7 +506,7 @@ impl ProcessorTrait for StakeProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

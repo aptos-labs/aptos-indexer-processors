@@ -5,7 +5,7 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::account_transaction_models::account_transactions::AccountTransaction,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -38,7 +38,7 @@ impl Debug for AccountTransactionsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -51,7 +51,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_account_transactions_query,
         account_transactions,
         AccountTransaction::field_count(),
@@ -91,7 +91,6 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
         let mut account_transactions = AHashMap::new();
 
         for txn in &transactions {
@@ -110,7 +109,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

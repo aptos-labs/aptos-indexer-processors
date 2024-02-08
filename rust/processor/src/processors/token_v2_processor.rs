@@ -68,7 +68,7 @@ impl Debug for TokenV2Processor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -89,56 +89,56 @@ async fn insert_to_db(
     );
 
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_collections_v2_query,
         collections_v2,
         CollectionV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_token_datas_v2_query,
         token_datas_v2,
         TokenDataV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_token_ownerships_v2_query,
         token_ownerships_v2,
         TokenOwnershipV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_collections_v2_query,
         current_collections_v2,
         CurrentCollectionV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_datas_v2_query,
         current_token_datas_v2,
         CurrentTokenDataV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
         CurrentTokenOwnershipV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_token_activities_v2_query,
         token_activities_v2,
         TokenActivityV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
         CurrentTokenV2Metadata::field_count(),
@@ -373,7 +373,7 @@ impl ProcessorTrait for TokenV2Processor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

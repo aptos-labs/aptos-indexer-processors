@@ -12,7 +12,7 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
 };
@@ -72,7 +72,7 @@ impl Debug for AnsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -92,56 +92,56 @@ async fn insert_to_db(
         "Inserting to db",
     );
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
         CurrentAnsLookup::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_ans_lookups_query,
         ans_lookups,
         AnsLookup::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
         CurrentAnsPrimaryName::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
         AnsPrimaryName::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
         CurrentAnsLookupV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
         AnsLookupV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
         CurrentAnsPrimaryNameV2::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,
         AnsPrimaryNameV2::field_count(),
@@ -332,7 +332,6 @@ impl ProcessorTrait for AnsProcessor {
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
 
         let (
             all_current_ans_lookups,
@@ -355,7 +354,7 @@ impl ProcessorTrait for AnsProcessor {
 
         // Insert values to db
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

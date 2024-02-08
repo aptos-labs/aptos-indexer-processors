@@ -15,7 +15,7 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
 };
@@ -54,7 +54,7 @@ impl Debug for ObjectsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -67,7 +67,13 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(conn, insert_objects_query, objects, Object::field_count()).await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_objects_query,
+        objects,
+        Object::field_count(),
+    )
+    .await?;
     execute_in_chunks(
         conn,
         insert_current_objects_query,
@@ -264,7 +270,7 @@ impl ProcessorTrait for ObjectsProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

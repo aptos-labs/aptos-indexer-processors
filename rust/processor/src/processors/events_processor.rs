@@ -5,7 +5,7 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::events_models::events::EventModel,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
@@ -41,7 +41,7 @@ impl Debug for EventsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -91,7 +91,6 @@ impl ProcessorTrait for EventsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
         let mut events = vec![];
         for txn in &transactions {
             let txn_version = txn.version as i64;
@@ -112,8 +111,14 @@ impl ProcessorTrait for EventsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result =
-            insert_to_db(&mut conn, self.name(), start_version, end_version, events).await;
+        let tx_result = insert_to_db(
+            self.get_pool(),
+            self.name(),
+            start_version,
+            end_version,
+            events,
+        )
+        .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
