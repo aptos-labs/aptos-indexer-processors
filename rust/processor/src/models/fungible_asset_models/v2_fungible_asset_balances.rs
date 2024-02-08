@@ -32,7 +32,7 @@ pub type CurrentFungibleAssetBalancePK = String;
 pub type CurrentFungibleAssetMapping =
     AHashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = fungible_asset_balances)]
 pub struct FungibleAssetBalance {
