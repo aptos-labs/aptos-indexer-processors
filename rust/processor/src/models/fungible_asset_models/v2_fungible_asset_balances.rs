@@ -18,6 +18,7 @@ use crate::{
     schema::{current_fungible_asset_balances, fungible_asset_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -25,12 +26,11 @@ use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use sha3::Sha3_256;
-use std::collections::HashMap;
 
 // Storage id
 pub type CurrentFungibleAssetBalancePK = String;
 pub type CurrentFungibleAssetMapping =
-    HashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
+    AHashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -165,7 +165,7 @@ impl FungibleAssetBalance {
                     last_transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };
-                let event_to_coin_mapping: EventToCoinType = HashMap::from([
+                let event_to_coin_mapping: EventToCoinType = AHashMap::from([
                     (
                         inner.withdraw_events.guid.id.get_standardized(),
                         coin_type.clone(),

@@ -17,20 +17,18 @@ use crate::{
         DerivedStringSnapshot,
     },
 };
+use ahash::AHashSet;
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    fmt::{self, Formatter},
-};
+use std::fmt::{self, Formatter};
 
 pub const TOKEN_V2_ADDR: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000004";
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
-pub type TokenV2Burned = HashSet<CurrentObjectPK>;
+pub type TokenV2Burned = AHashSet<CurrentObjectPK>;
 
 /// Tracks which token standard a token / collection is built upon
 #[derive(Serialize)]

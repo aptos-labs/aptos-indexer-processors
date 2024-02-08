@@ -12,6 +12,7 @@ use crate::{
     schema::{current_delegator_balances, delegator_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{
     write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
@@ -21,14 +22,13 @@ use diesel::{prelude::*, ExpressionMethods};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub type TableHandle = String;
 pub type Address = String;
-pub type ShareToStakingPoolMapping = HashMap<TableHandle, DelegatorPoolBalanceMetadata>;
-pub type ShareToPoolMapping = HashMap<TableHandle, PoolBalanceMetadata>;
+pub type ShareToStakingPoolMapping = AHashMap<TableHandle, DelegatorPoolBalanceMetadata>;
+pub type ShareToPoolMapping = AHashMap<TableHandle, PoolBalanceMetadata>;
 pub type CurrentDelegatorBalancePK = (Address, Address, String);
-pub type CurrentDelegatorBalanceMap = HashMap<CurrentDelegatorBalancePK, CurrentDelegatorBalance>;
+pub type CurrentDelegatorBalanceMap = AHashMap<CurrentDelegatorBalancePK, CurrentDelegatorBalance>;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(delegator_address, pool_address, pool_type))]
@@ -314,7 +314,7 @@ impl CurrentDelegatorBalance {
             write_resource,
             txn_version,
         )? {
-            Ok(Some(HashMap::from([(
+            Ok(Some(AHashMap::from([(
                 balance.active_share_table_handle.clone(),
                 balance,
             )])))
@@ -333,7 +333,7 @@ impl CurrentDelegatorBalance {
             write_resource,
             txn_version,
         )? {
-            Ok(Some(HashMap::from([(
+            Ok(Some(AHashMap::from([(
                 balance.inactive_share_table_handle.clone(),
                 balance,
             )])))
@@ -352,7 +352,7 @@ impl CurrentDelegatorBalance {
             write_table_item,
             txn_version,
         )? {
-            Ok(Some(HashMap::from([(
+            Ok(Some(AHashMap::from([(
                 balance.shares_table_handle.clone(),
                 balance,
             )])))
@@ -387,9 +387,9 @@ impl CurrentDelegatorBalance {
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<(Vec<DelegatorBalance>, CurrentDelegatorBalanceMap)> {
-        let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = HashMap::new();
-        let mut inactive_share_to_pool: ShareToPoolMapping = HashMap::new();
-        let mut current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
+        let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = AHashMap::new();
+        let mut inactive_share_to_pool: ShareToPoolMapping = AHashMap::new();
+        let mut current_delegator_balances: CurrentDelegatorBalanceMap = AHashMap::new();
         let mut delegator_balances = vec![];
         let txn_version = transaction.version as i64;
 

@@ -12,17 +12,17 @@ use crate::{
     },
     utils::util::standardize_address,
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 type StakingPoolAddress = String;
-pub type DelegatorPoolMap = HashMap<StakingPoolAddress, DelegatorPool>;
-pub type DelegatorPoolBalanceMap = HashMap<StakingPoolAddress, CurrentDelegatorPoolBalance>;
+pub type DelegatorPoolMap = AHashMap<StakingPoolAddress, DelegatorPool>;
+pub type DelegatorPoolBalanceMap = AHashMap<StakingPoolAddress, CurrentDelegatorPoolBalance>;
 
 // All pools
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
@@ -93,9 +93,9 @@ impl DelegatorPool {
         Vec<DelegatorPoolBalance>,
         DelegatorPoolBalanceMap,
     )> {
-        let mut delegator_pool_map = HashMap::new();
+        let mut delegator_pool_map = AHashMap::new();
         let mut delegator_pool_balances = vec![];
-        let mut delegator_pool_balances_map = HashMap::new();
+        let mut delegator_pool_balances_map = AHashMap::new();
         let txn_data = transaction
             .txn_data
             .as_ref()
