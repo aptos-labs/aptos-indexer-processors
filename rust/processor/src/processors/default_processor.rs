@@ -14,6 +14,7 @@ use crate::{
     schema,
     utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
@@ -23,7 +24,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub struct DefaultProcessor {
@@ -303,8 +304,8 @@ impl ProcessorTrait for DefaultProcessor {
         let mut move_modules = vec![];
         let mut move_resources = vec![];
         let mut table_items = vec![];
-        let mut current_table_items = HashMap::new();
-        let mut table_metadata = HashMap::new();
+        let mut current_table_items = AHashMap::new();
+        let mut table_metadata = AHashMap::new();
         for detail in wsc_details {
             match detail {
                 WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),

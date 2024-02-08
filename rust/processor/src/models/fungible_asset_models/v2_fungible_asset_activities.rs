@@ -21,12 +21,12 @@ use crate::{
     schema::fungible_asset_activities,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
@@ -37,7 +37,7 @@ pub type OwnerAddress = String;
 pub type CoinType = String;
 // Primary key of the current_coin_balances table, i.e. (owner_address, coin_type)
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
-pub type EventToCoinType = HashMap<EventGuidResource, CoinType>;
+pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(transaction_version, event_index))]

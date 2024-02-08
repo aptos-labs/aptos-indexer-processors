@@ -13,6 +13,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
@@ -34,6 +35,7 @@ gcloud-sdk = { workspace = true }
 google-cloud-googleapis = { workspace = true }
 google-cloud-pubsub = { workspace = true }
 hex = { workspace = true }
+num_cpus = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }

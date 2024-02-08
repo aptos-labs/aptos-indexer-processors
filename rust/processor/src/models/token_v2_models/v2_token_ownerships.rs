@@ -26,6 +26,7 @@ use crate::{
         util::{ensure_not_negative, standardize_address},
     },
 };
+use ahash::AHashMap;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{
     DeleteResource, DeleteTableItem, WriteResource, WriteTableItem,
@@ -35,7 +36,6 @@ use diesel::{prelude::*, ExpressionMethods};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
 pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
@@ -116,14 +116,14 @@ impl TokenOwnershipV2 {
         token_v2_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<(
         Vec<Self>,
-        HashMap<CurrentTokenOwnershipV2PK, CurrentTokenOwnershipV2>,
+        AHashMap<CurrentTokenOwnershipV2PK, CurrentTokenOwnershipV2>,
     )> {
         // We should be indexing v1 token or v2 fungible token here
         if token_data.is_fungible_v2 != Some(false) {
-            return Ok((vec![], HashMap::new()));
+            return Ok((vec![], AHashMap::new()));
         }
         let mut ownerships = vec![];
-        let mut current_ownerships = HashMap::new();
+        let mut current_ownerships = AHashMap::new();
 
         let metadata = token_v2_metadata
             .get(&token_data.token_data_id)
@@ -292,7 +292,7 @@ impl TokenOwnershipV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        prior_nft_ownership: &HashMap<String, NFTOwnershipV2>,
+        prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {

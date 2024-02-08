@@ -23,6 +23,7 @@ use crate::{
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
@@ -33,7 +34,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -282,11 +283,11 @@ async fn parse_v2_coin(
 ) {
     let mut fungible_asset_activities = vec![];
     let mut fungible_asset_balances = vec![];
-    let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = HashMap::new();
-    let mut fungible_asset_metadata: FungibleAssetMetadataMapping = HashMap::new();
+    let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = AHashMap::new();
+    let mut fungible_asset_metadata: FungibleAssetMetadataMapping = AHashMap::new();
 
     // Get Metadata for fungible assets by object
-    let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = HashMap::new();
+    let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = AHashMap::new();
 
     for txn in transactions {
         let txn_version = txn.version as i64;
@@ -318,7 +319,7 @@ async fn parse_v2_coin(
 
         // This is because v1 events (deposit/withdraw) don't have coin type so the only way is to match
         // the event to the resource using the event guid
-        let mut event_to_v1_coin_type: EventToCoinType = HashMap::new();
+        let mut event_to_v1_coin_type: EventToCoinType = AHashMap::new();
 
         // First loop to get all objects
         // Need to do a first pass to get all the objects

@@ -16,18 +16,18 @@ use crate::{
     schema::fungible_asset_metadata,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use anyhow::Context;
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::{prelude::*, sql_query, sql_types::Text};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // This is the asset type
 pub type FungibleAssetMetadataPK = String;
 pub type FungibleAssetMetadataMapping =
-    HashMap<FungibleAssetMetadataPK, FungibleAssetMetadataModel>;
+    AHashMap<FungibleAssetMetadataPK, FungibleAssetMetadataModel>;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(asset_type))]

@@ -26,6 +26,7 @@ use crate::{
     schema::coin_activities,
     utils::util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, Event as EventPB,
     Transaction as TransactionPB, TransactionInfo, UserTransactionRequest,
@@ -34,7 +35,6 @@ use bigdecimal::{BigDecimal, Zero};
 use chrono::NaiveDateTime;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
 #[diesel(primary_key(
@@ -75,18 +75,18 @@ impl CoinActivity {
     ) -> (
         Vec<Self>,
         Vec<CoinBalance>,
-        HashMap<CoinType, CoinInfo>,
-        HashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
+        AHashMap<CoinType, CoinInfo>,
+        AHashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
         Vec<CoinSupply>,
     ) {
         // All the items we want to track
         let mut coin_activities = Vec::new();
         let mut coin_balances = Vec::new();
-        let mut coin_infos: HashMap<CoinType, CoinInfo> = HashMap::new();
-        let mut current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
-            HashMap::new();
+        let mut coin_infos: AHashMap<CoinType, CoinInfo> = AHashMap::new();
+        let mut current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
+            AHashMap::new();
         // This will help us get the coin type when we see coin deposit/withdraw events for coin activities
-        let mut all_event_to_coin_type: EventToCoinType = HashMap::new();
+        let mut all_event_to_coin_type: EventToCoinType = AHashMap::new();
         let mut all_coin_supply = Vec::new();
 
         // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
