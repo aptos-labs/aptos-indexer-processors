@@ -14,8 +14,8 @@ use crate::{
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        user_transaction_processor::UserTransactionProcessor, ProcessedVersions, ProcessingResult,
+        Processor, ProcessorConfig, ProcessorTrait,
     },
     schema::{ledger_infos, processor_status},
     utils::{
@@ -31,7 +31,10 @@ use crate::{
         database::{
             execute_with_better_error, get_conn, new_db_pool, run_pending_migrations, PgDbPool,
         },
-        util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
+        util::{
+            parse_timestamp, time_diff_since_pb_timestamp_in_secs, timestamp_to_iso,
+            timestamp_to_unixtime,
+        },
     },
 };
 use anyhow::{Context, Result};
@@ -224,7 +227,7 @@ impl Worker {
 
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
-            tokio::sync::mpsc::channel::<ProcessingResult>(BUFFER_SIZE);
+            tokio::sync::mpsc::channel::<ProcessedVersions>(BUFFER_SIZE);
         let db_pool = self.db_pool.clone();
         tokio::spawn(async move {
             info!(
@@ -469,6 +472,7 @@ impl Worker {
                         .map(|t| timestamp_to_iso(&t))
                         .unwrap_or_default();
                     let end_txn_timestamp_iso = end_txn_timestamp
+                        .clone()
                         .map(|t| timestamp_to_iso(&t))
                         .unwrap_or_default();
 
@@ -502,8 +506,13 @@ impl Worker {
                         .inc_by(end_version - start_version + 1);
 
                     if let Ok(res) = processed_result {
+                        let processed_version = ProcessedVersions {
+                            start_version: res.start_version,
+                            end_version: res.end_version,
+                            last_transaction_timstamp: end_txn_timestamp,
+                        };
                         gap_detector_sender
-                            .send(res)
+                            .send(processed_version)
                             .await
                             .expect("[Parser] Gap detector thread has panicked");
 
@@ -780,15 +789,15 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
 /// 1. Pull from gap detector channel
 /// 2. Checks for any gaps. We detect a gap when GAP_DETECTION_BATCH_COUNT batches are processed and there is no advancement of prev_end version
 pub async fn create_gap_detector_task(
-    mut receiver: tokio::sync::mpsc::Receiver<ProcessingResult>,
+    mut receiver: tokio::sync::mpsc::Receiver<ProcessedVersions>,
     db_pool: PgDbPool,
     processor_name: String,
     starting_version: u64,
 ) {
     // Keep track of the start versions we've seen
     let mut seen_versions = HashMap::new();
-    // Keep track of the latest end version without gaps
-    let mut maybe_prev_end = None;
+    // Keep track of the latest batch processed without gaps
+    let mut maybe_prev_batch: Option<ProcessedVersions> = None;
     // Counter of how many batches have been processed with no gaps
     let mut num_batches_processed_without_gap = 0;
     // Counter of how many batches have been processed with a gap from prev_end
@@ -797,32 +806,52 @@ pub async fn create_gap_detector_task(
     loop {
         match receiver.recv().await {
             Some(result) => {
-                if let Some(prev_end) = maybe_prev_end {
+                if let Some(prev_batch) = maybe_prev_batch.clone() {
                     // If result isn't the first version processed, check for gaps
-                    if prev_end + 1 != result.start_version {
+                    if prev_batch.end_version + 1 != result.start_version {
                         seen_versions.insert(result.start_version, result);
                         num_batches_processed_with_gap += 1;
+                        info!(
+                            processor_name = processor_name,
+                            gap_start_version = prev_batch.end_version + 1,
+                            num_batches_processed_with_gap,
+                            "[Parser] Detected a gap"
+                        );
                     } else {
-                        let mut new_prev_end = result.end_version;
+                        let mut new_prev_batch = result;
                         num_batches_processed_without_gap += 1;
                         while let Some(next_batch_processed) =
-                            seen_versions.remove(&(new_prev_end + 1))
+                            seen_versions.remove(&(new_prev_batch.end_version + 1))
                         {
-                            new_prev_end = next_batch_processed.end_version;
+                            new_prev_batch = next_batch_processed;
                             num_batches_processed_without_gap += 1;
                         }
-                        maybe_prev_end = Some(new_prev_end);
+                        maybe_prev_batch = Some(new_prev_batch);
                         num_batches_processed_with_gap = 0;
+                        info!(
+                            processor_name = processor_name,
+                            num_batches_processed_without_gap, "[Parser] No gaps detected"
+                        );
                     }
                 } else {
                     // The first version processed should be equal to starting_version
                     if result.start_version == starting_version {
-                        maybe_prev_end = Some(result.end_version);
+                        maybe_prev_batch = Some(result);
                         num_batches_processed_without_gap += 1;
                         num_batches_processed_with_gap = 0;
+                        info!(
+                            processor_name = processor_name,
+                            num_batches_processed_without_gap, "[Parser] No gaps detected"
+                        )
                     } else {
                         seen_versions.insert(result.start_version, result);
                         num_batches_processed_with_gap += 1;
+                        info!(
+                            processor_name = processor_name,
+                            gap_start_version = starting_version,
+                            num_batches_processed_with_gap,
+                            "[Parser] Detected a gap"
+                        );
                     }
                 }
             },
@@ -837,9 +866,14 @@ pub async fn create_gap_detector_task(
 
         // If there's a gap detected, panic
         if num_batches_processed_with_gap >= GAP_DETECTION_BATCH_COUNT {
+            let gap_start_version = if let Some(prev_batch) = maybe_prev_batch {
+                prev_batch.end_version + 1
+            } else {
+                starting_version
+            };
             error!(
                 processor_name = processor_name,
-                gap_start_version = maybe_prev_end.unwrap() + 1,
+                gap_start_version,
                 "[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking."
             );
             panic!("[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking.");
@@ -847,10 +881,19 @@ pub async fn create_gap_detector_task(
 
         // Check if need to update processor status
         if num_batches_processed_without_gap >= PROCESSOR_STATUS_UPDATE_BATCH_COUNT {
+            let last_success_batch = maybe_prev_batch.clone().unwrap();
+            info!(
+                processor_name = processor_name,
+                last_success_batch = last_success_batch.end_version,
+                "[Parser] Updating processor status"
+            );
+            let timestamp = last_success_batch
+                .last_transaction_timstamp
+                .map(|t| parse_timestamp(&t, last_success_batch.end_version as i64));
             let status = ProcessorStatus {
                 processor: processor_name.clone(),
-                last_success_version: maybe_prev_end.unwrap() as i64,
-                last_transaction_timestamp: None,
+                last_success_version: last_success_batch.end_version as i64,
+                last_transaction_timestamp: timestamp,
             };
             let mut conn = get_conn(&db_pool).await;
             execute_with_better_error(
@@ -890,11 +933,10 @@ mod test {
         let gap_detector_task =
             create_gap_detector_task(rx, db_pool, processor_name, starting_version);
         for i in 0..GAP_DETECTION_BATCH_COUNT {
-            let result = ProcessingResult {
+            let result = ProcessedVersions {
                 start_version: i * 100,
                 end_version: i * 100 + 99,
-                processing_duration_in_secs: 0.0,
-                db_insertion_duration_in_secs: 0.0,
+                last_transaction_timstamp: None,
             };
             tx.send(result).await.unwrap();
         }
@@ -913,11 +955,10 @@ mod test {
         let gap_detector_task =
             create_gap_detector_task(rx, db_pool, processor_name, starting_version);
         for i in 0..GAP_DETECTION_BATCH_COUNT {
-            let result = ProcessingResult {
+            let result = ProcessedVersions {
                 start_version: 100 + i * 100,
                 end_version: 100 + i * 100 + 99,
-                processing_duration_in_secs: 0.0,
-                db_insertion_duration_in_secs: 0.0,
+                last_transaction_timstamp: None,
             };
             tx.send(result).await.unwrap();
         }
