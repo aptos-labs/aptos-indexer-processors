@@ -12,7 +12,7 @@ use crate::{
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -49,7 +49,7 @@ impl Debug for DefaultProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -72,56 +72,56 @@ async fn insert_to_db(
     );
 
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_transactions_query,
         txns,
         TransactionModel::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
         BlockMetadataTransactionModel::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_write_set_changes_query,
         wscs,
         WriteSetChangeModel::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_move_modules_query,
         move_modules,
         MoveModule::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_move_resources_query,
         move_resources,
         MoveResource::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_table_items_query,
         table_items,
         TableItem::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_table_items_query,
         current_table_items,
         CurrentTableItem::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_table_metadata_query,
         table_metadata,
         TableMetadata::field_count(),
@@ -293,7 +293,6 @@ impl ProcessorTrait for DefaultProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
         let (txns, block_metadata_txns, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
@@ -340,7 +339,7 @@ impl ProcessorTrait for DefaultProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

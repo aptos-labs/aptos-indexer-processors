@@ -720,7 +720,7 @@ impl Worker {
                     "[Parser] Adding chain id to db, continue to index..."
                 );
                 execute_with_better_error(
-                    &mut conn,
+                    self.db_pool.clone(),
                     diesel::insert_into(ledger_infos::table)
                         .values(LedgerInfo {
                             chain_id: grpc_chain_id,

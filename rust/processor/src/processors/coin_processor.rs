@@ -13,7 +13,7 @@ use crate::{
         fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, PgPoolConnection},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -51,7 +51,7 @@ impl Debug for CoinProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -69,35 +69,35 @@ async fn insert_to_db(
     );
 
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_coin_activities_query,
         coin_activities,
         CoinActivity::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_coin_infos_query,
         coin_infos,
         CoinInfo::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_coin_balances_query,
         coin_balances,
         CoinBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_coin_balances_query,
         current_coin_balances,
         CurrentCoinBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         inset_coin_supply_query,
         coin_supply,
         CoinSupply::field_count(),
@@ -232,7 +232,6 @@ impl ProcessorTrait for CoinProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
@@ -273,7 +272,7 @@ impl ProcessorTrait for CoinProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

@@ -60,7 +60,7 @@ impl Debug for FungibleAssetProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -77,28 +77,28 @@ async fn insert_to_db(
     );
 
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_fungible_asset_activities_query,
         fungible_asset_activities,
         FungibleAssetActivity::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_fungible_asset_metadata_query,
         fungible_asset_metadata,
         FungibleAssetMetadataModel::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_fungible_asset_balances_query,
         fungible_asset_balances,
         FungibleAssetBalance::field_count(),
     )
     .await?;
     execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_fungible_asset_balances_query,
         current_fungible_asset_balances,
         CurrentFungibleAssetBalance::field_count(),
@@ -235,7 +235,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

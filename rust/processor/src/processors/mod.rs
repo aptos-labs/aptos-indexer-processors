@@ -83,6 +83,12 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 
     //* Below are helper methods that don't need to be implemented *//
 
+    /// Gets an instance of the connection pool
+    fn get_pool(&self) -> PgDbPool {
+        let pool = self.connection_pool();
+        pool.clone()
+    }
+
     /// Gets the connection.
     /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
     async fn get_conn(&self) -> PgPoolConnection {
@@ -114,7 +120,6 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         version: u64,
         last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     ) -> anyhow::Result<()> {
-        let mut conn = self.get_conn().await;
         let timestamp = last_transaction_timestamp.map(|t| parse_timestamp(&t, version as i64));
         let status = ProcessorStatus {
             processor: self.name().to_string(),
@@ -122,7 +127,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
             last_transaction_timestamp: timestamp,
         };
         execute_with_better_error(
-            &mut conn,
+            self.get_pool(),
             diesel::insert_into(processor_status::table)
                 .values(&status)
                 .on_conflict(processor_status::processor)

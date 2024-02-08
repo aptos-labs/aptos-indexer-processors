@@ -83,7 +83,7 @@ pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<Asyn
 */
 
 pub async fn execute_in_chunks<U, T>(
-    conn: &mut MyDbConnection,
+    conn: PgDbPool,
     build_query: fn(Vec<T>) -> (U, Option<&'static str>),
     items_to_insert: Vec<T>,
     chunk_size: usize,
@@ -98,12 +98,17 @@ where
         let items = &items_to_insert[start_ind..end_ind];
 
         let (query, additional_where_clause) = build_query(items.to_vec());
-        match execute_with_better_error(conn, query, additional_where_clause).await {
+        match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
             Ok(_) => {},
             Err(_) => {
                 let cleaned_items = clean_data_for_db(items.to_vec(), true);
                 let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
-                match execute_with_better_error(conn, cleaned_query, additional_where_clause).await
+                match execute_with_better_error(
+                    conn.clone(),
+                    cleaned_query,
+                    additional_where_clause,
+                )
+                .await
                 {
                     Ok(_) => {},
                     Err(e) => {
@@ -117,7 +122,7 @@ where
 }
 
 pub async fn execute_with_better_error<U>(
-    conn: &mut MyDbConnection,
+    pool: PgDbPool,
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
@@ -136,6 +141,15 @@ where
     };
     let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
     tracing::debug!("Executing query: {:?}", debug_string);
+
+    let conn = &mut pool.get().await.map_err(|e| {
+        tracing::warn!("Error getting connection from pool: {:?}", e);
+        diesel::result::Error::DatabaseError(
+            diesel::result::DatabaseErrorKind::UnableToSendCommand,
+            Box::new(e.to_string()),
+        )
+    })?;
+
     let res = final_query.execute(conn).await;
     if let Err(ref e) = res {
         tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
