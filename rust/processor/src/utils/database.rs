@@ -116,6 +116,38 @@ where
     Ok(())
 }
 
+// pub async fn execute_in_chunks2<U>(
+//     conn: &mut MyDbConnection,
+//     query: U,
+//     additional_where_clause: Option<&'static str>,
+//     chunk_size: usize,
+// ) -> Result<(), diesel::result::Error>
+// where
+//     U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+// {
+//     let chunks = get_chunks(items_to_insert.len(), chunk_size);
+
+//     for (start_ind, end_ind) in chunks {
+//         let items = &items_to_insert[start_ind..end_ind];
+
+//         match execute_with_better_error(conn, query, additional_where_clause).await {
+//             Ok(_) => {},
+//             Err(_) => {
+//                 let cleaned_items = clean_data_for_db(items.to_vec(), true);
+//                 let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
+//                 match execute_with_better_error(conn, cleaned_query, additional_where_clause).await
+//                 {
+//                     Ok(_) => {},
+//                     Err(e) => {
+//                         return Err(e);
+//                     },
+//                 }
+//             },
+//         }
+//     }
+//     Ok(())
+// }
+
 pub async fn execute_with_better_error<U>(
     conn: &mut MyDbConnection,
     query: U,
@@ -170,6 +202,17 @@ where
     }
 }
 
+pub trait ProcessorPgQueryInsertable: Send {
+    fn build_query(
+        items_to_insert: Vec<Self>,
+    ) -> (
+        impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+        Option<&'static str>,
+    )
+    where
+        Self: Sized;
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -177,27 +220,32 @@ mod test {
     #[tokio::test]
     async fn test_get_chunks_logic() {
         assert_eq!(get_chunks(10, 5), vec![(0, 10)]);
-        assert_eq!(get_chunks(65535, 1), vec![
-            (0, 32767),
-            (32767, 65534),
-            (65534, 65535)
-        ]);
+        assert_eq!(
+            get_chunks(65535, 1),
+            vec![(0, 32767), (32767, 65534), (65534, 65535)]
+        );
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
-        assert_eq!(get_chunks(10000, 20), vec![
-            (0, 1638),
-            (1638, 3276),
-            (3276, 4914),
-            (4914, 6552),
-            (6552, 8190),
-            (8190, 9828),
-            (9828, 10000)
-        ]);
-        assert_eq!(get_chunks(65535, 2), vec![
-            (0, 16383),
-            (16383, 32766),
-            (32766, 49149),
-            (49149, 65532),
-            (65532, 65535)
-        ]);
+        assert_eq!(
+            get_chunks(10000, 20),
+            vec![
+                (0, 1638),
+                (1638, 3276),
+                (3276, 4914),
+                (4914, 6552),
+                (6552, 8190),
+                (8190, 9828),
+                (9828, 10000)
+            ]
+        );
+        assert_eq!(
+            get_chunks(65535, 2),
+            vec![
+                (0, 16383),
+                (16383, 32766),
+                (32766, 49149),
+                (49149, 65532),
+                (65532, 65535)
+            ]
+        );
     }
 }

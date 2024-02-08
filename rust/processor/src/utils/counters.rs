@@ -47,16 +47,6 @@ pub static PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|
     .unwrap()
 });
 
-/// Data latency when processor finishes processing transactions.
-pub static PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
-        "indexer_processor_data_processed_latency_in_secs",
-        "Data latency when processor finishes processing transactions",
-        &["request_token", "processor_name"]
-    )
-    .unwrap()
-});
-
 /// Number of times a given processor has been invoked
 pub static PROCESSOR_INVOCATIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -217,9 +207,11 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
 
 /// Data gap warnings
 pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("indexer_processor_data_gap_count", "Data gap count", &[
-        "type"
-    ])
+    register_int_counter_vec!(
+        "indexer_processor_data_gap_count",
+        "Data gap count",
+        &["type"]
+    )
     .unwrap()
 });
 
