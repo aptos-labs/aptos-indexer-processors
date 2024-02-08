@@ -21,6 +21,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
+    pub db_pool_size: Option<u32>,
     pub enable_verbose_logging: Option<bool>,
 }
 
@@ -36,6 +37,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
+            self.db_pool_size,
             self.enable_verbose_logging,
         )
         .await

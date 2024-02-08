@@ -7,17 +7,18 @@ use crate::utils::util::remove_null_bytes;
 use diesel::{
     pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
-    QueryResult,
+    ConnectionResult, QueryResult,
 };
 use diesel_async::{
     pg::AsyncPgConnection,
     pooled_connection::{
         bb8::{Pool, PooledConnection},
-        AsyncDieselConnectionManager, PoolError,
+        AsyncDieselConnectionManager, ManagerConfig, PoolError,
     },
     RunQueryDsl,
 };
 use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
+use futures_util::{future::BoxFuture, FutureExt};
 use once_cell::sync::Lazy;
 use std::{cmp::min, sync::Arc};
 
@@ -27,6 +28,8 @@ pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
 pub static MIGRATIONS: Lazy<EmbeddedMigrations> = Lazy::new(|| embed_migrations!());
+
+pub const DEFAULT_MAX_POOL_SIZE: u32 = 30;
 
 #[derive(QueryId)]
 /// Using this will append a where clause at the end of the string upsert function, e.g.
@@ -70,9 +73,70 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
     }
 }
 
-pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
-    let config = AsyncDieselConnectionManager::<MyDbConnection>::new(database_url);
-    Ok(Arc::new(Pool::builder().build(config).await?))
+fn establish_connection(database_url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+    use native_tls::{Certificate, TlsConnector};
+    use postgres_native_tls::MakeTlsConnector;
+
+    (async move {
+        let (url, cert_path) = parse_and_clean_db_url(database_url);
+        let cert = std::fs::read(cert_path.unwrap()).expect("Could not read certificate");
+
+        let cert = Certificate::from_pem(&cert).expect("Could not parse certificate");
+        let connector = TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .add_root_certificate(cert)
+            .build()
+            .expect("Could not build TLS connector");
+        let connector = MakeTlsConnector::new(connector);
+
+        let (client, connection) = tokio_postgres::connect(&url, connector)
+            .await
+            .expect("Could not connect to database");
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+        AsyncPgConnection::try_from(client).await
+    })
+    .boxed()
+}
+
+fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
+    let mut db_url = url::Url::parse(url).expect("Could not parse database url");
+    let mut cert_path = None;
+
+    let mut query = "".to_string();
+    db_url.query_pairs().for_each(|(k, v)| {
+        if k == "sslrootcert" {
+            cert_path = Some(v.parse().unwrap());
+        } else {
+            query.push_str(&format!("{}={}&", k, v));
+        }
+    });
+    db_url.set_query(Some(&query));
+
+    (db_url.to_string(), cert_path)
+}
+
+pub async fn new_db_pool(
+    database_url: &str,
+    max_pool_size: Option<u32>,
+) -> Result<PgDbPool, PoolError> {
+    let (_url, cert_path) = parse_and_clean_db_url(database_url);
+
+    let config = if cert_path.is_some() {
+        let mut config = ManagerConfig::<AsyncPgConnection>::default();
+        config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
+        AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config)
+    } else {
+        AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
+    };
+    let pool = Pool::builder()
+        .max_size(max_pool_size.unwrap_or(DEFAULT_MAX_POOL_SIZE))
+        .build(config)
+        .await?;
+    Ok(Arc::new(pool))
 }
 
 /*
