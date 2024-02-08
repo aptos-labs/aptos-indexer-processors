@@ -52,3 +52,8 @@ tonic = { workspace = true }
 tracing = { workspace = true }
 unescape = { workspace = true }
 url = { workspace = true }
+
+# Postgres SSL support
+native-tls = { workspace = true }
+postgres-native-tls = { workspace = true }
+tokio-postgres = { workspace = true }

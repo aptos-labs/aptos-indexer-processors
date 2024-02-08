@@ -75,6 +75,7 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
+        db_pool_size: Option<u32>,
         enable_verbose_logging: Option<bool>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
@@ -85,7 +86,7 @@ impl Worker {
             service_type = PROCESSOR_SERVICE_TYPE,
             "[Parser] Creating connection pool"
         );
-        let conn_pool = new_db_pool(&postgres_connection_string)
+        let conn_pool = new_db_pool(&postgres_connection_string, db_pool_size)
             .await
             .context("Failed to create connection pool")?;
         info!(
