@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 type StakingPoolAddress = String;
 pub type StakingPoolVoterMap = AHashMap<StakingPoolAddress, CurrentStakingPoolVoter>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = current_staking_pool_voter)]
 pub struct CurrentStakingPoolVoter {

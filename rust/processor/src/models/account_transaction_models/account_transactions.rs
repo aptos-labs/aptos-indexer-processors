@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 pub type AccountTransactionPK = (String, i64);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(account_address, transaction_version))]
 #[diesel(table_name = account_transactions)]
 pub struct AccountTransaction {
