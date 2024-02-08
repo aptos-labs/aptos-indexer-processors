@@ -175,7 +175,8 @@ impl CollectionData {
             match CurrentCollectionDataQuery::get_by_table_handle(conn, table_handle).await {
                 Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

@@ -373,7 +373,8 @@ impl CurrentDelegatorBalance {
             {
                 Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

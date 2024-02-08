@@ -163,7 +163,8 @@ impl FungibleAssetMetadataModel {
             match Self::get_by_asset_type(conn, address).await {
                 Ok(_) => return true,
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }
