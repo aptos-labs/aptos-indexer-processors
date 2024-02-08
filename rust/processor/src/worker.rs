@@ -17,8 +17,7 @@ use crate::{
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
     },
-    schema::ledger_infos,
-    schema::processor_status,
+    schema::{ledger_infos, processor_status},
     utils::{
         counters::{
             ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
@@ -504,7 +503,7 @@ impl Worker {
 
                     if let Ok(res) = processed_result {
                         gap_detector_sender
-                            .send(res.clone())
+                            .send(res)
                             .await
                             .expect("[Parser] Gap detector thread has panicked");
 
@@ -837,7 +836,7 @@ pub async fn create_gap_detector_task(
         };
 
         // If there's a gap detected, panic
-        if num_batches_processed_with_gap > GAP_DETECTION_BATCH_COUNT {
+        if num_batches_processed_with_gap >= GAP_DETECTION_BATCH_COUNT {
             error!(
                 processor_name = processor_name,
                 gap_start_version = maybe_prev_end.unwrap() + 1,
@@ -847,7 +846,7 @@ pub async fn create_gap_detector_task(
         }
 
         // Check if need to update processor status
-        if num_batches_processed_without_gap == PROCESSOR_STATUS_UPDATE_BATCH_COUNT {
+        if num_batches_processed_without_gap >= PROCESSOR_STATUS_UPDATE_BATCH_COUNT {
             let status = ProcessorStatus {
                 processor: processor_name.clone(),
                 last_success_version: maybe_prev_end.unwrap() as i64,
@@ -873,5 +872,55 @@ pub async fn create_gap_detector_task(
             .expect("[Parser] Error updating processor status");
             num_batches_processed_without_gap = 0;
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_create_gap_detector_no_gap() {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let db_pool = new_db_pool("postgres://test")
+            .await
+            .expect("Failed to create connection pool");
+        let processor_name = "test_processor".to_string();
+        let starting_version = 0;
+        let gap_detector_task =
+            create_gap_detector_task(rx, db_pool, processor_name, starting_version);
+        for i in 0..GAP_DETECTION_BATCH_COUNT {
+            let result = ProcessingResult {
+                start_version: i * 100,
+                end_version: i * 100 + 99,
+                processing_duration_in_secs: 0.0,
+                db_insertion_duration_in_secs: 0.0,
+            };
+            tx.send(result).await.unwrap();
+        }
+        gap_detector_task.await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "batches with a gap. Panicking.")]
+    async fn test_create_gap_detector_with_gap() {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let db_pool = new_db_pool("postgres://test")
+            .await
+            .expect("Failed to create connection pool");
+        let processor_name = "test_processor".to_string();
+        let starting_version = 0;
+        let gap_detector_task =
+            create_gap_detector_task(rx, db_pool, processor_name, starting_version);
+        for i in 0..GAP_DETECTION_BATCH_COUNT {
+            let result = ProcessingResult {
+                start_version: 100 + i * 100,
+                end_version: 100 + i * 100 + 99,
+                processing_duration_in_secs: 0.0,
+                db_insertion_duration_in_secs: 0.0,
+            };
+            tx.send(result).await.unwrap();
+        }
+        gap_detector_task.await;
     }
 }
