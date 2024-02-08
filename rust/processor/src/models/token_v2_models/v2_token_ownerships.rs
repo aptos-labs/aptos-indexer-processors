@@ -618,7 +618,8 @@ impl CurrentTokenOwnershipV2Query {
                     })
                 },
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

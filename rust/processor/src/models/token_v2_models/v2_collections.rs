@@ -304,7 +304,8 @@ impl CollectionV2 {
             match Self::get_by_table_handle(conn, table_handle).await {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

@@ -183,7 +183,8 @@ impl CurrentDelegatedVoter {
                     return Ok(current_delegated_voter_query_result.delegation_pool_address)
                 },
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }
@@ -209,7 +210,8 @@ impl CurrentDelegatedVoter {
             {
                 Ok(_) => return true,
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }
