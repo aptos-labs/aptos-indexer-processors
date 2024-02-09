@@ -54,6 +54,7 @@ use std::fmt::Debug;
 
 type StartVersion = u64;
 type EndVersion = u64;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ProcessingResult {
     pub start_version: StartVersion,

@@ -217,7 +217,7 @@ mod tests {
         assert!(FungibleAssetBalance::is_primary(
             owner_address,
             metadata_address,
-            fungible_store_address
+            fungible_store_address,
         ));
     }
 
@@ -230,7 +230,7 @@ mod tests {
         assert!(!FungibleAssetBalance::is_primary(
             owner_address,
             metadata_address,
-            fungible_store_address
+            fungible_store_address,
         ));
     }
 
@@ -244,7 +244,7 @@ mod tests {
         assert!(FungibleAssetBalance::is_primary(
             owner_address,
             metadata_address,
-            fungible_store_address
+            fungible_store_address,
         ));
     }
 }

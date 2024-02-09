@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
+
 use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,

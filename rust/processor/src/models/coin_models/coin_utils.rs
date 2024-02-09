@@ -18,6 +18,7 @@ use tracing::error;
 pub const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const COIN_TYPE_HASH_LENGTH: usize = 5000;
 const COIN_TYPE_MAX: usize = 1000;
+
 /**
  * This file defines deserialized coin types as defined in our 0x1 contracts.
  */

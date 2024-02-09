@@ -244,22 +244,22 @@ fn insert_current_token_ownerships_query(
     use schema::current_token_ownerships::dsl::*;
 
     (diesel::insert_into(schema::current_token_ownerships::table)
-            .values(items_to_insert)
-                .on_conflict((token_data_id_hash, property_version, owner_address))
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    amount.eq(excluded(amount)),
-                    token_properties.eq(excluded(token_properties)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    table_type.eq(excluded(table_type)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
-            )
+         .values(items_to_insert)
+         .on_conflict((token_data_id_hash, property_version, owner_address))
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             amount.eq(excluded(amount)),
+             token_properties.eq(excluded(token_properties)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             table_type.eq(excluded(table_type)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_current_token_datas_query(
@@ -270,33 +270,33 @@ fn insert_current_token_datas_query(
 ) {
     use schema::current_token_datas::dsl::*;
     (diesel::insert_into(schema::current_token_datas::table)
-            .values(items_to_insert)
-                .on_conflict(token_data_id_hash)
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    maximum.eq(excluded(maximum)),
-                    supply.eq(excluded(supply)),
-                    largest_property_version.eq(excluded(largest_property_version)),
-                    metadata_uri.eq(excluded(metadata_uri)),
-                    payee_address.eq(excluded(payee_address)),
-                    royalty_points_numerator.eq(excluded(royalty_points_numerator)),
-                    royalty_points_denominator.eq(excluded(royalty_points_denominator)),
-                    maximum_mutable.eq(excluded(maximum_mutable)),
-                    uri_mutable.eq(excluded(uri_mutable)),
-                    description_mutable.eq(excluded(description_mutable)),
-                    properties_mutable.eq(excluded(properties_mutable)),
-                    royalty_mutable.eq(excluded(royalty_mutable)),
-                    default_properties.eq(excluded(default_properties)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    description.eq(excluded(description)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
-            )
+         .values(items_to_insert)
+         .on_conflict(token_data_id_hash)
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             maximum.eq(excluded(maximum)),
+             supply.eq(excluded(supply)),
+             largest_property_version.eq(excluded(largest_property_version)),
+             metadata_uri.eq(excluded(metadata_uri)),
+             payee_address.eq(excluded(payee_address)),
+             royalty_points_numerator.eq(excluded(royalty_points_numerator)),
+             royalty_points_denominator.eq(excluded(royalty_points_denominator)),
+             maximum_mutable.eq(excluded(maximum_mutable)),
+             uri_mutable.eq(excluded(uri_mutable)),
+             description_mutable.eq(excluded(description_mutable)),
+             properties_mutable.eq(excluded(properties_mutable)),
+             royalty_mutable.eq(excluded(royalty_mutable)),
+             default_properties.eq(excluded(default_properties)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             description.eq(excluded(description)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_current_collection_datas_query(
@@ -308,25 +308,25 @@ fn insert_current_collection_datas_query(
     use schema::current_collection_datas::dsl::*;
 
     (diesel::insert_into(schema::current_collection_datas::table)
-            .values(items_to_insert)
-                .on_conflict(collection_data_id_hash)
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    description.eq(excluded(description)),
-                    metadata_uri.eq(excluded(metadata_uri)),
-                    supply.eq(excluded(supply)),
-                    maximum.eq(excluded(maximum)),
-                    maximum_mutable.eq(excluded(maximum_mutable)),
-                    uri_mutable.eq(excluded(uri_mutable)),
-                    description_mutable.eq(excluded(description_mutable)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    table_handle.eq(excluded(table_handle)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
-            )
+         .values(items_to_insert)
+         .on_conflict(collection_data_id_hash)
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             description.eq(excluded(description)),
+             metadata_uri.eq(excluded(metadata_uri)),
+             supply.eq(excluded(supply)),
+             maximum.eq(excluded(maximum)),
+             maximum_mutable.eq(excluded(maximum_mutable)),
+             uri_mutable.eq(excluded(uri_mutable)),
+             description_mutable.eq(excluded(description_mutable)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             table_handle.eq(excluded(table_handle)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_token_activities_query(
@@ -359,26 +359,26 @@ fn insert_current_token_claims_query(
 ) {
     use schema::current_token_pending_claims::dsl::*;
 
-    (            diesel::insert_into(schema::current_token_pending_claims::table)
-.values(items_to_insert)
-                .on_conflict((
-                    token_data_id_hash, property_version, from_address, to_address
-                ))
-                .do_update()
-                .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    amount.eq(excluded(amount)),
-                    table_handle.eq(excluded(table_handle)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    token_data_id.eq(excluded(token_data_id)),
-                    collection_id.eq(excluded(collection_id)),
-                )),
-            Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
-)
+    (diesel::insert_into(schema::current_token_pending_claims::table)
+         .values(items_to_insert)
+         .on_conflict((
+             token_data_id_hash, property_version, from_address, to_address
+         ))
+         .do_update()
+         .set((
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             amount.eq(excluded(amount)),
+             table_handle.eq(excluded(table_handle)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             inserted_at.eq(excluded(inserted_at)),
+             token_data_id.eq(excluded(token_data_id)),
+             collection_id.eq(excluded(collection_id)),
+         )),
+     Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_nft_points_query(

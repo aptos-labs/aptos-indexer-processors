@@ -146,14 +146,14 @@ impl FungibleAssetActivity {
                 creation_num: event_key.creation_number as i64,
             };
             let coin_type =
-                    event_to_coin_type
-                        .get(&event_move_guid)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                                txn_version, event_move_guid, event_to_coin_type
-                            )
-                        }).clone();
+                event_to_coin_type
+                    .get(&event_move_guid)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                            txn_version, event_move_guid, event_to_coin_type
+                        )
+                    }).clone();
             let storage_id =
                 CoinInfoType::get_storage_id(coin_type.as_str(), event_move_guid.addr.as_str());
             Ok(Some(Self {

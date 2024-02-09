@@ -516,31 +516,31 @@ fn parse_ans(
                             all_ans_lookups_v2.push(ans_lookup_v2);
                         }
                         if let Some((current_primary_name, primary_name)) =
-                        CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
-                            table_item,
-                            &ans_v1_primary_names_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
+                            CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
+                                table_item,
+                                &ans_v1_primary_names_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                                .unwrap_or_else(|e| {
+                                    error!(
                                 error = ?e,
                                 "Error parsing ANS v1 primary name from write table item"
                             );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_primary_name.pk(), current_primary_name.clone());
-                        all_ans_primary_names.push(primary_name.clone());
+                                    panic!();
+                                })
+                        {
+                            all_current_ans_primary_names
+                                .insert(current_primary_name.pk(), current_primary_name.clone());
+                            all_ans_primary_names.push(primary_name.clone());
 
-                        // Include all v1 primary names in v2 data
-                        let (current_primary_name_v2, primary_name_v2) =
-                            CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
-                        all_current_ans_primary_names_v2
-                            .insert(current_primary_name_v2.pk(), current_primary_name_v2);
-                        all_ans_primary_names_v2.push(primary_name_v2);
-                    }
+                            // Include all v1 primary names in v2 data
+                            let (current_primary_name_v2, primary_name_v2) =
+                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
+                            all_current_ans_primary_names_v2
+                                .insert(current_primary_name_v2.pk(), current_primary_name_v2);
+                            all_ans_primary_names_v2.push(primary_name_v2);
+                        }
                     },
                     WriteSetChange::DeleteTableItem(table_item) => {
                         if let Some((current_ans_lookup, ans_lookup)) =
@@ -570,31 +570,31 @@ fn parse_ans(
                             all_ans_lookups_v2.push(ans_lookup_v2);
                         }
                         if let Some((current_primary_name, primary_name)) =
-                        CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
-                            table_item,
-                            &ans_v1_primary_names_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
+                            CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
+                                table_item,
+                                &ans_v1_primary_names_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                                .unwrap_or_else(|e| {
+                                    error!(
                                 error = ?e,
                                 "Error parsing ANS v1 primary name from delete table item"
                             );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_primary_name.pk(), current_primary_name.clone());
-                        all_ans_primary_names.push(primary_name.clone());
+                                    panic!();
+                                })
+                        {
+                            all_current_ans_primary_names
+                                .insert(current_primary_name.pk(), current_primary_name.clone());
+                            all_ans_primary_names.push(primary_name.clone());
 
-                        // Include all v1 primary names in v2 data
-                        let (current_primary_name_v2, primary_name_v2) =
-                            CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
-                        all_current_ans_primary_names_v2
-                            .insert(current_primary_name_v2.pk(), current_primary_name_v2);
-                        all_ans_primary_names_v2.push(primary_name_v2);
-                    }
+                            // Include all v1 primary names in v2 data
+                            let (current_primary_name_v2, primary_name_v2) =
+                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
+                            all_current_ans_primary_names_v2
+                                .insert(current_primary_name_v2.pk(), current_primary_name_v2);
+                            all_ans_primary_names_v2.push(primary_name_v2);
+                        }
                     },
                     WriteSetChange::WriteResource(write_resource) => {
                         if let Some((current_ans_lookup_v2, ans_lookup_v2)) =

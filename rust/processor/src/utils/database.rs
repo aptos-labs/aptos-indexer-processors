@@ -3,6 +3,7 @@
 
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
+
 use crate::utils::util::remove_null_bytes;
 use diesel::{
     pg::Pg,
@@ -258,7 +259,7 @@ mod test {
         assert_eq!(get_chunks(65535, 1), vec![
             (0, 32767),
             (32767, 65534),
-            (65534, 65535)
+            (65534, 65535),
         ]);
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
         assert_eq!(get_chunks(10000, 20), vec![
@@ -268,14 +269,14 @@ mod test {
             (4914, 6552),
             (6552, 8190),
             (8190, 9828),
-            (9828, 10000)
+            (9828, 10000),
         ]);
         assert_eq!(get_chunks(65535, 2), vec![
             (0, 16383),
             (16383, 32766),
             (32766, 49149),
             (49149, 65532),
-            (65532, 65535)
+            (65532, 65535),
         ]);
     }
 }

@@ -26,7 +26,8 @@ use serde::{Deserialize, Serialize};
 pub struct CurrentDelegatedVoterQuery {
     pub delegation_pool_address: String,
     pub delegator_address: String,
-    pub table_handle: Option<String>, // vote_delegation table handle
+    pub table_handle: Option<String>,
+    // vote_delegation table handle
     pub voter: Option<String>,
     pub pending_voter: Option<String>,
     pub last_transaction_version: i64,
@@ -42,9 +43,11 @@ pub struct CurrentDelegatedVoterQuery {
 pub struct CurrentDelegatedVoter {
     pub delegation_pool_address: String,
     pub delegator_address: String,
-    pub table_handle: Option<String>, // vote_delegation table handle
+    pub table_handle: Option<String>,
+    // vote_delegation table handle
     pub voter: Option<String>,
-    pub pending_voter: Option<String>, // voter to be in the next lockup period
+    pub pending_voter: Option<String>,
+    // voter to be in the next lockup period
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
@@ -180,7 +183,7 @@ impl CurrentDelegatedVoter {
             retried += 1;
             match CurrentDelegatedVoterQuery::get_by_table_handle(conn, table_handle).await {
                 Ok(current_delegated_voter_query_result) => {
-                    return Ok(current_delegated_voter_query_result.delegation_pool_address)
+                    return Ok(current_delegated_voter_query_result.delegation_pool_address);
                 },
                 Err(_) => {
                     tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))

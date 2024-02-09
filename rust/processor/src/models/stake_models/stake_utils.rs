@@ -11,6 +11,7 @@ use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
 const STAKE_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StakePoolResource {
     delegated_voter: String,

@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 
 // PK of current_collections_v2, i.e. collection_id
 pub type CurrentCollectionV2PK = String;
+
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = collections_v2)]
