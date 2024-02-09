@@ -453,7 +453,7 @@ async fn parse_v2_token(
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
-        let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
+        let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exist!");
         let txn_version = txn.version as i64;
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");

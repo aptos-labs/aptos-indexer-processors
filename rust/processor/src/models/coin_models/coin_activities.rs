@@ -93,7 +93,7 @@ impl CoinActivity {
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Txn Data doesn't exist!");
         let (events, maybe_user_request): (&Vec<EventPB>, Option<&UserTransactionRequest>) =
             match txn_data {
                 TxnData::Genesis(inner) => (&inner.events, None),

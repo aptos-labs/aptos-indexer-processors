@@ -61,7 +61,7 @@ impl TokenActivity {
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Txn Data doesn't exist!");
         if let TxnData::User(user_txn) = txn_data {
             for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = transaction.version as i64;

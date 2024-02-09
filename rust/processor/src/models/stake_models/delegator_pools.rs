@@ -99,7 +99,7 @@ impl DelegatorPool {
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Txn Data doesn't exist!");
         let txn_version = transaction.version as i64;
 
         // Do a first pass to get the mapping of active_share table handles to staking pool addresses

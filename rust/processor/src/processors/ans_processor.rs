@@ -425,7 +425,7 @@ fn parse_ans(
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Txn Data doesn't exist!");
         let transaction_info = transaction
             .info
             .as_ref()

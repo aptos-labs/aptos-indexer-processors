@@ -33,7 +33,7 @@ impl ProposalVote {
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Txn Data doesn't exist!");
         let txn_version = transaction.version as i64;
 
         if let TxnData::User(user_txn) = txn_data {

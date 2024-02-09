@@ -44,7 +44,7 @@ impl AccountTransaction {
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .unwrap_or_else(|| panic!("Txn Data doesn't exit for version {}", txn_version));
+            .unwrap_or_else(|| panic!("Txn Data doesn't exist for version {}", txn_version));
         let transaction_info = transaction.info.as_ref().unwrap_or_else(|| {
             panic!("Transaction info doesn't exist for version {}", txn_version)
         });

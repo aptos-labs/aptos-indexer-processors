@@ -38,7 +38,7 @@ impl NftPoints {
         let txn_data = transaction
             .txn_data
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Txn Data doesn't exist!");
         let version = transaction.version as i64;
         let timestamp = transaction
             .timestamp
