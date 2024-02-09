@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
+
 use crate::{schema::ledger_infos, utils::database::PgPoolConnection};
 use diesel::{OptionalExtension, QueryDsl};
 use diesel_async::RunQueryDsl;

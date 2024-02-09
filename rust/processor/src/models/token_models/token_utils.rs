@@ -16,10 +16,10 @@ use std::fmt::{self, Formatter};
 pub const TOKEN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000003";
 pub const NAME_LENGTH: usize = 128;
 pub const URI_LENGTH: usize = 512;
+
 /**
  * This file defines deserialized move types as defined in our 0x3 contracts.
  */
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Table {
     handle: String,
@@ -178,6 +178,7 @@ impl RoyaltyType {
         standardize_address(&self.payee_address)
     }
 }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenType {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -323,6 +324,7 @@ impl ClaimTokenEventType {
         standardize_address(&self.to_address)
     }
 }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TypeInfo {
     pub account_address: String,

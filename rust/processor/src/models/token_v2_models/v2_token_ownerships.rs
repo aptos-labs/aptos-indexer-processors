@@ -615,7 +615,7 @@ impl CurrentTokenOwnershipV2Query {
                         token_data_id: inner.token_data_id.clone(),
                         owner_address: inner.owner_address.clone(),
                         is_soulbound: inner.is_soulbound_v2,
-                    })
+                    });
                 },
                 Err(_) => {
                     tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))

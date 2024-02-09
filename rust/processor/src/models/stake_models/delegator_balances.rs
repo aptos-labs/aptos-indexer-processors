@@ -271,11 +271,11 @@ impl CurrentDelegatorBalance {
                 Some(pool_address) => pool_address,
                 None => {
                     Self::get_staking_pool_from_inactive_share_handle(conn, &inactive_pool_handle)
-                    .await
+                        .await
                         .context(format!("Failed to get staking pool address from inactive share handle {}, txn version {}",
-                        inactive_pool_handle, txn_version
-                    ))?
-                },
+                                         inactive_pool_handle, txn_version
+                        ))?
+                }
             };
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 

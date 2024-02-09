@@ -38,6 +38,7 @@ use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
 pub struct FungibleAssetProcessor {
     connection_pool: PgDbPool,
 }
@@ -134,28 +135,28 @@ fn insert_fungible_asset_metadata_query(
     use schema::fungible_asset_metadata::dsl::*;
 
     (
-            diesel::insert_into(schema::fungible_asset_metadata::table)
-                .values(items_to_insert)
-                .on_conflict(asset_type)
-                .do_update()
-                .set(
-                    (
-                        creator_address.eq(excluded(creator_address)),
-                        name.eq(excluded(name)),
-                        symbol.eq(excluded(symbol)),
-                        decimals.eq(excluded(decimals)),
-                        icon_uri.eq(excluded(icon_uri)),
-                        project_uri.eq(excluded(project_uri)),
-                        last_transaction_version.eq(excluded(last_transaction_version)),
-                        last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                        supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
-                        supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
-                        token_standard.eq(excluded(token_standard)),
-                        inserted_at.eq(excluded(inserted_at)),
-                    )
-                ),
-            Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
-        )
+        diesel::insert_into(schema::fungible_asset_metadata::table)
+            .values(items_to_insert)
+            .on_conflict(asset_type)
+            .do_update()
+            .set(
+                (
+                    creator_address.eq(excluded(creator_address)),
+                    name.eq(excluded(name)),
+                    symbol.eq(excluded(symbol)),
+                    decimals.eq(excluded(decimals)),
+                    icon_uri.eq(excluded(icon_uri)),
+                    project_uri.eq(excluded(project_uri)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
+                    supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
+                    token_standard.eq(excluded(token_standard)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )
+            ),
+        Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 fn insert_fungible_asset_balances_query(
@@ -188,25 +189,25 @@ fn insert_current_fungible_asset_balances_query(
     use schema::current_fungible_asset_balances::dsl::*;
 
     (
-            diesel::insert_into(schema::current_fungible_asset_balances::table)
-                .values(items_to_insert)
-                .on_conflict(storage_id)
-                .do_update()
-                .set(
-                    (
-                        owner_address.eq(excluded(owner_address)),
-                        asset_type.eq(excluded(asset_type)),
-                        is_primary.eq(excluded(is_primary)),
-                        is_frozen.eq(excluded(is_frozen)),
-                        amount.eq(excluded(amount)),
-                        last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                        last_transaction_version.eq(excluded(last_transaction_version)),
-                        token_standard.eq(excluded(token_standard)),
-                        inserted_at.eq(excluded(inserted_at)),
-                    )
-                ),
-            Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
-        )
+        diesel::insert_into(schema::current_fungible_asset_balances::table)
+            .values(items_to_insert)
+            .on_conflict(storage_id)
+            .do_update()
+            .set(
+                (
+                    owner_address.eq(excluded(owner_address)),
+                    asset_type.eq(excluded(asset_type)),
+                    is_primary.eq(excluded(is_primary)),
+                    is_frozen.eq(excluded(is_frozen)),
+                    amount.eq(excluded(amount)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    token_standard.eq(excluded(token_standard)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )
+            ),
+        Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 #[async_trait]

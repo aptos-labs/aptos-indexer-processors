@@ -29,6 +29,7 @@ use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
 pub struct CoinProcessor {
     connection_pool: PgDbPool,
 }
@@ -143,21 +144,21 @@ fn insert_coin_infos_query(
 
     (
         diesel::insert_into(schema::coin_infos::table)
-                .values(items_to_insert)
-                .on_conflict(coin_type_hash)
-                .do_update()
-                .set((
-                    transaction_version_created.eq(excluded(transaction_version_created)),
-                    creator_address.eq(excluded(creator_address)),
-                    name.eq(excluded(name)),
-                    symbol.eq(excluded(symbol)),
-                    decimals.eq(excluded(decimals)),
-                    transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
-                    supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
-                    supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
+            .values(items_to_insert)
+            .on_conflict(coin_type_hash)
+            .do_update()
+            .set((
+                transaction_version_created.eq(excluded(transaction_version_created)),
+                creator_address.eq(excluded(creator_address)),
+                name.eq(excluded(name)),
+                symbol.eq(excluded(symbol)),
+                decimals.eq(excluded(decimals)),
+                transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+                supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+                supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
     )
 }
 

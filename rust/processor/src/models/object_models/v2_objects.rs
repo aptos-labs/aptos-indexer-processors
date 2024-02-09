@@ -197,7 +197,7 @@ impl Object {
                         is_token: res.is_token,
                         is_fungible_asset: res.is_fungible_asset,
                         is_deleted: res.is_deleted,
-                    })
+                    });
                 },
                 Err(_) => {
                     tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
