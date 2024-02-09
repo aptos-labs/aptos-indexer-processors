@@ -62,7 +62,7 @@ pub struct ProcessingResult {
     pub db_insertion_duration_in_secs: f64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 
 pub struct ProcessedVersions {
     pub start_version: StartVersion,
