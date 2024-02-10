@@ -422,10 +422,13 @@ fn parse_ans(
 
     for transaction in transactions {
         let txn_version = transaction.version as i64;
-        let txn_data = transaction.txn_data.as_ref().expect(&format!(
-            "Txn Data doesn't exist for version {}",
-            transaction.version
-        ));
+        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
+            error!(
+                transaction_version = transaction.version,
+                "Txn Data doesn't exist for version {}", transaction.version
+            );
+            panic!();
+        });
         let transaction_info = transaction
             .info
             .as_ref()
