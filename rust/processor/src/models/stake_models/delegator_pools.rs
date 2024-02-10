@@ -96,14 +96,15 @@ impl DelegatorPool {
     )> {
         let mut delegator_pool_map = AHashMap::new();
         let mut delegator_pool_balances = vec![];
-        let mut delegator_pool_balances_map = AHashMap::new();
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let mut delegator_pool_balances_map = HashMap::new();
+        let txn_data = match transaction
+            .txn_data
+            .as_ref() {
+                Some(data) => data,
+                None => {
+                    return Ok((delegator_pool_map, delegator_pool_balances, delegator_pool_balances_map));
+                },
+            };
         let txn_version = transaction.version as i64;
 
         // Do a first pass to get the mapping of active_share table handles to staking pool addresses

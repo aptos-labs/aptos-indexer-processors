@@ -59,13 +59,14 @@ struct TokenActivityHelper<'a> {
 impl TokenActivity {
     pub fn from_transaction(transaction: &Transaction) -> Vec<Self> {
         let mut token_activities = vec![];
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction
+            .txn_data
+            .as_ref() {
+                Some(data) => data,
+                None => {
+                    return token_activities;
+                },
+        };
         if let TxnData::User(user_txn) = txn_data {
             for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = transaction.version as i64;

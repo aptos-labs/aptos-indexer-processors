@@ -47,6 +47,29 @@ pub struct Transaction {
     pub payload_type: Option<String>,
 }
 
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            block_height: 0,
+            hash: "".to_string(),
+            type_: "".to_string(),
+            payload: None,
+            state_change_hash: "".to_string(),
+            event_root_hash: "".to_string(),
+            state_checkpoint_hash: None,
+            gas_used: BigDecimal::from(0),
+            success: true,
+            vm_status: "".to_string(),
+            accumulator_root_hash: "".to_string(),
+            num_events: 0,
+            num_write_set_changes: 0,
+            epoch: 0,
+            payload_type: None,
+        }
+    }
+}
+
 impl Transaction {
     fn from_transaction_info(
         info: &TransactionInfo,
@@ -97,13 +120,23 @@ impl Transaction {
     ) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction
+            .txn_data
+            .as_ref() {
+            Some(txn_data) => txn_data,
+            None => {
+                let mut transaction = Transaction::default();
+                transaction.version = transaction.version as i64;
+                transaction.epoch = epoch;
+                transaction.block_height = block_height;
+                return (
+                    transaction,
+                    None,
+                    Vec::new(),
+                    Vec::new(),
+                )
+            }
+        };
         let version = transaction.version as i64;
         let transaction_type = TransactionType::try_from(transaction.r#type)
             .expect("Transaction type doesn't exist!")

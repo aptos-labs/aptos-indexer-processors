@@ -36,13 +36,14 @@ impl NftPoints {
         transaction: &Transaction,
         nft_points_contract: Option<String>,
     ) -> Option<Self> {
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction
+            .txn_data
+            .as_ref() {
+                Some(data) => data,
+                None => {
+                    return None;
+                },
+            };
         let version = transaction.version as i64;
         let timestamp = transaction
             .timestamp
