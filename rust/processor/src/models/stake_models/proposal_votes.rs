@@ -30,10 +30,10 @@ pub struct ProposalVote {
 impl ProposalVote {
     pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
         let mut proposal_votes = vec![];
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exist!");
+        let txn_data = transaction.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            transaction.version
+        ));
         let txn_version = transaction.version as i64;
 
         if let TxnData::User(user_txn) = txn_data {

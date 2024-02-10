@@ -293,7 +293,10 @@ async fn parse_v2_coin(
     for txn in transactions {
         let txn_version = txn.version as i64;
         let block_height = txn.block_height as i64;
-        let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exist!");
+        let txn_data = txn.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            txn.version
+        ));
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
         let txn_timestamp = txn
             .timestamp

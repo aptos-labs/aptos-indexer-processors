@@ -35,10 +35,10 @@ impl NftPoints {
         transaction: &Transaction,
         nft_points_contract: Option<String>,
     ) -> Option<Self> {
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exist!");
+        let txn_data = transaction.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            transaction.version
+        ));
         let version = transaction.version as i64;
         let timestamp = transaction
             .timestamp

@@ -90,10 +90,10 @@ impl CoinActivity {
         let mut all_coin_supply = Vec::new();
 
         // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exist!");
+        let txn_data = transaction.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            transaction.version
+        ));
         let (events, maybe_user_request): (&Vec<EventPB>, Option<&UserTransactionRequest>) =
             match txn_data {
                 TxnData::Genesis(inner) => (&inner.events, None),

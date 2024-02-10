@@ -82,10 +82,10 @@ impl Token {
         AHashMap<TokenDataIdHash, CurrentCollectionData>,
         AHashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
     ) {
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exist!");
+        let txn_data = transaction.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            transaction.version
+        ));
         if let TxnData::User(_) = txn_data {
             let mut token_ownerships = vec![];
             let mut token_datas = vec![];

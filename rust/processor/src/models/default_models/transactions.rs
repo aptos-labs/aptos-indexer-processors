@@ -96,10 +96,10 @@ impl Transaction {
     ) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exist!");
+        let txn_data = transaction.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            transaction.version
+        ));
         let version = transaction.version as i64;
         let transaction_type = TransactionType::try_from(transaction.r#type)
             .expect("Transaction type doesn't exist!")

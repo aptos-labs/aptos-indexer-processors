@@ -29,10 +29,10 @@ impl DelegatedStakingActivity {
     /// Pretty straightforward parsing from known delegated staking events
     pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
         let mut delegator_activities = vec![];
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exist!");
+        let txn_data = transaction.txn_data.as_ref().expect(&format!(
+            "Txn Data doesn't exist for version {}",
+            transaction.version
+        ));
         let txn_version = transaction.version as i64;
         let events = match txn_data {
             TxnData::User(txn) => &txn.events,

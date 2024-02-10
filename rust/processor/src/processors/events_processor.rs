@@ -95,7 +95,10 @@ impl ProcessorTrait for EventsProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
-            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exist!");
+            let txn_data = txn.txn_data.as_ref().expect(&format!(
+                "Txn Data doesn't exist for version {}",
+                txn.version
+            ));
             let default = vec![];
             let raw_events = match txn_data {
                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
