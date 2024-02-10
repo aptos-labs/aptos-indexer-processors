@@ -83,22 +83,20 @@ impl Token {
         AHashMap<TokenDataIdHash, CurrentCollectionData>,
         AHashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
     ) {
-        let txn_data = match transaction
-            .txn_data
-            .as_ref() {
-                Some(data) => data,
-                None => {
-                    return (
-                        vec![],
-                        vec![],
-                        vec![],
-                        vec![],
-                        HashMap::new(),
-                        HashMap::new(),
-                        HashMap::new(),
-                        HashMap::new(),
-                    );
-                },
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                return (
+                    vec![],
+                    vec![],
+                    vec![],
+                    vec![],
+                    HashMap::new(),
+                    HashMap::new(),
+                    HashMap::new(),
+                    HashMap::new(),
+                );
+            },
         };
         if let TxnData::User(_) = txn_data {
             let mut token_ownerships = vec![];
@@ -379,7 +377,7 @@ impl TableMetadataForToken {
         let mut table_handle_to_owner: TableHandleToOwner = AHashMap::new();
         // Do a first pass to get all the table metadata in the batch.
         for transaction in transactions {
-            if let TxnData::User(_) = transaction.txn_data.as_ref().unwrap() {
+            if let Some(TxnData::User(_)) = transaction.txn_data.as_ref() {
                 let txn_version = transaction.version as i64;
 
                 let transaction_info = transaction

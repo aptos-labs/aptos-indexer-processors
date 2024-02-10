@@ -423,14 +423,12 @@ fn parse_ans(
 
     for transaction in transactions {
         let txn_version = transaction.version as i64;
-        let txn_data = match transaction
-            .txn_data
-            .as_ref() {
-                Some(data) => data,
-                None => {
-                    continue;
-                },
-            };
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                continue;
+            },
+        };
         let transaction_info = transaction
             .info
             .as_ref()

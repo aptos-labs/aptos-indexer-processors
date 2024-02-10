@@ -135,7 +135,12 @@ impl ProcessorTrait for UserTransactionProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
-            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exist!");
+            let txn_data = match txn.txn_data.as_ref() {
+                Some(txn_data) => txn_data,
+                None => {
+                    continue;
+                },
+            };
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
                     inner,

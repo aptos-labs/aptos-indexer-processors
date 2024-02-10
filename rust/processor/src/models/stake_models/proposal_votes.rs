@@ -31,14 +31,12 @@ pub struct ProposalVote {
 impl ProposalVote {
     pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
         let mut proposal_votes = vec![];
-        let txn_data = match transaction
-            .txn_data
-            .as_ref() {
-                Some(data) => data,
-                None => {
-                    return Ok(proposal_votes);
-                },
-            };
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                return Ok(proposal_votes);
+            },
+        };
         let txn_version = transaction.version as i64;
 
         if let TxnData::User(user_txn) = txn_data {

@@ -120,22 +120,17 @@ impl Transaction {
     ) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
-        let txn_data = match transaction
-            .txn_data
-            .as_ref() {
+        let txn_data = match transaction.txn_data.as_ref() {
             Some(txn_data) => txn_data,
             None => {
-                let mut transaction = Transaction::default();
-                transaction.version = transaction.version as i64;
-                transaction.epoch = epoch;
-                transaction.block_height = block_height;
-                return (
-                    transaction,
-                    None,
-                    Vec::new(),
-                    Vec::new(),
-                )
-            }
+                let transaction_out = Transaction {
+                    version: transaction.version as i64,
+                    epoch,
+                    block_height,
+                    ..Transaction::default()
+                };
+                return (transaction_out, None, Vec::new(), Vec::new());
+            },
         };
         let version = transaction.version as i64;
         let transaction_type = TransactionType::try_from(transaction.r#type)

@@ -36,14 +36,12 @@ impl NftPoints {
         transaction: &Transaction,
         nft_points_contract: Option<String>,
     ) -> Option<Self> {
-        let txn_data = match transaction
-            .txn_data
-            .as_ref() {
-                Some(data) => data,
-                None => {
-                    return None;
-                },
-            };
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                return None;
+            },
+        };
         let version = transaction.version as i64;
         let timestamp = transaction
             .timestamp
