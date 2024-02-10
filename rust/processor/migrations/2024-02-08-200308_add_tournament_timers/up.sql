@@ -1,0 +1,7 @@
+ALTER TABLE IF EXISTS tournaments ADD COLUMN tournament_start_timestamp TIMESTAMP NOT NULL DEFAULT TIMESTAMP '1970-01-01 00:00:00';
+ALTER TABLE IF EXISTS tournament_rounds ADD COLUMN round_end_timestamp TIMESTAMP NOT NULL DEFAULT TIMESTAMP '1970-01-01 00:00:00';
+CREATE TABLE IF NOT EXISTS main_page_tournament (
+    tournament_address VARCHAR(66) UNIQUE PRIMARY KEY NOT NULL,
+    last_transaction_version BIGINT NOT NULL,
+    inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
+);

@@ -58,6 +58,18 @@ pub fn standardize_address(handle: &str) -> String {
     }
 }
 
+/// Get standardized event type
+/// Expected input: 0xAddress::Module::Event
+pub fn standardized_type_address(event_type: &str) -> String {
+    let t: Vec<&str> = event_type.split("::").collect();
+    if t.len() == 3 {
+        let standardized_addr = standardize_address(t[0]);
+        format!("{}::{}::{}", standardized_addr, t[1], t[2])
+    } else {
+        event_type.to_string()
+    }
+}
+
 pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }
