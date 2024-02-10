@@ -14,6 +14,7 @@ use aptos_protos::transaction::v1::{transaction::TxnData, Event, Transaction};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
@@ -58,10 +59,13 @@ struct TokenActivityHelper<'a> {
 impl TokenActivity {
     pub fn from_transaction(transaction: &Transaction) -> Vec<Self> {
         let mut token_activities = vec![];
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exit!");
+        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
+            error!(
+                transaction_version = transaction.version,
+                "Txn Data doesn't exist for version {}", transaction.version
+            );
+            panic!();
+        });
         if let TxnData::User(user_txn) = txn_data {
             for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = transaction.version as i64;

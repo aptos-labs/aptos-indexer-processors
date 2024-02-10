@@ -35,6 +35,7 @@ use bigdecimal::{BigDecimal, Zero};
 use chrono::NaiveDateTime;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
@@ -90,10 +91,13 @@ impl CoinActivity {
         let mut all_coin_supply = Vec::new();
 
         // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exit!");
+        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
+            error!(
+                transaction_version = transaction.version,
+                "Txn Data doesn't exist for version {}", transaction.version
+            );
+            panic!();
+        });
         let (events, maybe_user_request): (&Vec<EventPB>, Option<&UserTransactionRequest>) =
             match txn_data {
                 TxnData::Genesis(inner) => (&inner.events, None),
