@@ -123,6 +123,7 @@ impl Transaction {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(txn_data) => txn_data,
             None => {
+                tracing::warn!("Transaction data doesn't exist for version {}", transaction.version);
                 let transaction_out = Transaction {
                     version: transaction.version as i64,
                     epoch,
