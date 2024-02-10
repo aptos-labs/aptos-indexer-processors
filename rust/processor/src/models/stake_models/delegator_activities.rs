@@ -33,7 +33,10 @@ impl DelegatedStakingActivity {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
             None => {
-                tracing::warn!("Transaction data doesn't exist for version {}", transaction.version);
+                tracing::warn!(
+                    "Transaction data doesn't exist for version {}",
+                    transaction.version
+                );
                 return Ok(delegator_activities);
             },
         };
