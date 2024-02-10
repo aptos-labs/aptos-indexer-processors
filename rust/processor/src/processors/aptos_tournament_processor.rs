@@ -36,6 +36,7 @@ use diesel::{pg::Pg, query_builder::QueryFragment, upsert::excluded, ExpressionM
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
+use tracing::error;
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -714,7 +715,13 @@ impl ProcessorTrait for AptosTournamentProcessor {
 
             let txn_version = txn.version as i64;
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
-            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
+            let txn_data = txn.txn_data.as_ref().unwrap_or_else(|| {
+                error!(
+                    transaction_version = txn.version,
+                    "Txn Data doesn't exist for version {}", txn.version
+                );
+                panic!();
+            });
 
             if let TxnData::User(user_txn) = txn_data {
                 // First pass: TournamentState, CurrentRound, object mapping, token reward claim mapping
