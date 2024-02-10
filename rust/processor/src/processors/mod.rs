@@ -38,6 +38,7 @@ use self::{
 };
 use crate::{
     models::processor_status::ProcessorStatus,
+    query_models::QueryModelBatchTrait,
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
@@ -52,14 +53,21 @@ use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-type StartVersion = u64;
-type EndVersion = u64;
+pub type StartVersion = u64;
+pub type EndVersion = u64;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ProcessingResult {
     pub start_version: StartVersion,
     pub end_version: EndVersion,
     pub processing_duration_in_secs: f64,
     pub db_insertion_duration_in_secs: f64,
+}
+
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProcessingParseResult {
+    pub start_version: StartVersion,
+    pub end_version: EndVersion,
+    pub query_model_batches: Vec<Box<dyn QueryModelBatchTrait>>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -84,6 +92,16 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         end_version: u64,
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult>;
+
+    fn parse_transactions(
+        &self,
+        _transactions: Vec<ProtoTransaction>,
+        _start_version: u64,
+        _end_version: u64,
+        _db_chain_id: Option<u64>,
+    ) -> anyhow::Result<Option<ProcessingParseResult>> {
+        Ok(None)
+    }
 
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below

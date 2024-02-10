@@ -12,8 +12,8 @@ use crate::{
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessedVersions, ProcessingResult,
-        Processor, ProcessorConfig, ProcessorTrait,
+        user_transaction_processor::UserTransactionProcessor, ProcessedVersions,
+        ProcessingParseResult, ProcessingResult, Processor, ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
@@ -207,8 +207,36 @@ impl Worker {
         });
 
         // Create a gap detector task that will panic if there is a gap in the processing
-        let (gap_detector_sender, mut gap_detector_receiver) =
+        let (query_executor_sender, query_executor_receiver) =
+            tokio::sync::mpsc::channel::<ProcessingParseResult>(BUFFER_SIZE);
+        let (gap_detector_sender, gap_detector_receiver) =
             tokio::sync::mpsc::channel::<ProcessedVersions>(BUFFER_SIZE);
+
+        // Create db executor task that will execute the queries and send the results to the gap detector
+        let executor_db_clone = self.db_pool.clone();
+        tokio::spawn(async move {
+            info!(
+                processor_name = processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                "[Parser] Starting query executor thread"
+            );
+
+            loop {
+                let result = match query_executor_receiver.recv().await {
+                    Some(result) => result,
+                    None => {
+                        error!(
+                            processor_name = processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            "[Parser] Query executor thread received None"
+                        );
+                        panic!("[Parser] Query executor thread received None");
+                    },
+                };
+            }
+        });
+
+        // Create a gap detector task that will panic if there is a gap in the processing
         let db_pool = self.db_pool.clone();
         tokio::spawn(async move {
             info!(
@@ -401,7 +429,8 @@ impl Worker {
             let mut tasks = vec![];
             for transactions_pb in transactions_batches {
                 let processor_clone = processor.clone();
-                let gap_detector_sender = gap_detector_sender.clone();
+                let query_executor_sender = query_executor_sender.clone();
+                // let gap_detector_sender = gap_detector_sender.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
                     let start_version = transactions_pb
@@ -458,6 +487,36 @@ impl Worker {
                     }
 
                     let processing_duration = std::time::Instant::now();
+
+                    let parsed_result = processor_clone.parse_transactions(
+                        transactions_pb.transactions.clone(),
+                        start_version,
+                        end_version,
+                        db_chain_id,
+                    );
+
+                    // TODO: Clean this up
+                    if let Ok(Some(res)) = parsed_result {
+                        match query_executor_sender.send(res).await {
+                            Ok(_) => {
+                                // TODO: Log this and add metrics
+                            },
+                            Err(e) => {
+                                error!(
+                                    processor_name = processor_name,
+                                    error = ?e,
+                                    "[Parser] Error sending parsed transactions to query builder"
+                                );
+                                panic!();
+                            },
+                        }
+                        return Ok(ProcessingResult {
+                            start_version: res.start_version,
+                            end_version: res.end_version,
+                            processing_duration_in_secs: 0.0,
+                            db_insertion_duration_in_secs: 0.0,
+                        });
+                    }
 
                     let processed_result = processor_clone
                         .process_transactions(
@@ -520,10 +579,10 @@ impl Worker {
                             end_version: res.end_version,
                             last_transaction_timstamp: end_txn_timestamp,
                         };
-                        gap_detector_sender
-                            .send(processed_version)
-                            .await
-                            .expect("[Parser] Gap detector thread has panicked");
+                        // gap_detector_sender
+                        //     .send(processed_version)
+                        //     .await
+                        //     .expect("[Parser] Gap detector thread has panicked");
 
                         // Logging and metrics
                         SINGLE_BATCH_PROCESSING_TIME_IN_SECS

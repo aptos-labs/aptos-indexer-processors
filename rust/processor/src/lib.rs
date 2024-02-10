@@ -18,6 +18,7 @@ pub mod gap_detector;
 pub mod grpc_stream;
 pub mod models;
 pub mod processors;
+pub mod query_models;
 pub mod schema;
 pub mod utils;
 pub mod worker;
