@@ -22,8 +22,8 @@ use crate::{
             },
             v2_token_utils::{
                 AptosCollection, BurnEvent, ConcurrentBurnEvent, ConcurrentSupply, FixedSupply,
-                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TransferEvent,
-                UnlimitedSupply,
+                MintEvent, PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned,
+                TokenV2Minted, TransferEvent, UnlimitedSupply,
             },
         },
     },
@@ -474,6 +474,9 @@ async fn parse_v2_token(
             // Get burn events for token v2 by object
             let mut tokens_burned: TokenV2Burned = AHashSet::new();
 
+            // Get mint events for token v2 by object
+            let mut tokens_minted: TokenV2Minted = AHashSet::new();
+
             // Need to do a first pass to get all the objects
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
@@ -571,6 +574,9 @@ async fn parse_v2_token(
                 if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address());
                 }
+                if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap() {
+                    tokens_minted.insert(mint_event.get_token_address());
+                }
                 if let Some(transfer_events) =
                     TransferEvent::from_event(event, txn_version).unwrap()
                 {
@@ -609,6 +615,7 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
+                    &tokens_minted,
                     conn,
                 )
                 .await

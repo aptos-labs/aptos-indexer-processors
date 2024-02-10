@@ -29,6 +29,8 @@ pub const TOKEN_V2_ADDR: &str =
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 pub type TokenV2Burned = AHashSet<CurrentObjectPK>;
+pub type TokenV2Minted = AHashSet<CurrentObjectPK>;
+pub type TokenV2MintedPK = (CurrentObjectPK, i64);
 
 /// Tracks which token standard a token / collection is built upon
 #[derive(Serialize)]
@@ -282,6 +284,16 @@ pub struct MintEvent {
 }
 
 impl MintEvent {
+    pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
+        if let Some(V2TokenEvent::MintEvent(inner)) =
+            V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_token_address(&self) -> String {
         standardize_address(&self.token)
     }
