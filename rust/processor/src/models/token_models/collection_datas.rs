@@ -22,7 +22,8 @@ use serde::{Deserialize, Serialize};
 
 pub const QUERY_RETRIES: u32 = 5;
 pub const QUERY_RETRY_DELAY_MS: u64 = 500;
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash, transaction_version))]
 #[diesel(table_name = collection_datas)]
 pub struct CollectionData {
@@ -41,7 +42,7 @@ pub struct CollectionData {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash))]
 #[diesel(table_name = current_collection_datas)]
 pub struct CurrentCollectionData {
@@ -175,7 +176,8 @@ impl CollectionData {
             match CurrentCollectionDataQuery::get_by_table_handle(conn, table_handle).await {
                 Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
                 },
             }
         }

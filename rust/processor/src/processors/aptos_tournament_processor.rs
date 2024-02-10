@@ -26,16 +26,13 @@ use crate::{
     },
     schema,
     utils::{
-        database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
-        },
+        database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{result::Error, upsert::excluded, ExpressionMethods};
+use diesel::{pg::Pg, query_builder::QueryFragment, upsert::excluded, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
@@ -77,7 +74,7 @@ impl Debug for AptosTournamentProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -98,7 +95,7 @@ async fn insert_to_db(
     rock_paper_scissors_players_to_insert: Vec<RockPaperScissorsPlayer>,
     trivia_questiosn_to_insert: Vec<TriviaQuestion>,
     trivia_answers_to_insert: Vec<TriviaAnswer>,
-    roulette: Vec<Roulette>,
+    roulette_to_insert: Vec<Roulette>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -106,248 +103,232 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                &main_page_tournaments_to_insert,
-                &tournaments_to_insert,
-                &tournament_coin_rewards_to_insert,
-                &tournament_token_rewards_to_insert,
-                &tournament_rounds_to_insert,
-                &tournament_rooms_to_insert,
-                &tournament_rooms_to_delete,
-                &tournament_players_to_insert,
-                &tournament_players_to_assign_room,
-                &tournament_players_to_delete_room,
-                &tournament_players_to_claim_coin,
-                &tournament_players_to_delete,
-                &rock_paper_scissors_games_to_insert,
-                &rock_paper_scissors_results_to_insert,
-                &rock_paper_scissors_players_to_insert,
-                &trivia_questiosn_to_insert,
-                &trivia_answers_to_insert,
-                &roulette,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async move {
-                        let main_page_tournaments_to_insert =
-                            clean_data_for_db(main_page_tournaments_to_insert, true);
-                        let tournaments_to_insert = clean_data_for_db(tournaments_to_insert, true);
-                        let tournament_coin_rewards_to_insert =
-                            clean_data_for_db(tournament_coin_rewards_to_insert, true);
-                        let tournament_token_rewards_to_insert =
-                            clean_data_for_db(tournament_token_rewards_to_insert, true);
-                        let tournament_rounds_to_insert =
-                            clean_data_for_db(tournament_rounds_to_insert, true);
-                        let tournament_rooms_to_insert =
-                            clean_data_for_db(tournament_rooms_to_insert, true);
-                        let tournament_rooms_to_delete =
-                            clean_data_for_db(tournament_rooms_to_delete, true);
-                        let tournament_players_to_insert =
-                            clean_data_for_db(tournament_players_to_insert, true);
-                        let tournament_players_to_assign_room =
-                            clean_data_for_db(tournament_players_to_assign_room, true);
-                        let tournament_players_to_delete_room =
-                            clean_data_for_db(tournament_players_to_delete_room, true);
-                        let tournament_players_to_claim_coin =
-                            clean_data_for_db(tournament_players_to_claim_coin, true);
-                        let tournament_players_to_delete =
-                            clean_data_for_db(tournament_players_to_delete, true);
-                        let rock_paper_scissors_games_to_insert =
-                            clean_data_for_db(rock_paper_scissors_games_to_insert, true);
-                        let rock_paper_scissors_results_to_insert =
-                            clean_data_for_db(rock_paper_scissors_results_to_insert, true);
-                        let rock_paper_scissors_players_to_insert =
-                            clean_data_for_db(rock_paper_scissors_players_to_insert, true);
-                        let trivia_questiosn_to_insert =
-                            clean_data_for_db(trivia_questiosn_to_insert, true);
-                        let trivia_answers_to_insert =
-                            clean_data_for_db(trivia_answers_to_insert, true);
-                        let roulette = clean_data_for_db(roulette, true);
-                        insert_to_db_impl(
-                            pg_conn,
-                            &main_page_tournaments_to_insert,
-                            &tournaments_to_insert,
-                            &tournament_coin_rewards_to_insert,
-                            &tournament_token_rewards_to_insert,
-                            &tournament_rounds_to_insert,
-                            &tournament_rooms_to_insert,
-                            &tournament_rooms_to_delete,
-                            &tournament_players_to_insert,
-                            &tournament_players_to_assign_room,
-                            &tournament_players_to_delete_room,
-                            &tournament_players_to_claim_coin,
-                            &tournament_players_to_delete,
-                            &rock_paper_scissors_games_to_insert,
-                            &rock_paper_scissors_results_to_insert,
-                            &rock_paper_scissors_players_to_insert,
-                            &trivia_questiosn_to_insert,
-                            &trivia_answers_to_insert,
-                            &roulette,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
-    }
-}
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    main_page_tournaments_to_insert: &[MainPageTournamentModel],
-    tournaments_to_insert: &[Tournament],
-    tournament_coin_rewards_to_insert: &[TournamentCoinReward],
-    tournament_token_rewards_to_insert: &[TournamentTokenReward],
-    tournament_rounds_to_insert: &[TournamentRound],
-    tournament_rooms_to_insert: &[TournamentRoom],
-    tournament_rooms_to_delete: &[TournamentRoom],
-    tournament_players_to_insert: &[TournamentPlayer],
-    tournament_players_to_assign_room: &[TournamentPlayer],
-    tournament_players_to_delete_room: &[TournamentPlayer],
-    tournament_players_to_claim_coin: &[TournamentPlayer],
-    tournament_players_to_delete: &[TournamentPlayer],
-    rock_paper_scissors_games_to_insert: &[RockPaperScissorsGame],
-    rock_paper_scissors_results_to_insert: &[RockPaperScissorsGame],
-    rock_paper_scissors_players_to_insert: &[RockPaperScissorsPlayer],
-    trivia_questiosn_to_insert: &[TriviaQuestion],
-    trivia_answers_to_insert: &[TriviaAnswer],
-    roulette: &[Roulette],
-) -> Result<(), diesel::result::Error> {
-    insert_main_page_tournaments(conn, main_page_tournaments_to_insert).await?;
-    insert_tournaments(conn, tournaments_to_insert).await?;
-    insert_tournament_coin_rewards(conn, tournament_coin_rewards_to_insert).await?;
-    insert_tournament_token_rewards(conn, tournament_token_rewards_to_insert).await?;
-    insert_tournament_rounds(conn, tournament_rounds_to_insert).await?;
-    insert_tournament_rooms(conn, tournament_rooms_to_insert).await?;
-    insert_tournament_rooms_to_delete(conn, tournament_rooms_to_delete).await?;
-    insert_tournament_players(conn, tournament_players_to_insert).await?;
-    insert_tournament_players_to_assign_room(conn, tournament_players_to_assign_room).await?;
-    insert_tournament_players_to_delete_room(conn, tournament_players_to_delete_room).await?;
-    insert_tournament_players_to_claim_coin(conn, tournament_players_to_claim_coin).await?;
-    insert_tournament_players_to_delete(conn, tournament_players_to_delete).await?;
-    insert_rock_paper_scissors_games(conn, rock_paper_scissors_games_to_insert).await?;
-    insert_rock_paper_scissors_results(conn, rock_paper_scissors_results_to_insert).await?;
-    insert_rock_paper_scissors_players(conn, rock_paper_scissors_players_to_insert).await?;
-    insert_trivia_questions(conn, trivia_questiosn_to_insert).await?;
-    insert_trivia_answers(conn, trivia_answers_to_insert).await?;
-    insert_roulette(conn, roulette).await?;
-    Ok(())
-}
-
-async fn insert_main_page_tournaments(
-    conn: &mut MyDbConnection,
-    main_page_tournaments_to_insert: &[MainPageTournamentModel],
-) -> Result<(), diesel::result::Error> {
-    let chunks = get_chunks(
-        main_page_tournaments_to_insert.len(),
+    execute_in_chunks(
+        conn.clone(),
+        insert_main_page_tournaments,
+        main_page_tournaments_to_insert,
         MainPageTournamentModel::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::main_page_tournament::table)
-                .values(&main_page_tournaments_to_insert[start_ind..end_ind])
-                .on_conflict_do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
+    )
+    .await?;
 
-async fn insert_tournaments(
-    conn: &mut MyDbConnection,
-    tournaments_to_insert: &[Tournament],
-) -> Result<(), diesel::result::Error> {
-    use schema::tournaments::dsl::*;
-    let chunks = get_chunks(tournaments_to_insert.len(), Tournament::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournaments::table)
-                .values(&tournaments_to_insert[start_ind..end_ind])
-                .on_conflict(address)
-                .do_update()
-                .set((
-                    tournament_name.eq(excluded(tournament_name)),
-                    max_players.eq(excluded(max_players)),
-                    max_num_winners.eq(excluded(max_num_winners)),
-                    players_joined.eq(excluded(players_joined)),
-                    is_joinable.eq(excluded(is_joinable)),
-                    current_round_address.eq(excluded(current_round_address)),
-                    current_round_number.eq(excluded(current_round_number)),
-                    current_game_module.eq(excluded(current_game_module)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    tournament_ended_at.eq(excluded(tournament_ended_at)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    tournament_start_timestamp.eq(excluded(tournament_start_timestamp)),
-                )),
-            Some(
-                " WHERE tournaments.last_transaction_version <= excluded.last_transaction_version ",
-            ),
-        )
-        .await?;
-    }
-    Ok(())
-}
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournaments,
+        tournaments_to_insert,
+        Tournament::field_count(),
+    )
+    .await?;
 
-async fn insert_tournament_coin_rewards(
-    conn: &mut MyDbConnection,
-    tournament_coin_rewards_to_insert: &[TournamentCoinReward],
-) -> Result<(), diesel::result::Error> {
-    use schema::tournament_coin_rewards::dsl::*;
-    let chunks = get_chunks(
-        tournament_coin_rewards_to_insert.len(),
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_coin_rewards,
+        tournament_coin_rewards_to_insert,
         TournamentCoinReward::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_coin_rewards::table)
-                .values(&tournament_coin_rewards_to_insert[start_ind..end_ind])
-                .on_conflict((tournament_address, coin_type))
-                .do_update()
-                .set((
-                    coin_type.eq(excluded(coin_type)),
-                    coins.eq(excluded(coins)),
-                    coin_reward_amount.eq(excluded(coin_reward_amount)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(
-                " WHERE tournament_coin_rewards.last_transaction_version <= excluded.last_transaction_version ",
-            ),
-        )
-        .await?;
-    }
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_token_rewards,
+        tournament_token_rewards_to_insert,
+        TournamentTokenReward::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_rounds,
+        tournament_rounds_to_insert,
+        TournamentRound::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_rooms,
+        tournament_rooms_to_insert,
+        TournamentRoom::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_rooms_to_delete,
+        tournament_rooms_to_delete,
+        TournamentRoom::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_players,
+        tournament_players_to_insert,
+        TournamentPlayer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_players_to_assign_room,
+        tournament_players_to_assign_room,
+        TournamentPlayer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_players_to_delete_room,
+        tournament_players_to_delete_room,
+        TournamentPlayer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_players_to_claim_coin,
+        tournament_players_to_claim_coin,
+        TournamentPlayer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_tournament_players_to_delete,
+        tournament_players_to_delete,
+        TournamentPlayer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_rock_paper_scissors_games,
+        rock_paper_scissors_games_to_insert,
+        RockPaperScissorsGame::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_rock_paper_scissors_results,
+        rock_paper_scissors_results_to_insert,
+        RockPaperScissorsGame::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_rock_paper_scissors_players,
+        rock_paper_scissors_players_to_insert,
+        RockPaperScissorsPlayer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_trivia_questions,
+        trivia_questiosn_to_insert,
+        TriviaQuestion::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_trivia_answers,
+        trivia_answers_to_insert,
+        TriviaAnswer::field_count(),
+    )
+    .await?;
+
+    execute_in_chunks(
+        conn.clone(),
+        insert_roulette,
+        roulette_to_insert,
+        Roulette::field_count(),
+    )
+    .await?;
     Ok(())
 }
 
-async fn insert_tournament_token_rewards(
-    conn: &mut MyDbConnection,
-    tournament_token_rewards_to_insert: &[TournamentTokenReward],
-) -> Result<(), diesel::result::Error> {
+fn insert_main_page_tournaments(
+    main_page_tournaments_to_insert: Vec<MainPageTournamentModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    (
+        diesel::insert_into(schema::main_page_tournament::table)
+            .values(main_page_tournaments_to_insert)
+            .on_conflict_do_nothing(),
+        None,
+    )
+}
+
+fn insert_tournaments(
+    tournaments_to_insert: Vec<Tournament>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::tournaments::dsl::*;
+    (
+        diesel::insert_into(schema::tournaments::table)
+            .values(tournaments_to_insert)
+            .on_conflict(address)
+            .do_update()
+            .set((
+                tournament_name.eq(excluded(tournament_name)),
+                max_players.eq(excluded(max_players)),
+                max_num_winners.eq(excluded(max_num_winners)),
+                players_joined.eq(excluded(players_joined)),
+                is_joinable.eq(excluded(is_joinable)),
+                current_round_address.eq(excluded(current_round_address)),
+                current_round_number.eq(excluded(current_round_number)),
+                current_game_module.eq(excluded(current_game_module)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                tournament_ended_at.eq(excluded(tournament_ended_at)),
+                inserted_at.eq(excluded(inserted_at)),
+                tournament_start_timestamp.eq(excluded(tournament_start_timestamp)),
+            )),
+        Some(" WHERE tournaments.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_tournament_coin_rewards(
+    tournament_coin_rewards_to_insert: Vec<TournamentCoinReward>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::tournament_coin_rewards::dsl::*;
+    (
+        diesel::insert_into(schema::tournament_coin_rewards::table)
+            .values(tournament_coin_rewards_to_insert)
+            .on_conflict((tournament_address, coin_type))
+            .do_update()
+            .set((
+                coin_type.eq(excluded(coin_type)),
+                coins.eq(excluded(coins)),
+                coin_reward_amount.eq(excluded(coin_reward_amount)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(
+            " WHERE tournament_coin_rewards.last_transaction_version <= excluded.last_transaction_version ",
+        ),
+    )
+}
+
+fn insert_tournament_token_rewards(
+    tournament_token_rewards_to_insert: Vec<TournamentTokenReward>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_token_rewards::dsl::*;
-    let chunks = get_chunks(
-        tournament_token_rewards_to_insert.len(),
-        TournamentTokenReward::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_token_rewards::table)
-                .values(&tournament_token_rewards_to_insert[start_ind..end_ind])
+
+    ( diesel::insert_into(schema::tournament_token_rewards::table)
+                .values(tournament_token_rewards_to_insert)
                 .on_conflict(tournament_address)
                 .do_update()
                 .set((
@@ -359,25 +340,18 @@ async fn insert_tournament_token_rewards(
                 " WHERE tournament_token_rewards.last_transaction_version <= excluded.last_transaction_version ",
             ),
         )
-        .await?;
-    }
-    Ok(())
 }
 
-async fn insert_tournament_rounds(
-    conn: &mut MyDbConnection,
-    tournament_rounds_to_insert: &[TournamentRound],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_rounds(
+    tournament_rounds_to_insert: Vec<TournamentRound>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_rounds::dsl::*;
-    let chunks = get_chunks(
-        tournament_rounds_to_insert.len(),
-        TournamentRound::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_rounds::table)
-                .values(&tournament_rounds_to_insert[start_ind..end_ind])
+
+    (diesel::insert_into(schema::tournament_rounds::table)
+                .values(tournament_rounds_to_insert)
                 .on_conflict(address)
                 .do_update()
                 .set((
@@ -391,27 +365,19 @@ async fn insert_tournament_rounds(
                 )),
             Some(
                 " WHERE tournament_rounds.last_transaction_version <= excluded.last_transaction_version ",
-            ),
-        )
-        .await?;
-    }
-    Ok(())
+            ),)
 }
 
-async fn insert_tournament_rooms(
-    conn: &mut MyDbConnection,
-    tournament_rooms_to_insert: &[TournamentRoom],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_rooms(
+    tournament_rooms_to_insert: Vec<TournamentRoom>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_rooms::dsl::*;
-    let chunks = get_chunks(
-        tournament_rooms_to_insert.len(),
-        TournamentRoom::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::tournament_rooms::table)
-                .values(&tournament_rooms_to_insert[start_ind..end_ind])
+                .values(tournament_rooms_to_insert)
                 .on_conflict(address)
                 .do_update()
                 .set((
@@ -423,27 +389,19 @@ async fn insert_tournament_rooms(
                 )),
             Some(
                 " WHERE tournament_rooms.last_transaction_version <= excluded.last_transaction_version ",
-            ),
-        )
-        .await?;
-    }
-    Ok(())
+            ),)
 }
 
-async fn insert_tournament_rooms_to_delete(
-    conn: &mut MyDbConnection,
-    tournament_rooms_to_insert: &[TournamentRoom],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_rooms_to_delete(
+    tournament_rooms_to_insert: Vec<TournamentRoom>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_rooms::dsl::*;
-    let chunks = get_chunks(
-        tournament_rooms_to_insert.len(),
-        TournamentRoom::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::tournament_rooms::table)
-                .values(&tournament_rooms_to_insert[start_ind..end_ind])
+                .values(tournament_rooms_to_insert)
                 .on_conflict(address)
                 .do_update()
                 .set((
@@ -452,27 +410,19 @@ async fn insert_tournament_rooms_to_delete(
                 )),
             Some(
                 " WHERE tournament_rooms.last_transaction_version <= excluded.last_transaction_version ",
-            ),
-        )
-        .await?;
-    }
-    Ok(())
+            ))
 }
 
-async fn insert_tournament_players(
-    conn: &mut MyDbConnection,
-    tournament_players_to_insert: &[TournamentPlayer],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_players(
+    tournament_players_to_insert: Vec<TournamentPlayer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_players::dsl::*;
-    let chunks = get_chunks(
-        tournament_players_to_insert.len(),
-        TournamentPlayer::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_players::table)
-                .values(&tournament_players_to_insert[start_ind..end_ind])
+
+    (   diesel::insert_into(schema::tournament_players::table)
+                .values(tournament_players_to_insert)
                 .on_conflict(token_address)
                 .do_update()
                 .set((
@@ -491,27 +441,19 @@ async fn insert_tournament_players(
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ),)
 }
 
-async fn insert_tournament_players_to_assign_room(
-    conn: &mut MyDbConnection,
-    tournament_players_to_insert: &[TournamentPlayer],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_players_to_assign_room(
+    tournament_players_to_insert: Vec<TournamentPlayer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_players::dsl::*;
-    let chunks = get_chunks(
-        tournament_players_to_insert.len(),
-        TournamentPlayer::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::tournament_players::table)
-                .values(&tournament_players_to_insert[start_ind..end_ind])
+                .values(tournament_players_to_insert)
                 .on_conflict(token_address)
                 .do_update()
                 .set((
@@ -520,27 +462,19 @@ async fn insert_tournament_players_to_assign_room(
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ),)
 }
 
-async fn insert_tournament_players_to_delete_room(
-    conn: &mut MyDbConnection,
-    tournament_players_to_insert: &[TournamentPlayer],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_players_to_delete_room(
+    tournament_players_to_insert: Vec<TournamentPlayer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_players::dsl::*;
-    let chunks = get_chunks(
-        tournament_players_to_insert.len(),
-        TournamentPlayer::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::tournament_players::table)
-                .values(&tournament_players_to_insert[start_ind..end_ind])
+                .values(tournament_players_to_insert)
                 .on_conflict(token_address)
                 .do_update()
                 .set((
@@ -549,27 +483,19 @@ async fn insert_tournament_players_to_delete_room(
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ))
 }
 
-async fn insert_tournament_players_to_claim_coin(
-    conn: &mut MyDbConnection,
-    tournament_players_to_insert: &[TournamentPlayer],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_players_to_claim_coin(
+    tournament_players_to_insert: Vec<TournamentPlayer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_players::dsl::*;
-    let chunks = get_chunks(
-        tournament_players_to_insert.len(),
-        TournamentPlayer::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_players::table)
-                .values(&tournament_players_to_insert[start_ind..end_ind])
+
+    ( diesel::insert_into(schema::tournament_players::table)
+                .values(tournament_players_to_insert)
                 .on_conflict(token_address)
                 .do_update()
                 .set((
@@ -579,27 +505,19 @@ async fn insert_tournament_players_to_claim_coin(
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ))
 }
 
-async fn insert_tournament_players_to_delete(
-    conn: &mut MyDbConnection,
-    tournament_players_to_insert: &[TournamentPlayer],
-) -> Result<(), diesel::result::Error> {
+fn insert_tournament_players_to_delete(
+    tournament_players_to_insert: Vec<TournamentPlayer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::tournament_players::dsl::*;
-    let chunks = get_chunks(
-        tournament_players_to_insert.len(),
-        TournamentPlayer::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tournament_players::table)
-                .values(&tournament_players_to_insert[start_ind..end_ind])
+
+    (  diesel::insert_into(schema::tournament_players::table)
+                .values(tournament_players_to_insert)
                 .on_conflict(token_address)
                 .do_update()
                 .set((
@@ -608,27 +526,19 @@ async fn insert_tournament_players_to_delete(
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ))
 }
 
-async fn insert_rock_paper_scissors_games(
-    conn: &mut MyDbConnection,
-    rock_paper_scissors_games_to_insert: &[RockPaperScissorsGame],
-) -> Result<(), diesel::result::Error> {
+fn insert_rock_paper_scissors_games(
+    rock_paper_scissors_games_to_insert: Vec<RockPaperScissorsGame>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::rock_paper_scissors_games::dsl::*;
-    let chunks = get_chunks(
-        rock_paper_scissors_games_to_insert.len(),
-        RockPaperScissorsGame::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::rock_paper_scissors_games::table)
-                .values(&rock_paper_scissors_games_to_insert[start_ind..end_ind])
+
+    ( diesel::insert_into(schema::rock_paper_scissors_games::table)
+                .values(rock_paper_scissors_games_to_insert)
                 .on_conflict(room_address)
                 .do_update()
                 .set((
@@ -640,26 +550,18 @@ async fn insert_rock_paper_scissors_games(
                 )),
                 Some(
                     " WHERE rock_paper_scissors_games.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ),)
 }
-async fn insert_rock_paper_scissors_results(
-    conn: &mut MyDbConnection,
-    rock_paper_scissors_games_to_insert: &[RockPaperScissorsGame],
-) -> Result<(), diesel::result::Error> {
+fn insert_rock_paper_scissors_results(
+    rock_paper_scissors_games_to_insert: Vec<RockPaperScissorsGame>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::rock_paper_scissors_games::dsl::*;
-    let chunks = get_chunks(
-        rock_paper_scissors_games_to_insert.len(),
-        RockPaperScissorsGame::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::rock_paper_scissors_games::table)
-                .values(&rock_paper_scissors_games_to_insert[start_ind..end_ind])
+
+    (  diesel::insert_into(schema::rock_paper_scissors_games::table)
+                .values(rock_paper_scissors_games_to_insert)
                 .on_conflict(room_address)
                 .do_update()
                 .set((
@@ -669,27 +571,19 @@ async fn insert_rock_paper_scissors_results(
                 )),
                 Some(
                     " WHERE rock_paper_scissors_games.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+                ),)
 }
 
-async fn insert_rock_paper_scissors_players(
-    conn: &mut MyDbConnection,
-    rock_paper_scissors_players_to_insert: &[RockPaperScissorsPlayer],
-) -> Result<(), diesel::result::Error> {
+fn insert_rock_paper_scissors_players(
+    rock_paper_scissors_players_to_insert: Vec<RockPaperScissorsPlayer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::rock_paper_scissors_players::dsl::*;
-    let chunks = get_chunks(
-        rock_paper_scissors_players_to_insert.len(),
-        RockPaperScissorsPlayer::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::rock_paper_scissors_players::table)
-                .values(&rock_paper_scissors_players_to_insert[start_ind..end_ind])
+
+    (    diesel::insert_into(schema::rock_paper_scissors_players::table)
+                .values(rock_paper_scissors_players_to_insert)
                 .on_conflict((token_address, room_address))
                 .do_update()
                 .set((
@@ -703,25 +597,18 @@ async fn insert_rock_paper_scissors_players(
                     " WHERE rock_paper_scissors_players.last_transaction_version <= excluded.last_transaction_version ",
                 ),
             )
-        .await?;
-    }
-    Ok(())
 }
 
-async fn insert_trivia_questions(
-    conn: &mut MyDbConnection,
-    trivia_questiosn_to_insert: &[TriviaQuestion],
-) -> Result<(), diesel::result::Error> {
+fn insert_trivia_questions(
+    trivia_questiosn_to_insert: Vec<TriviaQuestion>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::trivia_questions::dsl::*;
-    let chunks = get_chunks(
-        trivia_questiosn_to_insert.len(),
-        TriviaQuestion::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
+    (
             diesel::insert_into(schema::trivia_questions::table)
-                .values(&trivia_questiosn_to_insert[start_ind..end_ind])
+                .values(trivia_questiosn_to_insert)
                 .on_conflict(round_address)
                 .do_update()
                 .set((
@@ -734,63 +621,53 @@ async fn insert_trivia_questions(
                 Some(
                     " WHERE trivia_questions.last_transaction_version <= excluded.last_transaction_version ",
                 ),
-            )
-        .await?;
-    }
-    Ok(())
+           )
 }
 
-async fn insert_trivia_answers(
-    conn: &mut MyDbConnection,
-    trivia_answers_to_insert: &[TriviaAnswer],
-) -> Result<(), diesel::result::Error> {
+fn insert_trivia_answers(
+    trivia_answers_to_insert: Vec<TriviaAnswer>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::trivia_answers::dsl::*;
-    let chunks = get_chunks(trivia_answers_to_insert.len(), TriviaAnswer::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::trivia_answers::table)
-                .values(&trivia_answers_to_insert[start_ind..end_ind])
-                .on_conflict((token_address, round_address))
-                .do_update()
-                .set((
-                    answer_index.eq(excluded(answer_index)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-                Some(
-                    " WHERE trivia_answers.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::trivia_answers::table)
+            .values(trivia_answers_to_insert)
+            .on_conflict((token_address, round_address))
+            .do_update()
+            .set((
+                answer_index.eq(excluded(answer_index)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(
+            " WHERE trivia_answers.last_transaction_version <= excluded.last_transaction_version ",
+        ),
+    )
 }
 
-async fn insert_roulette(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[Roulette],
-) -> Result<(), diesel::result::Error> {
+fn insert_roulette(
+    items_to_insert: Vec<Roulette>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::roulette::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), Roulette::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::roulette::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(room_address)
-                .do_update()
-                .set((
-                    result_index.eq(excluded(result_index)),
-                    revealed_index.eq(excluded(revealed_index)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE roulette.last_transaction_version <= excluded.last_transaction_version "),
-        )
-        .await?;
-    }
-    Ok(())
+
+    (
+        diesel::insert_into(schema::roulette::table)
+            .values(items_to_insert)
+            .on_conflict(room_address)
+            .do_update()
+            .set((
+                result_index.eq(excluded(result_index)),
+                revealed_index.eq(excluded(revealed_index)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE roulette.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
 #[async_trait]
@@ -806,7 +683,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let conn = &mut self.connection_pool.get().await?;
         let processing_start = std::time::Instant::now();
 
         let mut tournament_token_reward_claims = HashMap::new();
@@ -933,7 +809,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         tournament_rooms_to_delete.insert(room.pk(), room);
                     }
                     if let Some(player) = TournamentPlayer::claim_token_reward(
-                        conn,
+                        &mut self.connection_pool.get().await?,
                         event,
                         txn_version,
                         &tournament_token_reward_claims,
@@ -1058,54 +934,39 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let mut main_page_tournaments = main_page_tournaments.values().cloned().collect::<Vec<_>>();
-        let mut tournaments = tournaments.values().cloned().collect::<Vec<_>>();
-        let mut tournament_coin_rewards = tournament_coin_rewards
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut tournament_token_rewards = tournament_token_rewards
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut tournament_rounds = tournament_rounds.values().cloned().collect::<Vec<_>>();
-        let mut tournament_rooms = tournament_rooms.values().cloned().collect::<Vec<_>>();
-        let mut tournament_rooms_to_delete = tournament_rooms_to_delete
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut tournament_players = tournament_players.values().cloned().collect::<Vec<_>>();
+        let mut main_page_tournaments = main_page_tournaments.into_values().collect::<Vec<_>>();
+        let mut tournaments = tournaments.into_values().collect::<Vec<_>>();
+        let mut tournament_coin_rewards = tournament_coin_rewards.into_values().collect::<Vec<_>>();
+        let mut tournament_token_rewards =
+            tournament_token_rewards.into_values().collect::<Vec<_>>();
+        let mut tournament_rounds = tournament_rounds.into_values().collect::<Vec<_>>();
+        let mut tournament_rooms = tournament_rooms.into_values().collect::<Vec<_>>();
+        let mut tournament_rooms_to_delete =
+            tournament_rooms_to_delete.into_values().collect::<Vec<_>>();
+        let mut tournament_players = tournament_players.into_values().collect::<Vec<_>>();
         let mut tournament_players_to_assign_room = tournament_players_to_assign_room
-            .values()
-            .cloned()
+            .into_values()
             .collect::<Vec<_>>();
         let mut tournament_players_to_delete_room = tournament_players_to_delete_room
-            .values()
-            .cloned()
+            .into_values()
             .collect::<Vec<_>>();
         let mut tournament_players_to_claim_coin = tournament_players_to_claim_coin
-            .values()
-            .cloned()
+            .into_values()
             .collect::<Vec<_>>();
         let mut tournament_players_to_delete = tournament_players_to_delete
-            .values()
-            .cloned()
+            .into_values()
             .collect::<Vec<_>>();
-        let mut rock_paper_scissors_games = rock_paper_scissors_games
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut rock_paper_scissors_games =
+            rock_paper_scissors_games.into_values().collect::<Vec<_>>();
         let mut rock_paper_scissors_results = rock_paper_scissors_results
-            .values()
-            .cloned()
+            .into_values()
             .collect::<Vec<_>>();
         let mut rock_paper_scissors_players = rock_paper_scissors_players
-            .values()
-            .cloned()
+            .into_values()
             .collect::<Vec<_>>();
-        let mut trivia_questions = trivia_questions.values().cloned().collect::<Vec<_>>();
-        let mut trivia_answers = trivia_answers.values().cloned().collect::<Vec<_>>();
-        let mut roulette = roulette.values().cloned().collect::<Vec<_>>();
+        let mut trivia_questions = trivia_questions.into_values().collect::<Vec<_>>();
+        let mut trivia_answers = trivia_answers.into_values().collect::<Vec<_>>();
+        let mut roulette = roulette.into_values().collect::<Vec<_>>();
 
         main_page_tournaments.sort();
         tournaments.sort();
@@ -1127,7 +988,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
         roulette.sort();
 
         insert_to_db(
-            conn,
+            self.connection_pool.clone(),
             self.name(),
             start_version,
             end_version,

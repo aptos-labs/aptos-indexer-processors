@@ -18,6 +18,7 @@ use crate::{
         util::{parse_timestamp, standardize_address},
     },
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use futures_util::future::try_join_all;
@@ -25,7 +26,6 @@ use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::client::{Client, ClientConfig};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     fmt::Debug,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -192,17 +192,17 @@ async fn parse_v2_token(
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
-    let mut current_token_datas_v2: HashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
-        HashMap::new();
-    let mut current_collections_v2: HashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
-        HashMap::new();
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+        AHashMap::new();
+    let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
+        AHashMap::new();
 
     for txn in transactions {
         let txn_version = txn.version as i64;
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
-        let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = HashMap::new();
+        let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
         for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                 if let Some(object) =
@@ -214,13 +214,15 @@ async fn parse_v2_token(
                             aptos_collection: None,
                             fixed_supply: None,
                             object,
+                            concurrent_supply: None,
                             unlimited_supply: None,
                             property_map: None,
-                            transfer_event: None,
+                            transfer_events: vec![],
                             token: None,
                             fungible_asset_metadata: None,
                             fungible_asset_supply: None,
                             fungible_asset_store: None,
+                            token_identifier: None,
                         },
                     );
                 }

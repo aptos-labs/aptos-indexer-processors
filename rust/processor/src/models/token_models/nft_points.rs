@@ -17,8 +17,9 @@ use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version))]
 #[diesel(table_name = nft_points)]
 pub struct NftPoints {
@@ -35,10 +36,13 @@ impl NftPoints {
         transaction: &Transaction,
         nft_points_contract: Option<String>,
     ) -> Option<Self> {
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exit!");
+        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
+            error!(
+                transaction_version = transaction.version,
+                "Txn Data doesn't exist for version {}", transaction.version
+            );
+            panic!();
+        });
         let version = transaction.version as i64;
         let timestamp = transaction
             .timestamp

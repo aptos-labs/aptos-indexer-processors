@@ -13,20 +13,23 @@ use crate::{
         fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-        PgPoolConnection,
-    },
+    utils::database::{execute_in_chunks, PgDbPool},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
 pub struct CoinProcessor {
     connection_pool: PgDbPool,
 }
@@ -48,24 +51,8 @@ impl Debug for CoinProcessor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    coin_activities: &[CoinActivity],
-    coin_infos: &[CoinInfo],
-    coin_balances: &[CoinBalance],
-    current_coin_balances: &[CurrentCoinBalance],
-    coin_supply: &[CoinSupply],
-) -> Result<(), diesel::result::Error> {
-    insert_coin_activities(conn, coin_activities).await?;
-    insert_coin_infos(conn, coin_infos).await?;
-    insert_coin_balances(conn, coin_balances).await?;
-    insert_current_coin_balances(conn, current_coin_balances).await?;
-    insert_coin_supply(conn, coin_supply).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -81,176 +68,155 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                &coin_activities,
-                &coin_infos,
-                &coin_balances,
-                &current_coin_balances,
-                &coin_supply,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let coin_activities = clean_data_for_db(coin_activities, true);
-                        let coin_infos = clean_data_for_db(coin_infos, true);
-                        let coin_balances = clean_data_for_db(coin_balances, true);
-                        let current_coin_balances = clean_data_for_db(current_coin_balances, true);
-                        let coin_supply = clean_data_for_db(coin_supply, true);
 
-                        insert_to_db_impl(
-                            pg_conn,
-                            &coin_activities,
-                            &coin_infos,
-                            &coin_balances,
-                            &current_coin_balances,
-                            &coin_supply,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
-    }
+    execute_in_chunks(
+        conn.clone(),
+        insert_coin_activities_query,
+        coin_activities,
+        CoinActivity::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_coin_infos_query,
+        coin_infos,
+        CoinInfo::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_coin_balances_query,
+        coin_balances,
+        CoinBalance::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_current_coin_balances_query,
+        current_coin_balances,
+        CurrentCoinBalance::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        inset_coin_supply_query,
+        coin_supply,
+        CoinSupply::field_count(),
+    )
+    .await?;
+
+    Ok(())
 }
 
-async fn insert_coin_activities(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[CoinActivity],
-) -> Result<(), diesel::result::Error> {
+fn insert_coin_activities_query(
+    items_to_insert: Vec<CoinActivity>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::coin_activities::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), CoinActivity::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::coin_activities::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((
-                    transaction_version,
-                    event_account_address,
-                    event_creation_number,
-                    event_sequence_number,
-                ))
-                .do_update()
-                .set((
-                    entry_function_id_str.eq(excluded(entry_function_id_str)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::coin_activities::table)
+            .values(items_to_insert)
+            .on_conflict((
+                transaction_version,
+                event_account_address,
+                event_creation_number,
+                event_sequence_number,
+            ))
+            .do_update()
+            .set((
+                entry_function_id_str.eq(excluded(entry_function_id_str)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        None,
+    )
 }
 
-async fn insert_coin_infos(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[CoinInfo],
-) -> Result<(), diesel::result::Error> {
+fn insert_coin_infos_query(
+    items_to_insert: Vec<CoinInfo>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::coin_infos::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), CoinInfo::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::coin_infos::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict(coin_type_hash)
-                .do_update()
-                .set((
-                    transaction_version_created.eq(excluded(transaction_version_created)),
-                    creator_address.eq(excluded(creator_address)),
-                    name.eq(excluded(name)),
-                    symbol.eq(excluded(symbol)),
-                    decimals.eq(excluded(decimals)),
-                    transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
-                    supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
-                    supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
-        ).await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::coin_infos::table)
+            .values(items_to_insert)
+            .on_conflict(coin_type_hash)
+            .do_update()
+            .set((
+                transaction_version_created.eq(excluded(transaction_version_created)),
+                creator_address.eq(excluded(creator_address)),
+                name.eq(excluded(name)),
+                symbol.eq(excluded(symbol)),
+                decimals.eq(excluded(decimals)),
+                transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+                supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+                supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
+    )
 }
 
-async fn insert_coin_balances(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[CoinBalance],
-) -> Result<(), diesel::result::Error> {
+fn insert_coin_balances_query(
+    items_to_insert: Vec<CoinBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::coin_balances::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), CoinBalance::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::coin_balances::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, owner_address, coin_type_hash))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::coin_balances::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, owner_address, coin_type_hash))
+            .do_nothing(),
+        None,
+    )
 }
 
-async fn insert_current_coin_balances(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[CurrentCoinBalance],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_coin_balances_query(
+    items_to_insert: Vec<CurrentCoinBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_coin_balances::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), CurrentCoinBalance::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_coin_balances::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((owner_address, coin_type_hash))
-                .do_update()
-                .set((
-                    amount.eq(excluded(amount)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-                Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
-            ).await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::current_coin_balances::table)
+            .values(items_to_insert)
+            .on_conflict((owner_address, coin_type_hash))
+            .do_update()
+            .set((
+                amount.eq(excluded(amount)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
-async fn insert_coin_supply(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[CoinSupply],
-) -> Result<(), diesel::result::Error> {
+fn inset_coin_supply_query(
+    items_to_insert: Vec<CoinSupply>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::coin_supply::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), CoinSupply::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::coin_supply::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, coin_type_hash))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::coin_supply::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, coin_type_hash))
+            .do_nothing(),
+        None,
+    )
 }
 
 #[async_trait]
@@ -267,13 +233,12 @@ impl ProcessorTrait for CoinProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
 
         let mut all_coin_activities = vec![];
         let mut all_coin_balances = vec![];
-        let mut all_coin_infos: HashMap<String, CoinInfo> = HashMap::new();
-        let mut all_current_coin_balances: HashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
-            HashMap::new();
+        let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
+        let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
+            AHashMap::new();
         let mut all_coin_supply = vec![];
 
         for txn in &transactions {
@@ -308,7 +273,7 @@ impl ProcessorTrait for CoinProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

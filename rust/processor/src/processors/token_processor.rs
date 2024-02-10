@@ -16,18 +16,20 @@ use crate::{
         },
     },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-        PgPoolConnection,
-    },
+    utils::database::{execute_in_chunks, PgDbPool},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -61,46 +63,18 @@ impl Debug for TokenProcessor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    basic_token_transaction_lists: (&[Token], &[TokenOwnership], &[TokenData], &[CollectionData]),
-    basic_token_current_lists: (
-        &[CurrentTokenOwnership],
-        &[CurrentTokenData],
-        &[CurrentCollectionData],
-    ),
-    token_activities: &[TokenActivity],
-    current_token_claims: &[CurrentTokenPendingClaim],
-    nft_points: &[NftPoints],
-) -> Result<(), diesel::result::Error> {
-    let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
-    let (current_token_ownerships, current_token_datas, current_collection_datas) =
-        basic_token_current_lists;
-    insert_tokens(conn, tokens).await?;
-    insert_token_datas(conn, token_datas).await?;
-    insert_token_ownerships(conn, token_ownerships).await?;
-    insert_collection_datas(conn, collection_datas).await?;
-    insert_current_token_ownerships(conn, current_token_ownerships).await?;
-    insert_current_token_datas(conn, current_token_datas).await?;
-    insert_current_collection_datas(conn, current_collection_datas).await?;
-    insert_token_activities(conn, token_activities).await?;
-    insert_current_token_claims(conn, current_token_claims).await?;
-    insert_nft_points(conn, nft_points).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    basic_token_transaction_lists: (
+    (tokens, token_ownerships, token_datas, collection_datas): (
         Vec<Token>,
         Vec<TokenOwnership>,
         Vec<TokenData>,
         Vec<CollectionData>,
     ),
-    basic_token_current_lists: (
+    (current_token_ownerships, current_token_datas, current_collection_datas): (
         Vec<CurrentTokenOwnership>,
         Vec<CurrentTokenData>,
         Vec<CurrentCollectionData>,
@@ -115,357 +89,313 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    let (tokens, token_ownerships, token_datas, collection_datas) = basic_token_transaction_lists;
-    let (current_token_ownerships, current_token_datas, current_collection_datas) =
-        basic_token_current_lists;
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                (&tokens, &token_ownerships, &token_datas, &collection_datas),
-                (
-                    &current_token_ownerships,
-                    &current_token_datas,
-                    &current_collection_datas,
-                ),
-                &token_activities,
-                &current_token_claims,
-                &nft_points,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let tokens = clean_data_for_db(tokens, true);
-                        let token_datas = clean_data_for_db(token_datas, true);
-                        let token_ownerships = clean_data_for_db(token_ownerships, true);
-                        let collection_datas = clean_data_for_db(collection_datas, true);
-                        let current_token_ownerships =
-                            clean_data_for_db(current_token_ownerships, true);
-                        let current_token_datas = clean_data_for_db(current_token_datas, true);
-                        let current_collection_datas =
-                            clean_data_for_db(current_collection_datas, true);
-                        let token_activities = clean_data_for_db(token_activities, true);
-                        let current_token_claims = clean_data_for_db(current_token_claims, true);
-                        let nft_points = clean_data_for_db(nft_points, true);
 
-                        insert_to_db_impl(
-                            pg_conn,
-                            (&tokens, &token_ownerships, &token_datas, &collection_datas),
-                            (
-                                &current_token_ownerships,
-                                &current_token_datas,
-                                &current_collection_datas,
-                            ),
-                            &token_activities,
-                            &current_token_claims,
-                            &nft_points,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
-    }
-}
+    execute_in_chunks(
+        conn.clone(),
+        insert_tokens_query,
+        tokens,
+        Token::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_token_ownerships_query,
+        token_ownerships,
+        TokenOwnership::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_token_datas_query,
+        token_datas,
+        TokenData::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_collection_datas_query,
+        collection_datas,
+        CollectionData::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_current_token_ownerships_query,
+        current_token_ownerships,
+        CurrentTokenOwnership::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_current_token_datas_query,
+        current_token_datas,
+        CurrentTokenData::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_current_collection_datas_query,
+        current_collection_datas,
+        CurrentCollectionData::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_token_activities_query,
+        token_activities,
+        TokenActivity::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_current_token_claims_query,
+        current_token_claims,
+        CurrentTokenPendingClaim::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn,
+        insert_nft_points_query,
+        nft_points,
+        NftPoints::field_count(),
+    )
+    .await?;
 
-async fn insert_tokens(
-    conn: &mut MyDbConnection,
-    tokens_to_insert: &[Token],
-) -> Result<(), diesel::result::Error> {
-    use schema::tokens::dsl::*;
-
-    let chunks = get_chunks(tokens_to_insert.len(), Token::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::tokens::table)
-                .values(&tokens_to_insert[start_ind..end_ind])
-                .on_conflict((token_data_id_hash, property_version, transaction_version))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
     Ok(())
 }
 
-async fn insert_token_ownerships(
-    conn: &mut MyDbConnection,
-    token_ownerships_to_insert: &[TokenOwnership],
-) -> Result<(), diesel::result::Error> {
+fn insert_tokens_query(
+    tokens_to_insert: Vec<Token>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::tokens::dsl::*;
+    (
+        diesel::insert_into(schema::tokens::table)
+            .values(tokens_to_insert)
+            .on_conflict((token_data_id_hash, property_version, transaction_version))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_token_ownerships_query(
+    token_ownerships_to_insert: Vec<TokenOwnership>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::token_ownerships::dsl::*;
 
-    let chunks = get_chunks(
-        token_ownerships_to_insert.len(),
-        TokenOwnership::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::token_ownerships::table)
-                .values(&token_ownerships_to_insert[start_ind..end_ind])
-                .on_conflict((
-                    token_data_id_hash,
-                    property_version,
-                    transaction_version,
-                    table_handle,
-                ))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::token_ownerships::table)
+            .values(token_ownerships_to_insert)
+            .on_conflict((
+                token_data_id_hash,
+                property_version,
+                transaction_version,
+                table_handle,
+            ))
+            .do_nothing(),
+        None,
+    )
 }
 
-async fn insert_token_datas(
-    conn: &mut MyDbConnection,
-    token_datas_to_insert: &[TokenData],
-) -> Result<(), diesel::result::Error> {
+fn insert_token_datas_query(
+    token_datas_to_insert: Vec<TokenData>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::token_datas::dsl::*;
-
-    let chunks = get_chunks(token_datas_to_insert.len(), TokenData::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::token_datas::table)
-                .values(&token_datas_to_insert[start_ind..end_ind])
-                .on_conflict((token_data_id_hash, transaction_version))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::token_datas::table)
+            .values(token_datas_to_insert)
+            .on_conflict((token_data_id_hash, transaction_version))
+            .do_nothing(),
+        None,
+    )
 }
 
-async fn insert_collection_datas(
-    conn: &mut MyDbConnection,
-    collection_datas_to_insert: &[CollectionData],
-) -> Result<(), diesel::result::Error> {
+fn insert_collection_datas_query(
+    collection_datas_to_insert: Vec<CollectionData>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::collection_datas::dsl::*;
 
-    let chunks = get_chunks(
-        collection_datas_to_insert.len(),
-        CollectionData::field_count(),
-    );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::collection_datas::table)
-                .values(&collection_datas_to_insert[start_ind..end_ind])
-                .on_conflict((collection_data_id_hash, transaction_version))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::collection_datas::table)
+            .values(collection_datas_to_insert)
+            .on_conflict((collection_data_id_hash, transaction_version))
+            .do_nothing(),
+        None,
+    )
 }
 
-async fn insert_current_token_ownerships(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentTokenOwnership],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_token_ownerships_query(
+    items_to_insert: Vec<CurrentTokenOwnership>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_token_ownerships::dsl::*;
 
-    let chunks = get_chunks(items_to_insert.len(), CurrentTokenOwnership::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_token_ownerships::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((token_data_id_hash, property_version, owner_address))
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    amount.eq(excluded(amount)),
-                    token_properties.eq(excluded(token_properties)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    table_type.eq(excluded(table_type)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+    (diesel::insert_into(schema::current_token_ownerships::table)
+         .values(items_to_insert)
+         .on_conflict((token_data_id_hash, property_version, owner_address))
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             amount.eq(excluded(amount)),
+             token_properties.eq(excluded(token_properties)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             table_type.eq(excluded(table_type)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
-async fn insert_current_token_datas(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentTokenData],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_token_datas_query(
+    items_to_insert: Vec<CurrentTokenData>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_token_datas::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), CurrentTokenData::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_token_datas::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(token_data_id_hash)
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    maximum.eq(excluded(maximum)),
-                    supply.eq(excluded(supply)),
-                    largest_property_version.eq(excluded(largest_property_version)),
-                    metadata_uri.eq(excluded(metadata_uri)),
-                    payee_address.eq(excluded(payee_address)),
-                    royalty_points_numerator.eq(excluded(royalty_points_numerator)),
-                    royalty_points_denominator.eq(excluded(royalty_points_denominator)),
-                    maximum_mutable.eq(excluded(maximum_mutable)),
-                    uri_mutable.eq(excluded(uri_mutable)),
-                    description_mutable.eq(excluded(description_mutable)),
-                    properties_mutable.eq(excluded(properties_mutable)),
-                    royalty_mutable.eq(excluded(royalty_mutable)),
-                    default_properties.eq(excluded(default_properties)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    description.eq(excluded(description)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+    (diesel::insert_into(schema::current_token_datas::table)
+         .values(items_to_insert)
+         .on_conflict(token_data_id_hash)
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             maximum.eq(excluded(maximum)),
+             supply.eq(excluded(supply)),
+             largest_property_version.eq(excluded(largest_property_version)),
+             metadata_uri.eq(excluded(metadata_uri)),
+             payee_address.eq(excluded(payee_address)),
+             royalty_points_numerator.eq(excluded(royalty_points_numerator)),
+             royalty_points_denominator.eq(excluded(royalty_points_denominator)),
+             maximum_mutable.eq(excluded(maximum_mutable)),
+             uri_mutable.eq(excluded(uri_mutable)),
+             description_mutable.eq(excluded(description_mutable)),
+             properties_mutable.eq(excluded(properties_mutable)),
+             royalty_mutable.eq(excluded(royalty_mutable)),
+             default_properties.eq(excluded(default_properties)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             description.eq(excluded(description)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
-async fn insert_current_collection_datas(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentCollectionData],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_collection_datas_query(
+    items_to_insert: Vec<CurrentCollectionData>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_collection_datas::dsl::*;
 
-    let chunks = get_chunks(items_to_insert.len(), CurrentCollectionData::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_collection_datas::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(collection_data_id_hash)
-                .do_update()
-                .set((
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    description.eq(excluded(description)),
-                    metadata_uri.eq(excluded(metadata_uri)),
-                    supply.eq(excluded(supply)),
-                    maximum.eq(excluded(maximum)),
-                    maximum_mutable.eq(excluded(maximum_mutable)),
-                    uri_mutable.eq(excluded(uri_mutable)),
-                    description_mutable.eq(excluded(description_mutable)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    table_handle.eq(excluded(table_handle)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+    (diesel::insert_into(schema::current_collection_datas::table)
+         .values(items_to_insert)
+         .on_conflict(collection_data_id_hash)
+         .do_update()
+         .set((
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             description.eq(excluded(description)),
+             metadata_uri.eq(excluded(metadata_uri)),
+             supply.eq(excluded(supply)),
+             maximum.eq(excluded(maximum)),
+             maximum_mutable.eq(excluded(maximum_mutable)),
+             uri_mutable.eq(excluded(uri_mutable)),
+             description_mutable.eq(excluded(description_mutable)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             table_handle.eq(excluded(table_handle)),
+             inserted_at.eq(excluded(inserted_at)),
+         )),
+     Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
-async fn insert_token_activities(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[TokenActivity],
-) -> Result<(), diesel::result::Error> {
+fn insert_token_activities_query(
+    items_to_insert: Vec<TokenActivity>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::token_activities::dsl::*;
 
-    let chunks = get_chunks(items_to_insert.len(), TokenActivity::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::token_activities::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((
-                    transaction_version,
-                    event_account_address,
-                    event_creation_number,
-                    event_sequence_number,
-                ))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::token_activities::table)
+            .values(items_to_insert)
+            .on_conflict((
+                transaction_version,
+                event_account_address,
+                event_creation_number,
+                event_sequence_number,
+            ))
+            .do_nothing(),
+        None,
+    )
 }
 
-async fn insert_current_token_claims(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentTokenPendingClaim],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_token_claims_query(
+    items_to_insert: Vec<CurrentTokenPendingClaim>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::current_token_pending_claims::dsl::*;
 
-    let chunks = get_chunks(
-        items_to_insert.len(),
-        CurrentTokenPendingClaim::field_count(),
-    );
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_token_pending_claims::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((
-                    token_data_id_hash, property_version, from_address, to_address
-                ))
-                .do_update()
-                .set((
-                    collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                    creator_address.eq(excluded(creator_address)),
-                    collection_name.eq(excluded(collection_name)),
-                    name.eq(excluded(name)),
-                    amount.eq(excluded(amount)),
-                    table_handle.eq(excluded(table_handle)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    token_data_id.eq(excluded(token_data_id)),
-                    collection_id.eq(excluded(collection_id)),
-                )),
-            Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
+    (diesel::insert_into(schema::current_token_pending_claims::table)
+         .values(items_to_insert)
+         .on_conflict((
+             token_data_id_hash, property_version, from_address, to_address
+         ))
+         .do_update()
+         .set((
+             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+             creator_address.eq(excluded(creator_address)),
+             collection_name.eq(excluded(collection_name)),
+             name.eq(excluded(name)),
+             amount.eq(excluded(amount)),
+             table_handle.eq(excluded(table_handle)),
+             last_transaction_version.eq(excluded(last_transaction_version)),
+             inserted_at.eq(excluded(inserted_at)),
+             token_data_id.eq(excluded(token_data_id)),
+             collection_id.eq(excluded(collection_id)),
+         )),
+     Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
+    )
 }
 
-async fn insert_nft_points(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[NftPoints],
-) -> Result<(), diesel::result::Error> {
+fn insert_nft_points_query(
+    items_to_insert: Vec<NftPoints>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::nft_points::dsl::*;
 
-    let chunks = get_chunks(items_to_insert.len(), NftPoints::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::nft_points::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(transaction_version)
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::nft_points::table)
+            .values(items_to_insert)
+            .on_conflict(transaction_version)
+            .do_nothing(),
+        None,
+    )
 }
 
 #[async_trait]
@@ -497,18 +427,18 @@ impl ProcessorTrait for TokenProcessor {
         let mut all_token_activities = vec![];
 
         // Hashmap key will be the PK of the table, we do not want to send duplicates writes to the db within a batch
-        let mut all_current_token_ownerships: HashMap<
+        let mut all_current_token_ownerships: AHashMap<
             CurrentTokenOwnershipPK,
             CurrentTokenOwnership,
-        > = HashMap::new();
-        let mut all_current_token_datas: HashMap<TokenDataIdHash, CurrentTokenData> =
-            HashMap::new();
-        let mut all_current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
-            HashMap::new();
-        let mut all_current_token_claims: HashMap<
+        > = AHashMap::new();
+        let mut all_current_token_datas: AHashMap<TokenDataIdHash, CurrentTokenData> =
+            AHashMap::new();
+        let mut all_current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
+            AHashMap::new();
+        let mut all_current_token_claims: AHashMap<
             CurrentTokenPendingClaimPK,
             CurrentTokenPendingClaim,
-        > = HashMap::new();
+        > = AHashMap::new();
 
         // This is likely temporary
         let mut all_nft_points = vec![];
@@ -592,7 +522,7 @@ impl ProcessorTrait for TokenProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,

@@ -8,8 +8,10 @@ use prometheus::{
 };
 
 pub enum ProcessorStep {
-    ReceivedTxnsFromGrpc, // Received transactions from GRPC. Sending transactions to channel.
-    ProcessedBatch,       // Processor finished processing one batch of transaction
+    ReceivedTxnsFromGrpc,
+    // Received transactions from GRPC. Sending transactions to channel.
+    ProcessedBatch,
+    // Processor finished processing one batch of transaction
     ProcessedMultipleBatches, // Processor finished processing multiple batches of transactions
 }
 
@@ -211,6 +213,24 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
         "indexer_processor_transaction_unix_timestamp",
         "Transaction timestamp in unixtime",
         &["processor_name", "step", "message"]
+    )
+    .unwrap()
+});
+
+/// Data gap warnings
+pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("indexer_processor_data_gap_count", "Data gap count", &[
+        "type"
+    ])
+    .unwrap()
+});
+
+/// GRPC latency.
+pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_grpc_latency_in_secs",
+        "GRPC latency observed by processor",
+        &["processor_name"]
     )
     .unwrap()
 });

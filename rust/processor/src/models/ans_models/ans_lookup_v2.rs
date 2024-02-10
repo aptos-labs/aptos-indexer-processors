@@ -16,11 +16,11 @@ use crate::{
     },
     utils::util::standardize_address,
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 type Domain = String;
 type Subdomain = String;
@@ -170,7 +170,7 @@ impl CurrentAnsLookupV2 {
         ans_v2_contract_address: &str,
         txn_version: i64,
         write_set_change_index: i64,
-        address_to_subdomain_ext: &HashMap<String, SubdomainExtV2>,
+        address_to_subdomain_ext: &AHashMap<String, SubdomainExtV2>,
     ) -> anyhow::Result<Option<(Self, AnsLookupV2)>> {
         if let Some(inner) =
             NameRecordV2::from_write_resource(write_resource, ans_v2_contract_address, txn_version)

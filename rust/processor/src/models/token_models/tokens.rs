@@ -20,6 +20,7 @@ use crate::{
         util::{ensure_not_negative, parse_timestamp, standardize_address},
     },
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, DeleteTableItem,
     Transaction, WriteResource, WriteTableItem,
@@ -27,12 +28,12 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use tracing::error;
 
 type TableHandle = String;
 type Address = String;
 type TableType = String;
-pub type TableHandleToOwner = HashMap<TableHandle, TableMetadataForToken>;
+pub type TableHandleToOwner = AHashMap<TableHandle, TableMetadataForToken>;
 pub type TokenDataIdHash = String;
 // PK of current_token_ownerships, i.e. token_data_id_hash + property_version + owner_address, used to dedupe
 pub type CurrentTokenOwnershipPK = (TokenDataIdHash, BigDecimal, Address);
@@ -41,7 +42,7 @@ pub type CurrentTokenPendingClaimPK = (TokenDataIdHash, BigDecimal, Address, Add
 // PK of tokens table, used to dedupe tokens
 pub type TokenPK = (TokenDataIdHash, BigDecimal);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id_hash, property_version, transaction_version))]
 #[diesel(table_name = tokens)]
 pub struct Token {
@@ -77,33 +78,36 @@ impl Token {
         Vec<TokenOwnership>,
         Vec<TokenData>,
         Vec<CollectionData>,
-        HashMap<CurrentTokenOwnershipPK, CurrentTokenOwnership>,
-        HashMap<TokenDataIdHash, CurrentTokenData>,
-        HashMap<TokenDataIdHash, CurrentCollectionData>,
-        HashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
+        AHashMap<CurrentTokenOwnershipPK, CurrentTokenOwnership>,
+        AHashMap<TokenDataIdHash, CurrentTokenData>,
+        AHashMap<TokenDataIdHash, CurrentCollectionData>,
+        AHashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
     ) {
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exit!");
+        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
+            error!(
+                transaction_version = transaction.version,
+                "Txn Data doesn't exist for version {}", transaction.version
+            );
+            panic!();
+        });
         if let TxnData::User(_) = txn_data {
             let mut token_ownerships = vec![];
             let mut token_datas = vec![];
             let mut collection_datas = vec![];
 
-            let mut tokens: HashMap<TokenPK, Token> = HashMap::new();
-            let mut current_token_ownerships: HashMap<
+            let mut tokens: AHashMap<TokenPK, Token> = AHashMap::new();
+            let mut current_token_ownerships: AHashMap<
                 CurrentTokenOwnershipPK,
                 CurrentTokenOwnership,
-            > = HashMap::new();
-            let mut current_token_datas: HashMap<TokenDataIdHash, CurrentTokenData> =
-                HashMap::new();
-            let mut current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
-                HashMap::new();
-            let mut current_token_claims: HashMap<
+            > = AHashMap::new();
+            let mut current_token_datas: AHashMap<TokenDataIdHash, CurrentTokenData> =
+                AHashMap::new();
+            let mut current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
+                AHashMap::new();
+            let mut current_token_claims: AHashMap<
                 CurrentTokenPendingClaimPK,
                 CurrentTokenPendingClaim,
-            > = HashMap::new();
+            > = AHashMap::new();
 
             let txn_version = transaction.version as i64;
             let txn_timestamp =
@@ -362,7 +366,7 @@ impl TableMetadataForToken {
     pub fn get_table_handle_to_owner_from_transactions(
         transactions: &[Transaction],
     ) -> TableHandleToOwner {
-        let mut table_handle_to_owner: TableHandleToOwner = HashMap::new();
+        let mut table_handle_to_owner: TableHandleToOwner = AHashMap::new();
         // Do a first pass to get all the table metadata in the batch.
         for transaction in transactions {
             if let TxnData::User(_) = transaction.txn_data.as_ref().unwrap() {
@@ -422,7 +426,7 @@ impl TableMetadataForToken {
             TokenResource::TokenStoreResource(inner) => inner.tokens.get_handle(),
             TokenResource::PendingClaimsResource(inner) => inner.pending_claims.get_handle(),
         };
-        Ok(Some(HashMap::from([(
+        Ok(Some(AHashMap::from([(
             standardize_address(&table_handle),
             value,
         )])))

@@ -14,6 +14,7 @@ pub mod coin_processor;
 pub mod default_processor;
 pub mod events_processor;
 pub mod fungible_asset_processor;
+pub mod monitoring_processor;
 pub mod nft_metadata_processor;
 pub mod objects_processor;
 pub mod stake_processor;
@@ -29,6 +30,7 @@ use self::{
     default_processor::DefaultProcessor,
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
+    monitoring_processor::MonitoringProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
     objects_processor::ObjectsProcessor,
     stake_processor::StakeProcessor,
@@ -54,6 +56,7 @@ use std::fmt::Debug;
 
 type StartVersion = u64;
 type EndVersion = u64;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ProcessingResult {
     pub start_version: StartVersion,
@@ -82,6 +85,12 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     fn connection_pool(&self) -> &PgDbPool;
 
     //* Below are helper methods that don't need to be implemented *//
+
+    /// Gets an instance of the connection pool
+    fn get_pool(&self) -> PgDbPool {
+        let pool = self.connection_pool();
+        pool.clone()
+    }
 
     /// Gets the connection.
     /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
@@ -114,7 +123,6 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         version: u64,
         last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     ) -> anyhow::Result<()> {
-        let mut conn = self.get_conn().await;
         let timestamp = last_transaction_timestamp.map(|t| parse_timestamp(&t, version as i64));
         let status = ProcessorStatus {
             processor: self.name().to_string(),
@@ -122,7 +130,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
             last_transaction_timestamp: timestamp,
         };
         execute_with_better_error(
-            &mut conn,
+            self.get_pool(),
             diesel::insert_into(processor_status::table)
                 .values(&status)
                 .on_conflict(processor_status::processor)
@@ -180,6 +188,7 @@ pub enum ProcessorConfig {
     DefaultProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
+    MonitoringProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
     ObjectsProcessor,
     StakeProcessor,
@@ -221,6 +230,7 @@ pub enum Processor {
     DefaultProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
+    MonitoringProcessor,
     NftMetadataProcessor,
     ObjectsProcessor,
     StakeProcessor,

@@ -240,6 +240,7 @@ impl AnsWriteResource {
         ))
     }
 }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenewNameEvent {
     domain_name: String,

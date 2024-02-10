@@ -143,6 +143,7 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                 Ok(resp) => {
                     tracing::info!(url = &url, response = ?resp, "Request succeeded");
                     // Process the data as needed
+                    let system_time_now = chrono::Utc::now().naive_utc();
                     for processor in resp.processor_status {
                         HASURA_API_LATEST_VERSION
                             .with_label_values(&[&processor.processor, &chain_name])
@@ -156,13 +157,10 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                                 processor.last_transaction_timestamp.timestamp_micros() as f64
                                     * 1e-6,
                             );
+                        let latency = system_time_now - processor.last_transaction_timestamp;
                         HASURA_API_LATEST_TRANSACTION_LATENCY_IN_SECS
                             .with_label_values(&[&processor.processor, &chain_name])
-                            .set(
-                                (processor.last_updated - processor.last_transaction_timestamp)
-                                    .num_milliseconds() as f64
-                                    * 1e-3,
-                            );
+                            .set(latency.num_milliseconds() as f64 * 1e-3);
                     }
                 },
                 Err(err) => {

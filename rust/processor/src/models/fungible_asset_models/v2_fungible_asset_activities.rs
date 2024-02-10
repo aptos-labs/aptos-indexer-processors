@@ -21,12 +21,12 @@ use crate::{
     schema::fungible_asset_activities,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
@@ -37,9 +37,9 @@ pub type OwnerAddress = String;
 pub type CoinType = String;
 // Primary key of the current_coin_balances table, i.e. (owner_address, coin_type)
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
-pub type EventToCoinType = HashMap<EventGuidResource, CoinType>;
+pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = fungible_asset_activities)]
 pub struct FungibleAssetActivity {
@@ -146,14 +146,14 @@ impl FungibleAssetActivity {
                 creation_num: event_key.creation_number as i64,
             };
             let coin_type =
-                    event_to_coin_type
-                        .get(&event_move_guid)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                                txn_version, event_move_guid, event_to_coin_type
-                            )
-                        }).clone();
+                event_to_coin_type
+                    .get(&event_move_guid)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                            txn_version, event_move_guid, event_to_coin_type
+                        )
+                    }).clone();
             let storage_id =
                 CoinInfoType::get_storage_id(coin_type.as_str(), event_move_guid.addr.as_str());
             Ok(Some(Self {

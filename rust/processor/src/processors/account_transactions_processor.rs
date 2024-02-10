@@ -5,17 +5,15 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::account_transaction_models::account_transactions::AccountTransaction,
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-        PgPoolConnection,
-    },
+    utils::database::{execute_in_chunks, PgDbPool},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::result::Error;
+use diesel::{pg::Pg, query_builder::QueryFragment};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 pub struct AccountTransactionsProcessor {
@@ -39,16 +37,8 @@ impl Debug for AccountTransactionsProcessor {
     }
 }
 
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    account_transactions: &[AccountTransaction],
-) -> Result<(), diesel::result::Error> {
-    insert_account_transactions(conn, account_transactions).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -60,46 +50,31 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| Box::pin(insert_to_db_impl(pg_conn, &account_transactions)))
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        insert_to_db_impl(pg_conn, &clean_data_for_db(account_transactions, true))
-                            .await
-                    })
-                })
-                .await
-        },
-    }
+    execute_in_chunks(
+        conn.clone(),
+        insert_account_transactions_query,
+        account_transactions,
+        AccountTransaction::field_count(),
+    )
+    .await?;
+    Ok(())
 }
 
-async fn insert_account_transactions(
-    conn: &mut MyDbConnection,
-    item_to_insert: &[AccountTransaction],
-) -> Result<(), diesel::result::Error> {
+fn insert_account_transactions_query(
+    item_to_insert: Vec<AccountTransaction>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::account_transactions::dsl::*;
 
-    let chunks = get_chunks(item_to_insert.len(), AccountTransaction::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::account_transactions::table)
-                .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, account_address))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::account_transactions::table)
+            .values(item_to_insert)
+            .on_conflict((transaction_version, account_address))
+            .do_nothing(),
+        None,
+    )
 }
 
 #[async_trait]
@@ -116,8 +91,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let mut conn = self.get_conn().await;
-        let mut account_transactions = HashMap::new();
+        let mut account_transactions = AHashMap::new();
 
         for txn in &transactions {
             account_transactions.extend(AccountTransaction::from_transaction(txn));
@@ -135,7 +109,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
