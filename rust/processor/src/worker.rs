@@ -3,11 +3,15 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    models::{
+        events_models::events::EventModel, ledger_info::LedgerInfo,
+        processor_status::ProcessorStatusQuery,
+    },
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        event_stream_processor::EventStreamProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
@@ -26,6 +30,7 @@ use crate::{
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        stream::spawn_stream,
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -33,9 +38,13 @@ use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use std::{sync::Arc, time::Duration};
-use tokio::time::timeout;
+use tokio::{
+    sync::broadcast::{self, Receiver, Sender},
+    time::timeout,
+};
 use tracing::{error, info};
 use url::Url;
+use warp::Filter;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
@@ -44,6 +53,26 @@ const BUFFER_SIZE: usize = 50;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
+
+#[derive(Clone)]
+pub struct StreamContext {
+    pub channel: Sender<EventModel>,
+    pub websocket_alive_duration: u64,
+}
+
+/// Handles WebSocket connection from /stream endpoint
+async fn handle_websocket(
+    websocket: warp::ws::Ws,
+    context: Arc<StreamContext>,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    Ok(websocket.on_upgrade(move |ws| {
+        spawn_stream(
+            ws,
+            context.channel.clone(),
+            context.websocket_alive_duration,
+        )
+    }))
+}
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
@@ -166,7 +195,8 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // Build the processor based on the config.
-        let processor = build_processor(&self.processor_config, self.db_pool.clone());
+        let (processor, (event_tx, mut event_rx)) =
+            build_processor(&self.processor_config, self.db_pool.clone()).await;
         let processor = Arc::new(processor);
 
         // This is the moving average that we use to calculate TPS
@@ -221,6 +251,34 @@ impl Worker {
                 gap_detection_batch_size,
             )
             .await;
+        });
+
+        // Receive all messages with initial Receiver to keep channel open
+        tokio::spawn(async move {
+            loop {
+                event_rx.recv().await.unwrap_or_else(|e| {
+                    error!(
+                        error = ?e,
+                        "[Event Stream] Failed to receive message from channel"
+                    );
+                    panic!();
+                });
+            }
+        });
+
+        tokio::spawn(async move {
+            // Create web server
+            let stream_context = Arc::new(StreamContext {
+                channel: event_tx,
+                websocket_alive_duration: 3000,
+            });
+
+            let ws_route = warp::path("stream")
+                .and(warp::ws())
+                .and(warp::any().map(move || stream_context.clone()))
+                .and_then(handle_websocket);
+
+            warp::serve(ws_route).run(([0, 0, 0, 0], 8081)).await;
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -729,8 +787,12 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
-    match config {
+pub async fn build_processor(
+    config: &ProcessorConfig,
+    db_pool: PgDbPool,
+) -> (Processor, (Sender<EventModel>, Receiver<EventModel>)) {
+    let (tx, rx) = broadcast::channel::<EventModel>(10000);
+    let processor = match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
         },
@@ -739,6 +801,9 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
+        ProcessorConfig::EventStreamProcessor => {
+            Processor::from(EventStreamProcessor::new(db_pool, tx.clone()))
+        },
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
@@ -756,5 +821,6 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
         },
-    }
+    };
+    (processor, (tx, rx))
 }

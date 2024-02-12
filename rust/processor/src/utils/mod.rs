@@ -3,4 +3,5 @@
 
 pub mod counters;
 pub mod database;
+pub mod stream;
 pub mod util;
