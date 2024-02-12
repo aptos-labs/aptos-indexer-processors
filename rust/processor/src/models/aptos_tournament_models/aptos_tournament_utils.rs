@@ -1,7 +1,8 @@
 use crate::{
     models::{
-        coin_models::coin_utils::Coin, default_models::move_resources::MoveResource,
-        token_models::token_utils::TokenType,
+        coin_models::coin_utils::Coin,
+        default_models::move_resources::MoveResource,
+        token_models::token_utils::{TokenIdType, TokenType},
     },
     utils::util::{deserialize_from_string, standardize_address, standardized_type_address},
 };
@@ -852,11 +853,85 @@ impl BurnRoomEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AddTokenV1Reward {
+    tournament_address: String,
+    token_id: TokenIdType,
+}
+
+impl AddTokenV1Reward {
+    pub fn get_tournament_address(&self) -> String {
+        standardize_address(&self.tournament_address)
+    }
+
+    pub fn get_token_data_id(&self) -> String {
+        self.token_id.token_data_id.to_hash()
+    }
+
+    pub fn from_event(
+        contract_addr: &str,
+        event: &Event,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        if let Some(AptosTournamentEvent::AddTokenV1Reward(inner)) =
+            AptosTournamentEvent::from_event(
+                contract_addr,
+                &standardized_type_address(event.type_str.as_str()),
+                &event.data,
+                txn_version,
+            )
+            .unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RemoveTokenV1Reward {
+    tournament_address: String,
+    token_id: TokenIdType,
+}
+
+impl RemoveTokenV1Reward {
+    pub fn get_tournament_address(&self) -> String {
+        standardize_address(&self.tournament_address)
+    }
+
+    pub fn get_token_data_id(&self) -> String {
+        self.token_id.token_data_id.to_hash()
+    }
+
+    pub fn from_event(
+        contract_addr: &str,
+        event: &Event,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        if let Some(AptosTournamentEvent::RemoveTokenV1Reward(inner)) =
+            AptosTournamentEvent::from_event(
+                contract_addr,
+                &standardized_type_address(event.type_str.as_str()),
+                &event.data,
+                txn_version,
+            )
+            .unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AptosTournamentEvent {
     RPSResultEvent(RPSResultEvent),
     CreateRoomEvent(CreateRoomEvent),
     BurnPlayerTokenEvent(BurnPlayerTokenEvent),
     BurnRoomEvent(BurnRoomEvent),
+    AddTokenV1Reward(AddTokenV1Reward),
+    RemoveTokenV1Reward(RemoveTokenV1Reward),
 }
 
 impl AptosTournamentEvent {
@@ -879,6 +954,12 @@ impl AptosTournamentEvent {
             },
             x if x == format!("{}::room::BurnRoomEvent", contract_addr) => {
                 serde_json::from_str(event_data).map(|inner| Some(Self::BurnRoomEvent(inner)))
+            },
+            x if x == format!("{}::rewards::AddTokenV1Reward", contract_addr) => {
+                serde_json::from_str(event_data).map(|inner| Some(Self::AddTokenV1Reward(inner)))
+            },
+            x if x == format!("{}::rewards::RemoveTokenV1Reward", contract_addr) => {
+                serde_json::from_str(event_data).map(|inner| Some(Self::RemoveTokenV1Reward(inner)))
             },
             _ => Ok(None),
         }

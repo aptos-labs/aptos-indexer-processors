@@ -950,6 +950,17 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     ) {
                         rock_paper_scissors_results.insert(rps_result.pk(), rps_result);
                     }
+                    if let Some(token_reward) = TournamentTokenReward::from_event(
+                        conn,
+                        &self.config.contract_address,
+                        event,
+                        txn_version,
+                        &tournament_token_rewards,
+                    )
+                    .await
+                    {
+                        tournament_token_rewards.insert(token_reward.pk(), token_reward);
+                    }
 
                     let players = TournamentPlayer::delete_room(
                         &self.config.contract_address,
@@ -983,13 +994,6 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             txn_version,
                         ) {
                             tournament_coin_rewards.insert(coin_reward.pk(), coin_reward);
-                        }
-                        if let Some(token_reward) = TournamentTokenReward::from_write_resource(
-                            &self.config.contract_address,
-                            wr,
-                            txn_version,
-                        ) {
-                            tournament_token_rewards.insert(token_reward.pk(), token_reward);
                         }
                         if let Some(player) = TournamentPlayer::claim_coin_reward(
                             &self.config.contract_address,

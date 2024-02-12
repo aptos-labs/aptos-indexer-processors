@@ -1,10 +1,16 @@
 // Copyright © Aptos Foundation
 
-use super::aptos_tournament_utils::AptosTournamentResource;
 use crate::{
-    models::default_models::move_resources::MoveResource, schema::tournament_token_rewards,
+    models::{
+        aptos_tournament_models::aptos_tournament_utils::{AddTokenV1Reward, RemoveTokenV1Reward},
+        token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+    },
+    schema::tournament_token_rewards,
+    utils::database::PgPoolConnection,
 };
-use aptos_protos::transaction::v1::WriteResource;
+use aptos_protos::transaction::v1::Event;
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,7 +24,7 @@ pub type TournamentTokenRewardMapping = HashMap<String, TournamentTokenReward>;
 #[diesel(table_name = tournament_token_rewards)]
 pub struct TournamentTokenReward {
     pub tournament_address: String,
-    pub tokens: Vec<String>,
+    pub tokens: Vec<Option<String>>,
     pub last_transaction_version: i64,
 }
 
@@ -27,43 +33,74 @@ impl TournamentTokenReward {
         self.tournament_address.clone()
     }
 
-    pub fn from_write_resource(
-        contract_addr: &str,
-        write_resource: &WriteResource,
-        transaction_version: i64,
+    async fn lookup(
+        conn: &mut PgPoolConnection<'_>,
+        tournament_address: &str,
+        previous_tournament_token_rewards: &TournamentTokenRewardMapping,
     ) -> Option<Self> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
-        if !AptosTournamentResource::is_resource_supported(contract_addr, type_str.as_str()) {
-            return None;
+        match previous_tournament_token_rewards.get(tournament_address) {
+            Some(rewards) => Some(rewards.clone()),
+            None => {
+                TournamentTokenRewardQuery::query_by_tournament_address(conn, tournament_address)
+                    .await
+                    .map(Into::into)
+            },
         }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            transaction_version,
-            0, // Placeholder, this isn't used anyway
-        );
+    }
 
-        if let AptosTournamentResource::TokenV1RewardPool(inner) =
-            AptosTournamentResource::from_resource(
-                contract_addr,
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                transaction_version,
-            )
-            .unwrap()
+    pub async fn from_event(
+        conn: &mut PgPoolConnection<'_>,
+        contract_addr: &str,
+        event: &Event,
+        transaction_version: i64,
+        previous_tournament_token_rewards: &TournamentTokenRewardMapping,
+    ) -> Option<Self> {
+        let mut rewards = None;
+        if let Some(add) =
+            AddTokenV1Reward::from_event(contract_addr, event, transaction_version).unwrap()
         {
-            return Some(TournamentTokenReward {
-                tournament_address: resource.address.clone(),
-                tokens: inner
-                    .tokens
-                    .inline_vec
-                    .iter()
-                    .map(|token| token.id.token_data_id.to_hash())
-                    .collect(),
-                last_transaction_version: transaction_version,
+            rewards = Some({
+                let mut prev = Self::lookup(
+                    conn,
+                    &add.get_tournament_address(),
+                    previous_tournament_token_rewards,
+                )
+                .await
+                .unwrap_or(Self {
+                    tournament_address: add.get_tournament_address(),
+                    tokens: vec![],
+                    last_transaction_version: transaction_version,
+                });
+                prev.tokens.push(Some(add.get_token_data_id()));
+                prev
             });
-        }
-        None
+        };
+        if let Some(remove) =
+            RemoveTokenV1Reward::from_event(contract_addr, event, transaction_version).unwrap()
+        {
+            if rewards.is_none() {
+                rewards = Some(
+                    Self::lookup(
+                        conn,
+                        &remove.get_tournament_address(),
+                        previous_tournament_token_rewards,
+                    )
+                    .await
+                    .unwrap(),
+                );
+            }
+
+            if let Some(mut r) = rewards {
+                r.tokens.remove(
+                    r.tokens
+                        .iter()
+                        .position(|t| t.clone().unwrap() == remove.get_token_data_id())
+                        .unwrap(),
+                );
+                rewards = Some(r);
+            }
+        };
+        rewards
     }
 }
 
@@ -76,5 +113,53 @@ impl Ord for TournamentTokenReward {
 impl PartialOrd for TournamentTokenReward {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[derive(Queryable, Identifiable, Debug, Clone)]
+#[diesel(primary_key(tournament_address))]
+#[diesel(table_name = tournament_token_rewards)]
+pub struct TournamentTokenRewardQuery {
+    pub tournament_address: String,
+    pub tokens: Vec<Option<String>>,
+    pub last_transaction_version: i64,
+    pub inserted_at: chrono::NaiveDateTime,
+}
+
+impl TournamentTokenRewardQuery {
+    pub async fn query_by_tournament_address(
+        conn: &mut PgPoolConnection<'_>,
+        tournament_address: &str,
+    ) -> Option<Self> {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            if let Ok(player) = Self::get_by_tournament_address(conn, tournament_address).await {
+                return player;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+        }
+        None
+    }
+
+    async fn get_by_tournament_address(
+        conn: &mut PgPoolConnection<'_>,
+        tournament_address: &str,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        tournament_token_rewards::table
+            .find(tournament_address)
+            .first::<Self>(conn)
+            .await
+            .optional()
+    }
+}
+
+impl From<TournamentTokenRewardQuery> for TournamentTokenReward {
+    fn from(query: TournamentTokenRewardQuery) -> Self {
+        Self {
+            tournament_address: query.tournament_address,
+            tokens: query.tokens,
+            last_transaction_version: query.last_transaction_version,
+        }
     }
 }
