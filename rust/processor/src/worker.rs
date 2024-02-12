@@ -33,7 +33,7 @@ use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
+use tokio::time::timeout;
 use tracing::{error, info};
 use url::Url;
 
@@ -179,7 +179,7 @@ impl Worker {
         // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
         // and write into a channel
         // The each item will be (chain_id, batch of transactions)
-        let (tx, mut receiver) = tokio::sync::mpsc::channel::<TransactionsPBResponse>(BUFFER_SIZE);
+        let (tx, receiver) = kanal::bounded_async::<TransactionsPBResponse>(BUFFER_SIZE);
         let request_ending_version = self.ending_version;
         let auth_token = self.auth_token.clone();
         tokio::spawn(async move {
@@ -223,16 +223,17 @@ impl Worker {
             let mut transactions_batches = vec![];
             let mut last_fetched_version = batch_start_version as i64 - 1;
             for task_index in 0..concurrent_tasks {
-                let receive_status = match task_index {
+                let txn_pb_res = match task_index {
                     0 => {
                         // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
-                        match timeout(
+                        let txn_pb_timeout_res = timeout(
                             Duration::from_secs(CONSUMER_THREAD_TIMEOUT_IN_SECS),
                             receiver.recv(),
                         )
-                        .await
-                        {
-                            Ok(result) => result.ok_or(TryRecvError::Disconnected),
+                        .await;
+                        match txn_pb_timeout_res {
+                            Ok(txn_pb_res) => txn_pb_res.map(Some),
+                            // Outer `Err` is a timeout
                             Err(_) => {
                                 error!(
                                     processor_name = processor_name,
@@ -246,65 +247,66 @@ impl Worker {
                                 );
                             },
                         }
-                        // If we're the first task, we should wait until we get data. If `None`, it means the channel is closed.
-                        // receiver.recv().await.ok_or(TryRecvError::Disconnected)
                     },
                     _ => {
                         // If we're not the first task, we should poll to see if we get any data.
                         receiver.try_recv()
                     },
                 };
-                match receive_status {
-                    Ok(txn_pb) => {
-                        if let Some(existing_id) = db_chain_id {
-                            if txn_pb.chain_id != existing_id {
-                                error!(
-                                    processor_name = processor_name,
-                                    stream_address =
-                                        self.indexer_grpc_data_service_address.as_str(),
-                                    chain_id = txn_pb.chain_id,
-                                    existing_id = existing_id,
-                                    "[Parser] Stream somehow changed chain id!",
-                                );
-                                panic!("[Parser] Stream somehow changed chain id!");
-                            }
-                        } else {
-                            db_chain_id = Some(
-                                self.check_or_update_chain_id(txn_pb.chain_id as i64)
-                                    .await
-                                    .unwrap(),
-                            );
-                        }
-                        let current_fetched_version =
-                            txn_pb.transactions.as_slice().first().unwrap().version;
-                        if last_fetched_version + 1 != current_fetched_version as i64 {
-                            error!(
-                                batch_start_version = batch_start_version,
-                                last_fetched_version = last_fetched_version,
-                                current_fetched_version = current_fetched_version,
-                                "[Parser] Received batch with gap from GRPC stream"
-                            );
-                            panic!("[Parser] Received batch with gap from GRPC stream");
-                        }
-                        last_fetched_version =
-                            txn_pb.transactions.as_slice().last().unwrap().version as i64;
-                        transactions_batches.push(txn_pb);
-                    },
-                    // Channel is empty and send is not drpped which we definitely expect. Wait for a bit and continue polling.
-                    Err(TryRecvError::Empty) => {
-                        break;
-                    },
+
+                let txn_pb = match txn_pb_res {
+                    Ok(txn_pb) => txn_pb,
                     // This happens when the channel is closed. We should panic.
-                    Err(TryRecvError::Disconnected) => {
+                    Err(_e) => {
                         error!(
                             processor_name = processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.indexer_grpc_data_service_address.as_str(),
-                            "[Parser] Channel closed; stream ended."
+                            "[Parser][T#{}] Channel closed; stream ended.",
+                            task_index
                         );
-                        panic!("[Parser] Channel closed");
+                        panic!("[Parser][T#{}] Channel closed", task_index);
                     },
+                };
+
+                // If we didn't get any data, break; we'll retry later
+                let txn_pb = match txn_pb {
+                    Some(txn_pb) => txn_pb,
+                    None => break,
+                };
+
+                if let Some(existing_id) = db_chain_id {
+                    if txn_pb.chain_id != existing_id {
+                        error!(
+                            processor_name = processor_name,
+                            stream_address = self.indexer_grpc_data_service_address.as_str(),
+                            chain_id = txn_pb.chain_id,
+                            existing_id = existing_id,
+                            "[Parser] Stream somehow changed chain id!",
+                        );
+                        panic!("[Parser] Stream somehow changed chain id!");
+                    }
+                } else {
+                    db_chain_id = Some(
+                        self.check_or_update_chain_id(txn_pb.chain_id as i64)
+                            .await
+                            .unwrap(),
+                    );
                 }
+                let current_fetched_version =
+                    txn_pb.transactions.as_slice().first().unwrap().version;
+                if last_fetched_version + 1 != current_fetched_version as i64 {
+                    error!(
+                        batch_start_version = batch_start_version,
+                        last_fetched_version = last_fetched_version,
+                        current_fetched_version = current_fetched_version,
+                        "[Parser] Received batch with gap from GRPC stream"
+                    );
+                    panic!("[Parser] Received batch with gap from GRPC stream");
+                }
+                last_fetched_version =
+                    txn_pb.transactions.as_slice().last().unwrap().version as i64;
+                transactions_batches.push(txn_pb);
             }
 
             let size_in_bytes = transactions_batches
