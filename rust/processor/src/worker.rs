@@ -3,7 +3,7 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    gap_detector::GapDetector,
+    gap_detector::{GapDetector, GapDetectorResult, GAP_DETECTION_BATCH_COUNT},
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -207,22 +207,52 @@ impl Worker {
         });
 
         // Create a gap detector task that will panic if there is a gap in the processing
-        let (gap_detector_sender, gap_detector_receiver) =
+        let (gap_detector_sender, mut gap_detector_receiver) =
             tokio::sync::mpsc::channel::<ProcessedVersions>(BUFFER_SIZE);
         let db_pool = self.db_pool.clone();
         tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                "[Parser] Starting gap detector thread"
+                "[Parser] Starting gap detector task",
             );
-            let mut gap_detector = GapDetector::new(
-                gap_detector_receiver,
-                db_pool,
-                processor_name.to_string(),
-                starting_version,
-            );
-            gap_detector.run().await;
+
+            let mut gap_detector =
+                GapDetector::new(processor_name.to_string(), db_pool, starting_version);
+            loop {
+                let result = match gap_detector_receiver.recv().await {
+                    Some(result) => result,
+                    None => {
+                        info!(
+                            processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            "[Parser] Gap detector channel has been closed",
+                        );
+                        return;
+                    },
+                };
+
+                match gap_detector.process_versions(result).await {
+                    Ok(GapDetectorResult::GapDetected { gap_start_version }) => {
+                        error!(
+                            processor_name,
+                            gap_start_version,
+                            "[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking."
+                        );
+                        panic!("[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking.");
+                    },
+                    Ok(GapDetectorResult::NoGapDetected()) => (),
+                    Err(e) => {
+                        error!(
+                            processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            error = ?e,
+                            "[Parser] Gap detector task has panicked"
+                        );
+                        panic!();
+                    },
+                }
+            }
         });
 
         // This is the consumer side of the channel. These are the major states:
