@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{
+    EndVersion, ProcessingParseResult, ProcessingResult, ProcessorName, ProcessorTrait,
+    StartVersion,
+};
 use crate::{
     models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
@@ -11,6 +14,7 @@ use crate::{
         transactions::TransactionModel,
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
+    query_models::{QueryModelBatch, QueryModelBatchTrait},
     schema,
     utils::database::{execute_in_chunks, PgDbPool},
 };
@@ -150,6 +154,36 @@ fn insert_transactions_query(
             )),
         None,
     )
+}
+
+#[derive(Clone, Debug)]
+pub struct TransactionModelBatch {
+    start_version: StartVersion,
+    end_version: EndVersion,
+    items_to_insert: Vec<TransactionModel>,
+}
+
+impl QueryModelBatchTrait for TransactionModelBatch {
+    fn build_query(
+        &self,
+    ) -> (
+        impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+        Option<&'static str>,
+    ) {
+        use schema::transactions::dsl::*;
+
+        (
+            diesel::insert_into(schema::transactions::table)
+                .values(self.items_to_insert.clone())
+                .on_conflict(version)
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    payload_type.eq(excluded(payload_type)),
+                )),
+            None,
+        )
+    }
 }
 
 fn insert_block_metadata_transactions_query(
@@ -379,5 +413,68 @@ impl ProcessorTrait for DefaultProcessor {
 
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
+    }
+
+    fn parse_transactions(
+        &self,
+        transactions: Vec<Transaction>,
+        start_version: u64,
+        end_version: u64,
+        _: Option<u64>,
+    ) -> anyhow::Result<Option<ProcessingParseResult>> {
+        let (txns, block_metadata_txns, write_set_changes, wsc_details) =
+            TransactionModel::from_transactions(&transactions);
+
+        let mut block_metadata_transactions = vec![];
+        for block_metadata_txn in block_metadata_txns {
+            block_metadata_transactions.push(block_metadata_txn.clone());
+        }
+        let mut move_modules = vec![];
+        let mut move_resources = vec![];
+        let mut table_items = vec![];
+        let mut current_table_items = AHashMap::new();
+        let mut table_metadata = AHashMap::new();
+        for detail in wsc_details {
+            match detail {
+                WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
+                WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
+                WriteSetChangeDetail::Table(item, current_item, metadata) => {
+                    table_items.push(item.clone());
+                    current_table_items.insert(
+                        (
+                            current_item.table_handle.clone(),
+                            current_item.key_hash.clone(),
+                        ),
+                        current_item.clone(),
+                    );
+                    if let Some(meta) = metadata {
+                        table_metadata.insert(meta.handle.clone(), meta.clone());
+                    }
+                },
+            }
+        }
+
+        // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
+        let mut current_table_items = current_table_items
+            .into_values()
+            .collect::<Vec<CurrentTableItem>>();
+        let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+        // Sort by PK
+        current_table_items
+            .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
+        table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
+        let txn_batch = QueryModelBatch::TransactionModelBatch(TransactionModelBatch {
+            start_version,
+            end_version,
+            items_to_insert: txns,
+        });
+        let query_model_batches = vec![txn_batch];
+
+        Ok(Some(ProcessingParseResult {
+            start_version,
+            end_version,
+            query_model_batches,
+        }))
     }
 }
