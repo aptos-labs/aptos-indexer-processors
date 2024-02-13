@@ -12,8 +12,8 @@ use crate::{
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessedVersions, ProcessingResult,
-        Processor, ProcessorConfig, ProcessorTrait,
+        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
+        ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
@@ -45,6 +45,9 @@ const BUFFER_SIZE: usize = 50;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
+
+// Number of batches to process before updating processor status
+const PROCESSOR_STATUS_UPDATE_BATCH_COUNT: u64 = 10;
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
@@ -208,8 +211,8 @@ impl Worker {
 
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, mut gap_detector_receiver) =
-            tokio::sync::mpsc::channel::<ProcessedVersions>(BUFFER_SIZE);
-        let db_pool = self.db_pool.clone();
+            tokio::sync::mpsc::channel::<ProcessingResult>(BUFFER_SIZE);
+        let processor_clone = processor.clone();
         tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
@@ -217,8 +220,9 @@ impl Worker {
                 "[Parser] Starting gap detector task",
             );
 
-            let mut gap_detector =
-                GapDetector::new(processor_name.to_string(), db_pool, starting_version);
+            let mut gap_detector = GapDetector::new(starting_version);
+            let mut num_batches_processed_without_gap = 0;
+
             loop {
                 let result = match gap_detector_receiver.recv().await {
                     Some(result) => result,
@@ -232,7 +236,7 @@ impl Worker {
                     },
                 };
 
-                match gap_detector.process_versions(result).await {
+                match gap_detector.process_versions(result) {
                     Ok(GapDetectorResult::GapDetected { gap_start_version }) => {
                         error!(
                             processor_name,
@@ -241,7 +245,25 @@ impl Worker {
                         );
                         panic!("[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking.");
                     },
-                    Ok(GapDetectorResult::NoGapDetected()) => (),
+                    Ok(GapDetectorResult::NoGapDetected {
+                        last_success_batch,
+                        num_batches_processed_without_gap: num_batches,
+                    }) => {
+                        num_batches_processed_without_gap += num_batches;
+                        if num_batches_processed_without_gap >= PROCESSOR_STATUS_UPDATE_BATCH_COUNT
+                        {
+                            // gap_detector.update_last_processed_version(last_success_batch, None).await.unwrap();
+                            let last_success_batch = last_success_batch.unwrap();
+                            processor_clone
+                                .update_last_processed_version(
+                                    last_success_batch.end_version,
+                                    last_success_batch.last_transaction_timstamp.clone(),
+                                )
+                                .await
+                                .unwrap();
+                            num_batches_processed_without_gap = 0;
+                        }
+                    },
                     Err(e) => {
                         error!(
                             processor_name,
@@ -516,16 +538,11 @@ impl Worker {
                         ])
                         .inc_by(end_version - start_version + 1);
 
-                    if let Ok(res) = processed_result {
-                        let processed_version = ProcessedVersions {
-                            start_version: res.start_version,
-                            end_version: res.end_version,
-                            last_transaction_timstamp: end_txn_timestamp,
-                        };
+                    if let Ok(ref res) = processed_result {
                         gap_detector_sender
-                            .send(processed_version)
+                            .send(res.clone())
                             .await
-                            .expect("[Parser] Gap detector thread has panicked");
+                            .expect("[Parser] Failed to send versions to gap detector");
 
                         // Logging and metrics
                         SINGLE_BATCH_PROCESSING_TIME_IN_SECS
@@ -629,7 +646,7 @@ impl Worker {
                 processed_versions.push(processed);
             }
 
-            // Make sure there are no gaps and advance states
+            // Log the metrics for processed batch
             processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
             let processed_versions_sorted = processed_versions.clone();
             let batch_start = processed_versions_sorted.first().unwrap().start_version;
