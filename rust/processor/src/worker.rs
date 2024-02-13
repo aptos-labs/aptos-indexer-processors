@@ -3,7 +3,6 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    gap_detector::{GapDetector, GapDetectorResult, GAP_DETECTION_BATCH_COUNT},
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -45,9 +44,6 @@ const BUFFER_SIZE: usize = 50;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
-
-// Number of batches to process before updating processor status
-const PROCESSOR_STATUS_UPDATE_BATCH_COUNT: u64 = 10;
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
@@ -210,71 +206,16 @@ impl Worker {
         });
 
         // Create a gap detector task that will panic if there is a gap in the processing
-        let (gap_detector_sender, mut gap_detector_receiver) =
-            tokio::sync::mpsc::channel::<ProcessingResult>(BUFFER_SIZE);
+        let (gap_detector_sender, gap_detector_receiver) =
+            kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
         let processor_clone = processor.clone();
         tokio::spawn(async move {
-            info!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                "[Parser] Starting gap detector task",
-            );
-
-            let mut gap_detector = GapDetector::new(starting_version);
-            let mut num_batches_processed_without_gap = 0;
-
-            loop {
-                let result = match gap_detector_receiver.recv().await {
-                    Some(result) => result,
-                    None => {
-                        info!(
-                            processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            "[Parser] Gap detector channel has been closed",
-                        );
-                        return;
-                    },
-                };
-
-                match gap_detector.process_versions(result) {
-                    Ok(GapDetectorResult::GapDetected { gap_start_version }) => {
-                        error!(
-                            processor_name,
-                            gap_start_version,
-                            "[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking."
-                        );
-                        panic!("[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking.");
-                    },
-                    Ok(GapDetectorResult::NoGapDetected {
-                        last_success_batch,
-                        num_batches_processed_without_gap: num_batches,
-                    }) => {
-                        num_batches_processed_without_gap += num_batches;
-                        if num_batches_processed_without_gap >= PROCESSOR_STATUS_UPDATE_BATCH_COUNT
-                        {
-                            // gap_detector.update_last_processed_version(last_success_batch, None).await.unwrap();
-                            let last_success_batch = last_success_batch.unwrap();
-                            processor_clone
-                                .update_last_processed_version(
-                                    last_success_batch.end_version,
-                                    last_success_batch.last_transaction_timstamp.clone(),
-                                )
-                                .await
-                                .unwrap();
-                            num_batches_processed_without_gap = 0;
-                        }
-                    },
-                    Err(e) => {
-                        error!(
-                            processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            error = ?e,
-                            "[Parser] Gap detector task has panicked"
-                        );
-                        panic!();
-                    },
-                }
-            }
+            crate::gap_detector::create_gap_detector_status_tracker_loop(
+                gap_detector_receiver,
+                processor_clone,
+                batch_start_version,
+            )
+            .await;
         });
 
         // This is the consumer side of the channel. These are the major states:

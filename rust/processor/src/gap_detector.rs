@@ -1,35 +1,39 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::processors::ProcessingResult;
+use std::sync::Arc;
+
+use crate::{
+    processors::{ProcessingResult, Processor, ProcessorTrait},
+    worker::PROCESSOR_SERVICE_TYPE,
+};
 use ahash::AHashMap;
+use kanal::AsyncReceiver;
+use tracing::{error, info};
 
 // Number of batches processed before gap detected
-pub const GAP_DETECTION_BATCH_COUNT: u64 = 50;
+const GAP_DETECTION_BATCH_COUNT: u64 = 50;
+// Number of seconds between each processor status update
+const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
 pub struct GapDetector {
-    starting_version: u64,
+    next_version_to_process: u64,
     seen_versions: AHashMap<u64, ProcessingResult>,
-    maybe_prev_batch: Option<ProcessingResult>,
+    last_success_batch: Option<ProcessingResult>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum GapDetectorResult {
-    GapDetected {
-        gap_start_version: u64,
-    },
-    NoGapDetected {
-        last_success_batch: Option<ProcessingResult>,
-        num_batches_processed_without_gap: u64,
-    },
+pub struct GapDetectorResult {
+    pub next_version_to_process: u64,
+    pub num_gaps: u64,
+    pub last_success_batch: Option<ProcessingResult>,
 }
 
 impl GapDetector {
     pub fn new(starting_version: u64) -> Self {
         Self {
-            starting_version,
+            next_version_to_process: starting_version,
             seen_versions: AHashMap::new(),
-            maybe_prev_batch: None,
+            last_success_batch: None,
         }
     }
 
@@ -38,52 +42,30 @@ impl GapDetector {
         result: ProcessingResult,
     ) -> anyhow::Result<GapDetectorResult> {
         // Check for gaps
-        let gap_detected = self.detect_gap(result.clone());
-
-        let mut num_batches_processed_without_gap = 0;
-        if gap_detected {
+        if self.next_version_to_process != result.start_version {
             self.seen_versions.insert(result.start_version, result);
             tracing::debug!("Gap detected");
-
-            // It detects a gap if it processed GAP_DETECTION_BATCH_COUNT batches without finding (maybe_prev_batch.end_version + 1)
-            if self.seen_versions.len() as u64 >= GAP_DETECTION_BATCH_COUNT {
-                let gap_start_version = if let Some(prev_batch) = &self.maybe_prev_batch {
-                    prev_batch.end_version + 1
-                } else {
-                    self.starting_version
-                };
-                return Ok(GapDetectorResult::GapDetected { gap_start_version });
-            }
         } else {
             // If no gap is detected, find the latest processed batch without gaps
-            num_batches_processed_without_gap = self.update_prev_batch(result);
+            self.update_prev_batch(result);
             tracing::debug!("No gap detected");
         }
 
-        Ok(GapDetectorResult::NoGapDetected {
-            last_success_batch: self.maybe_prev_batch.clone(),
-            num_batches_processed_without_gap,
-        })
+        return Ok(GapDetectorResult {
+            next_version_to_process: self.next_version_to_process,
+            num_gaps: self.seen_versions.len() as u64,
+            last_success_batch: self.last_success_batch.clone(),
+        });
     }
 
-    fn detect_gap(&self, result: ProcessingResult) -> bool {
-        if let Some(prev_batch) = &self.maybe_prev_batch {
-            prev_batch.end_version + 1 != result.start_version
-        } else {
-            result.start_version != self.starting_version
-        }
-    }
-
-    fn update_prev_batch(&mut self, result: ProcessingResult) -> u64 {
+    fn update_prev_batch(&mut self, result: ProcessingResult) {
         let mut new_prev_batch = result;
-        let mut num_batches_processed_without_gap = 1;
         while let Some(next_version) = self.seen_versions.remove(&(new_prev_batch.end_version + 1))
         {
             new_prev_batch = next_version;
-            num_batches_processed_without_gap += 1;
         }
-        self.maybe_prev_batch = Some(new_prev_batch);
-        num_batches_processed_without_gap
+        self.next_version_to_process = new_prev_batch.end_version + 1;
+        self.last_success_batch = Some(new_prev_batch);
     }
 }
 
@@ -96,7 +78,8 @@ mod test {
         let starting_version = 0;
         let mut gap_detector = GapDetector::new(starting_version);
 
-        for i in 0..GAP_DETECTION_BATCH_COUNT - 1 {
+        // Processing batches with gaps
+        for i in 0..GAP_DETECTION_BATCH_COUNT {
             let result = ProcessingResult {
                 start_version: 100 + i * 100,
                 end_version: 199 + i * 100,
@@ -105,46 +88,106 @@ mod test {
                 db_insertion_duration_in_secs: 0.0,
             };
             let gap_detector_result = gap_detector.process_versions(result).unwrap();
-            match gap_detector_result {
-                GapDetectorResult::NoGapDetected {
-                    last_success_batch: _,
-                    num_batches_processed_without_gap: _,
-                } => {},
-                _ => panic!("No gap should be detected"),
-            }
-        }
-        let gap_detectgor_result = gap_detector.process_versions(ProcessingResult {
-            start_version: 100 + (GAP_DETECTION_BATCH_COUNT - 1) * 100,
-            end_version: 199 + (GAP_DETECTION_BATCH_COUNT - 1) * 100,
-            last_transaction_timstamp: None,
-            processing_duration_in_secs: 0.0,
-            db_insertion_duration_in_secs: 0.0,
-        });
-        match gap_detectgor_result {
-            Ok(GapDetectorResult::GapDetected { gap_start_version }) => {
-                assert_eq!(gap_start_version, 0);
-            },
-            _ => panic!("Gap should be detected"),
+            assert_eq!(gap_detector_result.num_gaps, i + 1);
+            assert_eq!(gap_detector_result.next_version_to_process, 0);
+            assert_eq!(gap_detector_result.last_success_batch, None);
         }
 
-        let gap_detector_result = gap_detector.process_versions(ProcessingResult {
-            start_version: 0,
-            end_version: 99,
-            last_transaction_timstamp: None,
-            processing_duration_in_secs: 0.0,
-            db_insertion_duration_in_secs: 0.0,
-        });
-        match gap_detector_result {
-            Ok(GapDetectorResult::NoGapDetected {
-                last_success_batch: _,
-                num_batches_processed_without_gap,
-            }) => {
-                assert_eq!(
-                    num_batches_processed_without_gap,
-                    GAP_DETECTION_BATCH_COUNT + 1
+        // Process a batch without a gap
+        let gap_detector_result = gap_detector
+            .process_versions(ProcessingResult {
+                start_version: 0,
+                end_version: 99,
+                last_transaction_timstamp: None,
+                processing_duration_in_secs: 0.0,
+                db_insertion_duration_in_secs: 0.0,
+            })
+            .unwrap();
+        assert_eq!(gap_detector_result.num_gaps, 0);
+        assert_eq!(
+            gap_detector_result.next_version_to_process,
+            100 + (GAP_DETECTION_BATCH_COUNT) * 100
+        );
+        assert_eq!(
+            gap_detector_result
+                .last_success_batch
+                .clone()
+                .unwrap()
+                .start_version,
+            100 + (GAP_DETECTION_BATCH_COUNT - 1) * 100
+        );
+        assert_eq!(
+            gap_detector_result.last_success_batch.unwrap().end_version,
+            199 + (GAP_DETECTION_BATCH_COUNT - 1) * 100
+        );
+    }
+}
+
+pub async fn create_gap_detector_status_tracker_loop(
+    gap_detector_receiver: AsyncReceiver<ProcessingResult>,
+    processor: Arc<Processor>,
+    starting_version: u64,
+) {
+    let processor_name = processor.name();
+    info!(
+        processor_name = processor_name,
+        service_type = PROCESSOR_SERVICE_TYPE,
+        "[Parser] Starting gap detector task",
+    );
+
+    let mut gap_detector = GapDetector::new(starting_version);
+    let mut last_update_time = std::time::Instant::now();
+
+    loop {
+        let result = match gap_detector_receiver.recv().await {
+            Ok(result) => result,
+            Err(e) => {
+                info!(
+                    processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    error = ?e,
+                    "[Parser] Gap detector channel has been closed",
                 );
+                return;
             },
-            _ => panic!("No gap should be detected"),
+        };
+
+        match gap_detector.process_versions(result) {
+            Ok(res) => {
+                if res.num_gaps >= GAP_DETECTION_BATCH_COUNT {
+                    error!(
+                        processor_name,
+                        gap_start_version = res.next_version_to_process,
+                        num_gaps = res.num_gaps,
+                        "[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking."
+                    );
+                    panic!(
+                        "[Parser] Processed {GAP_DETECTION_BATCH_COUNT} batches with a gap. Panicking."
+                    );
+                }
+
+                if let Some(res_last_success_batch) = res.last_success_batch {
+                    if last_update_time.elapsed().as_secs() >= UPDATE_PROCESSOR_STATUS_SECS {
+                        processor
+                            .update_last_processed_version(
+                                res_last_success_batch.end_version,
+                                res_last_success_batch.last_transaction_timstamp.clone(),
+                            )
+                            .await
+                            .unwrap();
+                        last_update_time = std::time::Instant::now();
+                    }
+                }
+            },
+            Err(e) => {
+                error!(
+                    processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    error = ?e,
+                    "[Parser] Gap detector task has panicked"
+                );
+                panic!();
+            },
         }
     }
 }
