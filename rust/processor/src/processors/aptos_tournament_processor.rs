@@ -450,10 +450,9 @@ async fn insert_tournament_rooms_to_delete(
                 .set((
                     in_progress.eq(excluded(in_progress)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
-            Some(
-                " WHERE tournament_rooms.last_transaction_version <= excluded.last_transaction_version ",
-            ),
+            None,
         )
         .await?;
     }
@@ -482,7 +481,6 @@ async fn insert_tournament_players(
                     // Do not update room address here; separately update in other function to reduce number of lookups
                     // room_address.eq(excluded(room_address)),
                     player_name.eq(excluded(player_name)),
-                    alive.eq(excluded(alive)),
                     token_uri.eq(excluded(token_uri)),
                     coin_reward_claimed_type.eq(excluded(coin_reward_claimed_type)),
                     coin_reward_claimed_amount.eq(excluded(coin_reward_claimed_amount)),
@@ -518,6 +516,7 @@ async fn insert_tournament_players_to_assign_room(
                 .set((
                     room_address.eq(excluded(room_address)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
@@ -547,6 +546,7 @@ async fn insert_tournament_players_to_delete_room(
                 .set((
                     room_address.eq(excluded(room_address)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
@@ -577,6 +577,7 @@ async fn insert_tournament_players_to_claim_coin(
                     coin_reward_claimed_type.eq(excluded(coin_reward_claimed_type)),
                     coin_reward_claimed_amount.eq(excluded(coin_reward_claimed_amount)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
                     " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
@@ -604,13 +605,12 @@ async fn insert_tournament_players_to_delete(
                 .on_conflict(token_address)
                 .do_update()
                 .set((
-                    alive.eq(excluded(alive)),
+                    alive.eq(false),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
-                Some(
-                    " WHERE tournament_players.last_transaction_version <= excluded.last_transaction_version ",
-                ),
-            )
+            None,
+        )
         .await?;
     }
     Ok(())
@@ -667,6 +667,7 @@ async fn insert_rock_paper_scissors_results(
                     winners.eq(excluded(winners)),
                     losers.eq(excluded(losers)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
                 )),
                 Some(
                     " WHERE rock_paper_scissors_games.last_transaction_version <= excluded.last_transaction_version ",

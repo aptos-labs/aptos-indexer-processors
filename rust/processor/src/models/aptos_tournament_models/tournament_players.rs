@@ -32,7 +32,6 @@ pub struct TournamentPlayer {
     pub tournament_address: String,
     pub room_address: Option<String>,
     pub player_name: String,
-    pub alive: bool,
     pub token_uri: String,
     pub coin_reward_claimed_type: Option<String>,
     pub coin_reward_claimed_amount: Option<i64>,
@@ -63,7 +62,6 @@ impl TournamentPlayer {
                     tournament_address: player.tournament_address,
                     room_address: player.room_address,
                     player_name: player.player_name,
-                    alive: player.alive,
                     token_uri: player.token_uri.clone(),
                     coin_reward_claimed_type: player.coin_reward_claimed_type.clone(),
                     coin_reward_claimed_amount: player.coin_reward_claimed_amount,
@@ -94,7 +92,6 @@ impl TournamentPlayer {
                 tournament_address: tournament_token.get_tournament_address(),
                 room_address: None,
                 player_name: tournament_token.player_name.clone(),
-                alive: true,
                 token_uri: tournament_token.token_uri,
                 coin_reward_claimed_type: None,
                 coin_reward_claimed_amount: None,
@@ -117,22 +114,18 @@ impl TournamentPlayer {
             let room_address = &standardize_address(&write_resource.address);
             for player in room.get_players().iter() {
                 let token_address = standardize_address(player);
-                players.insert(
-                    token_address.clone(),
-                    TournamentPlayer {
-                        token_address,
-                        user_address: String::new(),
-                        tournament_address: String::new(),
-                        room_address: Some(room_address.to_string()),
-                        player_name: String::new(),
-                        alive: true,
-                        token_uri: String::new(),
-                        coin_reward_claimed_type: None,
-                        coin_reward_claimed_amount: None,
-                        token_reward_claimed: vec![],
-                        last_transaction_version: transaction_version,
-                    },
-                );
+                players.insert(token_address.clone(), TournamentPlayer {
+                    token_address,
+                    user_address: String::new(),
+                    tournament_address: String::new(),
+                    room_address: Some(room_address.to_string()),
+                    player_name: String::new(),
+                    token_uri: String::new(),
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: vec![],
+                    last_transaction_version: transaction_version,
+                });
             }
         }
         players
@@ -153,7 +146,6 @@ impl TournamentPlayer {
                 tournament_address: String::new(),
                 room_address: None,
                 player_name: String::new(),
-                alive: false,
                 token_uri: String::new(),
                 coin_reward_claimed_type: None,
                 coin_reward_claimed_amount: None,
@@ -180,7 +172,6 @@ impl TournamentPlayer {
                     tournament_address: String::new(),
                     room_address: None,
                     player_name: String::new(),
-                    alive: true,
                     token_uri: String::new(),
                     coin_reward_claimed_type: None,
                     coin_reward_claimed_amount: None,
@@ -214,7 +205,6 @@ impl TournamentPlayer {
                 tournament_address: String::new(),
                 room_address: None,
                 player_name: String::new(),
-                alive: true,
                 token_uri: String::new(),
                 coin_reward_claimed_type: Some(type_arg.to_string()),
                 coin_reward_claimed_amount: Some(coin_reward.amount),

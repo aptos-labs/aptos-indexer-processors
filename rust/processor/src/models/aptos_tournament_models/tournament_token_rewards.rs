@@ -90,14 +90,15 @@ impl TournamentTokenReward {
                 );
             }
 
-            if let Some(mut r) = rewards {
-                r.tokens.remove(
-                    r.tokens
-                        .iter()
-                        .position(|t| t.clone().unwrap() == remove.get_token_data_id())
-                        .unwrap(),
-                );
-                rewards = Some(r);
+            if let Some(mut r) = rewards.clone() {
+                if let Some(pos) = r
+                    .tokens
+                    .iter()
+                    .position(|t| t.clone().unwrap() == remove.get_token_data_id())
+                {
+                    r.tokens.remove(pos);
+                    rewards = Some(r)
+                }
             }
         };
         rewards
