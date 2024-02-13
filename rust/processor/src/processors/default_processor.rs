@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    EndVersion, ProcessingParseResult, ProcessingResult, ProcessorName, ProcessorTrait,
-    StartVersion,
-};
+use super::{ProcessingParseResult, ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
@@ -14,9 +11,9 @@ use crate::{
         transactions::TransactionModel,
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
-    query_models::{QueryModelBatchTrait, QueryModelFragment},
+    query_models::{QueryModelBatchTrait, QueryModelFragment, QueryModelTrait},
     schema,
-    utils::database::{execute_in_chunks, PgDbPool, UpsertFilterLatestTransactionQuery},
+    utils::database::{execute_in_chunks, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -28,6 +25,7 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
+use std::any::Any;
 use std::fmt::Debug;
 use tracing::error;
 
@@ -155,22 +153,64 @@ fn insert_transactions_query(
         None,
     )
 }
-
 #[derive(Clone, Debug)]
 pub struct TransactionModelBatch {
-    start_version: StartVersion,
-    end_version: EndVersion,
     items_to_insert: Vec<TransactionModel>,
 }
 
+impl QueryModelTrait for TransactionModel {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+// impl TransactionModelBatch {
+//     pub fn from_items(items: Vec<TransactionModel>) -> Vec<Self> {
+//         let chunks = get_chunks(items.len(), TransactionModelBatch::chunk_size());
+//         chunks
+//             .iter()
+//             .map(|(start_ind, end_ind)| {
+//                 let items_to_insert = items[*start_ind..*end_ind].to_vec();
+//                 Self { items_to_insert }
+//             })
+//             .collect::<Vec<Self>>()
+//     }
+// }
+
 impl QueryModelBatchTrait for TransactionModelBatch {
-    fn build_query(&self) -> QueryModelFragment {
+    fn chunk_size(&self) -> usize {
+        TransactionModel::field_count()
+    }
+
+    fn items_to_insert(&self) -> Vec<&dyn QueryModelTrait> {
+        self.items_to_insert
+            .iter()
+            .map(|x| x as &dyn QueryModelTrait)
+            .collect()
+    }
+
+    fn build_query(
+        &self,
+        items_to_insert: Vec<&dyn QueryModelTrait>,
+        cleaned: bool,
+    ) -> QueryModelFragment {
         use schema::transactions::dsl::*;
+
+        let items = items_to_insert
+            .into_iter()
+            .map(|x| {
+                let a = x.as_any();
+                let b = a.downcast_ref::<TransactionModel>();
+                let c = b.unwrap_or_else(|| panic!("Error downcasting to TransactionModel "));
+                let d = c.clone();
+                d
+            })
+            .collect::<Vec<TransactionModel>>();
 
         QueryModelFragment {
             query: Box::new(
                 diesel::insert_into(schema::transactions::table)
-                    .values(self.items_to_insert.clone())
+                    .values(items)
                     .on_conflict(version)
                     .do_update()
                     .set((
@@ -178,8 +218,47 @@ impl QueryModelBatchTrait for TransactionModelBatch {
                         payload_type.eq(excluded(payload_type)),
                     )),
             ),
-            where_clause: None,
+            additional_where_clause: None,
         }
+    }
+
+    fn build_query_fn<U>(&self) -> fn(Vec<&dyn QueryModelTrait>) -> (U, Option<&'static str>)
+    where
+        U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    {
+        fn insert_transactions_query(
+            items_to_insert: Vec<&dyn QueryModelTrait>,
+        ) -> (
+            impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+            Option<&'static str>,
+        ) {
+            use schema::transactions::dsl::*;
+
+            let items = items_to_insert
+                .into_iter()
+                .map(|x| {
+                    let a = x.as_any();
+                    let b = a.downcast_ref::<TransactionModel>();
+                    let c = b.unwrap_or_else(|| panic!("Error downcasting to TransactionModel "));
+                    let d = c.clone();
+                    d
+                })
+                .collect::<Vec<TransactionModel>>();
+
+            (
+                diesel::insert_into(schema::transactions::table)
+                    .values(items)
+                    .on_conflict(version)
+                    .do_update()
+                    .set((
+                        inserted_at.eq(excluded(inserted_at)),
+                        payload_type.eq(excluded(payload_type)),
+                    )),
+                None,
+            )
+        }
+
+        insert_transactions_query
     }
 }
 
@@ -461,7 +540,13 @@ impl ProcessorTrait for DefaultProcessor {
             .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
 
-        let query_model_batches = vec![];
+        let txn_batch = TransactionModelBatch {
+            items_to_insert: txns,
+        };
+        let query_model_batches = vec![txn_batch]
+            .into_iter()
+            .map(|x| Box::new(x) as Box<dyn QueryModelBatchTrait>)
+            .collect::<Vec<Box<dyn QueryModelBatchTrait>>>();
 
         Ok(Some(ProcessingParseResult {
             start_version,

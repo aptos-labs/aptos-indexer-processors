@@ -15,6 +15,7 @@ use crate::{
         user_transaction_processor::UserTransactionProcessor, ProcessedVersions,
         ProcessingParseResult, ProcessingResult, Processor, ProcessorConfig, ProcessorTrait,
     },
+    query_models::QueryModelFragment,
     schema::ledger_infos,
     utils::{
         counters::{
@@ -26,7 +27,10 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
-        database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{
+            execute_or_retry_cleaned, execute_with_better_error, get_chunks, new_db_pool,
+            run_pending_migrations, PgDbPool,
+        },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -207,13 +211,13 @@ impl Worker {
         });
 
         // Create a gap detector task that will panic if there is a gap in the processing
-        let (query_executor_sender, query_executor_receiver) =
+        let (query_executor_sender, mut query_executor_receiver) =
             tokio::sync::mpsc::channel::<ProcessingParseResult>(BUFFER_SIZE);
-        let (gap_detector_sender, gap_detector_receiver) =
+        let (gap_detector_sender, mut gap_detector_receiver) =
             tokio::sync::mpsc::channel::<ProcessedVersions>(BUFFER_SIZE);
 
         // Create db executor task that will execute the queries and send the results to the gap detector
-        let executor_db_clone = self.db_pool.clone();
+        let db_pool = self.db_pool.clone();
         tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
@@ -233,6 +237,21 @@ impl Worker {
                         panic!("[Parser] Query executor thread received None");
                     },
                 };
+
+                let tasks = tokio::task::JoinSet::new();
+                for query_model in result.query_model_batches {
+                    let a = (*query_model).clone();
+                    let a = query_model.downcast_ref::<QueryModelFragment>().unwrap();
+                    let items_to_insert = query_model.items_to_insert();
+                    let chunks = get_chunks(items_to_insert.len(), query_model.chunk_size());
+                    for (start_ind, end_ind) in chunks {
+                        let items = items_to_insert[start_ind..end_ind].to_vec();
+                        let build_query = query_model.build_query_fn();
+                        tasks.spawn(async move {
+                            execute_or_retry_cleaned(db_pool, build_query, items)
+                        });
+                    }
+                }
             }
         });
 
@@ -497,6 +516,8 @@ impl Worker {
 
                     // TODO: Clean this up
                     if let Ok(Some(res)) = parsed_result {
+                        let start_version = res.start_version;
+                        let end_version = res.end_version;
                         match query_executor_sender.send(res).await {
                             Ok(_) => {
                                 // TODO: Log this and add metrics
@@ -511,8 +532,8 @@ impl Worker {
                             },
                         }
                         return Ok(ProcessingResult {
-                            start_version: res.start_version,
-                            end_version: res.end_version,
+                            start_version,
+                            end_version,
                             processing_duration_in_secs: 0.0,
                             db_insertion_duration_in_secs: 0.0,
                         });

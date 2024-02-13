@@ -4,7 +4,10 @@
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
 use super::counters::GOT_CONNECTION_COUNT;
-use crate::utils::{counters::UNABLE_TO_GET_CONNECTION_COUNT, util::remove_null_bytes};
+use crate::{
+    query_models::QueryModelTrait,
+    utils::{counters::UNABLE_TO_GET_CONNECTION_COUNT, util::remove_null_bytes},
+};
 use diesel::{
     pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
@@ -206,6 +209,35 @@ where
             },
         }
     }
+    Ok(())
+}
+
+pub async fn execute_or_retry_cleaned<U>(
+    conn: PgDbPool,
+    build_query: fn(Vec<&dyn QueryModelTrait>) -> (U, Option<&'static str>),
+    items: Vec<&dyn QueryModelTrait>,
+) -> Result<(), diesel::result::Error>
+where
+    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+{
+    let (query, additional_where_clause) = build_query(items);
+
+    match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
+        Ok(_) => {},
+        Err(_) => {
+            let cleaned_items = clean_data_for_db(items, true);
+            let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
+            match execute_with_better_error(conn.clone(), cleaned_query, additional_where_clause)
+                .await
+            {
+                Ok(_) => {},
+                Err(e) => {
+                    return Err(e);
+                },
+            }
+        },
+    }
+
     Ok(())
 }
 
