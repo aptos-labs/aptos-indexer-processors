@@ -1246,6 +1246,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
         round_end_timestamp -> Timestamp,
+        matchmaking_ended -> Bool,
     }
 }
 

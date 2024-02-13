@@ -22,6 +22,7 @@ pub struct TournamentRound {
     paused: bool,
     last_transaction_version: i64,
     round_end_timestamp: chrono::NaiveDateTime,
+    matchmaking_ended: bool,
 }
 
 impl TournamentRound {
@@ -65,6 +66,7 @@ impl TournamentRound {
                     0,
                 )
                 .unwrap(),
+                matchmaking_ended: inner.matchmaking_ended,
             });
         }
         None

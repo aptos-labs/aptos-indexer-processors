@@ -387,7 +387,8 @@ async fn insert_tournament_rounds(
                     paused.eq(excluded(paused)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
-                    round_end_timestamp.eq(excluded(round_end_timestamp))
+                    round_end_timestamp.eq(excluded(round_end_timestamp)),
+                    matchmaking_ended.eq(excluded(matchmaking_ended)),
                 )),
             Some(
                 " WHERE tournament_rounds.last_transaction_version <= excluded.last_transaction_version ",
