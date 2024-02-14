@@ -104,10 +104,7 @@ impl ProcessorTrait for EventsProcessor {
                     PROCESSOR_UNKNOWN_TYPE_COUNT
                         .with_label_values(&["EventsProcessor"])
                         .inc();
-                    tracing::warn!(
-                        "Transaction data doesn't exist for version {}",
-                        txn_version
-                    );
+                    tracing::warn!("Transaction data doesn't exist for version {}", txn_version);
                     continue;
                 },
             };

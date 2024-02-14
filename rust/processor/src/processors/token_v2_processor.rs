@@ -455,16 +455,14 @@ async fn parse_v2_token(
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
+        let txn_version = txn.version;
         let txn_data = match txn.txn_data.as_ref() {
             Some(data) => data,
             None => {
                 PROCESSOR_UNKNOWN_TYPE_COUNT
                     .with_label_values(&["TokenV2Processor"])
                     .inc();
-                tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    txn_version
-                );
+                tracing::warn!("Transaction data doesn't exist for version {}", txn_version);
                 continue;
             },
         };

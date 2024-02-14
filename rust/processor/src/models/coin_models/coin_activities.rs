@@ -91,7 +91,6 @@ impl CoinActivity {
         // This will help us get the coin type when we see coin deposit/withdraw events for coin activities
         let mut all_event_to_coin_type: EventToCoinType = AHashMap::new();
         let mut all_coin_supply = Vec::new();
-        let txn_version = transaction.version;
         // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
