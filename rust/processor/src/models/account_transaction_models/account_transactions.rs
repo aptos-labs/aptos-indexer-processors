@@ -20,7 +20,6 @@ use aptos_protos::transaction::v1::{
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 pub type AccountTransactionPK = (String, i64);
 
@@ -49,7 +48,7 @@ impl AccountTransaction {
                     "Transaction data doesn't exist for version {}",
                     transaction.version
                 );
-                return HashMap::new();
+                return AHashMap::new();
             },
         };
         let transaction_info = transaction.info.as_ref().unwrap_or_else(|| {

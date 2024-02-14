@@ -28,7 +28,6 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 type TableHandle = String;
 type Address = String;
@@ -95,10 +94,10 @@ impl Token {
                     vec![],
                     vec![],
                     vec![],
-                    HashMap::new(),
-                    HashMap::new(),
-                    HashMap::new(),
-                    HashMap::new(),
+                    AHashMap::new(),
+                    AHashMap::new(),
+                    AHashMap::new(),
+                    AHashMap::new(),
                 );
             },
         };

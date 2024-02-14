@@ -4,14 +4,12 @@
 use crate::metrics::{
     HASURA_API_LAST_UPDATED_TIME_LATENCY_IN_SECS, HASURA_API_LATEST_VERSION_LATENCY,
 };
+use ahash::AHashMap;
 use anyhow::Result;
 use chrono::NaiveDateTime;
 use core::panic;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::info;
 
 const PROCESSOR_STATUS_CHECKER_WAIT_TIME_IN_SECS: u64 = 10;
@@ -86,7 +84,7 @@ impl ProcessorStatusChecker {
     }
 }
 
-async fn handle_hasura_response(hasura_endpoint: String) -> Result<HashMap<String, i64>> {
+async fn handle_hasura_response(hasura_endpoint: String) -> Result<AHashMap<String, i64>> {
     let endpoint = hasura_endpoint.clone();
     info!("Connecting to hasura endpoint: {}", endpoint);
     let client = reqwest::Client::new();
@@ -99,7 +97,7 @@ async fn handle_hasura_response(hasura_endpoint: String) -> Result<HashMap<Strin
         },
     };
 
-    let mut processor_latest_version_map = HashMap::new();
+    let mut processor_latest_version_map = AHashMap::new();
 
     for processor_status in processor_status_response.processor_status {
         let last_updated_time = NaiveDateTime::parse_from_str(
