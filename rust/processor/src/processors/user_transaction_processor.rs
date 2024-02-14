@@ -144,6 +144,10 @@ impl ProcessorTrait for UserTransactionProcessor {
                     PROCESSOR_UNKNOWN_TYPE_COUNT
                         .with_label_values(&["UserTransactionProcessor"])
                         .inc();
+                    tracing::warn!(
+                        "Transaction data doesn't exist for version {}",
+                        txn_version
+                    );
                     continue;
                 },
             };
