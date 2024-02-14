@@ -129,8 +129,8 @@ impl Transaction {
                     .with_label_values(&["Transaction"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 let transaction_out = Transaction {
                     version: transaction.version as i64,
