@@ -804,6 +804,7 @@ diesel::table! {
         #[max_length = 66]
         tournament_address -> Varchar,
         last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
     }
 }
 
