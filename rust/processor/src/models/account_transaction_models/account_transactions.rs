@@ -48,8 +48,8 @@ impl AccountTransaction {
                     .with_label_values(&["AccountTransaction"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return AHashMap::new();
             },
