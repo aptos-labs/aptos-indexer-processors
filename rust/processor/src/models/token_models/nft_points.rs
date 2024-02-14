@@ -45,8 +45,8 @@ impl NftPoints {
                     .with_label_values(&["NftPoints"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return None;
             },

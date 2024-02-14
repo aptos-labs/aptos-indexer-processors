@@ -462,7 +462,10 @@ async fn parse_v2_token(
                 PROCESSOR_UNKNOWN_TYPE_COUNT
                     .with_label_values(&["TokenV2Processor"])
                     .inc();
-                tracing::warn!("Transaction data doesn't exist for version {}", txn_version);
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
                 continue;
             },
         };

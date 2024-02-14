@@ -40,8 +40,8 @@ impl ProposalVote {
                     .with_label_values(&["ProposalVote"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return Ok(proposal_votes);
             },

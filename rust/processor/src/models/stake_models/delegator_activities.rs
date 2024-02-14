@@ -39,8 +39,8 @@ impl DelegatedStakingActivity {
                     .with_label_values(&["DelegatedStakingActivity"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return Ok(delegator_activities);
             },

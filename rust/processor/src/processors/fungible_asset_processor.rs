@@ -298,10 +298,13 @@ async fn parse_v2_coin(
         let txn_data = match txn.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
                 PROCESSOR_UNKNOWN_TYPE_COUNT
                     .with_label_values(&["FungibleAssetProcessor"])
                     .inc();
-                tracing::warn!("Transaction data doesn't exist for version {}", txn_version);
                 continue;
             },
         };

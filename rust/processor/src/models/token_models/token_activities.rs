@@ -68,8 +68,8 @@ impl TokenActivity {
                     .with_label_values(&["TokenActivity"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return token_activities;
             },

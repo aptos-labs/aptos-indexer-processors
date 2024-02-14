@@ -90,8 +90,8 @@ impl Token {
                     .with_label_values(&["Token"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return (
                     vec![],

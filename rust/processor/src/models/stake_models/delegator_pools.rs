@@ -103,8 +103,8 @@ impl DelegatorPool {
                     .with_label_values(&["DelegatorPool"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 return Ok((
                     delegator_pool_map,

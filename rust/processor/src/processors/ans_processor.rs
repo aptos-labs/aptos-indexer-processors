@@ -431,8 +431,8 @@ fn parse_ans(
                     .with_label_values(&["AnsProcessor"])
                     .inc();
                 tracing::warn!(
-                    "Transaction data doesn't exist for version {}",
-                    transaction.version
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
                 );
                 continue;
             },
