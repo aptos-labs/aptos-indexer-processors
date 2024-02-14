@@ -91,6 +91,8 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut account_transactions = AHashMap::new();
 
         for txn in &transactions {
@@ -124,7 +126,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(err) => {
                 error!(

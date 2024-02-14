@@ -350,6 +350,8 @@ impl ProcessorTrait for StakeProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
 
         let mut all_current_stake_pool_voters: StakingPoolVoterMap = AHashMap::new();
@@ -527,7 +529,7 @@ impl ProcessorTrait for StakeProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(

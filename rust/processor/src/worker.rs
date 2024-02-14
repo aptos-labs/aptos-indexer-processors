@@ -34,7 +34,7 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
 use diesel::Connection;
 use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use url::Url;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
@@ -208,7 +208,6 @@ impl Worker {
                 request_ending_version,
                 auth_token.clone(),
                 processor_name.to_string(),
-                starting_version,
                 BUFFER_SIZE,
             )
             .await
@@ -217,12 +216,12 @@ impl Worker {
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
-        let processor_clone = processor.clone();
         let gap_detection_batch_size = self.gap_detection_batch_size;
+        let processor = build_processor(&self.processor_config, self.db_pool.clone());
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
                 gap_detector_receiver,
-                processor_clone,
+                processor,
                 starting_version,
                 gap_detection_batch_size,
             )
@@ -247,7 +246,7 @@ impl Worker {
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
             let join_handle = self
-                .launch_processor_task(task_index, receiver.clone())
+                .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
                 .await;
             processor_tasks.push(join_handle);
         }
@@ -270,6 +269,7 @@ impl Worker {
         &self,
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
+        gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -312,7 +312,7 @@ impl Worker {
                 let txn_channel_fetch_latency_sec =
                     txn_channel_fetch_latency.elapsed().as_secs_f64();
 
-                info!(
+                debug!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     start_version = first_txn_version,
@@ -457,6 +457,12 @@ impl Worker {
                 SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
                     .with_label_values(&[processor_name, &task_index_str])
                     .set(processing_result.db_insertion_duration_in_secs);
+
+                // Send the result to the gap detector
+                gap_detector_sender
+                    .send(processing_result)
+                    .await
+                    .expect("[Parser] Failed to send versions to gap detector");
             }
         })
     }
@@ -534,7 +540,7 @@ async fn fetch_transactions(
 ) -> TransactionsPBResponse {
     let pb_channel_fetch_time = std::time::Instant::now();
     let txn_pb_res = receiver.recv().await;
-    // Track how much time this thread spent waiting for a pb bundle
+    // Track how much time this task spent waiting for a pb bundle
     PB_CHANNEL_FETCH_WAIT_TIME_SECS
         .with_label_values(&[processor_name, &task_index.to_string()])
         .set(pb_channel_fetch_time.elapsed().as_secs_f64());

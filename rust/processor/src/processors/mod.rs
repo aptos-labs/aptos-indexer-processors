@@ -56,7 +56,7 @@ use std::fmt::Debug;
 pub struct ProcessingResult {
     pub start_version: u64,
     pub end_version: u64,
-    pub last_transaction_timstamp: Option<aptos_protos::util::timestamp::Timestamp>,
+    pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     pub processing_duration_in_secs: f64,
     pub db_insertion_duration_in_secs: f64,
 }

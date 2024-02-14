@@ -17,7 +17,7 @@ use prost::Message;
 use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use url::Url;
 
 /// GRPC request metadata key for the token ID.
@@ -28,7 +28,7 @@ const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 /// GRPC connection id
 const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 /// We will try to reconnect to GRPC 5 times in case upstream connection is being updated
-pub const RECONNECTION_MAX_RETRIES: u64 = 65;
+pub const RECONNECTION_MAX_RETRIES: u64 = 5;
 /// 256MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
 
@@ -101,10 +101,36 @@ pub async fn get_stream(
         "[Parser] Setting up GRPC client"
     );
 
-    // Use tokio::time::timeout to set a timeout for the request
-    let connect_res = timeout(Duration::from_secs(1), RawDataClient::connect(channel))
-        .await
-        .expect("[Parser] Timeout connecting to GRPC server");
+    // TODO: move this to a config file
+    // Retry this connection a few times before giving up
+    let mut connect_retries = 0;
+    let connect_res = loop {
+        let res = timeout(
+            Duration::from_secs(5),
+            RawDataClient::connect(channel.clone()),
+        )
+        .await;
+        match res {
+            Ok(client) => break Ok(client),
+            Err(e) => {
+                error!(
+                    processor_name = processor_name,
+                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    start_version = starting_version,
+                    end_version = ending_version,
+                    retries = connect_retries,
+                    error = ?e,
+                    "[Parser] Error connecting to GRPC client"
+                );
+                connect_retries += 1;
+                if connect_retries >= RECONNECTION_MAX_RETRIES {
+                    break Err(e);
+                }
+            },
+        }
+    }
+    .expect("[Parser] Timeout connecting to GRPC server");
 
     let mut rpc_client = match connect_res {
         Ok(client) => client
@@ -219,11 +245,10 @@ pub async fn create_fetcher_loop(
     request_ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
-    batch_start_version: u64,
     buffer_size: usize,
 ) {
     let mut grpc_channel_recv_latency = std::time::Instant::now();
-    let mut next_version_to_fetch = batch_start_version;
+    let mut next_version_to_fetch = starting_version;
     let mut reconnection_retries = 0;
     info!(
         processor_name = processor_name,
@@ -258,8 +283,8 @@ pub async fn create_fetcher_loop(
         "[Parser] Successfully connected to GRPC stream",
     );
 
-    let mut last_fetched_version = batch_start_version as i64 - 1;
-    let mut batch_start_version = batch_start_version;
+    let mut last_fetched_version = starting_version as i64 - 1;
+    let mut batch_start_version = starting_version;
     loop {
         let is_success = match resp_stream.next().await {
             Some(Ok(r)) => {
@@ -273,6 +298,8 @@ pub async fn create_fetcher_loop(
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
 
+                let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
+                let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -296,9 +323,9 @@ pub async fn create_fetcher_loop(
                         as u64,
                     bytes_per_sec =
                         r.encoded_len() as f64 / grpc_channel_recv_latency.elapsed().as_secs_f64(),
-                    step = ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                    step,
                     "{}",
-                    ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                    label,
                 );
 
                 let current_fetched_version = start_version;
@@ -315,40 +342,20 @@ pub async fn create_fetcher_loop(
                 batch_start_version = (last_fetched_version + 1) as u64;
 
                 LATEST_PROCESSED_VERSION
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                        "-",
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .set(end_version as i64);
                 TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                        "-",
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .set(
                         start_txn_timestamp
                             .map(|t| timestamp_to_unixtime(&t))
                             .unwrap_or_default(),
                     );
                 PROCESSED_BYTES_COUNT
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                        "-",
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .inc_by(size_in_bytes);
                 NUM_TRANSACTIONS_PROCESSED_COUNT
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                        "-",
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
@@ -379,7 +386,7 @@ pub async fn create_fetcher_loop(
                 let tps = (num_txns as f64 / duration_in_secs) as u64;
                 let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
 
-                info!(
+                debug!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
@@ -455,7 +462,7 @@ pub async fn create_fetcher_loop(
                 if channel_capacity == buffer_size {
                     break;
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
             info!(
                 processor_name = processor_name,
@@ -473,7 +480,7 @@ pub async fn create_fetcher_loop(
 
             // Sleep for 100ms between reconnect tries
             // TODO: Turn this into exponential backoff
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
 
             if reconnection_retries >= RECONNECTION_MAX_RETRIES {
                 error!(
