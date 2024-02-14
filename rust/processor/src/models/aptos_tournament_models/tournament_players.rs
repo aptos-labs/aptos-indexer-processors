@@ -8,7 +8,7 @@ use crate::{
         collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
         token_utils::TokenEvent,
     },
-    schema::tournament_players,
+    schema::{tournament_players, tournament_players_debug},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::{Event, WriteResource};
@@ -20,6 +20,7 @@ use std::collections::HashMap;
 
 type TokenAddress = String;
 pub type TournamentPlayerMapping = HashMap<TokenAddress, TournamentPlayer>;
+pub type TournamentPlayerDebugMapping = Vec<TournamentPlayerDebug>;
 
 #[derive(
     Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Eq, PartialEq,
@@ -37,6 +38,26 @@ pub struct TournamentPlayer {
     pub coin_reward_claimed_amount: Option<i64>,
     pub token_reward_claimed: Vec<Option<String>>,
     pub last_transaction_version: i64,
+}
+
+#[derive(
+    Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Eq, PartialEq,
+)]
+#[diesel(primary_key(transaction_version, index))]
+#[diesel(table_name = tournament_players_debug)]
+pub struct TournamentPlayerDebug {
+    pub transaction_version: i64,
+    pub index: i64,
+    pub token_address: String,
+    pub user_address: Option<String>,
+    pub tournament_address: Option<String>,
+    pub room_address: Option<String>,
+    pub player_name: Option<String>,
+    pub alive: Option<bool>,
+    pub token_uri: Option<String>,
+    pub coin_reward_claimed_type: Option<String>,
+    pub coin_reward_claimed_amount: Option<i64>,
+    pub token_reward_claimed: Option<Vec<Option<String>>>,
 }
 
 impl TournamentPlayer {
@@ -75,9 +96,10 @@ impl TournamentPlayer {
     pub fn from_tournament_token(
         contract_addr: &str,
         write_resource: &WriteResource,
+        wsc_index: i64,
         transaction_version: i64,
         object_to_owner: &HashMap<String, String>,
-    ) -> Option<Self> {
+    ) -> Option<(Self, TournamentPlayerDebug)> {
         if let Some(tournament_token) = TournamentPlayerToken::from_write_resource(
             contract_addr,
             write_resource,
@@ -86,18 +108,34 @@ impl TournamentPlayer {
         .unwrap()
         {
             let token_address = standardize_address(&write_resource.address);
-            return Some(TournamentPlayer {
-                token_address: token_address.clone(),
-                user_address: object_to_owner.get(&token_address).unwrap().clone(),
-                tournament_address: tournament_token.get_tournament_address(),
-                room_address: None,
-                player_name: tournament_token.player_name.clone(),
-                token_uri: tournament_token.token_uri,
-                coin_reward_claimed_type: None,
-                coin_reward_claimed_amount: None,
-                token_reward_claimed: vec![],
-                last_transaction_version: transaction_version,
-            });
+            return Some((
+                TournamentPlayer {
+                    token_address: token_address.clone(),
+                    user_address: object_to_owner.get(&token_address).unwrap().clone(),
+                    tournament_address: tournament_token.get_tournament_address(),
+                    room_address: None,
+                    player_name: tournament_token.player_name.clone(),
+                    token_uri: tournament_token.token_uri.clone(),
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: vec![],
+                    last_transaction_version: transaction_version,
+                },
+                TournamentPlayerDebug {
+                    transaction_version,
+                    index: wsc_index,
+                    token_address: token_address.clone(),
+                    user_address: Some(object_to_owner.get(&token_address).unwrap().clone()),
+                    tournament_address: Some(tournament_token.get_tournament_address()),
+                    room_address: None,
+                    player_name: Some(tournament_token.player_name.clone()),
+                    alive: Some(true),
+                    token_uri: Some(tournament_token.token_uri),
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: None,
+                },
+            ));
         }
         None
     }
@@ -105,9 +143,11 @@ impl TournamentPlayer {
     pub fn from_room(
         contract_addr: &str,
         write_resource: &WriteResource,
+        wsc_index: i64,
         transaction_version: i64,
-    ) -> TournamentPlayerMapping {
+    ) -> (TournamentPlayerMapping, TournamentPlayerDebugMapping) {
         let mut players = HashMap::new();
+        let mut players_debug = vec![];
         if let Some(room) =
             Room::from_write_resource(contract_addr, write_resource, transaction_version).unwrap()
         {
@@ -115,7 +155,7 @@ impl TournamentPlayer {
             for player in room.get_players().iter() {
                 let token_address = standardize_address(player);
                 players.insert(token_address.clone(), TournamentPlayer {
-                    token_address,
+                    token_address: token_address.clone(),
                     user_address: String::new(),
                     tournament_address: String::new(),
                     room_address: Some(room_address.to_string()),
@@ -126,48 +166,38 @@ impl TournamentPlayer {
                     token_reward_claimed: vec![],
                     last_transaction_version: transaction_version,
                 });
+                players_debug.push(TournamentPlayerDebug {
+                    transaction_version,
+                    index: wsc_index,
+                    token_address,
+                    user_address: None,
+                    tournament_address: None,
+                    room_address: Some(room_address.to_string()),
+                    player_name: None,
+                    alive: None,
+                    token_uri: None,
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: None,
+                });
             }
         }
-        players
+        (players, players_debug)
     }
 
     pub fn delete_player(
         contract_addr: &str,
         event: &Event,
+        event_index: i64,
         transaction_version: i64,
-    ) -> Option<Self> {
+    ) -> Option<(Self, TournamentPlayerDebug)> {
         if let Some(burn_player_token_event) =
             BurnPlayerTokenEvent::from_event(contract_addr, event, transaction_version).unwrap()
         {
             let object_address = burn_player_token_event.get_object_address();
-            return Some(TournamentPlayer {
-                token_address: object_address.to_string(),
-                user_address: String::new(),
-                tournament_address: String::new(),
-                room_address: None,
-                player_name: String::new(),
-                token_uri: String::new(),
-                coin_reward_claimed_type: None,
-                coin_reward_claimed_amount: None,
-                token_reward_claimed: vec![],
-                last_transaction_version: transaction_version,
-            });
-        }
-        None
-    }
-
-    pub fn delete_room(
-        contract_addr: &str,
-        event: &Event,
-        transaction_version: i64,
-    ) -> TournamentPlayerMapping {
-        let mut players = HashMap::new();
-        if let Some(burn_room_event) =
-            BurnRoomEvent::from_event(contract_addr, event, transaction_version).unwrap()
-        {
-            for player_addr in burn_room_event.get_players() {
-                let player = TournamentPlayer {
-                    token_address: player_addr,
+            return Some((
+                TournamentPlayer {
+                    token_address: object_address.to_string(),
                     user_address: String::new(),
                     tournament_address: String::new(),
                     room_address: None,
@@ -177,18 +207,75 @@ impl TournamentPlayer {
                     coin_reward_claimed_amount: None,
                     token_reward_claimed: vec![],
                     last_transaction_version: transaction_version,
-                };
-                players.insert(player.token_address.clone(), player);
+                },
+                TournamentPlayerDebug {
+                    transaction_version,
+                    index: event_index,
+                    token_address: object_address.to_string(),
+                    user_address: None,
+                    tournament_address: None,
+                    room_address: None,
+                    player_name: None,
+                    alive: Some(false),
+                    token_uri: None,
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: None,
+                },
+            ));
+        }
+        None
+    }
+
+    pub fn delete_room(
+        contract_addr: &str,
+        event: &Event,
+        event_index: i64,
+        transaction_version: i64,
+    ) -> (TournamentPlayerMapping, TournamentPlayerDebugMapping) {
+        let mut players = HashMap::new();
+        let mut players_debug = Vec::new();
+        if let Some(burn_room_event) =
+            BurnRoomEvent::from_event(contract_addr, event, transaction_version).unwrap()
+        {
+            for player_addr in burn_room_event.get_players() {
+                players.insert(player_addr.clone(), TournamentPlayer {
+                    token_address: player_addr.clone(),
+                    user_address: String::new(),
+                    tournament_address: String::new(),
+                    room_address: None,
+                    player_name: String::new(),
+                    token_uri: String::new(),
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: vec![],
+                    last_transaction_version: transaction_version,
+                });
+                players_debug.push(TournamentPlayerDebug {
+                    transaction_version,
+                    index: event_index,
+                    token_address: player_addr.clone(),
+                    user_address: None,
+                    tournament_address: None,
+                    room_address: None,
+                    player_name: None,
+                    alive: None,
+                    token_uri: None,
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: None,
+                });
             }
         }
-        players
+        (players, players_debug)
     }
 
     pub fn claim_coin_reward(
         contract_addr: &str,
         write_resource: &WriteResource,
+        wsc_index: i64,
         transaction_version: i64,
-    ) -> Option<Self> {
+    ) -> Option<(Self, TournamentPlayerDebug)> {
         if let Some(coin_reward) = CoinRewardClaimed::from_write_resource(
             contract_addr,
             write_resource,
@@ -199,18 +286,34 @@ impl TournamentPlayer {
             let object_address = standardize_address(&write_resource.address);
             let type_ = write_resource.type_str.clone();
             let type_arg = &type_[type_.find('<').unwrap() + 1..type_.find('>').unwrap()];
-            return Some(TournamentPlayer {
-                token_address: object_address,
-                user_address: String::new(),
-                tournament_address: String::new(),
-                room_address: None,
-                player_name: String::new(),
-                token_uri: String::new(),
-                coin_reward_claimed_type: Some(type_arg.to_string()),
-                coin_reward_claimed_amount: Some(coin_reward.amount),
-                token_reward_claimed: vec![],
-                last_transaction_version: transaction_version,
-            });
+            return Some((
+                TournamentPlayer {
+                    token_address: object_address.clone(),
+                    user_address: String::new(),
+                    tournament_address: String::new(),
+                    room_address: None,
+                    player_name: String::new(),
+                    token_uri: String::new(),
+                    coin_reward_claimed_type: Some(type_arg.to_string()),
+                    coin_reward_claimed_amount: Some(coin_reward.amount),
+                    token_reward_claimed: vec![],
+                    last_transaction_version: transaction_version,
+                },
+                TournamentPlayerDebug {
+                    transaction_version,
+                    index: wsc_index,
+                    token_address: object_address.clone(),
+                    user_address: None,
+                    tournament_address: None,
+                    room_address: None,
+                    player_name: None,
+                    alive: None,
+                    token_uri: None,
+                    coin_reward_claimed_type: Some(type_arg.to_string()),
+                    coin_reward_claimed_amount: Some(coin_reward.amount),
+                    token_reward_claimed: None,
+                },
+            ));
         }
         None
     }
@@ -218,10 +321,11 @@ impl TournamentPlayer {
     pub async fn claim_token_reward(
         conn: &mut PgPoolConnection<'_>,
         event: &Event,
+        event_index: i64,
         transaction_version: i64,
         receiver_to_object: &HashMap<String, String>,
         previous_tournament_token: &TournamentPlayerMapping,
-    ) -> Option<Self> {
+    ) -> Option<(Self, TournamentPlayerDebug)> {
         if let Some(TokenEvent::DepositTokenEvent(deposit_event)) = TokenEvent::from_event(
             event.type_str.as_str(),
             event.data.as_str(),
@@ -234,9 +338,23 @@ impl TournamentPlayer {
                 let token_hash = deposit_event.id.token_data_id.to_hash();
                 let mut player =
                     Self::lookup(conn, object_address, previous_tournament_token).await;
-                player.token_reward_claimed.push(Some(token_hash));
+                let mut rewards = player.clone().token_reward_claimed;
+                rewards.push(Some(token_hash));
                 player.last_transaction_version = transaction_version;
-                return Some(player);
+                return Some((player, TournamentPlayerDebug {
+                    transaction_version,
+                    index: event_index,
+                    token_address: object_address.to_string(),
+                    user_address: None,
+                    tournament_address: None,
+                    room_address: None,
+                    player_name: None,
+                    alive: None,
+                    token_uri: None,
+                    coin_reward_claimed_type: None,
+                    coin_reward_claimed_amount: None,
+                    token_reward_claimed: Some(rewards),
+                }));
             }
         }
         None

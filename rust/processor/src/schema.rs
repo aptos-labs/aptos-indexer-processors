@@ -1222,6 +1222,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    tournament_players_debug (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
+        #[max_length = 66]
+        token_address -> Varchar,
+        #[max_length = 66]
+        user_address -> Nullable<Varchar>,
+        #[max_length = 66]
+        tournament_address -> Nullable<Varchar>,
+        #[max_length = 66]
+        room_address -> Nullable<Varchar>,
+        player_name -> Nullable<Varchar>,
+        alive -> Nullable<Bool>,
+        token_uri -> Nullable<Varchar>,
+        coin_reward_claimed_type -> Nullable<Varchar>,
+        coin_reward_claimed_amount -> Nullable<Int8>,
+        token_reward_claimed -> Nullable<Array<Nullable<Text>>>,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     tournament_rooms (address) {
         #[max_length = 66]
         address -> Varchar,
@@ -1277,6 +1299,27 @@ diesel::table! {
         tournament_ended_at -> Nullable<Timestamp>,
         inserted_at -> Timestamp,
         tournament_start_timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
+    tournaments_debug (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
+        #[max_length = 66]
+        address -> Nullable<Varchar>,
+        tournament_name -> Nullable<Varchar>,
+        max_players -> Int8,
+        max_num_winners -> Int8,
+        players_joined -> Int8,
+        is_joinable -> Bool,
+        #[max_length = 66]
+        current_round_address -> Nullable<Varchar>,
+        current_round_number -> Int8,
+        current_game_module -> Nullable<Varchar>,
+        tournament_ended_at -> Nullable<Timestamp>,
+        tournament_start_timestamp -> Nullable<Timestamp>,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -1434,10 +1477,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     tokens,
     tournament_coin_rewards,
     tournament_players,
+    tournament_players_debug,
     tournament_rooms,
     tournament_rounds,
     tournament_token_rewards,
     tournaments,
+    tournaments_debug,
     transactions,
     trivia_answers,
     trivia_questions,
