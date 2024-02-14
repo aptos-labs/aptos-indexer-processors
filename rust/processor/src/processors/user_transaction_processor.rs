@@ -7,7 +7,10 @@ use crate::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        database::{execute_in_chunks, PgDbPool},
+    },
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
@@ -135,13 +138,19 @@ impl ProcessorTrait for UserTransactionProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
-            let txn_data = txn.txn_data.as_ref().unwrap_or_else(|| {
-                error!(
-                    transaction_version = txn.version,
-                    "Txn Data doesn't exist for version {}", txn.version
-                );
-                panic!();
-            });
+            let txn_data = match txn.txn_data.as_ref() {
+                Some(txn_data) => txn_data,
+                None => {
+                    PROCESSOR_UNKNOWN_TYPE_COUNT
+                        .with_label_values(&["UserTransactionProcessor"])
+                        .inc();
+                    tracing::warn!(
+                        transaction_version = txn_version,
+                        "Transaction data doesn't exist"
+                    );
+                    continue;
+                },
+            };
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
                     inner,

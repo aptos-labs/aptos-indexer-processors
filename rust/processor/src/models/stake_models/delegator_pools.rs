@@ -10,7 +10,7 @@ use crate::{
         current_delegated_staking_pool_balances, delegated_staking_pool_balances,
         delegated_staking_pools,
     },
-    utils::util::standardize_address,
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
@@ -19,7 +19,6 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 type StakingPoolAddress = String;
 pub type DelegatorPoolMap = AHashMap<StakingPoolAddress, DelegatorPool>;
@@ -97,13 +96,23 @@ impl DelegatorPool {
         let mut delegator_pool_map = AHashMap::new();
         let mut delegator_pool_balances = vec![];
         let mut delegator_pool_balances_map = AHashMap::new();
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["DelegatorPool"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                return Ok((
+                    delegator_pool_map,
+                    delegator_pool_balances,
+                    delegator_pool_balances_map,
+                ));
+            },
+        };
         let txn_version = transaction.version as i64;
 
         // Do a first pass to get the mapping of active_share table handles to staking pool addresses

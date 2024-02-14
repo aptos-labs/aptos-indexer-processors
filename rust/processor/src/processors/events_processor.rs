@@ -5,7 +5,10 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::events_models::events::EventModel,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        database::{execute_in_chunks, PgDbPool},
+    },
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
@@ -95,13 +98,19 @@ impl ProcessorTrait for EventsProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
-            let txn_data = txn.txn_data.as_ref().unwrap_or_else(|| {
-                error!(
-                    transaction_version = txn.version,
-                    "Txn Data doesn't exist for version {}", txn.version
-                );
-                panic!();
-            });
+            let txn_data = match txn.txn_data.as_ref() {
+                Some(data) => data,
+                None => {
+                    tracing::warn!(
+                        transaction_version = txn_version,
+                        "Transaction data doesn't exist"
+                    );
+                    PROCESSOR_UNKNOWN_TYPE_COUNT
+                        .with_label_values(&["EventsProcessor"])
+                        .inc();
+                    continue;
+                },
+            };
             let default = vec![];
             let raw_events = match txn_data {
                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,

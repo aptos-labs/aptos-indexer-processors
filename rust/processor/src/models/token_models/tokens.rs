@@ -16,6 +16,7 @@ use crate::{
     models::default_models::move_resources::MoveResource,
     schema::tokens,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::PgPoolConnection,
         util::{ensure_not_negative, parse_timestamp, standardize_address},
     },
@@ -28,7 +29,6 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 type TableHandle = String;
 type Address = String;
@@ -83,13 +83,28 @@ impl Token {
         AHashMap<TokenDataIdHash, CurrentCollectionData>,
         AHashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
     ) {
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["Token"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                return (
+                    vec![],
+                    vec![],
+                    vec![],
+                    vec![],
+                    AHashMap::new(),
+                    AHashMap::new(),
+                    AHashMap::new(),
+                    AHashMap::new(),
+                );
+            },
+        };
         if let TxnData::User(_) = txn_data {
             let mut token_ownerships = vec![];
             let mut token_datas = vec![];
@@ -369,7 +384,7 @@ impl TableMetadataForToken {
         let mut table_handle_to_owner: TableHandleToOwner = AHashMap::new();
         // Do a first pass to get all the table metadata in the batch.
         for transaction in transactions {
-            if let TxnData::User(_) = transaction.txn_data.as_ref().unwrap() {
+            if let Some(TxnData::User(_)) = transaction.txn_data.as_ref() {
                 let txn_version = transaction.version as i64;
 
                 let transaction_info = transaction

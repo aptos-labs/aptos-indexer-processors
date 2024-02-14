@@ -6,13 +6,15 @@
 use super::stake_utils::StakeEvent;
 use crate::{
     schema::delegated_staking_activities,
-    utils::util::{standardize_address, u64_to_bigdecimal},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{standardize_address, u64_to_bigdecimal},
+    },
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
@@ -30,13 +32,20 @@ impl DelegatedStakingActivity {
     /// Pretty straightforward parsing from known delegated staking events
     pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
         let mut delegator_activities = vec![];
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["DelegatedStakingActivity"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                return Ok(delegator_activities);
+            },
+        };
+
         let txn_version = transaction.version as i64;
         let events = match txn_data {
             TxnData::User(txn) => &txn.events,

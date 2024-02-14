@@ -8,13 +8,15 @@
 use super::token_utils::{TokenDataIdType, TokenEvent};
 use crate::{
     schema::token_activities,
-    utils::util::{parse_timestamp, standardize_address},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{parse_timestamp, standardize_address},
+    },
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Event, Transaction};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
@@ -59,13 +61,19 @@ struct TokenActivityHelper<'a> {
 impl TokenActivity {
     pub fn from_transaction(transaction: &Transaction) -> Vec<Self> {
         let mut token_activities = vec![];
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["TokenActivity"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                return token_activities;
+            },
+        };
         if let TxnData::User(user_txn) = txn_data {
             for (index, event) in user_txn.events.iter().enumerate() {
                 let txn_version = transaction.version as i64;

@@ -12,6 +12,7 @@ use crate::{
     },
     schema,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
@@ -423,13 +424,19 @@ fn parse_ans(
 
     for transaction in transactions {
         let txn_version = transaction.version as i64;
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["AnsProcessor"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                continue;
+            },
+        };
         let transaction_info = transaction
             .info
             .as_ref()

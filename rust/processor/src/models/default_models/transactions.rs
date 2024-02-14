@@ -11,9 +11,12 @@ use super::{
 };
 use crate::{
     schema::transactions,
-    utils::util::{
-        get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
-        u64_to_bigdecimal,
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{
+            get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
+            u64_to_bigdecimal,
+        },
     },
 };
 use aptos_protos::transaction::v1::{
@@ -23,7 +26,6 @@ use aptos_protos::transaction::v1::{
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
@@ -45,6 +47,29 @@ pub struct Transaction {
     pub num_write_set_changes: i64,
     pub epoch: i64,
     pub payload_type: Option<String>,
+}
+
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            block_height: 0,
+            hash: "".to_string(),
+            type_: "".to_string(),
+            payload: None,
+            state_change_hash: "".to_string(),
+            event_root_hash: "".to_string(),
+            state_checkpoint_hash: None,
+            gas_used: BigDecimal::from(0),
+            success: true,
+            vm_status: "".to_string(),
+            accumulator_root_hash: "".to_string(),
+            num_events: 0,
+            num_write_set_changes: 0,
+            epoch: 0,
+            payload_type: None,
+        }
+    }
 }
 
 impl Transaction {
@@ -97,13 +122,25 @@ impl Transaction {
     ) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
-        let txn_data = transaction.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = transaction.version,
-                "Txn Data doesn't exist for version {}", transaction.version
-            );
-            panic!();
-        });
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(txn_data) => txn_data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["Transaction"])
+                    .inc();
+                tracing::warn!(
+                    "Transaction data doesn't exist for version {}",
+                    transaction.version
+                );
+                let transaction_out = Transaction {
+                    version: transaction.version as i64,
+                    epoch,
+                    block_height,
+                    ..Transaction::default()
+                };
+                return (transaction_out, None, Vec::new(), Vec::new());
+            },
+        };
         let version = transaction.version as i64;
         let transaction_type = TransactionType::try_from(transaction.r#type)
             .expect("Transaction type doesn't exist!")

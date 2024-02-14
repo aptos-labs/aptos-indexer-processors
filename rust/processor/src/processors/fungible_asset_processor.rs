@@ -19,6 +19,7 @@ use crate::{
     },
     schema,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, standardize_address},
     },
@@ -294,13 +295,19 @@ async fn parse_v2_coin(
     for txn in transactions {
         let txn_version = txn.version as i64;
         let block_height = txn.block_height as i64;
-        let txn_data = txn.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = txn.version,
-                "Txn Data doesn't exist for version {}", txn.version
-            );
-            panic!();
-        });
+        let txn_data = match txn.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["FungibleAssetProcessor"])
+                    .inc();
+                continue;
+            },
+        };
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
         let txn_timestamp = txn
             .timestamp

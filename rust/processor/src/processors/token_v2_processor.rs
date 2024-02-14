@@ -29,6 +29,7 @@ use crate::{
     },
     schema,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
@@ -454,13 +455,20 @@ async fn parse_v2_token(
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
-        let txn_data = txn.txn_data.as_ref().unwrap_or_else(|| {
-            error!(
-                transaction_version = txn.version,
-                "Txn Data doesn't exist for version {}", txn.version
-            );
-            panic!();
-        });
+        let txn_version = txn.version;
+        let txn_data = match txn.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["TokenV2Processor"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
+                continue;
+            },
+        };
         let txn_version = txn.version as i64;
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
