@@ -19,6 +19,7 @@ use crate::{
     },
     schema,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, standardize_address},
     },
@@ -297,6 +298,9 @@ async fn parse_v2_coin(
         let txn_data = match txn.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["FungibleAssetProcessor"])
+                    .inc();
                 continue;
             },
         };

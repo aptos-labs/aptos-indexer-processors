@@ -7,7 +7,10 @@ use crate::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        database::{execute_in_chunks, PgDbPool},
+    },
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
@@ -138,6 +141,9 @@ impl ProcessorTrait for UserTransactionProcessor {
             let txn_data = match txn.txn_data.as_ref() {
                 Some(txn_data) => txn_data,
                 None => {
+                    PROCESSOR_UNKNOWN_TYPE_COUNT
+                        .with_label_values(&["UserTransactionProcessor"])
+                        .inc();
                     continue;
                 },
             };

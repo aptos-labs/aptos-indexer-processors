@@ -234,3 +234,13 @@ pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Processor unknown type count.
+pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_unknown_type_count",
+        "Processor unknown type count, e.g., comptaibility issues",
+        &["model_name"]
+    )
+    .unwrap()
+});

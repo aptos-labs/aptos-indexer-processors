@@ -24,7 +24,10 @@ use crate::{
     },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
-    utils::util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
+    },
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
@@ -93,6 +96,9 @@ impl CoinActivity {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["CoinActivity"])
+                    .inc();
                 tracing::warn!(
                     "Transaction data doesn't exist for version {}",
                     transaction.version

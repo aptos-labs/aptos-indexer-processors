@@ -11,9 +11,12 @@ use super::{
 };
 use crate::{
     schema::transactions,
-    utils::util::{
-        get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
-        u64_to_bigdecimal,
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{
+            get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
+            u64_to_bigdecimal,
+        },
     },
 };
 use aptos_protos::transaction::v1::{
@@ -122,6 +125,9 @@ impl Transaction {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(txn_data) => txn_data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["Transaction"])
+                    .inc();
                 tracing::warn!(
                     "Transaction data doesn't exist for version {}",
                     transaction.version

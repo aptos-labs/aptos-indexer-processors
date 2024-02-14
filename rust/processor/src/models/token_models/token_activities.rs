@@ -8,7 +8,10 @@
 use super::token_utils::{TokenDataIdType, TokenEvent};
 use crate::{
     schema::token_activities,
-    utils::util::{parse_timestamp, standardize_address},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{parse_timestamp, standardize_address},
+    },
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Event, Transaction};
 use bigdecimal::{BigDecimal, Zero};
@@ -61,6 +64,9 @@ impl TokenActivity {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["TokenActivity"])
+                    .inc();
                 tracing::warn!(
                     "Transaction data doesn't exist for version {}",
                     transaction.version

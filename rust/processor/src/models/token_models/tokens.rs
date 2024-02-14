@@ -16,6 +16,7 @@ use crate::{
     models::default_models::move_resources::MoveResource,
     schema::tokens,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::PgPoolConnection,
         util::{ensure_not_negative, parse_timestamp, standardize_address},
     },
@@ -85,6 +86,9 @@ impl Token {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["Token"])
+                    .inc();
                 tracing::warn!(
                     "Transaction data doesn't exist for version {}",
                     transaction.version

@@ -10,7 +10,7 @@ use crate::{
         current_delegated_staking_pool_balances, delegated_staking_pool_balances,
         delegated_staking_pools,
     },
-    utils::util::standardize_address,
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
@@ -99,6 +99,9 @@ impl DelegatorPool {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["DelegatorPool"])
+                    .inc();
                 tracing::warn!(
                     "Transaction data doesn't exist for version {}",
                     transaction.version

@@ -6,7 +6,10 @@
 use super::stake_utils::StakeEvent;
 use crate::{
     schema::delegated_staking_activities,
-    utils::util::{standardize_address, u64_to_bigdecimal},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{standardize_address, u64_to_bigdecimal},
+    },
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
@@ -32,6 +35,9 @@ impl DelegatedStakingActivity {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
             None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["DelegatedStakingActivity"])
+                    .inc();
                 tracing::warn!(
                     "Transaction data doesn't exist for version {}",
                     transaction.version
