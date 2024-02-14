@@ -47,18 +47,18 @@ use crate::{
 };
 use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, prelude::*};
+use diesel::{upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 type StartVersion = u64;
 type EndVersion = u64;
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProcessingResult {
     pub start_version: StartVersion,
     pub end_version: EndVersion,
+    pub last_transaction_timstamp: Option<aptos_protos::util::timestamp::Timestamp>,
     pub processing_duration_in_secs: f64,
     pub db_insertion_duration_in_secs: f64,
 }

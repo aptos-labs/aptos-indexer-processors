@@ -36,7 +36,7 @@ impl ProcessorTrait for MonitoringProcessor {
 
     async fn process_transactions(
         &self,
-        _transactions: Vec<Transaction>,
+        transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -46,6 +46,7 @@ impl ProcessorTrait for MonitoringProcessor {
             end_version,
             processing_duration_in_secs: 0.0,
             db_insertion_duration_in_secs: 0.0,
+            last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
         })
     }
 

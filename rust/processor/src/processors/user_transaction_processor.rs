@@ -132,7 +132,7 @@ impl ProcessorTrait for UserTransactionProcessor {
         let processing_start = std::time::Instant::now();
         let mut signatures = vec![];
         let mut user_transactions = vec![];
-        for txn in transactions {
+        for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
             let txn_data = txn.txn_data.as_ref().unwrap_or_else(|| {
@@ -145,7 +145,7 @@ impl ProcessorTrait for UserTransactionProcessor {
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
                     inner,
-                    &txn.timestamp.unwrap(),
+                    txn.timestamp.as_ref().unwrap(),
                     block_height,
                     txn.epoch as i64,
                     txn_version,
@@ -174,6 +174,7 @@ impl ProcessorTrait for UserTransactionProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
+                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
             }),
             Err(e) => {
                 error!(

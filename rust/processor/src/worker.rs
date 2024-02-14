@@ -62,6 +62,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
+    pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
 }
 
@@ -76,6 +77,7 @@ impl Worker {
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
+        gap_detection_batch_size: u64,
         enable_verbose_logging: Option<bool>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
@@ -105,6 +107,7 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
+            gap_detection_batch_size,
             enable_verbose_logging,
         })
     }
@@ -203,6 +206,21 @@ impl Worker {
                 BUFFER_SIZE,
             )
             .await
+        });
+
+        // Create a gap detector task that will panic if there is a gap in the processing
+        let (gap_detector_sender, gap_detector_receiver) =
+            kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
+        let processor_clone = processor.clone();
+        let gap_detection_batch_size = self.gap_detection_batch_size;
+        tokio::spawn(async move {
+            crate::gap_detector::create_gap_detector_status_tracker_loop(
+                gap_detector_receiver,
+                processor_clone,
+                batch_start_version,
+                gap_detection_batch_size,
+            )
+            .await;
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -353,6 +371,7 @@ impl Worker {
             let mut tasks = vec![];
             for transactions_pb in transactions_batches {
                 let processor_clone = processor.clone();
+                let gap_detector_sender = gap_detector_sender.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
                     let start_version = transactions_pb
@@ -432,6 +451,7 @@ impl Worker {
                         .map(|t| timestamp_to_iso(&t))
                         .unwrap_or_default();
                     let end_txn_timestamp_iso = end_txn_timestamp
+                        .clone()
                         .map(|t| timestamp_to_iso(&t))
                         .unwrap_or_default();
 
@@ -464,7 +484,13 @@ impl Worker {
                         ])
                         .inc_by(end_version - start_version + 1);
 
-                    if let Ok(res) = processed_result {
+                    if let Ok(ref res) = processed_result {
+                        gap_detector_sender
+                            .send(res.clone())
+                            .await
+                            .expect("[Parser] Failed to send versions to gap detector");
+
+                        // Logging and metrics
                         SINGLE_BATCH_PROCESSING_TIME_IN_SECS
                             .with_label_values(&[processor_name])
                             .set(processing_duration.elapsed().as_secs_f64());
@@ -566,52 +592,12 @@ impl Worker {
                 processed_versions.push(processed);
             }
 
-            // Make sure there are no gaps and advance states
+            // Log the metrics for processed batch
             processed_versions.sort_by(|a, b| a.start_version.cmp(&b.start_version));
-            let mut prev_start = None;
-            let mut prev_end = None;
-            let mut max_processing_duration_in_secs: f64 = 0.0;
-            let mut max_db_insertion_duration_in_secs: f64 = 0.0;
             let processed_versions_sorted = processed_versions.clone();
-            for processing_result in processed_versions {
-                let start = processing_result.start_version;
-                let end = processing_result.end_version;
-                max_processing_duration_in_secs = max_processing_duration_in_secs
-                    .max(processing_result.processing_duration_in_secs);
-                max_db_insertion_duration_in_secs = max_db_insertion_duration_in_secs
-                    .max(processing_result.db_insertion_duration_in_secs);
-                if prev_start.is_none() {
-                    prev_start = Some(start);
-                    prev_end = Some(end);
-                } else {
-                    if prev_end.unwrap() + 1 != start {
-                        error!(
-                            processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
-                            processed_versions = processed_versions_sorted
-                                .iter()
-                                .map(|result| format!(
-                                    "{}-{}",
-                                    result.start_version, result.end_version
-                                ))
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                            "[Parser] Gaps in processing stream"
-                        );
-                        panic!();
-                    }
-                    prev_start = Some(start);
-                    prev_end = Some(end);
-                }
-            }
             let batch_start = processed_versions_sorted.first().unwrap().start_version;
             let batch_end = processed_versions_sorted.last().unwrap().end_version;
             batch_start_version = batch_end + 1;
-
-            processor
-                .update_last_processed_version(batch_end, batch_end_txn_timestamp.clone())
-                .await
-                .unwrap();
 
             ma.tick_now(batch_end - batch_start + 1);
             info!(
