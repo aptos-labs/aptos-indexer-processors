@@ -14,11 +14,13 @@ use crate::{
             rock_paper_scissors_player::{RockPaperScissorsPlayer, RockPaperScissorsPlayerMapping},
             roulette::{Roulette, RouletteMapping},
             tournament_coin_rewards::{TournamentCoinReward, TournamentCoinRewardMapping},
-            tournament_players::{TournamentPlayer, TournamentPlayerMapping},
+            tournament_players::{
+                TournamentPlayer, TournamentPlayerDebug, TournamentPlayerMapping,
+            },
             tournament_rooms::{TournamentRoom, TournamentRoomMapping},
             tournament_rounds::{TournamentRound, TournamentRoundMapping},
             tournament_token_rewards::{TournamentTokenReward, TournamentTokenRewardMapping},
-            tournaments::{Tournament, TournamentMapping},
+            tournaments::{Tournament, TournamentDebug, TournamentMapping},
             trivia_answer::{TriviaAnswer, TriviaAnswerMapping},
             trivia_question::{TriviaQuestion, TriviaQuestionMapping},
         },
@@ -99,6 +101,8 @@ async fn insert_to_db(
     trivia_questiosn_to_insert: Vec<TriviaQuestion>,
     trivia_answers_to_insert: Vec<TriviaAnswer>,
     roulette: Vec<Roulette>,
+    tournaments_debug: Vec<TournamentDebug>,
+    tournament_players_debug: Vec<TournamentPlayerDebug>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -130,6 +134,8 @@ async fn insert_to_db(
                 &trivia_questiosn_to_insert,
                 &trivia_answers_to_insert,
                 &roulette,
+                &tournaments_debug,
+                &tournament_players_debug,
             ))
         })
         .await
@@ -174,6 +180,9 @@ async fn insert_to_db(
                         let trivia_answers_to_insert =
                             clean_data_for_db(trivia_answers_to_insert, true);
                         let roulette = clean_data_for_db(roulette, true);
+                        let tournaments_debug = clean_data_for_db(tournaments_debug, true);
+                        let tournament_players_debug =
+                            clean_data_for_db(tournament_players_debug, true);
                         insert_to_db_impl(
                             pg_conn,
                             &main_page_tournaments_to_insert,
@@ -194,6 +203,8 @@ async fn insert_to_db(
                             &trivia_questiosn_to_insert,
                             &trivia_answers_to_insert,
                             &roulette,
+                            &tournaments_debug,
+                            &tournament_players_debug,
                         )
                         .await
                     })
@@ -223,6 +234,8 @@ async fn insert_to_db_impl(
     trivia_questiosn_to_insert: &[TriviaQuestion],
     trivia_answers_to_insert: &[TriviaAnswer],
     roulette: &[Roulette],
+    tournaments_debug: &[TournamentDebug],
+    tournament_players_debug: &[TournamentPlayerDebug],
 ) -> Result<(), diesel::result::Error> {
     insert_main_page_tournaments(conn, main_page_tournaments_to_insert).await?;
     insert_tournaments(conn, tournaments_to_insert).await?;
@@ -242,6 +255,54 @@ async fn insert_to_db_impl(
     insert_trivia_questions(conn, trivia_questiosn_to_insert).await?;
     insert_trivia_answers(conn, trivia_answers_to_insert).await?;
     insert_roulette(conn, roulette).await?;
+    insert_tournaments_debug(conn, tournaments_debug).await?;
+    insert_tournament_players_debug(conn, tournament_players_debug).await?;
+    Ok(())
+}
+
+async fn insert_tournaments_debug(
+    conn: &mut MyDbConnection,
+    tournaments_debug_to_insert: &[TournamentDebug],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournaments_debug::dsl::*;
+    let chunks = get_chunks(
+        tournaments_debug_to_insert.len(),
+        TournamentDebug::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournaments_debug::table)
+                .values(&tournaments_debug_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, index))
+                .do_nothing(),
+            None,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn insert_tournament_players_debug(
+    conn: &mut MyDbConnection,
+    tournament_players_debug_to_insert: &[TournamentPlayerDebug],
+) -> Result<(), diesel::result::Error> {
+    use schema::tournament_players_debug::dsl::*;
+    let chunks = get_chunks(
+        tournament_players_debug_to_insert.len(),
+        TournamentPlayerDebug::field_count(),
+    );
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::tournament_players_debug::table)
+                .values(&tournament_players_debug_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, index))
+                .do_nothing(),
+            None,
+        )
+        .await?;
+    }
     Ok(())
 }
 
@@ -832,6 +893,9 @@ impl ProcessorTrait for AptosTournamentProcessor {
         let mut trivia_answers: TriviaAnswerMapping = HashMap::new();
         let mut roulette: RouletteMapping = HashMap::new();
 
+        let mut tournaments_debug = vec![];
+        let mut tournament_players_debug = vec![];
+
         for txn in transactions {
             let mut tournament_state_mapping: TournamentStateMapping = HashMap::new();
             let mut current_round_mapping: CurrentRoundMapping = HashMap::new();
@@ -886,31 +950,44 @@ impl ProcessorTrait for AptosTournamentProcessor {
                 }
 
                 // Second pass: get tournament and players metadata
-                for wsc in transaction_info.changes.iter() {
+                for (i, wsc) in transaction_info.changes.iter().enumerate() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                        if let Some(tournament_player) = TournamentPlayer::from_tournament_token(
-                            &self.config.contract_address,
-                            wr,
-                            txn_version,
-                            &object_to_owner,
-                        ) {
+                        if let Some((tournament_player, tournament_player_debug)) =
+                            TournamentPlayer::from_tournament_token(
+                                &self.config.contract_address,
+                                wr,
+                                i as i64,
+                                txn_version,
+                                &object_to_owner,
+                            )
+                        {
                             tournament_players.insert(tournament_player.pk(), tournament_player);
+                            tournament_players_debug.push(tournament_player_debug);
                         }
-                        if let Some(tournament) = Tournament::from_write_resource(
-                            &self.config.contract_address,
-                            wr,
-                            txn_version,
-                            tournament_state_mapping.clone(),
-                            current_round_mapping.clone(),
-                            txn.timestamp.clone().unwrap(),
-                        ) {
+                        if let Some((tournament, tournament_debug)) =
+                            Tournament::from_write_resource(
+                                &self.config.contract_address,
+                                wr,
+                                i as i64,
+                                txn_version,
+                                tournament_state_mapping.clone(),
+                                current_round_mapping.clone(),
+                                txn.timestamp.clone().unwrap(),
+                            )
+                        {
                             tournaments.insert(tournament.pk(), tournament);
+                            tournaments_debug.push(tournament_debug);
                         }
                     }
                 }
 
                 // Pass through events for create room events
-                for event in user_txn.events.iter() {
+                for (i, event) in user_txn.events.iter().enumerate() {
+                    let event_index = if i == 0 {
+                        -1 * user_txn.events.len() as i64
+                    } else {
+                        i as i64 * -1
+                    };
                     if let Some(create_room) = CreateRoomEvent::from_event(
                         &self.config.contract_address,
                         event,
@@ -920,12 +997,14 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     {
                         create_room_events.insert(create_room.get_object_address(), create_room);
                     }
-                    if let Some(player) = TournamentPlayer::delete_player(
+                    if let Some((player, player_debug)) = TournamentPlayer::delete_player(
                         &self.config.contract_address,
                         event,
+                        event_index,
                         txn_version,
                     ) {
                         tournament_players_to_delete.insert(player.pk(), player);
+                        tournament_players_debug.push(player_debug);
                     }
                     if let Some(room) = TournamentRoom::delete_room(
                         &self.config.contract_address,
@@ -934,9 +1013,10 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     ) {
                         tournament_rooms_to_delete.insert(room.pk(), room);
                     }
-                    if let Some(player) = TournamentPlayer::claim_token_reward(
+                    if let Some((player, player_debug)) = TournamentPlayer::claim_token_reward(
                         conn,
                         event,
+                        event_index,
                         txn_version,
                         &tournament_token_reward_claims,
                         &tournament_players,
@@ -944,6 +1024,7 @@ impl ProcessorTrait for AptosTournamentProcessor {
                     .await
                     {
                         tournament_players.insert(player.pk(), player);
+                        tournament_players_debug.push(player_debug);
                     }
                     if let Some(rps_result) = RockPaperScissorsGame::from_results(
                         &self.config.contract_address,
@@ -964,16 +1045,18 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         tournament_token_rewards.insert(token_reward.pk(), token_reward);
                     }
 
-                    let players = TournamentPlayer::delete_room(
+                    let (players, players_debug) = TournamentPlayer::delete_room(
                         &self.config.contract_address,
                         event,
+                        event_index,
                         txn_version,
                     );
                     tournament_players_to_delete_room.extend(players);
+                    tournament_players_debug.extend(players_debug);
                 }
 
                 // Third pass: everything else
-                for wsc in transaction_info.changes.iter() {
+                for (i, wsc) in transaction_info.changes.iter().enumerate() {
                     if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                         if let Some(round) = TournamentRound::from_write_resource(
                             &self.config.contract_address,
@@ -997,12 +1080,14 @@ impl ProcessorTrait for AptosTournamentProcessor {
                         ) {
                             tournament_coin_rewards.insert(coin_reward.pk(), coin_reward);
                         }
-                        if let Some(player) = TournamentPlayer::claim_coin_reward(
+                        if let Some((player, player_debug)) = TournamentPlayer::claim_coin_reward(
                             &self.config.contract_address,
                             wr,
+                            i as i64,
                             txn_version,
                         ) {
                             tournament_players_to_claim_coin.insert(player.pk(), player);
+                            tournament_players_debug.push(player_debug);
                         }
                         if let Some(game) = RockPaperScissorsGame::from_write_resource(
                             &self.config.contract_address,
@@ -1050,12 +1135,14 @@ impl ProcessorTrait for AptosTournamentProcessor {
                             main_page_tournaments.insert(mpt.pk(), mpt);
                         }
 
-                        let players = TournamentPlayer::from_room(
+                        let (players, players_debug) = TournamentPlayer::from_room(
                             &self.config.contract_address,
                             wr,
+                            i as i64,
                             txn_version,
                         );
                         tournament_players_to_assign_room.extend(players);
+                        tournament_players_debug.extend(players_debug);
                     }
                 }
             }
@@ -1155,6 +1242,8 @@ impl ProcessorTrait for AptosTournamentProcessor {
             trivia_questions,
             trivia_answers,
             roulette,
+            tournaments_debug,
+            tournament_players_debug,
         )
         .await?;
 

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 
 use super::aptos_tournament_utils::{CurrentRound, TournamentDirector, TournamentState};
-use crate::{schema::tournaments, utils::util::standardize_address};
+use crate::{
+    schema::{tournaments, tournaments_debug},
+    utils::util::standardize_address,
+};
 use aptos_protos::{transaction::v1::WriteResource, util::timestamp::Timestamp};
 use diesel::prelude::*;
 use field_count::FieldCount;
@@ -30,6 +33,27 @@ pub struct Tournament {
     pub tournament_start_timestamp: chrono::NaiveDateTime,
 }
 
+#[derive(
+    Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, PartialEq, Eq,
+)]
+#[diesel(primary_key(transaction_version, index))]
+#[diesel(table_name = tournaments_debug)]
+pub struct TournamentDebug {
+    pub transaction_version: i64,
+    pub index: i64,
+    pub address: String,
+    pub tournament_name: String,
+    pub max_players: i64,
+    pub max_num_winners: i64,
+    pub players_joined: i64,
+    pub is_joinable: bool,
+    pub current_round_address: Option<String>,
+    pub current_round_number: i64,
+    pub current_game_module: Option<String>,
+    pub tournament_ended_at: Option<chrono::NaiveDateTime>,
+    pub tournament_start_timestamp: chrono::NaiveDateTime,
+}
+
 impl Tournament {
     pub fn pk(&self) -> String {
         self.address.clone()
@@ -38,11 +62,12 @@ impl Tournament {
     pub fn from_write_resource(
         contract_addr: &str,
         write_resource: &WriteResource,
+        wsc_index: i64,
         transaction_version: i64,
         tournament_state_mapping: HashMap<String, TournamentState>,
         current_round_mapping: HashMap<String, CurrentRound>,
         timestamp: Timestamp,
-    ) -> Option<Self> {
+    ) -> Option<(Self, TournamentDebug)> {
         if let Some(td) = TournamentDirector::from_write_resource(
             contract_addr,
             write_resource,
@@ -64,20 +89,37 @@ impl Tournament {
                     chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, 0);
             }
 
-            return Some(Tournament {
-                address: tournament_address,
-                tournament_name: td.tournament_name,
-                max_players: td.max_players,
-                max_num_winners: td.max_num_winners,
-                players_joined: td.players_joined,
-                is_joinable: state.is_joinable,
-                current_round_address: Some(current_round.get_round_address()),
-                current_round_number: current_round.number,
-                current_game_module: Some(current_round.game_module.clone()),
-                last_transaction_version: transaction_version,
-                tournament_ended_at,
-                tournament_start_timestamp,
-            });
+            return Some((
+                Tournament {
+                    address: tournament_address.clone(),
+                    tournament_name: td.tournament_name.clone(),
+                    max_players: td.max_players,
+                    max_num_winners: td.max_num_winners,
+                    players_joined: td.players_joined,
+                    is_joinable: state.is_joinable,
+                    current_round_address: Some(current_round.get_round_address()),
+                    current_round_number: current_round.number,
+                    current_game_module: Some(current_round.game_module.clone()),
+                    last_transaction_version: transaction_version,
+                    tournament_ended_at,
+                    tournament_start_timestamp,
+                },
+                TournamentDebug {
+                    transaction_version,
+                    index: wsc_index,
+                    address: tournament_address,
+                    tournament_name: td.tournament_name,
+                    max_players: td.max_players,
+                    max_num_winners: td.max_num_winners,
+                    players_joined: td.players_joined,
+                    is_joinable: state.is_joinable,
+                    current_round_address: Some(current_round.get_round_address()),
+                    current_round_number: current_round.number,
+                    current_game_module: Some(current_round.game_module.clone()),
+                    tournament_ended_at,
+                    tournament_start_timestamp,
+                },
+            ));
         }
         None
     }
