@@ -4,6 +4,7 @@
 use crate::{
     gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig, worker::Worker,
 };
+use ahash::AHashMap;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
@@ -27,6 +28,7 @@ pub struct IndexerGrpcProcessorConfig {
     #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
     pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
+    pub per_table_chunk_sizes: AHashMap<String, u64>,
 }
 
 impl IndexerGrpcProcessorConfig {
@@ -49,6 +51,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.number_concurrent_processing_tasks,
             self.db_pool_size,
             self.gap_detection_batch_size,
+            self.per_table_chunk_sizes.clone(),
             self.enable_verbose_logging,
         )
         .await

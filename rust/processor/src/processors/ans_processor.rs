@@ -91,12 +91,14 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
+
     let cal = execute_in_chunks(
         conn.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
         CurrentAnsLookup::field_count(),
     );
+
     let al = execute_in_chunks(
         conn.clone(),
         insert_ans_lookups_query,

@@ -29,6 +29,7 @@ use crate::{
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
+use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
@@ -65,6 +66,7 @@ pub struct Worker {
     pub gap_detection_batch_size: u64,
     pub grpc_chain_id: Option<u64>,
     pub enable_verbose_logging: Option<bool>,
+    pub per_table_chunk_sizes: AHashMap<String, u64>,
 }
 
 impl Worker {
@@ -79,6 +81,7 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
         gap_detection_batch_size: u64,
+        per_table_chunk_sizes: AHashMap<String, u64>,
         enable_verbose_logging: Option<bool>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
@@ -110,6 +113,7 @@ impl Worker {
             number_concurrent_processing_tasks,
             gap_detection_batch_size,
             grpc_chain_id: None,
+            per_table_chunk_sizes,
             enable_verbose_logging,
         })
     }
@@ -620,7 +624,7 @@ pub async fn do_processor(
 
 /// Given a config and a db pool, build a concrete instance of a processor.
 // As time goes on there might be other things that we need to provide to certain
-// processors. As that happens we can revist whether this function (which tends to
+// processors. As that happens we can revisit whether this function (which tends to
 // couple processors together based on their args) makes sense.
 pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
     match config {

@@ -87,13 +87,13 @@ pub async fn create_gap_detector_status_tracker_loop(
         let result = match gap_detector_receiver.recv().await {
             Ok(result) => result,
             Err(e) => {
-                error!(
+                info!(
                     processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     error = ?e,
                     "[Parser] Gap detector channel has been closed",
                 );
-                panic!("[Parser] Gap detector channel has been closed");
+                return;
             },
         };
 

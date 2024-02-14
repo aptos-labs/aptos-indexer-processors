@@ -12,6 +12,7 @@ use crate::{
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
+    schema::account_transactions::table,
     utils::database::{execute_in_chunks, PgDbPool},
 };
 use ahash::AHashMap;
@@ -20,8 +21,8 @@ use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
+    query_builder::{AsQuery, QueryFragment, QueryId},
+    ExpressionMethods, IntoSql,
 };
 use field_count::FieldCount;
 use std::fmt::Debug;
@@ -70,6 +71,12 @@ async fn insert_to_db(
         start_version = start_version,
         end_version = end_version,
         "Inserting to db",
+    );
+
+    use diesel::prelude::*;
+    let table_name = crate::schema::account_transactions::table::tracing::info!(
+        ">>>>>>>>>>>>> {:?}",
+        table_name
     );
 
     let txns_res = execute_in_chunks(
