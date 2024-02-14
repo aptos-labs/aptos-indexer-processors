@@ -29,6 +29,7 @@ use crate::{
     },
     schema,
     utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
@@ -456,7 +457,12 @@ async fn parse_v2_token(
     for txn in transactions {
         let txn_data = match txn.txn_data.as_ref() {
             Some(data) => data,
-            None => continue,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["TokenV2Processor"])
+                    .inc();
+                continue;
+            },
         };
         let txn_version = txn.version as i64;
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
