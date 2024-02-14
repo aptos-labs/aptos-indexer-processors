@@ -62,6 +62,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
+    pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
 }
 
@@ -76,6 +77,7 @@ impl Worker {
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
+        gap_detection_batch_size: u64,
         enable_verbose_logging: Option<bool>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
@@ -105,6 +107,7 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
+            gap_detection_batch_size,
             enable_verbose_logging,
         })
     }
@@ -209,11 +212,13 @@ impl Worker {
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
         let processor_clone = processor.clone();
+        let gap_detection_batch_size = self.gap_detection_batch_size;
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
                 gap_detector_receiver,
                 processor_clone,
                 batch_start_version,
+                gap_detection_batch_size,
             )
             .await;
         });

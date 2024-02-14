@@ -3,8 +3,7 @@
 
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
-use super::counters::GOT_CONNECTION_COUNT;
-use crate::utils::{counters::UNABLE_TO_GET_CONNECTION_COUNT, util::remove_null_bytes};
+use crate::utils::util::remove_null_bytes;
 use diesel::{
     pg::Pg,
     query_builder::{AstPass, Query, QueryFragment},
@@ -146,29 +145,6 @@ pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<Asyn
     Ok(AsyncConnectionWrapper::from(connection))
 }
 */
-
-/// Gets the connection.
-/// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
-pub async fn get_conn(db_pool: &PgDbPool) -> PgPoolConnection {
-    loop {
-        match db_pool.get().await {
-            Ok(conn) => {
-                GOT_CONNECTION_COUNT.inc();
-                return conn;
-            },
-            Err(err) => {
-                UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                tracing::error!(
-                    // todo bb8 doesn't let you read the connection timeout.
-                    //"Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
-                    //pool.connection_timeout(),
-                    "Could not get DB connection from pool, will retry. Err: {:?}",
-                    err
-                );
-            },
-        };
-    }
-}
 
 pub async fn execute_in_chunks<U, T>(
     conn: PgDbPool,
