@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS tournament_players_debug (
     tournament_address VARCHAR(66),
     room_address VARCHAR(66),
     player_name VARCHAR,
-    alive BOOLEAN DEFAULT TRUE,
+    alive BOOLEAN,
     token_uri VARCHAR,
     coin_reward_claimed_type VARCHAR,
     coin_reward_claimed_amount BIGINT,
