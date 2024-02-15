@@ -3,10 +3,7 @@
 use crate::models::events_models::events::EventModel;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
 use std::time::Duration;
-use tokio::{
-    sync::broadcast::{Receiver, Sender},
-    time,
-};
+use tokio::{sync::broadcast::Receiver, time};
 use tracing::{error, info};
 use warp::filters::ws::{Message, WebSocket};
 
@@ -60,10 +57,10 @@ impl Stream {
 
 pub async fn spawn_stream(
     ws: WebSocket,
-    channel: Sender<EventModel>,
+    channel: Receiver<EventModel>,
     websocket_alive_duration: u64,
 ) {
     let (tx, _) = ws.split();
-    let mut stream = Stream::new(tx, channel.subscribe(), websocket_alive_duration);
+    let mut stream = Stream::new(tx, channel, websocket_alive_duration);
     stream.run().await;
 }

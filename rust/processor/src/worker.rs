@@ -30,6 +30,7 @@ use crate::{
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
+        event_ordering::{EventOrdering, TransactionEvents},
         stream::spawn_stream,
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
@@ -37,11 +38,9 @@ use crate::{
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
+use kanal::AsyncReceiver;
 use std::{sync::Arc, time::Duration};
-use tokio::{
-    sync::broadcast::{self, Receiver, Sender},
-    time::timeout,
-};
+use tokio::{sync::broadcast, time::timeout};
 use tracing::{error, info};
 use url::Url;
 use warp::Filter;
@@ -56,7 +55,7 @@ pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
 pub struct StreamContext {
-    pub channel: Sender<EventModel>,
+    pub channel: broadcast::Sender<EventModel>,
     pub websocket_alive_duration: u64,
 }
 
@@ -68,7 +67,7 @@ async fn handle_websocket(
     Ok(websocket.on_upgrade(move |ws| {
         spawn_stream(
             ws,
-            context.channel.clone(),
+            context.channel.subscribe(),
             context.websocket_alive_duration,
         )
     }))
@@ -195,7 +194,7 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // Build the processor based on the config.
-        let (processor, (event_tx, mut event_rx)) =
+        let (processor, transaction_events_rx) =
             build_processor(&self.processor_config, self.db_pool.clone()).await;
         let processor = Arc::new(processor);
 
@@ -253,10 +252,18 @@ impl Worker {
             .await;
         });
 
+        let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10000);
+        let ordering_broadcast_tx = broadcast_tx.clone();
+        tokio::spawn(async move {
+            let mut event_ordering =
+                EventOrdering::new(transaction_events_rx, ordering_broadcast_tx.clone());
+            event_ordering.run(starting_version as i64).await;
+        });
+
         // Receive all messages with initial Receiver to keep channel open
         tokio::spawn(async move {
             loop {
-                event_rx.recv().await.unwrap_or_else(|e| {
+                broadcast_rx.recv().await.unwrap_or_else(|e| {
                     error!(
                         error = ?e,
                         "[Event Stream] Failed to receive message from channel"
@@ -269,7 +276,7 @@ impl Worker {
         tokio::spawn(async move {
             // Create web server
             let stream_context = Arc::new(StreamContext {
-                channel: event_tx,
+                channel: broadcast_tx.clone(),
                 websocket_alive_duration: 3000,
             });
 
@@ -790,8 +797,8 @@ impl Worker {
 pub async fn build_processor(
     config: &ProcessorConfig,
     db_pool: PgDbPool,
-) -> (Processor, (Sender<EventModel>, Receiver<EventModel>)) {
-    let (tx, rx) = broadcast::channel::<EventModel>(10000);
+) -> (Processor, AsyncReceiver<TransactionEvents>) {
+    let (tx, rx) = kanal::bounded_async::<TransactionEvents>(10000);
     let processor = match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
@@ -822,5 +829,5 @@ pub async fn build_processor(
             Processor::from(UserTransactionProcessor::new(db_pool))
         },
     };
-    (processor, (tx, rx))
+    (processor, rx)
 }

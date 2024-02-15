@@ -2,19 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
-use crate::{models::events_models::events::EventModel, utils::database::PgDbPool};
+use crate::{
+    models::events_models::events::EventModel,
+    utils::{database::PgDbPool, event_ordering::TransactionEvents},
+};
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
+use kanal::AsyncSender;
 use std::fmt::Debug;
-use tokio::sync::broadcast::Sender;
 
 pub struct EventStreamProcessor {
     connection_pool: PgDbPool,
-    channel: Sender<EventModel>,
+    channel: AsyncSender<TransactionEvents>,
 }
 
 impl EventStreamProcessor {
-    pub fn new(connection_pool: PgDbPool, channel: Sender<EventModel>) -> Self {
+    pub fn new(connection_pool: PgDbPool, channel: AsyncSender<TransactionEvents>) -> Self {
         Self {
             connection_pool,
             channel,
@@ -59,10 +62,12 @@ impl ProcessorTrait for EventStreamProcessor {
                 _ => &default,
             };
 
-            let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-            for event in txn_events {
-                self.channel.send(event)?;
-            }
+            self.channel
+                .send(TransactionEvents {
+                    transaction_version: txn_version,
+                    events: EventModel::from_events(raw_events, txn_version, block_height),
+                })
+                .await?;
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
