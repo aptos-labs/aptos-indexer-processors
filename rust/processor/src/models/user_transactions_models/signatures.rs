@@ -10,7 +10,8 @@ use crate::{
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum,
-    any_signature::Type as AnySignatureTypeEnumPb, signature::Signature as SignatureEnum,
+    any_signature::{Signature as AnySignaturePb, Type as AnySignatureTypeEnumPb},
+    signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
@@ -353,6 +354,12 @@ impl Signature {
                 "".to_string()
             },
         };
+        let signature_bytes = match signature.signature.as_ref().unwrap() {
+            AnySignaturePb::Ed25519(sig) => sig.signature.as_slice(),
+            AnySignaturePb::Secp256k1Ecdsa(sig) => sig.signature.as_slice(),
+            AnySignaturePb::Webauthn(sig) => sig.signature.as_slice(),
+            AnySignaturePb::Zkid(sig) => sig.signature.as_slice(),
+        };
         Self {
             transaction_version,
             transaction_block_height,
@@ -365,7 +372,7 @@ impl Signature {
             ),
             threshold: 1,
             public_key_indices: serde_json::Value::Array(vec![]),
-            signature: format!("0x{}", hex::encode(signature.signature.as_slice())),
+            signature: format!("0x{}", hex::encode(signature_bytes)),
             multi_agent_index,
             multi_sig_index: 0,
         }
@@ -394,7 +401,19 @@ impl Signature {
                 .unwrap()
                 .public_key
                 .clone();
-            let signature_bytes = signature.signature.as_ref().unwrap().signature.clone();
+            let signature_bytes = match signature
+                .signature
+                .as_ref()
+                .unwrap()
+                .signature
+                .as_ref()
+                .unwrap()
+            {
+                AnySignaturePb::Ed25519(sig) => sig.signature.as_slice(),
+                AnySignaturePb::Secp256k1Ecdsa(sig) => sig.signature.as_slice(),
+                AnySignaturePb::Webauthn(sig) => sig.signature.as_slice(),
+                AnySignaturePb::Zkid(sig) => sig.signature.as_slice(),
+            };
             let type_ = match AnySignatureTypeEnumPb::try_from(
                 signature.signature.as_ref().unwrap().r#type,
             ) {
@@ -421,7 +440,7 @@ impl Signature {
                 type_,
                 public_key: format!("0x{}", hex::encode(public_key.as_slice())),
                 threshold: s.signatures_required as i64,
-                signature: format!("0x{}", hex::encode(signature_bytes.as_slice())),
+                signature: format!("0x{}", hex::encode(signature_bytes)),
                 public_key_indices: serde_json::Value::Array(
                     public_key_indices
                         .iter()
