@@ -906,8 +906,7 @@ diesel::table! {
         type_ -> Varchar,
         #[max_length = 136]
         public_key -> Varchar,
-        #[max_length = 200]
-        signature -> Varchar,
+        signature -> Text,
         threshold -> Int8,
         public_key_indices -> Jsonb,
         inserted_at -> Timestamp,
