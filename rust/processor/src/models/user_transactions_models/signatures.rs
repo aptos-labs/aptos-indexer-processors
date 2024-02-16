@@ -5,12 +5,12 @@
 
 use crate::{
     schema::signatures::{self},
-    utils::{counters::PROCESSOR_DATA_GAP_COUNT, util::standardize_address},
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum,
-    any_signature::Type as AnySignatureTypeEnumPb, signature::Signature as SignatureEnum,
+    any_signature::SignatureVariant, signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
@@ -337,22 +337,8 @@ impl Signature {
     ) -> Self {
         let signer = standardize_address(override_address.unwrap_or(sender));
         let signature = s.signature.as_ref().unwrap();
-        let type_ = match AnySignatureTypeEnumPb::try_from(signature.r#type) {
-            Ok(AnySignatureTypeEnumPb::Ed25519) => String::from("single_key_ed25519_signature"),
-            Ok(AnySignatureTypeEnumPb::Secp256k1Ecdsa) => {
-                String::from("single_key_secp256k1_ecdsa_signature")
-            },
-            wildcard => {
-                tracing::warn!(
-                    "Unspecified signature type or un-recognized type is not supported: {:?}",
-                    wildcard
-                );
-                PROCESSOR_DATA_GAP_COUNT
-                    .with_label_values(&["unspecified_signature_type"])
-                    .inc();
-                "".to_string()
-            },
-        };
+        let signature_bytes = Self::get_any_signature_bytes(&signature.signature_variant, transaction_version);
+        let type_ = Self::get_any_signature_type(&signature.signature_variant, true, transaction_version);
         Self {
             transaction_version,
             transaction_block_height,
@@ -365,7 +351,7 @@ impl Signature {
             ),
             threshold: 1,
             public_key_indices: serde_json::Value::Array(vec![]),
-            signature: format!("0x{}", hex::encode(signature.signature.as_slice())),
+            signature: format!("0x{}", hex::encode(signature_bytes.as_slice())),
             multi_agent_index,
             multi_sig_index: 0,
         }
@@ -394,25 +380,8 @@ impl Signature {
                 .unwrap()
                 .public_key
                 .clone();
-            let signature_bytes = signature.signature.as_ref().unwrap().signature.clone();
-            let type_ = match AnySignatureTypeEnumPb::try_from(
-                signature.signature.as_ref().unwrap().r#type,
-            ) {
-                Ok(AnySignatureTypeEnumPb::Ed25519) => String::from("multi_key_ed25519_signature"),
-                Ok(AnySignatureTypeEnumPb::Secp256k1Ecdsa) => {
-                    String::from("multi_key_secp256k1_ecdsa_signature")
-                },
-                wildcard => {
-                    tracing::warn!(
-                        "Unspecified signature type or un-recognized type is not supported: {:?}",
-                        wildcard
-                    );
-                    PROCESSOR_DATA_GAP_COUNT
-                        .with_label_values(&["unspecified_signature_type"])
-                        .inc();
-                    "".to_string()
-                },
-            };
+            let signature_bytes = Self::get_any_signature_bytes(&signature.signature.as_ref().unwrap().signature_variant, transaction_version);
+            let type_ = Self::get_any_signature_type(&signature.signature.as_ref().unwrap().signature_variant, false, transaction_version);
             signatures.push(Self {
                 transaction_version,
                 transaction_block_height,
@@ -435,6 +404,49 @@ impl Signature {
             });
         }
         signatures
+    }
+
+    fn get_any_signature_bytes(signature_variant: &Option<SignatureVariant>, transaction_version: i64) -> Vec<u8> {
+        match signature_variant {
+            Some(SignatureVariant::Ed25519(sig)) => sig.signature.clone(),
+            Some(SignatureVariant::Zkid(sig)) => sig.signature.clone(),
+            Some(SignatureVariant::Webauthn(sig)) => sig.signature.clone(),
+            Some(SignatureVariant::Secp256k1Ecdsa(sig)) => sig.signature.clone(),
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                .with_label_values(&["SignatureVariant"])
+                .inc();
+                tracing::warn!(
+                    transaction_version = transaction_version,
+                    "Signature variant doesn't exist",
+                );
+                0u8.to_be_bytes().to_vec()
+            },
+        }
+    }
+
+    fn get_any_signature_type(signature_variant: &Option<SignatureVariant>, is_single_sender: bool, transaction_version: i64) -> String {
+        let prefix = if is_single_sender {
+            "single_sender"
+        } else {
+            "multi_key"
+        };
+        match signature_variant {
+            Some(SignatureVariant::Ed25519(_)) => format!("{}_ed25519_signature", prefix),
+            Some(SignatureVariant::Zkid(_)) => format!("{}_zkid_signature", prefix),
+            Some(SignatureVariant::Webauthn(_)) => format!("{}_webauthn_signature", prefix),
+            Some(SignatureVariant::Secp256k1Ecdsa(_)) => format!("{}_secp256k1_ecdsa_signature", prefix),
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                .with_label_values(&["SignatureVariant"])
+                .inc();
+                tracing::warn!(
+                    transaction_version = transaction_version,
+                    "Signature variant doesn't exist",
+                );
+                "unknown".to_string()
+            },
+        }
     }
 
     fn parse_single_sender(

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::models::property_map::{PropertyMap, TokenObjectPropertyMap};
+use crate::{models::property_map::{PropertyMap, TokenObjectPropertyMap}, utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT};
 use aptos_protos::{
     transaction::v1::{
         multisig_transaction_payload::Payload as MultisigPayloadType,
@@ -114,6 +114,16 @@ pub fn get_payload_type(payload: &TransactionPayload) -> String {
 /// This function converts the string into json recursively and lets the diesel ORM handles
 /// the escaping.
 pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<Value> {
+    if payload.payload.as_ref().is_none() {
+        PROCESSOR_UNKNOWN_TYPE_COUNT
+        .with_label_values(&["TransactionPayload"])
+        .inc();
+        tracing::warn!(
+            transaction_version = version,
+            "Transaction payload doesn't exist",
+        );
+        return None;
+    }
     match payload.payload.as_ref().unwrap() {
         PayloadType::EntryFunctionPayload(inner) => {
             let clean = get_clean_entry_function_payload(inner, version);
@@ -125,12 +135,6 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
         PayloadType::ScriptPayload(inner) => {
             let clean = get_clean_script_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                tracing::error!(version = version, "Unable to serialize payload into value");
-                panic!()
-            }))
-        },
-        PayloadType::ModuleBundlePayload(inner) => {
-            Some(serde_json::to_value(inner).unwrap_or_else(|_| {
                 tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
