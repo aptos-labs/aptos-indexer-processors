@@ -124,7 +124,7 @@ impl CollectionV2 {
                 }
 
                 // Aggregator V2 enables a separate struct for supply
-                let concurrent_supply = metadata.concurrent_supply.as_ref();
+                let concurrent_supply = object_data.concurrent_supply.as_ref();
                 if let Some(supply) = concurrent_supply {
                     (current_supply, max_supply, total_minted_v2) = (
                         supply.current_supply.value.clone(),
