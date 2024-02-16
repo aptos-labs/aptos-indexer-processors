@@ -75,6 +75,38 @@ impl Default for Transaction {
 impl Transaction {
     fn from_transaction_info(
         info: &TransactionInfo,
+        version: i64,
+        epoch: i64,
+        block_height: i64,
+    ) -> Self {
+        Self {
+            version,
+            block_height,
+            hash: standardize_address(hex::encode(info.hash.as_slice()).as_str()),
+            state_change_hash: standardize_address(
+                hex::encode(info.state_change_hash.as_slice()).as_str(),
+            ),
+            event_root_hash: standardize_address(
+                hex::encode(info.event_root_hash.as_slice()).as_str(),
+            ),
+            state_checkpoint_hash: info
+                .state_checkpoint_hash
+                .as_ref()
+                .map(|hash| standardize_address(hex::encode(hash).as_str())),
+            gas_used: u64_to_bigdecimal(info.gas_used),
+            success: info.success,
+            vm_status: info.vm_status.clone(),
+            accumulator_root_hash: standardize_address(
+                hex::encode(info.accumulator_root_hash.as_slice()).as_str(),
+            ),
+            num_write_set_changes: info.changes.len() as i64,
+            epoch,
+            ..Default::default()
+        }
+    }
+
+    fn from_transaction_info_with_data(
+        info: &TransactionInfo,
         payload: Option<serde_json::Value>,
         payload_type: Option<String>,
         version: i64,
@@ -122,6 +154,10 @@ impl Transaction {
     ) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
+        let transaction_info = transaction
+            .info
+            .as_ref()
+            .expect("Transaction info doesn't exist!");
         let txn_data = match transaction.txn_data.as_ref() {
             Some(txn_data) => txn_data,
             None => {
@@ -132,12 +168,12 @@ impl Transaction {
                     transaction_version = transaction.version,
                     "Transaction data doesn't exist",
                 );
-                let transaction_out = Transaction {
-                    version: transaction.version as i64,
+                let transaction_out = Self::from_transaction_info(
+                    transaction_info,
+                    transaction.version as i64,
                     epoch,
                     block_height,
-                    ..Transaction::default()
-                };
+                );
                 return (transaction_out, None, Vec::new(), Vec::new());
             },
         };
@@ -146,10 +182,6 @@ impl Transaction {
             .expect("Transaction type doesn't exist!")
             .as_str_name()
             .to_string();
-        let transaction_info = transaction
-            .info
-            .as_ref()
-            .expect("Transaction info doesn't exist!");
         let timestamp = transaction
             .timestamp
             .as_ref()
@@ -172,7 +204,7 @@ impl Transaction {
                 let payload_type = get_payload_type(payload);
 
                 (
-                    Self::from_transaction_info(
+                    Self::from_transaction_info_with_data(
                         transaction_info,
                         payload_cleaned,
                         Some(payload_type),
@@ -198,7 +230,7 @@ impl Transaction {
                 // It's genesis so no big deal
                 let payload_type = None;
                 (
-                    Self::from_transaction_info(
+                    Self::from_transaction_info_with_data(
                         transaction_info,
                         payload_cleaned,
                         payload_type,
@@ -220,7 +252,7 @@ impl Transaction {
                     block_height,
                 );
                 (
-                    Self::from_transaction_info(
+                    Self::from_transaction_info_with_data(
                         transaction_info,
                         None,
                         None,
@@ -242,7 +274,7 @@ impl Transaction {
                 )
             },
             TxnData::StateCheckpoint(_state_checkpoint_txn) => (
-                Self::from_transaction_info(
+                Self::from_transaction_info_with_data(
                     transaction_info,
                     None,
                     None,

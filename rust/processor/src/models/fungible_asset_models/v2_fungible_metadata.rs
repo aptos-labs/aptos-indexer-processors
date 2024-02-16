@@ -9,18 +9,15 @@ use super::v2_fungible_asset_utils::FungibleAssetMetadata;
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+        object_models::{v2_object_utils::ObjectAggregatedDataMapping, v2_objects::Object},
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use ahash::AHashMap;
-use anyhow::Context;
 use aptos_protos::transaction::v1::WriteResource;
-use diesel::{prelude::*, sql_query, sql_types::Text};
-use diesel_async::RunQueryDsl;
+use diesel::sql_types::Text;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -59,17 +56,17 @@ impl FungibleAssetMetadataModel {
         write_resource: &WriteResource,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        fungible_asset_metadata: &ObjectAggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
         if let Some(inner) =
             &FungibleAssetMetadata::from_write_resource(write_resource, txn_version)?
         {
             // the new coin type
             let asset_type = standardize_address(&write_resource.address.to_string());
-            if let Some(metadata) = fungible_asset_metadata.get(&asset_type) {
-                let object = &metadata.object.object_core;
+            if let Some(object_metadata) = object_metadatas.get(&asset_type) {
+                let object = &object_metadata.object.object_core;
                 // Do not write here if asset is fungible token
-                if metadata.token.is_some() {
+                if object_metadata.token.is_some() {
                     return Ok(None);
                 }
 
@@ -135,56 +132,26 @@ impl FungibleAssetMetadataModel {
 
     /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
     /// 1. If metadata is present without token object, then it's not a token
-    /// 2. If metadata is not present, we will do a lookup in the db. If it's not there, it's a token
+    /// 2. If metadata is not present, we will do a lookup in the db.
     pub async fn is_address_fungible_asset(
         conn: &mut PgPoolConnection<'_>,
         address: &str,
-        fungible_asset_metadata: &ObjectAggregatedDataMapping,
+        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
+        txn_version: i64,
     ) -> bool {
-        if let Some(metadata) = fungible_asset_metadata.get(address) {
-            metadata.token.is_none()
-        } else {
-            // Look up in the db
-            Self::query_is_address_fungible_asset(conn, address).await
-        }
-    }
-
-    /// Try to see if an address is a fungible asset (not a token). We'll try a few times in case there is a race condition,
-    /// and if we can't find after N times, we'll assume that it's not a fungible asset.
-    /// TODO: An improvement is to combine this with is_address_token. To do this well we need
-    /// a k-v store
-    async fn query_is_address_fungible_asset(
-        conn: &mut PgPoolConnection<'_>,
-        address: &str,
-    ) -> bool {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match Self::get_by_asset_type(conn, address).await {
-                Ok(_) => return true,
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
+        // 1. If metadata is present without token object, then it's not a token
+        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
+            if object_data.fungible_asset_metadata.is_some() {
+                return object_data.token.is_none();
             }
         }
-        false
-    }
-
-    /// TODO: Change this to a KV store
-    pub async fn get_by_asset_type(
-        conn: &mut PgPoolConnection<'_>,
-        address: &str,
-    ) -> anyhow::Result<String> {
-        let mut res: Vec<Option<AssetTypeFromTable>> =
-            sql_query("SELECT asset_type FROM fungible_asset_metadata WHERE asset_type = $1")
-                .bind::<Text, _>(address)
-                .get_results(conn)
-                .await?;
-        Ok(res
-            .pop()
-            .context("fungible asset metadata result empty")?
-            .context("fungible asset metadata result null")?
-            .asset_type)
+        // 2. If metadata is not present, we will do a lookup in the db.
+        // The object must exist in current_objects table for this processor to proceed
+        // If it doesn't exist or is null, then you probably need to backfill objects processor
+        let object = Object::get_current_object(conn, address, txn_version).await;
+        if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
+            return is_fa && !is_token;
+        }
+        panic!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
     }
 }

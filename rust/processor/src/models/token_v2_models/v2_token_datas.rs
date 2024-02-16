@@ -8,21 +8,14 @@
 use super::v2_token_utils::{TokenStandard, TokenV2};
 use crate::{
     models::{
-        fungible_asset_models::v2_fungible_metadata::FungibleAssetMetadataModel,
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::{
-            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-            token_utils::TokenWriteSet,
-        },
+        object_models::{v2_object_utils::ObjectAggregatedDataMapping, v2_objects::Object},
+        token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use anyhow::Context;
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
-use diesel::{prelude::*, sql_query, sql_types::Text};
-use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -70,12 +63,6 @@ pub struct CurrentTokenDataV2 {
     pub decimals: i64,
 }
 
-#[derive(Debug, QueryableByName)]
-pub struct TokenDataIdFromTable {
-    #[diesel(sql_type = Text)]
-    pub token_data_id: String,
-}
-
 impl TokenDataV2 {
     // TODO: remove the useless_asref lint when new clippy nighly is released.
     #[allow(clippy::useless_asref)]
@@ -84,7 +71,7 @@ impl TokenDataV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &ObjectAggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentTokenDataV2)>> {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
@@ -94,9 +81,9 @@ impl TokenDataV2 {
                 (None, BigDecimal::zero(), 0, Some(false));
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
-            if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
-                let fungible_asset_metadata = metadata.fungible_asset_metadata.as_ref();
-                let fungible_asset_supply = metadata.fungible_asset_supply.as_ref();
+            if let Some(object_metadata) = object_metadatas.get(&token_data_id) {
+                let fungible_asset_metadata = object_metadata.fungible_asset_metadata.as_ref();
+                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
                 if let Some(metadata) = fungible_asset_metadata {
                     if let Some(fa_supply) = fungible_asset_supply {
                         maximum = fa_supply.get_maximum();
@@ -105,13 +92,13 @@ impl TokenDataV2 {
                         is_fungible_v2 = Some(true);
                     }
                 }
-                token_properties = metadata
+                token_properties = object_metadata
                     .property_map
                     .as_ref()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
                 // In aggregator V2 name is now derived from a separate struct
-                if let Some(token_identifier) = metadata.token_identifier.as_ref() {
+                if let Some(token_identifier) = object_metadata.token_identifier.as_ref() {
                     token_name = token_identifier.get_name_trunc();
                 }
             } else {
@@ -250,6 +237,7 @@ impl TokenDataV2 {
         conn: &mut PgPoolConnection<'_>,
         address: &str,
         object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
+        txn_version: i64,
     ) -> bool {
         // 1. If metadata is present, the object is a token iff token struct is also present in the object
         if let Some(object_data) = object_aggregated_data_mapping.get(address) {
@@ -258,49 +246,14 @@ impl TokenDataV2 {
             }
         }
         // 2. If metadata is not present, we will do a lookup in the db.
-        Self::query_is_address_token(conn, address).await
-    }
-
-    /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
-    /// and if we can't find after N times, we'll assume that it's not a token.
-    /// TODO: An improvement is to combine this with is_address_coin. To do this well we need
-    /// a k-v store
-    async fn query_is_address_token(conn: &mut PgPoolConnection<'_>, address: &str) -> bool {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match Self::get_by_token_data_id(conn, address).await {
-                Ok(_) => return true,
-                Err(_) => {
-                    // TODO: this'll unblock very short term but we should clean this up
-                    if FungibleAssetMetadataModel::get_by_asset_type(conn, address)
-                        .await
-                        .is_ok()
-                    {
-                        return false;
-                    }
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
+        //  The object must exist in current_objects table for this processor to proceed
+        let object = Object::get_current_object(conn, address, txn_version).await;
+        if let Some(is_token) = object.is_token {
+            return is_token;
         }
-        false
-    }
-
-    /// TODO: Change this to a KV store
-    async fn get_by_token_data_id(
-        conn: &mut PgPoolConnection<'_>,
-        address: &str,
-    ) -> anyhow::Result<String> {
-        let mut res: Vec<Option<TokenDataIdFromTable>> =
-            sql_query("SELECT token_data_id FROM current_token_datas_v2 WHERE token_data_id = $1")
-                .bind::<Text, _>(address)
-                .get_results(conn)
-                .await?;
-        Ok(res
-            .pop()
-            .context("token data result empty")?
-            .context("token data result null")?
-            .token_data_id)
+        panic!(
+            "is_token is null for object_address: {}. You should probably backfill db.",
+            address
+        );
     }
 }
