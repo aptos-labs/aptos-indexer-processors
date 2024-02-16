@@ -1,4 +1,4 @@
-use crate::models::events_models::events::EventModel;
+use crate::models::events_models::events::{EventModel, EventStreamMessage};
 use kanal::AsyncReceiver;
 use std::{
     collections::BinaryHeap,
@@ -13,6 +13,7 @@ use tracing::{error, warn};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransactionEvents {
     pub transaction_version: i64,
+    pub transaction_timestamp: chrono::NaiveDateTime,
     pub events: Vec<EventModel>,
 }
 
@@ -31,11 +32,11 @@ impl PartialOrd for TransactionEvents {
 
 pub struct EventOrdering {
     rx: Arc<AsyncReceiver<TransactionEvents>>,
-    tx: Sender<EventModel>,
+    tx: Sender<EventStreamMessage>,
 }
 
 impl EventOrdering {
-    pub fn new(rx: AsyncReceiver<TransactionEvents>, tx: Sender<EventModel>) -> Self {
+    pub fn new(rx: AsyncReceiver<TransactionEvents>, tx: Sender<EventStreamMessage>) -> Self {
         Self {
             rx: Arc::new(rx),
             tx,
@@ -73,12 +74,17 @@ impl EventOrdering {
                     if transaction_events.transaction_version
                         == next_transaction_version.load(Ordering::SeqCst)
                     {
+                        let transaction_timestamp = transaction_events.transaction_timestamp;
                         let transaction_events = heap_locked.pop().unwrap_or_else(|| {
                             error!("Failed to pop events from the heap");
                             panic!();
                         });
                         for event in transaction_events.events {
-                            tx.send(event).unwrap_or_else(|e| {
+                            tx.send(EventStreamMessage::from_event(
+                                &event,
+                                transaction_timestamp,
+                            ))
+                            .unwrap_or_else(|e| {
                                 warn!(
                                     error = ?e,
                                     "Failed to send event to the channel"

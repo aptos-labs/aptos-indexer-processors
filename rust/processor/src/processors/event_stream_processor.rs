@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::events_models::events::EventModel,
-    utils::{database::PgDbPool, event_ordering::TransactionEvents},
+    processors::{ProcessingResult, ProcessorName, ProcessorTrait},
+    utils::{database::PgDbPool, event_ordering::TransactionEvents, util::parse_timestamp},
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
@@ -53,6 +53,7 @@ impl ProcessorTrait for EventStreamProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
+            let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
             let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
             let default = vec![];
             let raw_events = match txn_data {
@@ -65,6 +66,7 @@ impl ProcessorTrait for EventStreamProcessor {
             self.channel
                 .send(TransactionEvents {
                     transaction_version: txn_version,
+                    transaction_timestamp: txn_timestamp,
                     events: EventModel::from_events(raw_events, txn_version, block_height),
                 })
                 .await?;

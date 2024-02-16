@@ -4,7 +4,7 @@
 use crate::{
     config::IndexerGrpcHttp2Config,
     models::{
-        events_models::events::EventModel, ledger_info::LedgerInfo,
+        events_models::events::EventStreamMessage, ledger_info::LedgerInfo,
         processor_status::ProcessorStatusQuery,
     },
     processors::{
@@ -55,7 +55,7 @@ pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
 pub struct StreamContext {
-    pub channel: broadcast::Sender<EventModel>,
+    pub channel: broadcast::Sender<EventStreamMessage>,
     pub websocket_alive_duration: u64,
 }
 
@@ -252,41 +252,43 @@ impl Worker {
             .await;
         });
 
-        let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10000);
-        let ordering_broadcast_tx = broadcast_tx.clone();
-        tokio::spawn(async move {
-            let mut event_ordering =
-                EventOrdering::new(transaction_events_rx, ordering_broadcast_tx.clone());
-            event_ordering.run(starting_version as i64).await;
-        });
-
-        // Receive all messages with initial Receiver to keep channel open
-        tokio::spawn(async move {
-            loop {
-                broadcast_rx.recv().await.unwrap_or_else(|e| {
-                    error!(
-                        error = ?e,
-                        "[Event Stream] Failed to receive message from channel"
-                    );
-                    panic!();
-                });
-            }
-        });
-
-        tokio::spawn(async move {
-            // Create web server
-            let stream_context = Arc::new(StreamContext {
-                channel: broadcast_tx.clone(),
-                websocket_alive_duration: 3000,
+        if processor.name() == "event_stream_processor" {
+            let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10000);
+            let ordering_broadcast_tx = broadcast_tx.clone();
+            tokio::spawn(async move {
+                let mut event_ordering =
+                    EventOrdering::new(transaction_events_rx, ordering_broadcast_tx.clone());
+                event_ordering.run(starting_version as i64).await;
             });
 
-            let ws_route = warp::path("stream")
-                .and(warp::ws())
-                .and(warp::any().map(move || stream_context.clone()))
-                .and_then(handle_websocket);
+            // Receive all messages with initial Receiver to keep channel open
+            tokio::spawn(async move {
+                loop {
+                    broadcast_rx.recv().await.unwrap_or_else(|e| {
+                        error!(
+                            error = ?e,
+                            "[Event Stream] Failed to receive message from channel"
+                        );
+                        panic!();
+                    });
+                }
+            });
 
-            warp::serve(ws_route).run(([0, 0, 0, 0], 8081)).await;
-        });
+            tokio::spawn(async move {
+                // Create web server
+                let stream_context = Arc::new(StreamContext {
+                    channel: broadcast_tx.clone(),
+                    websocket_alive_duration: 3000,
+                });
+
+                let ws_route = warp::path("stream")
+                    .and(warp::ws())
+                    .and(warp::any().map(move || stream_context.clone()))
+                    .and_then(handle_websocket);
+
+                warp::serve(ws_route).run(([0, 0, 0, 0], 8081)).await;
+            });
+        }
 
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions

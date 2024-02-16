@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::models::events_models::events::EventModel;
+use crate::models::events_models::events::EventStreamMessage;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
 use std::time::Duration;
 use tokio::{sync::broadcast::Receiver, time};
@@ -9,14 +9,14 @@ use warp::filters::ws::{Message, WebSocket};
 
 pub struct Stream {
     tx: SplitSink<WebSocket, Message>,
-    channel: Receiver<EventModel>,
+    channel: Receiver<EventStreamMessage>,
     websocket_alive_duration: u64,
 }
 
 impl Stream {
     pub fn new(
         tx: SplitSink<WebSocket, Message>,
-        channel: Receiver<EventModel>,
+        channel: Receiver<EventStreamMessage>,
         websocket_alive_duration: u64,
     ) -> Self {
         info!("Received WebSocket connection");
@@ -35,13 +35,14 @@ impl Stream {
         loop {
             tokio::select! {
                 msg = self.channel.recv() => {
-                    let event = msg.unwrap_or_else(|e| {
+                    let mut event = msg.unwrap_or_else(|e| {
                         error!(
                             error = ?e,
                             "[Event Stream] Failed to receive message from channel"
                         );
                         panic!();
                     });
+                    event.transaction_timestamp = chrono::Utc::now().naive_utc();
                     self.tx
                         .send(warp::ws::Message::text(serde_json::to_string(&event).unwrap()))
                         .await
@@ -57,7 +58,7 @@ impl Stream {
 
 pub async fn spawn_stream(
     ws: WebSocket,
-    channel: Receiver<EventModel>,
+    channel: Receiver<EventStreamMessage>,
     websocket_alive_duration: u64,
 ) {
     let (tx, _) = ws.split();

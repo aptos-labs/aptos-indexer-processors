@@ -76,3 +76,34 @@ impl Event {
 
 // Prevent conflicts with other things named `Event`
 pub type EventModel = Event;
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct EventStreamMessage {
+    pub sequence_number: i64,
+    pub creation_number: i64,
+    pub account_address: String,
+    pub transaction_version: i64,
+    pub transaction_block_height: i64,
+    pub type_: String,
+    pub data: serde_json::Value,
+    pub event_index: i64,
+    pub indexed_type: String,
+    pub transaction_timestamp: chrono::NaiveDateTime,
+}
+
+impl EventStreamMessage {
+    pub fn from_event(event: &Event, transaction_timestamp: chrono::NaiveDateTime) -> Self {
+        EventStreamMessage {
+            account_address: event.account_address.clone(),
+            creation_number: event.creation_number,
+            sequence_number: event.sequence_number,
+            transaction_version: event.transaction_version,
+            transaction_block_height: event.transaction_block_height,
+            type_: event.type_.clone(),
+            data: event.data.clone(),
+            event_index: event.event_index,
+            indexed_type: event.indexed_type.clone(),
+            transaction_timestamp,
+        }
+    }
+}
