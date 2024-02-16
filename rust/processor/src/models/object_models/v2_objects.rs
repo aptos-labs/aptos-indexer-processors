@@ -21,6 +21,7 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -135,17 +136,7 @@ impl Object {
             let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
                 object.clone()
             } else {
-                match Self::get_object_owner(conn, &resource.address).await {
-                    Ok(owner) => owner,
-                    Err(_) => {
-                        tracing::error!(
-                            transaction_version = txn_version,
-                            lookup_key = &resource.address,
-                            "Missing object owner for object. You probably should backfill db.",
-                        );
-                        return Ok(None);
-                    },
-                }
+                Self::get_current_object(conn, &resource.address, txn_version).await
             };
             Ok(Some((
                 Self {
@@ -177,17 +168,19 @@ impl Object {
         }
     }
 
-    /// This is actually not great because object owner can change. The best we can do now though
-    async fn get_object_owner(
+    /// This is actually not great because object owner can change. The best we can do now though.
+    /// This will loop forever until we get the object from the db
+    pub async fn get_current_object(
         conn: &mut PgPoolConnection<'_>,
         object_address: &str,
-    ) -> anyhow::Result<CurrentObject> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        transaction_version: i64,
+    ) -> CurrentObject {
+        let mut retries = 0;
+        while retries < QUERY_RETRIES {
+            retries += 1;
             match CurrentObjectQuery::get_by_address(object_address, conn).await {
                 Ok(res) => {
-                    return Ok(CurrentObject {
+                    return CurrentObject {
                         object_address: res.object_address,
                         owner_address: res.owner_address,
                         state_key_hash: res.state_key_hash,
@@ -197,15 +190,24 @@ impl Object {
                         is_token: res.is_token,
                         is_fungible_asset: res.is_fungible_asset,
                         is_deleted: res.is_deleted,
-                    });
+                    };
                 },
-                Err(_) => {
+                Err(e) => {
+                    warn!(
+                        transaction_version,
+                        error = ?e,
+                        object_address,
+                        retry_ms = QUERY_RETRY_DELAY_MS,
+                        "Failed to get object from current_objects table for object_address: {}, retrying in {} ms. ",
+                        object_address,
+                        QUERY_RETRY_DELAY_MS,
+                    );
                     tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
                         .await;
                 },
             }
         }
-        Err(anyhow::anyhow!("Failed to get object owner"))
+        panic!("Failed to get object from current_objects table for object_address: {}. You should probably backfill db.", object_address);
     }
 }
 

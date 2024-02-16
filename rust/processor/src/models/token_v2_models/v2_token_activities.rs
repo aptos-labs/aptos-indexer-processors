@@ -77,7 +77,7 @@ impl TokenActivityV2 {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        token_v2_metadata: &ObjectAggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
@@ -89,13 +89,18 @@ impl TokenActivityV2 {
 
             // The event account address will also help us find fungible store which tells us where to find
             // the metadata
-            if let Some(metadata) = token_v2_metadata.get(&event_account_address) {
-                let object_core = &metadata.object.object_core;
-                let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
+            if let Some(object_data) = object_metadatas.get(&event_account_address) {
+                let object_core = &object_data.object.object_core;
+                let fungible_asset = object_data.fungible_asset_store.as_ref().unwrap();
                 let token_data_id = fungible_asset.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
-                    .await
+                if !TokenDataV2::is_address_fungible_token(
+                    conn,
+                    &token_data_id,
+                    object_metadatas,
+                    txn_version,
+                )
+                .await
                 {
                     return Ok(None);
                 }
