@@ -16,7 +16,6 @@ use crate::{
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use ahash::AHashMap;
-use anyhow::Context;
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::sql_types::Text;
 use field_count::FieldCount;
