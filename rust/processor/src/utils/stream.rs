@@ -35,14 +35,13 @@ impl Stream {
         loop {
             tokio::select! {
                 msg = self.channel.recv() => {
-                    let mut event = msg.unwrap_or_else(|e| {
+                    let event = msg.unwrap_or_else(|e| {
                         error!(
                             error = ?e,
                             "[Event Stream] Failed to receive message from channel"
                         );
                         panic!();
                     });
-                    event.transaction_timestamp = chrono::Utc::now().naive_utc();
                     self.tx
                         .send(warp::ws::Message::text(serde_json::to_string(&event).unwrap()))
                         .await
