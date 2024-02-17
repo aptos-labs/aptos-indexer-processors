@@ -273,7 +273,22 @@ impl Transaction {
                     wsc_detail,
                 )
             },
-            TxnData::StateCheckpoint(_state_checkpoint_txn) => (
+            TxnData::StateCheckpoint(_) => (
+                Self::from_transaction_info_with_data(
+                    transaction_info,
+                    None,
+                    None,
+                    version,
+                    transaction_type,
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+            ),
+            TxnData::Validator(_) => (
                 Self::from_transaction_info_with_data(
                     transaction_info,
                     None,
