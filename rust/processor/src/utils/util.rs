@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{models::property_map::{PropertyMap, TokenObjectPropertyMap}, utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT};
+use crate::{
+    models::property_map::{PropertyMap, TokenObjectPropertyMap},
+    utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+};
 use aptos_protos::{
     transaction::v1::{
         multisig_transaction_payload::Payload as MultisigPayloadType,
@@ -116,8 +119,8 @@ pub fn get_payload_type(payload: &TransactionPayload) -> String {
 pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<Value> {
     if payload.payload.as_ref().is_none() {
         PROCESSOR_UNKNOWN_TYPE_COUNT
-        .with_label_values(&["TransactionPayload"])
-        .inc();
+            .with_label_values(&["TransactionPayload"])
+            .inc();
         tracing::warn!(
             transaction_version = version,
             "Transaction payload doesn't exist",

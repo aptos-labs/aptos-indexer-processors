@@ -9,10 +9,10 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
-    account_signature::Signature as AccountSignatureEnum,
-    any_signature::SignatureVariant, signature::Signature as SignatureEnum,
-    AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
-    FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
+    account_signature::Signature as AccountSignatureEnum, any_signature::SignatureVariant,
+    signature::Signature as SignatureEnum, AccountSignature as ProtoAccountSignature,
+    Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature,
+    MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
     Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
     SingleSender as SingleSenderPb,
@@ -337,8 +337,10 @@ impl Signature {
     ) -> Self {
         let signer = standardize_address(override_address.unwrap_or(sender));
         let signature = s.signature.as_ref().unwrap();
-        let signature_bytes = Self::get_any_signature_bytes(&signature.signature_variant, transaction_version);
-        let type_ = Self::get_any_signature_type(&signature.signature_variant, true, transaction_version);
+        let signature_bytes =
+            Self::get_any_signature_bytes(&signature.signature_variant, transaction_version);
+        let type_ =
+            Self::get_any_signature_type(&signature.signature_variant, true, transaction_version);
         Self {
             transaction_version,
             transaction_block_height,
@@ -380,8 +382,15 @@ impl Signature {
                 .unwrap()
                 .public_key
                 .clone();
-            let signature_bytes = Self::get_any_signature_bytes(&signature.signature.as_ref().unwrap().signature_variant, transaction_version);
-            let type_ = Self::get_any_signature_type(&signature.signature.as_ref().unwrap().signature_variant, false, transaction_version);
+            let signature_bytes = Self::get_any_signature_bytes(
+                &signature.signature.as_ref().unwrap().signature_variant,
+                transaction_version,
+            );
+            let type_ = Self::get_any_signature_type(
+                &signature.signature.as_ref().unwrap().signature_variant,
+                false,
+                transaction_version,
+            );
             signatures.push(Self {
                 transaction_version,
                 transaction_block_height,
@@ -406,7 +415,10 @@ impl Signature {
         signatures
     }
 
-    fn get_any_signature_bytes(signature_variant: &Option<SignatureVariant>, transaction_version: i64) -> Vec<u8> {
+    fn get_any_signature_bytes(
+        signature_variant: &Option<SignatureVariant>,
+        transaction_version: i64,
+    ) -> Vec<u8> {
         match signature_variant {
             Some(SignatureVariant::Ed25519(sig)) => sig.signature.clone(),
             Some(SignatureVariant::Zkid(sig)) => sig.signature.clone(),
@@ -414,8 +426,8 @@ impl Signature {
             Some(SignatureVariant::Secp256k1Ecdsa(sig)) => sig.signature.clone(),
             None => {
                 PROCESSOR_UNKNOWN_TYPE_COUNT
-                .with_label_values(&["SignatureVariant"])
-                .inc();
+                    .with_label_values(&["SignatureVariant"])
+                    .inc();
                 tracing::warn!(
                     transaction_version = transaction_version,
                     "Signature variant doesn't exist",
@@ -425,7 +437,11 @@ impl Signature {
         }
     }
 
-    fn get_any_signature_type(signature_variant: &Option<SignatureVariant>, is_single_sender: bool, transaction_version: i64) -> String {
+    fn get_any_signature_type(
+        signature_variant: &Option<SignatureVariant>,
+        is_single_sender: bool,
+        transaction_version: i64,
+    ) -> String {
         let prefix = if is_single_sender {
             "single_sender"
         } else {
@@ -435,11 +451,13 @@ impl Signature {
             Some(SignatureVariant::Ed25519(_)) => format!("{}_ed25519_signature", prefix),
             Some(SignatureVariant::Zkid(_)) => format!("{}_zkid_signature", prefix),
             Some(SignatureVariant::Webauthn(_)) => format!("{}_webauthn_signature", prefix),
-            Some(SignatureVariant::Secp256k1Ecdsa(_)) => format!("{}_secp256k1_ecdsa_signature", prefix),
+            Some(SignatureVariant::Secp256k1Ecdsa(_)) => {
+                format!("{}_secp256k1_ecdsa_signature", prefix)
+            },
             None => {
                 PROCESSOR_UNKNOWN_TYPE_COUNT
-                .with_label_values(&["SignatureVariant"])
-                .inc();
+                    .with_label_values(&["SignatureVariant"])
+                    .inc();
                 tracing::warn!(
                     transaction_version = transaction_version,
                     "Signature variant doesn't exist",
