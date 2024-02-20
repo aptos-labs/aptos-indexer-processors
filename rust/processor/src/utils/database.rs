@@ -191,6 +191,7 @@ where
         where_clause: additional_where_clause,
     };
     let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    let db_insertion_duration_in_secs = std::time::Instant::now();
     tracing::debug!("Executing query: {:?}", debug_string);
     let conn = &mut pool.get().await.map_err(|e| {
         tracing::warn!("Error getting connection from pool: {:?}", e);
@@ -200,6 +201,11 @@ where
         )
     })?;
     let res = final_query.execute(conn).await;
+    tracing::info!(
+        db_insertion_time = db_insertion_duration_in_secs.elapsed().as_secs_f64(),
+        "Executed query: {:?}",
+        debug_string
+    );
     if let Err(ref e) = res {
         tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
     }
