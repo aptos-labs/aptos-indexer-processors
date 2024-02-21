@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig,
-    transaction_filter::TransactionFilter, worker::Worker,
+    db_writer::QueryGenerator,
+    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE,
+    processors::ProcessorConfig,
+    transaction_filter::TransactionFilter,
+    utils::database::{new_db_pool, DEFAULT_MAX_POOL_SIZE},
+    worker::Worker,
 };
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
@@ -27,9 +31,11 @@ pub struct IndexerGrpcProcessorConfig {
     // Version to end indexing at
     pub ending_version: Option<u64>,
     // Number of tasks waiting to pull transaction batches from the channel and process them
-    pub number_concurrent_processing_tasks: Option<usize>,
+    // TODO: ADD A DEFAULT HERE!
+    pub number_concurrent_processing_tasks: usize,
     // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
-    pub db_pool_size: Option<u32>,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_db_pool_size")]
+    pub db_pool_size: u32,
     // Maximum number of batches "missing" before we assume we have an issue with gaps and abort
     #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
     pub gap_detection_batch_size: u64,
@@ -39,9 +45,19 @@ pub struct IndexerGrpcProcessorConfig {
     // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
     #[serde(default = "AHashMap::new")]
     pub per_table_chunk_sizes: AHashMap<String, usize>,
-    pub enable_verbose_logging: Option<bool>,
+    // Any tables to skip indexing for
+    #[serde(default = "AHashSet::new")]
+    pub skip_tables: AHashSet<String>,
+    // Number of parallel db writer tasks that pull from the channel and do inserts
+    #[serde(default = "IndexerGrpcProcessorConfig::default_number_concurrent_db_writer_tasks")]
+    pub number_concurrent_db_writer_tasks: usize,
+    // Size of the channel between the processor tasks and the db writer tasks
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_executor_channel_size")]
+    pub query_executor_channel_size: usize,
     #[serde(default)]
     pub transaction_filter: TransactionFilter,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_false")]
+    pub enable_verbose_logging: bool,
 }
 
 impl IndexerGrpcProcessorConfig {
@@ -54,11 +70,46 @@ impl IndexerGrpcProcessorConfig {
     pub const fn default_pb_channel_txn_chunk_size() -> usize {
         100_000
     }
+
+    pub const fn default_false() -> bool {
+        false
+    }
+
+    pub const fn default_db_pool_size() -> u32 {
+        DEFAULT_MAX_POOL_SIZE
+    }
+
+    // TODO: ideally the default is a multiple of pool_size and/or number_concurrent_processing_tasks
+    pub const fn default_number_concurrent_db_writer_tasks() -> usize {
+        50
+    }
+
+    /// Make the default very large on purpose so that by default it's not chunked
+    /// This _minimizes_ some unexpected changes in behavior
+    pub const fn default_query_executor_channel_size() -> usize {
+        100_000
+    }
 }
 
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
     async fn run(&self) -> Result<()> {
+        let conn_pool = new_db_pool(&self.postgres_connection_string, self.db_pool_size)
+            .await
+            .context("Failed to create connection pool")?;
+
+        let processor_name = self.processor_config.name();
+
+        let (query_sender, query_receiver) =
+            kanal::bounded_async::<QueryGenerator>(self.query_executor_channel_size);
+        let db_writer = crate::db_writer::DbWriter::new(
+            processor_name,
+            conn_pool.clone(),
+            query_sender,
+            self.per_table_chunk_sizes.clone(),
+            self.skip_tables.clone(),
+        );
+
         let mut worker = Worker::new(
             self.processor_config.clone(),
             self.postgres_connection_string.clone(),
@@ -68,12 +119,13 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            self.db_pool_size,
             self.gap_detection_batch_size,
             self.pb_channel_txn_chunk_size,
-            self.per_table_chunk_sizes.clone(),
+            self.number_concurrent_db_writer_tasks,
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
+            query_receiver,
+            db_writer,
         )
         .await
         .context("Failed to build worker")?;

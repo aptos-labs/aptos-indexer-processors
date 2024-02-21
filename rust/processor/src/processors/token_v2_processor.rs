@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    diesel::ExpressionMethods,
     models::{
         fungible_asset_models::v2_fungible_asset_utils::{
             FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
@@ -17,8 +18,8 @@ use crate::{
             v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
             v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
             v2_token_ownerships::{
-                CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
-                TokenOwnershipV2,
+                CurrentDeletedTokenOwnershipV2, CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK,
+                NFTOwnershipV2, TokenOwnershipV2,
             },
             v2_token_utils::{
                 AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
@@ -30,7 +31,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool, PgPoolConnection},
+        database::PgPoolConnection,
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
 };
@@ -38,54 +39,46 @@ use ahash::{AHashMap, AHashSet};
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
-};
-use std::fmt::Debug;
+use diesel::pg::upsert::excluded;
 use tracing::error;
 
 pub struct TokenV2Processor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl TokenV2Processor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for TokenV2Processor {
+impl std::fmt::Debug for TokenV2Processor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "TokenV2TransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
+impl TokenV2Processor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
+}
+
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    collections_v2: &[CollectionV2],
-    token_datas_v2: &[TokenDataV2],
-    token_ownerships_v2: &[TokenOwnershipV2],
-    current_collections_v2: &[CurrentCollectionV2],
-    current_token_datas_v2: &[CurrentTokenDataV2],
-    current_token_ownerships_v2: &[CurrentTokenOwnershipV2],
-    current_deleted_token_ownerships_v2: &[CurrentTokenOwnershipV2],
-    token_activities_v2: &[TokenActivityV2],
-    current_token_v2_metadata: &[CurrentTokenV2Metadata],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
+    collections_v2: Vec<CollectionV2>,
+    token_datas_v2: Vec<TokenDataV2>,
+    token_ownerships_v2: Vec<TokenOwnershipV2>,
+    current_collections_v2: Vec<CurrentCollectionV2>,
+    current_token_datas_v2: Vec<CurrentTokenDataV2>,
+    current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
+    current_burned_token_ownerships_v2: Vec<CurrentDeletedTokenOwnershipV2>,
+    token_activities_v2: Vec<TokenActivityV2>,
+    current_token_v2_metadata: Vec<CurrentTokenV2Metadata>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -94,172 +87,83 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let coll_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_collections_v2_query,
-        collections_v2,
-        get_config_table_chunk_size::<CollectionV2>("collections_v2", per_table_chunk_sizes),
+    let coll_v2 = db_writer.send_in_chunks("collections_v2", collections_v2);
+    let td_v2 = db_writer.send_in_chunks("token_datas_v2", token_datas_v2);
+    let to_v2 = db_writer.send_in_chunks("token_ownerships_v2", token_ownerships_v2);
+    let cc_v2 = db_writer.send_in_chunks("current_collections_v2", current_collections_v2);
+    let ctd_v2 = db_writer.send_in_chunks("current_token_datas_v2", current_token_datas_v2);
+    let cto_v2 =
+        db_writer.send_in_chunks("current_token_ownerships_v2", current_token_ownerships_v2);
+    let cbto_v2 = db_writer.send_in_chunks(
+        "current_token_ownerships_v2",
+        current_burned_token_ownerships_v2,
     );
-    let td_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_datas_v2_query,
-        token_datas_v2,
-        get_config_table_chunk_size::<TokenDataV2>("token_datas_v2", per_table_chunk_sizes),
-    );
-    let to_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_ownerships_v2_query,
-        token_ownerships_v2,
-        get_config_table_chunk_size::<TokenOwnershipV2>(
-            "token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cc_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_collections_v2_query,
-        current_collections_v2,
-        get_config_table_chunk_size::<CurrentCollectionV2>(
-            "current_collections_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let ctd_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_datas_v2_query,
-        current_token_datas_v2,
-        get_config_table_chunk_size::<CurrentTokenDataV2>(
-            "current_token_datas_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cto_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_ownerships_v2_query,
-        current_token_ownerships_v2,
-        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
-            "current_token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cdto_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_deleted_token_ownerships_v2_query,
-        current_deleted_token_ownerships_v2,
-        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
-            "current_token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let ta_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_activities_v2_query,
-        token_activities_v2,
-        get_config_table_chunk_size::<TokenActivityV2>(
-            "token_activities_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let ct_v2 = execute_in_chunks(
-        conn,
-        insert_current_token_v2_metadatas_query,
-        current_token_v2_metadata,
-        get_config_table_chunk_size::<CurrentTokenV2Metadata>(
-            "current_token_v2_metadata",
-            per_table_chunk_sizes,
-        ),
-    );
+    let ta_v2 = db_writer.send_in_chunks("token_activities_v2", token_activities_v2);
+    let ct_v2 = db_writer.send_in_chunks("current_token_v2_metadata", current_token_v2_metadata);
 
-    let (
-        coll_v2_res,
-        td_v2_res,
-        to_v2_res,
-        cc_v2_res,
-        ctd_v2_res,
-        cto_v2_res,
-        cdto_v2_res,
-        ta_v2_res,
-        ct_v2_res,
-    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, cdto_v2, ta_v2, ct_v2,);
-
-    for res in [
-        coll_v2_res,
-        td_v2_res,
-        to_v2_res,
-        cc_v2_res,
-        ctd_v2_res,
-        cto_v2_res,
-        cdto_v2_res,
-        ta_v2_res,
-        ct_v2_res,
-    ] {
-        res?;
-    }
+    tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, cbto_v2, ta_v2, ct_v2,);
 
     Ok(())
 }
 
-fn insert_collections_v2_query(
-    items_to_insert: Vec<CollectionV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::collections_v2::dsl::*;
-    (
-        diesel::insert_into(schema::collections_v2::table)
-            .values(items_to_insert)
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CollectionV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::collections_v2::dsl::*;
+
+        let query = diesel::insert_into(schema::collections_v2::table)
+            .values(self)
             .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+            .do_nothing();
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_token_datas_v2_query(
-    items_to_insert: Vec<TokenDataV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::token_datas_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<TokenDataV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::token_datas_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::token_datas_v2::table)
-            .values(items_to_insert)
+        let query = diesel::insert_into(schema::token_datas_v2::table)
+            .values(self)
             .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+            .do_nothing();
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_token_ownerships_v2_query(
-    items_to_insert: Vec<TokenOwnershipV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::token_ownerships_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<TokenOwnershipV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::token_ownerships_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::token_ownerships_v2::table)
-            .values(items_to_insert)
+        let query = diesel::insert_into(schema::token_ownerships_v2::table)
+            .values(self)
             .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+            .do_nothing();
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_current_collections_v2_query(
-    items_to_insert: Vec<CurrentCollectionV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_collections_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CurrentCollectionV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::current_collections_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_collections_v2::table)
-            .values(items_to_insert)
+        let query = diesel::insert_into(schema::current_collections_v2::table)
+            .values(self)
             .on_conflict(collection_id)
             .do_update()
             .set((
@@ -277,22 +181,21 @@ fn insert_current_collections_v2_query(
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_collections_v2.last_transaction_version <= excluded.last_transaction_version "),
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_collections_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+    }
 }
 
-fn insert_current_token_datas_v2_query(
-    items_to_insert: Vec<CurrentTokenDataV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_datas_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CurrentTokenDataV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::current_token_datas_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_token_datas_v2::table)
-            .values(items_to_insert)
+        let query = diesel::insert_into(schema::current_token_datas_v2::table)
+            .values(self)
             .on_conflict(token_data_id)
             .do_update()
             .set((
@@ -310,23 +213,27 @@ fn insert_current_token_datas_v2_query(
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 decimals.eq(excluded(decimals)),
-            )),
-        Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+    }
 }
 
-fn insert_current_token_ownerships_v2_query(
-    items_to_insert: Vec<CurrentTokenOwnershipV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_ownerships_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnershipV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::current_token_ownerships_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_token_ownerships_v2::table)
-            .values(items_to_insert)
-            .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
+        let query = diesel::insert_into(schema::current_token_ownerships_v2::table)
+            .values(self)
+            .on_conflict((
+                token_data_id,
+                property_version_v1,
+                owner_address,
+                storage_id,
+            ))
             .do_update()
             .set((
                 amount.eq(excluded(amount)),
@@ -339,66 +246,68 @@ fn insert_current_token_ownerships_v2_query(
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
-            )),
-        Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+    }
 }
 
-fn insert_current_deleted_token_ownerships_v2_query(
-    items_to_insert: Vec<CurrentTokenOwnershipV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_ownerships_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CurrentDeletedTokenOwnershipV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::current_token_ownerships_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_token_ownerships_v2::table)
-            .values(items_to_insert)
-            .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
+        let query = diesel::insert_into(schema::current_token_ownerships_v2::table)
+            .values(self)
+            .on_conflict((
+                token_data_id,
+                property_version_v1,
+                owner_address,
+                storage_id,
+            ))
             .do_update()
             .set((
                 amount.eq(excluded(amount)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+    }
 }
 
-fn insert_token_activities_v2_query(
-    items_to_insert: Vec<TokenActivityV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::token_activities_v2::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<TokenActivityV2> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::token_activities_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::token_activities_v2::table)
-            .values(items_to_insert)
+        let query = diesel::insert_into(schema::token_activities_v2::table)
+            .values(self)
             .on_conflict((transaction_version, event_index))
             .do_update()
             .set((
                 entry_function_id_str.eq(excluded(entry_function_id_str)),
                 inserted_at.eq(excluded(inserted_at)),
-            )),
-        None,
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_current_token_v2_metadatas_query(
-    items_to_insert: Vec<CurrentTokenV2Metadata>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_v2_metadata::dsl::*;
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CurrentTokenV2Metadata> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::current_token_v2_metadata::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_token_v2_metadata::table)
-            .values(items_to_insert)
+        let query = diesel::insert_into(schema::current_token_v2_metadata::table)
+            .values(self)
             .on_conflict((object_address, resource_type))
             .do_update()
             .set((
@@ -406,9 +315,9 @@ fn insert_current_token_v2_metadatas_query(
                 state_key_hash.eq(excluded(state_key_hash)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_token_v2_metadata.last_transaction_version <= excluded.last_transaction_version "),
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_v2_metadata.last_transaction_version <= excluded.last_transaction_version "))).await
+    }
 }
 
 #[async_trait]
@@ -451,30 +360,29 @@ impl ProcessorTrait for TokenV2Processor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &collections_v2,
-            &token_datas_v2,
-            &token_ownerships_v2,
-            &current_collections_v2,
-            &current_token_datas_v2,
-            &current_token_ownerships_v2,
-            &current_deleted_token_ownerships_v2,
-            &token_activities_v2,
-            &current_token_v2_metadata,
-            &self.per_table_chunk_sizes,
+            collections_v2,
+            token_datas_v2,
+            token_ownerships_v2,
+            current_collections_v2,
+            current_token_datas_v2,
+            current_token_ownerships_v2,
+            current_deleted_token_ownerships_v2,
+            token_activities_v2,
+            current_token_v2_metadata,
         )
         .await;
 
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
                 processing_duration_in_secs,
-                db_insertion_duration_in_secs,
+                db_channel_insertion_duration_in_secs,
                 last_transaction_timestamp,
             }),
             Err(e) => {
@@ -490,8 +398,8 @@ impl ProcessorTrait for TokenV2Processor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 
@@ -506,7 +414,7 @@ async fn parse_v2_token(
     Vec<CurrentCollectionV2>,
     Vec<CurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
-    Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
+    Vec<CurrentDeletedTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
 ) {
@@ -823,7 +731,7 @@ async fn parse_v2_token(
                                         cto.owner_address.clone(),
                                         cto.storage_id.clone(),
                                     ),
-                                    cto,
+                                    cto.into(),
                                 );
                             }
                         }
@@ -915,7 +823,7 @@ async fn parse_v2_token(
                                     current_nft_ownership.owner_address.clone(),
                                     current_nft_ownership.storage_id.clone(),
                                 ),
-                                current_nft_ownership,
+                                current_nft_ownership.into(),
                             );
                         }
 
@@ -992,7 +900,7 @@ async fn parse_v2_token(
                                     current_nft_ownership.owner_address.clone(),
                                     current_nft_ownership.storage_id.clone(),
                                 ),
-                                current_nft_ownership,
+                                current_nft_ownership.into(),
                             );
                         }
                     },
@@ -1017,7 +925,7 @@ async fn parse_v2_token(
         .collect::<Vec<CurrentTokenV2Metadata>>();
     let mut current_deleted_token_ownerships_v2 = current_deleted_token_ownerships_v2
         .into_values()
-        .collect::<Vec<CurrentTokenOwnershipV2>>();
+        .collect::<Vec<CurrentDeletedTokenOwnershipV2>>();
 
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));

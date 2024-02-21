@@ -4,7 +4,8 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    schema::signatures::{self},
+    db_writer::execute_with_better_error,
+    schema::signatures,
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
 use anyhow::{Context, Result};
@@ -515,5 +516,26 @@ impl Signature {
             ),
             None => vec![],
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<Signature> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::signatures::dsl::*;
+
+        let query = diesel::insert_into(crate::schema::signatures::table)
+            .values(self)
+            .on_conflict((
+                transaction_version,
+                multi_agent_index,
+                multi_sig_index,
+                is_sender_primary,
+            ))
+            .do_nothing();
+        execute_with_better_error(conn, query).await
     }
 }

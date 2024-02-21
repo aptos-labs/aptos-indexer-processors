@@ -9,6 +9,8 @@
 
 use super::signatures::Signature;
 use crate::{
+    db_writer::execute_with_better_error,
+    diesel::ExpressionMethods,
     schema::user_transactions,
     utils::util::{
         get_entry_function_from_user_request, parse_timestamp, standardize_address,
@@ -20,6 +22,7 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use bigdecimal::BigDecimal;
+use diesel::upsert::excluded;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -103,3 +106,23 @@ impl UserTransaction {
 
 // Prevent conflicts with other things named `Transaction`
 pub type UserTransactionModel = UserTransaction;
+
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<UserTransactionModel> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::user_transactions::dsl::*;
+
+        let query = diesel::insert_into(crate::schema::user_transactions::table)
+            .values(self)
+            .on_conflict(version)
+            .do_update()
+            .set((
+                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+                inserted_at.eq(excluded(inserted_at)),
+            ));
+        execute_with_better_error(conn, query).await
+    }
+}

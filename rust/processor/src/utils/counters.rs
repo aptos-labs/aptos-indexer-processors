@@ -107,26 +107,6 @@ pub static GOT_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-#[allow(dead_code)]
-/// Number of times the indexer has been unable to fetch a transaction. Ideally zero.
-pub static UNABLE_TO_FETCH_TRANSACTION: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "indexer_unable_to_fetch_transaction_count",
-        "Number of times the indexer has been unable to fetch a transaction"
-    )
-    .unwrap()
-});
-
-#[allow(dead_code)]
-/// Number of times the indexer has been able to fetch a transaction
-pub static FETCHED_TRANSACTION: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "indexer_fetched_transaction_count",
-        "Number of times the indexer has been able to fetch a transaction"
-    )
-    .unwrap()
-});
-
 /// Max version processed
 pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -207,12 +187,73 @@ pub static SINGLE_BATCH_PARSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// DB insertion time for a single batch of transactions
-pub static SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+/// DB writer channel insertion time for a single batch of transaction artifacts
+pub static DB_EXECUTOR_CHANNEL_QUEUE_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
-        "indexer_processor_single_batch_db_insertion_time_in_secs",
-        "Time taken to insert to DB for a single batch of transactions",
+        "indexer_processor_db_executor_channel_queue_time_in_secs",
+        "Time taken to queue a batch of transaction artifacts into the db executor channel",
         &["processor_name", "task_index"]
+    )
+    .unwrap()
+});
+
+/// DB writer number of times a chunk was inserted into the channel
+pub static DB_EXECUTOR_CHANNEL_CHUNK_INSERT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_db_executor_channel_chunk_insert_count",
+        "Number of times a chunk was inserted into the db executor channel",
+        &["processor_name", "table_name"]
+    )
+    .unwrap()
+});
+
+/// The number of items in the db writer channel
+pub static DB_EXECUTOR_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_processor_db_executor_channel_size",
+        "The number of items in the db writer channel",
+        &["processor_name"]
+    )
+    .unwrap()
+});
+
+/// DB execution time for a single batch of transactions artifacts
+pub static DB_SINGLE_BATCH_EXECUTION_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_db_single_batch_execution_time_in_secs",
+        "Time taken to insert a batch of transaction artifacts to the DB",
+        &["processor_name", "table_name"]
+    )
+    .unwrap()
+});
+
+/// Number of times a query failed due to attempting to insert a null byte to the DB (PG Only)
+pub static DB_NULL_BYTE_INSERT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_db_null_byte_insert_count",
+        "Number of times a query failed due to attempting to insert a null byte to the DB (PG Only)",
+        &["processor_name", "table_name"]
+    )
+    .unwrap()
+});
+
+/// DB insertion time for a single batch of transactions artifacts
+pub static DB_EXECUTION_RETRIES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_db_execution_retry_count",
+        "Time taken to execute a batch of transaction artifacts to the DB",
+        &["processor_name", "table_name", "error_type"]
+    )
+    .unwrap()
+});
+
+/// Number of rows _attempted_ to be inserted into the DB
+/// This is potentially different from actual insertion/updates due to unique constraints, etc
+pub static DB_INSERTION_ROWS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_db_insertion_rows_count",
+        "Number of rows attempted to be inserted into the DB",
+        &["processor_name", "table_name"]
     )
     .unwrap()
 });
@@ -249,7 +290,7 @@ pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
 pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_processor_unknown_type_count",
-        "Processor unknown type count, e.g., comptaibility issues",
+        "Processor unknown type count, e.g., compatibility issues",
         &["model_name"]
     )
     .unwrap()

@@ -28,6 +28,8 @@ pub type PgPool = Pool<MyDbConnection>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
+pub type QueryBuilderFunc<U, T> = fn(Vec<T>) -> (U, Option<&'static str>);
+
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
@@ -37,8 +39,17 @@ pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
 /// INSERT INTO ... ON CONFLICT DO UPDATE SET ... WHERE "transaction_version" = excluded."transaction_version"
 /// This is needed when we want to maintain a table with only the latest state
 pub struct UpsertFilterLatestTransactionQuery<T> {
-    query: T,
-    where_clause: Option<&'static str>,
+    pub query: T,
+    pub where_clause: Option<&'static str>,
+}
+
+impl<T> UpsertFilterLatestTransactionQuery<T> {
+    pub fn new(query: T, where_clause: Option<&'static str>) -> Self {
+        Self {
+            query,
+            where_clause,
+        }
+    }
 }
 
 // the max is actually u16::MAX but we see that when the size is too big we get an overflow error so reducing it a bit
@@ -117,10 +128,7 @@ fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
     (db_url.to_string(), cert_path)
 }
 
-pub async fn new_db_pool(
-    database_url: &str,
-    max_pool_size: Option<u32>,
-) -> Result<PgDbPool, PoolError> {
+pub async fn new_db_pool(database_url: &str, max_pool_size: u32) -> Result<PgDbPool, PoolError> {
     let (_url, cert_path) = parse_and_clean_db_url(database_url);
 
     let config = if cert_path.is_some() {
@@ -131,7 +139,7 @@ pub async fn new_db_pool(
         AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
     };
     let pool = Pool::builder()
-        .max_size(max_pool_size.unwrap_or(DEFAULT_MAX_POOL_SIZE))
+        .max_size(max_pool_size)
         .build(config)
         .await?;
     Ok(Arc::new(pool))
@@ -139,7 +147,7 @@ pub async fn new_db_pool(
 
 pub async fn execute_in_chunks<U, T>(
     conn: PgDbPool,
-    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    build_query: QueryBuilderFunc<U, T>,
     items_to_insert: &[T],
     chunk_size: usize,
 ) -> Result<(), diesel::result::Error>
@@ -195,7 +203,7 @@ where
     let conn = &mut pool.get().await.map_err(|e| {
         tracing::warn!("Error getting connection from pool: {:?}", e);
         diesel::result::Error::DatabaseError(
-            diesel::result::DatabaseErrorKind::UnableToSendCommand,
+            diesel::result::DatabaseErrorKind::Unknown,
             Box::new(e.to_string()),
         )
     })?;
@@ -248,7 +256,7 @@ where
 
 async fn execute_or_retry_cleaned<U, T>(
     conn: PgDbPool,
-    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    build_query: QueryBuilderFunc<U, T>,
     items: Vec<T>,
     query: U,
     additional_where_clause: Option<&'static str>,

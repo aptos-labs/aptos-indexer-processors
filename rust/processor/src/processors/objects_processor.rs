@@ -3,60 +3,56 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::object_models::{
-        v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
-        v2_objects::{CurrentObject, Object},
+    diesel::ExpressionMethods,
+    models::{
+        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
+        object_models::{
+            v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            },
+            v2_objects::{CurrentObject, Object},
+        },
+        token_v2_models::v2_token_utils::TokenV2,
     },
     schema,
-    utils::{
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-        util::standardize_address,
-    },
+    utils::util::standardize_address,
 };
 use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
-};
-use std::fmt::Debug;
+use diesel::pg::upsert::excluded;
 use tracing::error;
 
 pub struct ObjectsProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for ObjectsProcessor {
+impl std::fmt::Debug for ObjectsProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "ObjectsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
+impl ObjectsProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
+}
+
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    (objects, current_objects): (&[Object], &[CurrentObject]),
-    per_table_chunk_sizes: &AHashMap<String, usize>,
+    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -65,53 +61,40 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let io = execute_in_chunks(
-        conn.clone(),
-        insert_objects_query,
-        objects,
-        get_config_table_chunk_size::<Object>("objects", per_table_chunk_sizes),
-    );
-    let co = execute_in_chunks(
-        conn,
-        insert_current_objects_query,
-        current_objects,
-        get_config_table_chunk_size::<CurrentObject>("current_objects", per_table_chunk_sizes),
-    );
-    let (io_res, co_res) = tokio::join!(io, co);
-    for res in [io_res, co_res] {
-        res?;
-    }
+    let io = db_writer.send_in_chunks("objects", objects);
+    let co = db_writer.send_in_chunks("current_objects", current_objects);
+    tokio::join!(io, co);
 
     Ok(())
 }
 
-fn insert_objects_query(
-    items_to_insert: Vec<Object>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::objects::dsl::*;
-    (
-        diesel::insert_into(schema::objects::table)
-            .values(items_to_insert)
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<Object> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::objects::dsl::*;
+
+        let query = diesel::insert_into(schema::objects::table)
+            .values(self)
             .on_conflict((transaction_version, write_set_change_index))
             .do_update()
-            .set((inserted_at.eq(excluded(inserted_at)),)),
-        None,
-    )
+            .set(inserted_at.eq(excluded(inserted_at)));
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_current_objects_query(
-    items_to_insert: Vec<CurrentObject>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_objects::dsl::*;
-    (
-        diesel::insert_into(schema::current_objects::table)
-            .values(items_to_insert)
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<CurrentObject> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::current_objects::dsl::*;
+
+        let query = diesel::insert_into(schema::current_objects::table)
+            .values(self)
             .on_conflict(object_address)
             .do_update()
             .set((
@@ -122,11 +105,9 @@ fn insert_current_objects_query(
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(
-            " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
-        ),
-    )
+            ));
+        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "))).await
+    }
 }
 
 #[async_trait]
@@ -244,22 +225,21 @@ impl ProcessorTrait for ObjectsProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            (&all_objects, &all_current_objects),
-            &self.per_table_chunk_sizes,
+            (all_objects, all_current_objects),
         )
         .await;
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
                 processing_duration_in_secs,
-                db_insertion_duration_in_secs,
+                db_channel_insertion_duration_in_secs,
                 last_transaction_timestamp,
             }),
             Err(e) => {
@@ -275,7 +255,7 @@ impl ProcessorTrait for ObjectsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

@@ -14,7 +14,7 @@ use crate::{
         },
     },
     utils::{
-        database::{PgDbPool, PgPoolConnection},
+        database::PgPoolConnection,
         util::{parse_timestamp, remove_null_bytes, standardize_address},
     },
 };
@@ -41,13 +41,26 @@ pub struct NftMetadataProcessorConfig {
 }
 
 pub struct NftMetadataProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     chain_id: u8,
     config: NftMetadataProcessorConfig,
 }
 
+impl std::fmt::Debug for NftMetadataProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl NftMetadataProcessor {
-    pub fn new(connection_pool: PgDbPool, config: NftMetadataProcessorConfig) -> Self {
+    pub fn new(db_writer: crate::db_writer::DbWriter, config: NftMetadataProcessorConfig) -> Self {
         tracing::info!("init NftMetadataProcessor");
 
         // Crate reads from authentication from file specified in
@@ -57,7 +70,7 @@ impl NftMetadataProcessor {
         }
 
         Self {
-            connection_pool,
+            db_writer,
             chain_id: 0,
             config,
         }
@@ -65,17 +78,6 @@ impl NftMetadataProcessor {
 
     pub fn set_chain_id(&mut self, chain_id: u8) {
         self.chain_id = chain_id;
-    }
-}
-
-impl Debug for NftMetadataProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "NftMetadataProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
     }
 }
 
@@ -161,19 +163,19 @@ impl ProcessorTrait for NftMetadataProcessor {
             .await?;
         }
 
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         Ok(ProcessingResult {
             start_version,
             end_version,
             processing_duration_in_secs,
-            db_insertion_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
             last_transaction_timestamp,
         })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 

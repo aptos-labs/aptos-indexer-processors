@@ -2,29 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
-use crate::utils::database::PgDbPool;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use std::fmt::Debug;
 
 pub struct MonitoringProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl MonitoringProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+impl std::fmt::Debug for MonitoringProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
     }
 }
 
-impl Debug for MonitoringProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "MonitoringProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
+impl MonitoringProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
     }
 }
 
@@ -45,12 +45,12 @@ impl ProcessorTrait for MonitoringProcessor {
             start_version,
             end_version,
             processing_duration_in_secs: 0.0,
-            db_insertion_duration_in_secs: 0.0,
+            db_channel_insertion_duration_in_secs: 0.0,
             last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
         })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

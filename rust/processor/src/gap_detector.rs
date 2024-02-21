@@ -155,7 +155,7 @@ mod test {
                 end_version: 199 + i * 100,
                 last_transaction_timestamp: None,
                 processing_duration_in_secs: 0.0,
-                db_insertion_duration_in_secs: 0.0,
+                db_channel_insertion_duration_in_secs: 0.0,
             };
             let gap_detector_result = gap_detector.process_versions(result).unwrap();
             assert_eq!(gap_detector_result.num_gaps, i + 1);
@@ -170,7 +170,7 @@ mod test {
                 end_version: 99,
                 last_transaction_timestamp: None,
                 processing_duration_in_secs: 0.0,
-                db_insertion_duration_in_secs: 0.0,
+                db_channel_insertion_duration_in_secs: 0.0,
             })
             .unwrap();
         assert_eq!(gap_detector_result.num_gaps, 0);

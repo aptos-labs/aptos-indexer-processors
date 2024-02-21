@@ -8,50 +8,43 @@ use crate::{
         write_set_size_info::WriteSetSize,
     },
     schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
-use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::Pg, query_builder::QueryFragment};
-use std::fmt::Debug;
 use tracing::{error, warn};
 
 pub struct TransactionMetadataProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
 impl TransactionMetadataProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
     }
 }
 
-impl Debug for TransactionMetadataProcessor {
+impl std::fmt::Debug for TransactionMetadataProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "TransactionMetadataProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    transaction_sizes: &[TransactionSize],
-    event_sizes: &[EventSize],
-    write_set_sizes: &[WriteSetSize],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
+    transaction_sizes: Vec<TransactionSize>,
+    event_sizes: Vec<EventSize>,
+    write_set_sizes: Vec<WriteSetSize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -60,80 +53,61 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
-        conn.clone(),
-        insert_transaction_sizes_query,
-        transaction_sizes,
-        get_config_table_chunk_size::<TransactionSize>(
-            "transaction_size_info",
-            per_table_chunk_sizes,
-        ),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
-        insert_event_sizes_query,
-        event_sizes,
-        get_config_table_chunk_size::<EventSize>("event_size_info", per_table_chunk_sizes),
-    )
-    .await?;
-    execute_in_chunks(
-        conn,
-        insert_write_set_sizes_query,
-        write_set_sizes,
-        get_config_table_chunk_size::<WriteSetSize>("write_set_size_info", per_table_chunk_sizes),
-    )
-    .await?;
+    let tsi = db_writer.send_in_chunks("transaction_size_info", transaction_sizes);
+    let esi = db_writer.send_in_chunks("event_size_info", event_sizes);
+    let wssi = db_writer.send_in_chunks("write_set_size_info", write_set_sizes);
+
+    tokio::join!(tsi, esi, wssi);
 
     Ok(())
 }
 
-fn insert_transaction_sizes_query(
-    items_to_insert: Vec<TransactionSize>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::transaction_size_info::dsl::*;
-    (
-        diesel::insert_into(schema::transaction_size_info::table)
-            .values(items_to_insert)
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<TransactionSize> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use schema::transaction_size_info::dsl::*;
+
+        let query = diesel::insert_into(schema::transaction_size_info::table)
+            .values(self)
             .on_conflict(transaction_version)
-            .do_nothing(),
-        None,
-    )
+            .do_nothing();
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_event_sizes_query(
-    items_to_insert: Vec<EventSize>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::event_size_info::dsl::*;
-    (
-        diesel::insert_into(schema::event_size_info::table)
-            .values(items_to_insert)
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<EventSize> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use schema::event_size_info::dsl::*;
+
+        let query = diesel::insert_into(schema::event_size_info::table)
+            .values(self)
             .on_conflict((transaction_version, index))
-            .do_nothing(),
-        None,
-    )
+            .do_nothing();
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
-fn insert_write_set_sizes_query(
-    items_to_insert: Vec<WriteSetSize>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::write_set_size_info::dsl::*;
-    (
-        diesel::insert_into(schema::write_set_size_info::table)
-            .values(items_to_insert)
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<WriteSetSize> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use schema::write_set_size_info::dsl::*;
+
+        let query = diesel::insert_into(schema::write_set_size_info::table)
+            .values(self)
             .on_conflict((transaction_version, index))
-            .do_nothing(),
-        None,
-    )
+            .do_nothing();
+        crate::db_writer::execute_with_better_error(conn, query).await
+    }
 }
 
 #[async_trait]
@@ -183,26 +157,27 @@ impl ProcessorTrait for TransactionMetadataProcessor {
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
-        let db_insertion_start = std::time::Instant::now();
+        let db_channel_insertion_duration_in_secs = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &transaction_sizes,
-            &event_sizes,
-            &write_set_sizes,
-            &self.per_table_chunk_sizes,
+            transaction_sizes,
+            event_sizes,
+            write_set_sizes,
         )
         .await;
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        let db_channel_insertion_duration_in_secs = db_channel_insertion_duration_in_secs
+            .elapsed()
+            .as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
                 processing_duration_in_secs,
-                db_insertion_duration_in_secs,
+                db_channel_insertion_duration_in_secs,
                 last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
             }),
             Err(e) => {
@@ -218,7 +193,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
