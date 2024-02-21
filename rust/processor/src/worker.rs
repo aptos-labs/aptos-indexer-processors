@@ -195,7 +195,7 @@ impl Worker {
             // Create and start ingestor
             let broadcast_tx_write = broadcast_tx.clone();
             tokio::spawn(async move {
-                let url = Url::parse(&format!("ws://{}:12345/stream", ip)).unwrap_or_else(|e| {
+                let url = Url::parse(&ip).unwrap_or_else(|e| {
                     error!(error = ?e, "Failed to parse URL");
                     panic!();
                 });
