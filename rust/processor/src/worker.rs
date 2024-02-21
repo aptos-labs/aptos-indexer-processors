@@ -194,47 +194,46 @@ impl Worker {
 
             // Create and start ingestor
             let broadcast_tx_write = broadcast_tx.clone();
-            tokio::spawn(async move {
-                let url = Url::parse(&ip).unwrap_or_else(|e| {
-                    error!(error = ?e, "Failed to parse URL");
-                    panic!();
-                });
 
-                let (ws_stream, _) = connect_async(url).await.unwrap_or_else(|e| {
-                    error!(error = ?e, "Failed to connect to WebSocket");
-                    panic!();
-                });
-
-                let (_, mut read) = ws_stream.split();
-
-                while let Some(message) = read.next().await {
-                    match message {
-                        Ok(msg) => {
-                            GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS
-                                .with_label_values(&["event_stream"])
-                                .set({
-                                    let transaction_timestamp = chrono::Utc::now();
-                                    let transaction_timestamp =
-                                        std::time::SystemTime::from(transaction_timestamp);
-                                    std::time::SystemTime::now()
-                                        .duration_since(transaction_timestamp)
-                                        .unwrap_or_default()
-                                        .as_secs_f64()
-                                });
-                            broadcast_tx_write
-                                .send(
-                                    serde_json::from_str::<EventStreamMessage>(&msg.to_string())
-                                        .unwrap(),
-                                )
-                                .unwrap();
-                        },
-                        Err(e) => {
-                            eprintln!("Error receiving message: {}", e);
-                            break;
-                        },
-                    }
-                }
+            let url = Url::parse(&ip).unwrap_or_else(|e| {
+                error!(error = ?e, "Failed to parse URL");
+                panic!();
             });
+
+            let (ws_stream, _) = connect_async(url).await.unwrap_or_else(|e| {
+                error!(error = ?e, "Failed to connect to WebSocket");
+                panic!();
+            });
+
+            let (_, mut read) = ws_stream.split();
+
+            while let Some(message) = read.next().await {
+                match message {
+                    Ok(msg) => {
+                        GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS
+                            .with_label_values(&["event_stream"])
+                            .set({
+                                let transaction_timestamp = chrono::Utc::now();
+                                let transaction_timestamp =
+                                    std::time::SystemTime::from(transaction_timestamp);
+                                std::time::SystemTime::now()
+                                    .duration_since(transaction_timestamp)
+                                    .unwrap_or_default()
+                                    .as_secs_f64()
+                            });
+                        broadcast_tx_write
+                            .send(
+                                serde_json::from_str::<EventStreamMessage>(&msg.to_string())
+                                    .unwrap(),
+                            )
+                            .unwrap();
+                    },
+                    Err(e) => {
+                        eprintln!("Error receiving message: {}", e);
+                        break;
+                    },
+                }
+            }
         }
     }
 
