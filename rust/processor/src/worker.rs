@@ -210,17 +210,22 @@ impl Worker {
             while let Some(message) = read.next().await {
                 match message {
                     Ok(msg) => {
-                        GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS
-                            .with_label_values(&["event_stream"])
-                            .set({
-                                let transaction_timestamp = chrono::Utc::now();
-                                let transaction_timestamp =
-                                    std::time::SystemTime::from(transaction_timestamp);
-                                std::time::SystemTime::now()
-                                    .duration_since(transaction_timestamp)
-                                    .unwrap_or_default()
-                                    .as_secs_f64()
+                        let event = serde_json::from_str::<EventStreamMessage>(&msg.to_string())
+                            .unwrap_or_else(|e| {
+                                error!(error = ?e, "Failed to parse message");
+                                panic!();
                             });
+                        GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS.set({
+                            use chrono::TimeZone;
+                            let transaction_timestamp =
+                                chrono::Utc.from_utc_datetime(&event.transaction_timestamp);
+                            let transaction_timestamp =
+                                std::time::SystemTime::from(transaction_timestamp);
+                            std::time::SystemTime::now()
+                                .duration_since(transaction_timestamp)
+                                .unwrap_or_default()
+                                .as_secs_f64()
+                        });
                         broadcast_tx_write
                             .send(
                                 serde_json::from_str::<EventStreamMessage>(&msg.to_string())

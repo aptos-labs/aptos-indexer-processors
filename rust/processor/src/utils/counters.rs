@@ -3,8 +3,8 @@
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    register_gauge_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    GaugeVec, IntCounter, IntCounterVec, IntGaugeVec,
+    register_gauge, register_gauge_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec, Gauge, GaugeVec, IntCounter, IntCounterVec, IntGaugeVec,
 };
 
 pub enum ProcessorStep {
@@ -245,22 +245,11 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Indexer gRPC to Processor 1 serve latency
-pub static GRPC_TO_PROCESSOR_1_SERVE_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
-        "indexer_grpc_to_processor_1_serve_latency_in_secs",
-        "Indexer gRPC to Processor 1 serve latency",
-        &["processor_name"]
-    )
-    .unwrap()
-});
-
 /// Indexer gRPC to Processer 2 extract latency
-pub static GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
+pub static GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
         "indexer_grpc_to_processor_2_extract_latency_in_secs",
         "Indexer gRPC to Processor 2 extract latency",
-        &["processor_name"]
     )
     .unwrap()
 });
