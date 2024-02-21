@@ -10,7 +10,7 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        event_stream_processor::EventStreamProcessor, events_processor::EventsProcessor,
+        event_filter_processor::EventFilterProcessor, events_processor::EventsProcessor,
         fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
@@ -174,7 +174,7 @@ impl Worker {
         let processor = build_processor(&self.processor_config, self.db_pool.clone()).await;
         let processor = Arc::new(processor);
 
-        if processor.name() == "event_stream_processor" {
+        if processor.name() == "event_filter_processor" {
             // Create Event broadcast channel
             // Can use channel size to help with pubsub lagging
             let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10000);
@@ -314,8 +314,8 @@ pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Pro
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
-        ProcessorConfig::EventStreamProcessor => {
-            Processor::from(EventStreamProcessor::new(db_pool))
+        ProcessorConfig::EventFilterProcessor => {
+            Processor::from(EventFilterProcessor::new(db_pool))
         },
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {

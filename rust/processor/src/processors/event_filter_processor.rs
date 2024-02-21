@@ -9,31 +9,31 @@ use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-pub struct EventStreamProcessor {
+pub struct EventFilterProcessor {
     connection_pool: PgDbPool,
 }
 
-impl EventStreamProcessor {
+impl EventFilterProcessor {
     pub fn new(connection_pool: PgDbPool) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for EventStreamProcessor {
+impl Debug for EventFilterProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
             f,
-            "EventStreamProcessor {{ connections: {:?}  idle_connections: {:?} }}",
+            "EventFilterProcessor {{ connections: {:?}  idle_connections: {:?} }}",
             state.connections, state.idle_connections
         )
     }
 }
 
 #[async_trait]
-impl ProcessorTrait for EventStreamProcessor {
+impl ProcessorTrait for EventFilterProcessor {
     fn name(&self) -> &'static str {
-        ProcessorName::EventStreamProcessor.into()
+        ProcessorName::EventFilterProcessor.into()
     }
 
     async fn process_transactions(
