@@ -4,7 +4,7 @@
 use crate::{
     config::IndexerGrpcHttp2Config,
     models::{
-        events_models::events::EventStreamMessage, ledger_info::LedgerInfo,
+        events_models::events::EventModel, ledger_info::LedgerInfo,
         processor_status::ProcessorStatusQuery,
     },
     processors::{
@@ -15,62 +15,42 @@ use crate::{
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        user_transaction_processor::UserTransactionProcessor, Processor, ProcessorConfig,
+        ProcessorTrait,
     },
     schema::ledger_infos,
     utils::{
-        counters::{
-            ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
-            MULTI_BATCH_PROCESSING_TIME_IN_SECS, NUM_TRANSACTIONS_PROCESSED_COUNT,
-            PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
-            PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
-            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
-            SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
-            SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
-        },
+        counters::GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS,
         database::{execute_with_better_error, new_db_pool, run_pending_migrations, PgDbPool},
-        event_ordering::{EventOrdering, TransactionEvents},
-        stream::spawn_stream,
-        util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
+        EventStreamMessage,
     },
 };
 use anyhow::{Context, Result};
-use aptos_moving_average::MovingAverage;
 use aptos_protos::transaction::v1::Transaction;
-use kanal::AsyncReceiver;
-use std::{sync::Arc, time::Duration};
-use tokio::{sync::broadcast, time::timeout};
+use futures_util::StreamExt;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use tokio_tungstenite::connect_async;
 use tracing::{error, info};
 use url::Url;
-use warp::Filter;
 
-// this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
-// of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
-// machines accordingly.
-const BUFFER_SIZE: usize = 50;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
-const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
-#[derive(Clone)]
-pub struct StreamContext {
-    pub channel: broadcast::Sender<EventStreamMessage>,
-    pub websocket_alive_duration: u64,
+/// Config from Event Stream YAML
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventFilterConfig {
+    pub server_port: u16,
+    pub num_sec_valid: Option<i64>,
+    pub websocket_alive_duration: Option<u64>,
 }
 
-/// Handles WebSocket connection from /stream endpoint
-async fn handle_websocket(
-    websocket: warp::ws::Ws,
-    context: Arc<StreamContext>,
-) -> Result<impl warp::Reply, warp::Rejection> {
-    Ok(websocket.on_upgrade(move |ws| {
-        spawn_stream(
-            ws,
-            context.channel.subscribe(),
-            context.websocket_alive_duration,
-        )
-    }))
+#[derive(Clone)]
+pub struct FilterContext {
+    pub channel: broadcast::Sender<EventModel>,
+    pub websocket_alive_duration: u64,
 }
 
 #[derive(Clone)]
@@ -148,7 +128,6 @@ impl Worker {
     /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
         let processor_name = self.processor_config.name();
-        let enable_verbose_logging = self.enable_verbose_logging.unwrap_or(false);
         info!(
             processor_name = processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
@@ -191,75 +170,14 @@ impl Worker {
             "[Parser] Building processor",
         );
 
-        let concurrent_tasks = self.number_concurrent_processing_tasks;
-
         // Build the processor based on the config.
-        let (processor, transaction_events_rx) =
-            build_processor(&self.processor_config, self.db_pool.clone()).await;
+        let processor = build_processor(&self.processor_config, self.db_pool.clone()).await;
         let processor = Arc::new(processor);
 
-        // This is the moving average that we use to calculate TPS
-        let mut ma = MovingAverage::new(10);
-        let mut batch_start_version = starting_version;
-
-        let ending_version = self.ending_version;
-        let indexer_grpc_data_service_address = self.indexer_grpc_data_service_address.clone();
-        let indexer_grpc_http2_ping_interval =
-            self.grpc_http2_config.grpc_http2_ping_interval_in_secs();
-        let indexer_grpc_http2_ping_timeout =
-            self.grpc_http2_config.grpc_http2_ping_timeout_in_secs();
-        // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
-        // and write into a channel
-        // The each item will be (chain_id, batch of transactions)
-        let (tx, receiver) = kanal::bounded_async::<TransactionsPBResponse>(BUFFER_SIZE);
-        let request_ending_version = self.ending_version;
-        let auth_token = self.auth_token.clone();
-        tokio::spawn(async move {
-            info!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                end_version = ending_version,
-                start_version = batch_start_version,
-                "[Parser] Starting fetcher thread"
-            );
-            crate::grpc_stream::create_fetcher_loop(
-                tx,
-                indexer_grpc_data_service_address,
-                indexer_grpc_http2_ping_interval,
-                indexer_grpc_http2_ping_timeout,
-                starting_version,
-                request_ending_version,
-                auth_token,
-                processor_name.to_string(),
-                batch_start_version,
-                BUFFER_SIZE,
-            )
-            .await
-        });
-
-        // Create a gap detector task that will panic if there is a gap in the processing
-        let (gap_detector_sender, gap_detector_receiver) =
-            kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
-        let processor_clone = processor.clone();
-        let gap_detection_batch_size = self.gap_detection_batch_size;
-        tokio::spawn(async move {
-            crate::gap_detector::create_gap_detector_status_tracker_loop(
-                gap_detector_receiver,
-                processor_clone,
-                batch_start_version,
-                gap_detection_batch_size,
-            )
-            .await;
-        });
-
         if processor.name() == "event_stream_processor" {
+            // Create Event broadcast channel
+            // Can use channel size to help with pubsub lagging
             let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10000);
-            let ordering_broadcast_tx = broadcast_tx.clone();
-            tokio::spawn(async move {
-                let mut event_ordering =
-                    EventOrdering::new(transaction_events_rx, ordering_broadcast_tx.clone());
-                event_ordering.run(starting_version as i64).await;
-            });
 
             // Receive all messages with initial Receiver to keep channel open
             tokio::spawn(async move {
@@ -267,26 +185,52 @@ impl Worker {
                     broadcast_rx.recv().await.unwrap_or_else(|e| {
                         error!(
                             error = ?e,
-                            "[Event Stream] Failed to receive message from channel"
+                            "[Event Filter] Failed to receive message from channel"
                         );
                         panic!();
                     });
                 }
             });
 
+            // Create and start ingestor
+            let broadcast_tx_write = broadcast_tx.clone();
             tokio::spawn(async move {
-                // Create web server
-                let stream_context = Arc::new(StreamContext {
-                    channel: broadcast_tx.clone(),
-                    websocket_alive_duration: 3000,
-                });
+                let url = Url::parse("ws://localhost:12345/stream")
+                    .expect("Failed to parse WebSocket URL");
 
-                let ws_route = warp::path("stream")
-                    .and(warp::ws())
-                    .and(warp::any().map(move || stream_context.clone()))
-                    .and_then(handle_websocket);
+                let (ws_stream, _) = connect_async(url)
+                    .await
+                    .expect("Failed to connect to WebSocket");
 
-                warp::serve(ws_route).run(([0, 0, 0, 0], 8081)).await;
+                let (_, mut read) = ws_stream.split();
+
+                while let Some(message) = read.next().await {
+                    match message {
+                        Ok(msg) => {
+                            GRPC_TO_PROCESSOR_2_EXTRACT_LATENCY_IN_SECS
+                                .with_label_values(&["event_stream"])
+                                .set({
+                                    let transaction_timestamp = chrono::Utc::now();
+                                    let transaction_timestamp =
+                                        std::time::SystemTime::from(transaction_timestamp);
+                                    std::time::SystemTime::now()
+                                        .duration_since(transaction_timestamp)
+                                        .unwrap_or_default()
+                                        .as_secs_f64()
+                                });
+                            broadcast_tx_write
+                                .send(
+                                    serde_json::from_str::<EventStreamMessage>(&msg.to_string())
+                                        .unwrap(),
+                                )
+                                .unwrap();
+                        },
+                        Err(e) => {
+                            eprintln!("Error receiving message: {}", e);
+                            break;
+                        },
+                    }
+                }
             });
         }
     }
@@ -360,12 +304,8 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub async fn build_processor(
-    config: &ProcessorConfig,
-    db_pool: PgDbPool,
-) -> (Processor, AsyncReceiver<TransactionEvents>) {
-    let (tx, rx) = kanal::bounded_async::<TransactionEvents>(10000);
-    let processor = match config {
+pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
+    match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
         },
@@ -375,7 +315,7 @@ pub async fn build_processor(
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
         ProcessorConfig::EventStreamProcessor => {
-            Processor::from(EventStreamProcessor::new(db_pool, tx.clone()))
+            Processor::from(EventStreamProcessor::new(db_pool))
         },
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
         ProcessorConfig::FungibleAssetProcessor => {
@@ -394,6 +334,5 @@ pub async fn build_processor(
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
         },
-    };
-    (processor, rx)
+    }
 }
