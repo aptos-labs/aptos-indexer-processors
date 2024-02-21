@@ -7,7 +7,14 @@ use crate::{
 };
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventFilterProcessorConfig {
+    pub stream_ip: Option<String>,
+}
 
 pub struct EventFilterProcessor {
     connection_pool: PgDbPool,

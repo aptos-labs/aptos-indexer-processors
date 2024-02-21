@@ -171,7 +171,7 @@ impl Worker {
         );
 
         // Build the processor based on the config.
-        let processor = build_processor(&self.processor_config, self.db_pool.clone()).await;
+        let (processor, ip) = build_processor(&self.processor_config, self.db_pool.clone()).await;
         let processor = Arc::new(processor);
 
         if processor.name() == "event_filter_processor" {
@@ -195,7 +195,7 @@ impl Worker {
             // Create and start ingestor
             let broadcast_tx_write = broadcast_tx.clone();
             tokio::spawn(async move {
-                let url = Url::parse("ws://10.77.6.96:12345/stream").unwrap_or_else(|e| {
+                let url = Url::parse(&format!("ws://{}:12345/stream", ip)).unwrap_or_else(|e| {
                     error!(error = ?e, "Failed to parse URL");
                     panic!();
                 });
@@ -307,8 +307,9 @@ impl Worker {
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to
 // couple processors together based on their args) makes sense.
-pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor {
-    match config {
+pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> (Processor, String) {
+    let mut out = String::new();
+    let processor = match config {
         ProcessorConfig::AccountTransactionsProcessor => {
             Processor::from(AccountTransactionsProcessor::new(db_pool))
         },
@@ -317,7 +318,8 @@ pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Pro
         },
         ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(db_pool)),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(db_pool)),
-        ProcessorConfig::EventFilterProcessor => {
+        ProcessorConfig::EventFilterProcessor(config) => {
+            out = config.clone().stream_ip.unwrap_or("localhost".to_string());
             Processor::from(EventFilterProcessor::new(db_pool))
         },
         ProcessorConfig::EventsProcessor => Processor::from(EventsProcessor::new(db_pool)),
@@ -337,5 +339,6 @@ pub async fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Pro
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
         },
-    }
+    };
+    (processor, out.to_string())
 }
