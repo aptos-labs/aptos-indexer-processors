@@ -46,7 +46,6 @@ impl Stream {
                         panic!();
                     });
                     GRPC_TO_PROCESSOR_1_SERVE_LATENCY_IN_SECS
-                        .with_label_values(&["event_stream"])
                         .set({
                             use chrono::TimeZone;
                             let transaction_timestamp = chrono::Utc.from_utc_datetime(&event.transaction_timestamp);
