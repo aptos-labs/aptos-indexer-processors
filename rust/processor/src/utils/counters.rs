@@ -244,3 +244,13 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Indexer gRPC to Processor 1 serve latency
+pub static GRPC_TO_PROCESSOR_1_SERVE_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_grpc_to_processor_1_serve_latency_in_secs",
+        "Indexer gRPC to Processor 1 serve latency",
+        &["processor_name"]
+    )
+    .unwrap()
+});

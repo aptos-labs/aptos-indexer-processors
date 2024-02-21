@@ -1940,6 +1940,7 @@ dependencies = [
  "tracing",
  "unescape",
  "url",
+ "warp",
 ]
 
 [[package]]
