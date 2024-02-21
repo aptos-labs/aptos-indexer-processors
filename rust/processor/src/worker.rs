@@ -195,12 +195,15 @@ impl Worker {
             // Create and start ingestor
             let broadcast_tx_write = broadcast_tx.clone();
             tokio::spawn(async move {
-                let url = Url::parse("ws://localhost:12345/stream")
-                    .expect("Failed to parse WebSocket URL");
+                let url = Url::parse("ws://10.77.6.96:12345/stream").unwrap_or_else(|e| {
+                    error!(error = ?e, "Failed to parse URL");
+                    panic!();
+                });
 
-                let (ws_stream, _) = connect_async(url)
-                    .await
-                    .expect("Failed to connect to WebSocket");
+                let (ws_stream, _) = connect_async(url).await.unwrap_or_else(|e| {
+                    error!(error = ?e, "Failed to connect to WebSocket");
+                    panic!();
+                });
 
                 let (_, mut read) = ws_stream.split();
 
