@@ -13,7 +13,8 @@ extern crate diesel;
 
 pub use config::IndexerGrpcProcessorConfig;
 
-mod config;
+pub mod config;
+pub mod db_writer;
 pub mod gap_detector;
 pub mod grpc_stream;
 pub mod models;

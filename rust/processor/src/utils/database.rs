@@ -28,6 +28,8 @@ pub type PgPool = Pool<MyDbConnection>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
+pub type QueryBuilderFunc<U, T> = fn(Vec<T>) -> (U, Option<&'static str>);
+
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
@@ -139,7 +141,7 @@ pub async fn new_db_pool(
 
 pub async fn execute_in_chunks<U, T>(
     conn: PgDbPool,
-    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    build_query: QueryBuilderFunc<U, T>,
     items_to_insert: &[T],
     chunk_size: usize,
 ) -> Result<(), diesel::result::Error>
@@ -248,7 +250,7 @@ where
 
 async fn execute_or_retry_cleaned<U, T>(
     conn: PgDbPool,
-    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    build_query: QueryBuilderFunc<U, T>,
     items: Vec<T>,
     query: U,
     additional_where_clause: Option<&'static str>,
