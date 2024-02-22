@@ -167,9 +167,9 @@ impl TokenActivityV2 {
             // burn and mint events are attached to the collection. The rest should be attached to the token
             let token_data_id = match token_event {
                 V2TokenEvent::MintEvent(inner) => inner.get_token_address(),
-                V2TokenEvent::ConcurrentMintEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::Mint(inner) => inner.get_token_address(),
                 V2TokenEvent::BurnEvent(inner) => inner.get_token_address(),
-                V2TokenEvent::ConcurrentBurnEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::Burn(inner) => inner.get_token_address(),
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
@@ -185,7 +185,7 @@ impl TokenActivityV2 {
                         after_value: None,
                         event_type: event_type.clone(),
                     },
-                    V2TokenEvent::ConcurrentMintEvent(_) => TokenActivityHelperV2 {
+                    V2TokenEvent::Mint(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
                         to_address: None,
                         token_amount: BigDecimal::one(),
@@ -209,7 +209,7 @@ impl TokenActivityV2 {
                         after_value: None,
                         event_type: event_type.clone(),
                     },
-                    V2TokenEvent::ConcurrentBurnEvent(_) => TokenActivityHelperV2 {
+                    V2TokenEvent::Burn(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
                         to_address: None,
                         token_amount: BigDecimal::one(),

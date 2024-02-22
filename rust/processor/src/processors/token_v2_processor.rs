@@ -21,9 +21,9 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, ConcurrentBurnEvent, ConcurrentSupply, FixedSupply,
-                MintEvent, PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned,
-                TokenV2Minted, TransferEvent, UnlimitedSupply,
+                AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
+                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
+                TransferEvent, UnlimitedSupply,
             },
         },
     },
@@ -562,10 +562,10 @@ async fn parse_v2_token(
                         {
                             aggregated_data.fungible_asset_store = Some(fungible_asset_store);
                         }
-                        if let Some(oken_identifier) =
+                        if let Some(token_identifier) =
                             TokenIdentifiers::from_write_resource(wr, txn_version).unwrap()
                         {
-                            aggregated_data.token_identifier = Some(oken_identifier);
+                            aggregated_data.token_identifier = Some(token_identifier);
                         }
                     }
                 }
@@ -575,9 +575,7 @@ async fn parse_v2_token(
             // This needs to be here because we need the metadata above for token activities
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
-                if let Some(burn_event) =
-                    ConcurrentBurnEvent::from_event(event, txn_version).unwrap()
-                {
+                if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address());
                 }
                 if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
