@@ -44,6 +44,19 @@ pub struct FungibleAssetProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for FungibleAssetProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl FungibleAssetProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -118,16 +131,18 @@ async fn insert_to_db(
 fn insert_fungible_asset_activities_query(
     items_to_insert: &[FungibleAssetActivity],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::fungible_asset_activities::dsl::*;
 
     (
-        diesel::insert_into(schema::fungible_asset_activities::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, event_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::fungible_asset_activities::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, event_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -135,32 +150,34 @@ fn insert_fungible_asset_activities_query(
 fn insert_fungible_asset_metadata_query(
     items_to_insert: &[FungibleAssetMetadataModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::fungible_asset_metadata::dsl::*;
 
     (
-        diesel::insert_into(schema::fungible_asset_metadata::table)
-            .values(items_to_insert)
-            .on_conflict(asset_type)
-            .do_update()
-            .set(
-                (
-                    creator_address.eq(excluded(creator_address)),
-                    name.eq(excluded(name)),
-                    symbol.eq(excluded(symbol)),
-                    decimals.eq(excluded(decimals)),
-                    icon_uri.eq(excluded(icon_uri)),
-                    project_uri.eq(excluded(project_uri)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
-                    supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
-                    token_standard.eq(excluded(token_standard)),
-                    inserted_at.eq(excluded(inserted_at)),
+        Box::new(
+            diesel::insert_into(schema::fungible_asset_metadata::table)
+                .values(items_to_insert)
+                .on_conflict(asset_type)
+                .do_update()
+                .set(
+                    (
+                        creator_address.eq(excluded(creator_address)),
+                        name.eq(excluded(name)),
+                        symbol.eq(excluded(symbol)),
+                        decimals.eq(excluded(decimals)),
+                        icon_uri.eq(excluded(icon_uri)),
+                        project_uri.eq(excluded(project_uri)),
+                        last_transaction_version.eq(excluded(last_transaction_version)),
+                        last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                        supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
+                        supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
+                        token_standard.eq(excluded(token_standard)),
+                        inserted_at.eq(excluded(inserted_at)),
+                    )
                 )
-            ),
+        ),
         Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -168,20 +185,22 @@ fn insert_fungible_asset_metadata_query(
 fn insert_fungible_asset_balances_query(
     items_to_insert: &[FungibleAssetBalance],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::fungible_asset_balances::dsl::*;
 
     (
-        diesel::insert_into(schema::fungible_asset_balances::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set((
-                is_frozen.eq(excluded(is_frozen)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::fungible_asset_balances::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_update()
+                .set((
+                    is_frozen.eq(excluded(is_frozen)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+        ),
         None,
     )
 }
@@ -189,29 +208,31 @@ fn insert_fungible_asset_balances_query(
 fn insert_current_fungible_asset_balances_query(
     items_to_insert: &[CurrentFungibleAssetBalance],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_fungible_asset_balances::dsl::*;
 
     (
-        diesel::insert_into(schema::current_fungible_asset_balances::table)
-            .values(items_to_insert)
-            .on_conflict(storage_id)
-            .do_update()
-            .set(
-                (
-                    owner_address.eq(excluded(owner_address)),
-                    asset_type.eq(excluded(asset_type)),
-                    is_primary.eq(excluded(is_primary)),
-                    is_frozen.eq(excluded(is_frozen)),
-                    amount.eq(excluded(amount)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    token_standard.eq(excluded(token_standard)),
-                    inserted_at.eq(excluded(inserted_at)),
+        Box::new(
+            diesel::insert_into(schema::current_fungible_asset_balances::table)
+                .values(items_to_insert)
+                .on_conflict(storage_id)
+                .do_update()
+                .set(
+                    (
+                        owner_address.eq(excluded(owner_address)),
+                        asset_type.eq(excluded(asset_type)),
+                        is_primary.eq(excluded(is_primary)),
+                        is_frozen.eq(excluded(is_frozen)),
+                        amount.eq(excluded(amount)),
+                        last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                        last_transaction_version.eq(excluded(last_transaction_version)),
+                        token_standard.eq(excluded(token_standard)),
+                        inserted_at.eq(excluded(inserted_at)),
+                    )
                 )
-            ),
+        ),
         Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
     )
 }

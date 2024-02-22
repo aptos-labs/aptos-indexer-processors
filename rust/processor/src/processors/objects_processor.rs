@@ -36,6 +36,19 @@ pub struct ObjectsProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for ObjectsProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl ObjectsProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -63,7 +76,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let query_sender = db_writer.get_query_sender();
+    let query_sender = db_writer.query_sender.clone();
     let io = execute_in_chunks(
         query_sender.clone(),
         insert_objects_query,
@@ -87,20 +100,22 @@ async fn insert_to_db(
 fn insert_objects_query(
     items_to_insert: &[Object],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::objects::dsl::*;
     (
-        diesel::insert_into(schema::objects::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                is_token.eq(excluded(is_token)),
-                is_fungible_asset.eq(excluded(is_fungible_asset)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::objects::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    is_token.eq(excluded(is_token)),
+                    is_fungible_asset.eq(excluded(is_fungible_asset)),
+                )),
+        ),
         None,
     )
 }
@@ -108,26 +123,28 @@ fn insert_objects_query(
 fn insert_current_objects_query(
     items_to_insert: &[CurrentObject],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_objects::dsl::*;
     (
-        diesel::insert_into(schema::current_objects::table)
-            .values(items_to_insert)
-            .on_conflict(object_address)
-            .do_update()
-            .set((
-                owner_address.eq(excluded(owner_address)),
-                state_key_hash.eq(excluded(state_key_hash)),
-                allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
-                last_guid_creation_num.eq(excluded(last_guid_creation_num)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                is_deleted.eq(excluded(is_deleted)),
-                inserted_at.eq(excluded(inserted_at)),
-                is_token.eq(excluded(is_token)),
-                is_fungible_asset.eq(excluded(is_fungible_asset)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_objects::table)
+                .values(items_to_insert)
+                .on_conflict(object_address)
+                .do_update()
+                .set((
+                    owner_address.eq(excluded(owner_address)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                    allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
+                    last_guid_creation_num.eq(excluded(last_guid_creation_num)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                    is_token.eq(excluded(is_token)),
+                    is_fungible_asset.eq(excluded(is_fungible_asset)),
+                )),
+        ),
         Some(
             " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
         ),

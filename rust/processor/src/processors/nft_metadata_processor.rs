@@ -46,6 +46,19 @@ pub struct NftMetadataProcessor {
     config: NftMetadataProcessorConfig,
 }
 
+impl std::fmt::Debug for NftMetadataProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl NftMetadataProcessor {
     pub fn new(db_writer: crate::db_writer::DbWriter, config: NftMetadataProcessorConfig) -> Self {
         tracing::info!("init NftMetadataProcessor");

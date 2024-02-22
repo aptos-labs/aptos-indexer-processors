@@ -9,6 +9,19 @@ pub struct MonitoringProcessor {
     db_writer: crate::db_writer::DbWriter,
 }
 
+impl std::fmt::Debug for MonitoringProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl MonitoringProcessor {
     pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
         Self { db_writer }

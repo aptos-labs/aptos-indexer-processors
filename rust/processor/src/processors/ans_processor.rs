@@ -45,6 +45,19 @@ pub struct AnsProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for AnsProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl AnsProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -159,24 +172,26 @@ async fn insert_to_db(
 fn insert_current_ans_lookups_query(
     items_to_insert: &[CurrentAnsLookup],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_ans_lookup::dsl::*;
 
     (
-        diesel::insert_into(schema::current_ans_lookup::table)
-            .values(items_to_insert)
-            .on_conflict((domain, subdomain))
-            .do_update()
-            .set((
-                registered_address.eq(excluded(registered_address)),
-                expiration_timestamp.eq(excluded(expiration_timestamp)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_ans_lookup::table)
+                .values(items_to_insert)
+                .on_conflict((domain, subdomain))
+                .do_update()
+                .set((
+                    registered_address.eq(excluded(registered_address)),
+                    expiration_timestamp.eq(excluded(expiration_timestamp)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    token_name.eq(excluded(token_name)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -184,16 +199,18 @@ fn insert_current_ans_lookups_query(
 fn insert_ans_lookups_query(
     items_to_insert: &[AnsLookup],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::ans_lookup::dsl::*;
 
     (
-        diesel::insert_into(schema::ans_lookup::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::ans_lookup::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -201,24 +218,26 @@ fn insert_ans_lookups_query(
 fn insert_current_ans_primary_names_query(
     items_to_insert: &[CurrentAnsPrimaryName],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_ans_primary_name::dsl::*;
 
     (
-        diesel::insert_into(schema::current_ans_primary_name::table)
-            .values(items_to_insert)
-            .on_conflict(registered_address)
-            .do_update()
-            .set((
-                domain.eq(excluded(domain)),
-                subdomain.eq(excluded(subdomain)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_ans_primary_name::table)
+                .values(items_to_insert)
+                .on_conflict(registered_address)
+                .do_update()
+                .set((
+                    domain.eq(excluded(domain)),
+                    subdomain.eq(excluded(subdomain)),
+                    token_name.eq(excluded(token_name)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -226,16 +245,18 @@ fn insert_current_ans_primary_names_query(
 fn insert_ans_primary_names_query(
     items_to_insert: &[AnsPrimaryName],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::ans_primary_name::dsl::*;
 
     (
-        diesel::insert_into(schema::ans_primary_name::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::ans_primary_name::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -243,24 +264,26 @@ fn insert_ans_primary_names_query(
 fn insert_current_ans_lookups_v2_query(
     items_to_insert: &[CurrentAnsLookupV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_ans_lookup_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::current_ans_lookup_v2::table)
-            .values(items_to_insert)
-            .on_conflict((domain, subdomain, token_standard))
-            .do_update()
-            .set((
-                registered_address.eq(excluded(registered_address)),
-                expiration_timestamp.eq(excluded(expiration_timestamp)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_ans_lookup_v2::table)
+                .values(items_to_insert)
+                .on_conflict((domain, subdomain, token_standard))
+                .do_update()
+                .set((
+                    registered_address.eq(excluded(registered_address)),
+                    expiration_timestamp.eq(excluded(expiration_timestamp)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    token_name.eq(excluded(token_name)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -268,16 +291,18 @@ fn insert_current_ans_lookups_v2_query(
 fn insert_ans_lookups_v2_query(
     items_to_insert: &[AnsLookupV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::ans_lookup_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::ans_lookup_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::ans_lookup_v2::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -285,24 +310,26 @@ fn insert_ans_lookups_v2_query(
 fn insert_current_ans_primary_names_v2_query(
     items_to_insert: &[CurrentAnsPrimaryNameV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_ans_primary_name_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::current_ans_primary_name_v2::table)
-            .values(items_to_insert)
-            .on_conflict((registered_address, token_standard))
-            .do_update()
-            .set((
-                domain.eq(excluded(domain)),
-                subdomain.eq(excluded(subdomain)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_ans_primary_name_v2::table)
+                .values(items_to_insert)
+                .on_conflict((registered_address, token_standard))
+                .do_update()
+                .set((
+                    domain.eq(excluded(domain)),
+                    subdomain.eq(excluded(subdomain)),
+                    token_name.eq(excluded(token_name)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_ans_primary_name_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -310,16 +337,18 @@ fn insert_current_ans_primary_names_v2_query(
 fn insert_ans_primary_names_v2_query(
     items_to_insert: &[AnsPrimaryNameV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::ans_primary_name_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::ans_primary_name_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::ans_primary_name_v2::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }

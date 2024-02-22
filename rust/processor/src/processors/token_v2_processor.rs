@@ -51,6 +51,19 @@ pub struct TokenV2Processor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for TokenV2Processor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl TokenV2Processor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -161,15 +174,17 @@ async fn insert_to_db(
 fn insert_collections_v2_query(
     items_to_insert: &[CollectionV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::collections_v2::dsl::*;
     (
-        diesel::insert_into(schema::collections_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::collections_v2::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -177,16 +192,18 @@ fn insert_collections_v2_query(
 fn insert_token_datas_v2_query(
     items_to_insert: &[TokenDataV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::token_datas_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::token_datas_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::token_datas_v2::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -194,16 +211,18 @@ fn insert_token_datas_v2_query(
 fn insert_token_ownerships_v2_query(
     items_to_insert: &[TokenOwnershipV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::token_ownerships_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::token_ownerships_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::token_ownerships_v2::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -211,32 +230,34 @@ fn insert_token_ownerships_v2_query(
 fn insert_current_collections_v2_query(
     items_to_insert: &[CurrentCollectionV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_collections_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::current_collections_v2::table)
-            .values(items_to_insert)
-            .on_conflict(collection_id)
-            .do_update()
-            .set((
-                creator_address.eq(excluded(creator_address)),
-                collection_name.eq(excluded(collection_name)),
-                description.eq(excluded(description)),
-                uri.eq(excluded(uri)),
-                current_supply.eq(excluded(current_supply)),
-                max_supply.eq(excluded(max_supply)),
-                total_minted_v2.eq(excluded(total_minted_v2)),
-                mutable_description.eq(excluded(mutable_description)),
-                mutable_uri.eq(excluded(mutable_uri)),
-                table_handle_v1.eq(excluded(table_handle_v1)),
-                token_standard.eq(excluded(token_standard)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_collections_v2::table)
+                .values(items_to_insert)
+                .on_conflict(collection_id)
+                .do_update()
+                .set((
+                    creator_address.eq(excluded(creator_address)),
+                    collection_name.eq(excluded(collection_name)),
+                    description.eq(excluded(description)),
+                    uri.eq(excluded(uri)),
+                    current_supply.eq(excluded(current_supply)),
+                    max_supply.eq(excluded(max_supply)),
+                    total_minted_v2.eq(excluded(total_minted_v2)),
+                    mutable_description.eq(excluded(mutable_description)),
+                    mutable_uri.eq(excluded(mutable_uri)),
+                    table_handle_v1.eq(excluded(table_handle_v1)),
+                    token_standard.eq(excluded(token_standard)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_collections_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -244,32 +265,34 @@ fn insert_current_collections_v2_query(
 fn insert_current_token_datas_v2_query(
     items_to_insert: &[CurrentTokenDataV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_token_datas_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::current_token_datas_v2::table)
-            .values(items_to_insert)
-            .on_conflict(token_data_id)
-            .do_update()
-            .set((
-                collection_id.eq(excluded(collection_id)),
-                token_name.eq(excluded(token_name)),
-                maximum.eq(excluded(maximum)),
-                supply.eq(excluded(supply)),
-                largest_property_version_v1.eq(excluded(largest_property_version_v1)),
-                token_uri.eq(excluded(token_uri)),
-                description.eq(excluded(description)),
-                token_properties.eq(excluded(token_properties)),
-                token_standard.eq(excluded(token_standard)),
-                is_fungible_v2.eq(excluded(is_fungible_v2)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                inserted_at.eq(excluded(inserted_at)),
-                decimals.eq(excluded(decimals)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_token_datas_v2::table)
+                .values(items_to_insert)
+                .on_conflict(token_data_id)
+                .do_update()
+                .set((
+                    collection_id.eq(excluded(collection_id)),
+                    token_name.eq(excluded(token_name)),
+                    maximum.eq(excluded(maximum)),
+                    supply.eq(excluded(supply)),
+                    largest_property_version_v1.eq(excluded(largest_property_version_v1)),
+                    token_uri.eq(excluded(token_uri)),
+                    description.eq(excluded(description)),
+                    token_properties.eq(excluded(token_properties)),
+                    token_standard.eq(excluded(token_standard)),
+                    is_fungible_v2.eq(excluded(is_fungible_v2)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    inserted_at.eq(excluded(inserted_at)),
+                    decimals.eq(excluded(decimals)),
+                ))
+        ),
         Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -277,28 +300,30 @@ fn insert_current_token_datas_v2_query(
 fn insert_current_token_ownerships_v2_query(
     items_to_insert: &[CurrentTokenOwnershipV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_token_ownerships_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::current_token_ownerships_v2::table)
-            .values(items_to_insert)
-            .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
-            .do_update()
-            .set((
-                amount.eq(excluded(amount)),
-                table_type_v1.eq(excluded(table_type_v1)),
-                token_properties_mutated_v1.eq(excluded(token_properties_mutated_v1)),
-                is_soulbound_v2.eq(excluded(is_soulbound_v2)),
-                token_standard.eq(excluded(token_standard)),
-                is_fungible_v2.eq(excluded(is_fungible_v2)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                inserted_at.eq(excluded(inserted_at)),
-                non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_token_ownerships_v2::table)
+                .values(items_to_insert)
+                .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
+                .do_update()
+                .set((
+                    amount.eq(excluded(amount)),
+                    table_type_v1.eq(excluded(table_type_v1)),
+                    token_properties_mutated_v1.eq(excluded(token_properties_mutated_v1)),
+                    is_soulbound_v2.eq(excluded(is_soulbound_v2)),
+                    token_standard.eq(excluded(token_standard)),
+                    is_fungible_v2.eq(excluded(is_fungible_v2)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    inserted_at.eq(excluded(inserted_at)),
+                    non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
+                ))
+        ),
         Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -306,20 +331,22 @@ fn insert_current_token_ownerships_v2_query(
 fn insert_token_activities_v2_query(
     items_to_insert: &[TokenActivityV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::token_activities_v2::dsl::*;
 
     (
-        diesel::insert_into(schema::token_activities_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, event_index))
-            .do_update()
-            .set((
-                entry_function_id_str.eq(excluded(entry_function_id_str)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::token_activities_v2::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, event_index))
+                .do_update()
+                .set((
+                    entry_function_id_str.eq(excluded(entry_function_id_str)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+        ),
         None,
     )
 }
@@ -327,22 +354,24 @@ fn insert_token_activities_v2_query(
 fn insert_current_token_v2_metadatas_query(
     items_to_insert: &[CurrentTokenV2Metadata],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_token_v2_metadata::dsl::*;
 
     (
-        diesel::insert_into(schema::current_token_v2_metadata::table)
-            .values(items_to_insert)
-            .on_conflict((object_address, resource_type))
-            .do_update()
-            .set((
-                data.eq(excluded(data)),
-                state_key_hash.eq(excluded(state_key_hash)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_token_v2_metadata::table)
+                .values(items_to_insert)
+                .on_conflict((object_address, resource_type))
+                .do_update()
+                .set((
+                    data.eq(excluded(data)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_token_v2_metadata.last_transaction_version <= excluded.last_transaction_version "),
     )
 }

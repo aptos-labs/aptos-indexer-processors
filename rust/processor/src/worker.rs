@@ -3,6 +3,7 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
+    db_writer::AnyGeneratesQuery,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -25,7 +26,7 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
-        database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -54,7 +55,6 @@ pub struct TransactionsPBResponse {
 }
 
 pub struct Worker {
-    pub db_pool: PgDbPool,
     pub processor_config: ProcessorConfig,
     pub postgres_connection_string: String,
     pub indexer_grpc_data_service_address: Url,
@@ -68,6 +68,8 @@ pub struct Worker {
     pub pb_channel_txn_chunk_size: usize,
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
+    pub db_writer: crate::db_writer::DbWriter,
+    pub query_receiver: kanal::AsyncReceiver<Box<dyn AnyGeneratesQuery>>,
 }
 
 impl Worker {
@@ -85,6 +87,10 @@ impl Worker {
         // The number of transactions per protobuf batch
         pb_channel_txn_chunk_size: usize,
         per_table_chunk_sizes: AHashMap<String, usize>,
+        // Number of db query generation tasks in the channel
+        query_executor_channel_size: usize,
+        // Number of parallel db writer tasks
+        db_writer_parallelism: usize,
         enable_verbose_logging: Option<bool>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
@@ -104,8 +110,12 @@ impl Worker {
             "[Parser] Finish creating the connection pool"
         );
         let number_concurrent_processing_tasks = number_concurrent_processing_tasks.unwrap_or(10);
+
+        let (query_sender, query_receiver) =
+            kanal::bounded_async::<Box<dyn AnyGeneratesQuery>>(query_executor_channel_size);
+        let db_writer = crate::db_writer::DbWriter::new(conn_pool.clone(), query_sender);
         Ok(Self {
-            db_pool: conn_pool,
+            db_writer,
             processor_config,
             postgres_connection_string,
             indexer_grpc_data_service_address,
@@ -116,6 +126,7 @@ impl Worker {
             number_concurrent_processing_tasks,
             gap_detection_batch_size,
             grpc_chain_id: None,
+            query_receiver,
             pb_channel_txn_chunk_size,
             per_table_chunk_sizes,
             enable_verbose_logging,
@@ -230,7 +241,7 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
-            self.db_pool.clone(),
+            self.db_writer.clone(),
         );
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
@@ -294,7 +305,7 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
-            self.db_pool.clone(),
+            self.db_writer.clone(),
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -496,7 +507,7 @@ impl Worker {
 
     /// Gets the start version for the processor. If not found, start from 0.
     pub async fn get_start_version(&self) -> Result<Option<u64>> {
-        let mut conn = self.db_pool.get().await?;
+        let mut conn = self.db_writer.db_pool.get().await?;
 
         match ProcessorStatusQuery::get_by_processor(self.processor_config.name(), &mut conn)
             .await?
@@ -513,7 +524,7 @@ impl Worker {
             processor_name = processor_name,
             "[Parser] Checking if chain id is correct"
         );
-        let mut conn = self.db_pool.get().await?;
+        let mut conn = self.db_writer.db_pool.get().await?;
 
         let maybe_existing_chain_id = LedgerInfo::get(&mut conn).await?.map(|li| li.chain_id);
 
@@ -644,49 +655,52 @@ pub async fn do_processor(
 pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
-    db_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
-            AccountTransactionsProcessor::new(db_pool, per_table_chunk_sizes),
+            AccountTransactionsProcessor::new(db_writer, per_table_chunk_sizes),
         ),
         ProcessorConfig::AnsProcessor(config) => Processor::from(AnsProcessor::new(
-            db_pool,
+            db_writer,
             per_table_chunk_sizes,
             config.clone(),
         )),
         ProcessorConfig::CoinProcessor => {
-            Processor::from(CoinProcessor::new(db_pool, per_table_chunk_sizes))
+            Processor::from(CoinProcessor::new(db_writer, per_table_chunk_sizes))
         },
         ProcessorConfig::DefaultProcessor => {
-            Processor::from(DefaultProcessor::new(db_pool, per_table_chunk_sizes))
+            Processor::from(DefaultProcessor::new(db_writer, per_table_chunk_sizes))
         },
         ProcessorConfig::EventsProcessor => {
-            Processor::from(EventsProcessor::new(db_pool, per_table_chunk_sizes))
+            Processor::from(EventsProcessor::new(db_writer, per_table_chunk_sizes))
         },
-        ProcessorConfig::FungibleAssetProcessor => {
-            Processor::from(FungibleAssetProcessor::new(db_pool, per_table_chunk_sizes))
+        ProcessorConfig::FungibleAssetProcessor => Processor::from(FungibleAssetProcessor::new(
+            db_writer,
+            per_table_chunk_sizes,
+        )),
+        ProcessorConfig::MonitoringProcessor => {
+            Processor::from(MonitoringProcessor::new(db_writer))
         },
-        ProcessorConfig::MonitoringProcessor => Processor::from(MonitoringProcessor::new(db_pool)),
         ProcessorConfig::NftMetadataProcessor(config) => {
-            Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
+            Processor::from(NftMetadataProcessor::new(db_writer, config.clone()))
         },
         ProcessorConfig::ObjectsProcessor => {
-            Processor::from(ObjectsProcessor::new(db_pool, per_table_chunk_sizes))
+            Processor::from(ObjectsProcessor::new(db_writer, per_table_chunk_sizes))
         },
         ProcessorConfig::StakeProcessor => {
-            Processor::from(StakeProcessor::new(db_pool, per_table_chunk_sizes))
+            Processor::from(StakeProcessor::new(db_writer, per_table_chunk_sizes))
         },
         ProcessorConfig::TokenProcessor(config) => Processor::from(TokenProcessor::new(
-            db_pool,
+            db_writer,
             per_table_chunk_sizes,
             config.clone(),
         )),
         ProcessorConfig::TokenV2Processor => {
-            Processor::from(TokenV2Processor::new(db_pool, per_table_chunk_sizes))
+            Processor::from(TokenV2Processor::new(db_writer, per_table_chunk_sizes))
         },
         ProcessorConfig::UserTransactionProcessor => Processor::from(
-            UserTransactionProcessor::new(db_pool, per_table_chunk_sizes),
+            UserTransactionProcessor::new(db_writer, per_table_chunk_sizes),
         ),
     }
 }

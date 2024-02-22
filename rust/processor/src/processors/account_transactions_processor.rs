@@ -19,6 +19,19 @@ pub struct AccountTransactionsProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for AccountTransactionsProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl AccountTransactionsProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -54,23 +67,25 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     )
-    .await?;
+    .await;
     Ok(())
 }
 
 fn insert_account_transactions_query(
     items_to_insert: &[AccountTransaction],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::account_transactions::dsl::*;
 
     (
-        diesel::insert_into(schema::account_transactions::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, account_address))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::account_transactions::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, account_address))
+                .do_nothing(),
+        ),
         None,
     )
 }

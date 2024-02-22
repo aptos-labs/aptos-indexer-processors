@@ -24,6 +24,19 @@ pub struct EventsProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for EventsProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl EventsProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -56,26 +69,28 @@ async fn insert_to_db(
         events,
         get_config_table_chunk_size::<EventModel>("events", per_table_chunk_sizes),
     )
-    .await?;
+    .await;
     Ok(())
 }
 
 fn insert_events_query(
     items_to_insert: &[EventModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::events::dsl::*;
     (
-        diesel::insert_into(schema::events::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, event_index))
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                indexed_type.eq(excluded(indexed_type)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::events::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, event_index))
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    indexed_type.eq(excluded(indexed_type)),
+                )),
+        ),
         None,
     )
 }

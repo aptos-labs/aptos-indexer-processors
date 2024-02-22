@@ -31,6 +31,19 @@ pub struct DefaultProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for DefaultProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl DefaultProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -138,20 +151,22 @@ async fn insert_to_db(
 fn insert_transactions_query(
     items_to_insert: &[TransactionModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::transactions::dsl::*;
 
     (
-        diesel::insert_into(schema::transactions::table)
-            .values(items_to_insert)
-            .on_conflict(version)
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                payload_type.eq(excluded(payload_type)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::transactions::table)
+                .values(items_to_insert)
+                .on_conflict(version)
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    payload_type.eq(excluded(payload_type)),
+                )),
+        ),
         None,
     )
 }
@@ -159,16 +174,18 @@ fn insert_transactions_query(
 fn insert_block_metadata_transactions_query(
     items_to_insert: &[BlockMetadataTransactionModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::block_metadata_transactions::dsl::*;
 
     (
-        diesel::insert_into(schema::block_metadata_transactions::table)
-            .values(items_to_insert)
-            .on_conflict(version)
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::block_metadata_transactions::table)
+                .values(items_to_insert)
+                .on_conflict(version)
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -176,16 +193,18 @@ fn insert_block_metadata_transactions_query(
 fn insert_write_set_changes_query(
     items_to_insert: &[WriteSetChangeModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::write_set_changes::dsl::*;
 
     (
-        diesel::insert_into(schema::write_set_changes::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::write_set_changes::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -193,16 +212,18 @@ fn insert_write_set_changes_query(
 fn insert_move_modules_query(
     items_to_insert: &[MoveModule],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::move_modules::dsl::*;
 
     (
-        diesel::insert_into(schema::move_modules::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::move_modules::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -210,16 +231,18 @@ fn insert_move_modules_query(
 fn insert_move_resources_query(
     items_to_insert: &[MoveResource],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::move_resources::dsl::*;
 
     (
-        diesel::insert_into(schema::move_resources::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::move_resources::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -227,16 +250,18 @@ fn insert_move_resources_query(
 fn insert_table_items_query(
     items_to_insert: &[TableItem],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::table_items::dsl::*;
 
     (
-        diesel::insert_into(schema::table_items::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::table_items::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -244,24 +269,26 @@ fn insert_table_items_query(
 fn insert_current_table_items_query(
     items_to_insert: &[CurrentTableItem],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_table_items::dsl::*;
 
     (
-        diesel::insert_into(schema::current_table_items::table)
-            .values(items_to_insert)
-            .on_conflict((table_handle, key_hash))
-            .do_update()
-            .set((
-                key.eq(excluded(key)),
-                decoded_key.eq(excluded(decoded_key)),
-                decoded_value.eq(excluded(decoded_value)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_table_items::table)
+                .values(items_to_insert)
+                .on_conflict((table_handle, key_hash))
+                .do_update()
+                .set((
+                    key.eq(excluded(key)),
+                    decoded_key.eq(excluded(decoded_key)),
+                    decoded_value.eq(excluded(decoded_value)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -269,16 +296,18 @@ fn insert_current_table_items_query(
 fn insert_table_metadata_query(
     items_to_insert: &[TableMetadata],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::table_metadatas::dsl::*;
 
     (
-        diesel::insert_into(schema::table_metadatas::table)
-            .values(items_to_insert)
-            .on_conflict(handle)
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::table_metadatas::table)
+                .values(items_to_insert)
+                .on_conflict(handle)
+                .do_nothing(),
+        ),
         None,
     )
 }

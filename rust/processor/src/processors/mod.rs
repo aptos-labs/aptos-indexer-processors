@@ -86,7 +86,7 @@ pub trait ProcessorTrait: Send + Sync {
     }
 
     /// Gets a query executor sender
-    fn query_sender(&self) -> kanal::AsyncSender<Box<AnyGeneratesQuery>> {
+    fn query_sender(&self) -> kanal::AsyncSender<Box<dyn AnyGeneratesQuery>> {
         self.db_writer().query_sender.clone()
     }
 
@@ -151,19 +151,6 @@ pub trait ProcessorTrait: Send + Sync {
         )
         .await?;
         Ok(())
-    }
-}
-
-impl std::fmt::Debug for dyn ProcessorTrait {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool().state();
-        write!(
-            f,
-            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
-            self.name(),
-            state.connections,
-            state.idle_connections
-        )
     }
 }
 

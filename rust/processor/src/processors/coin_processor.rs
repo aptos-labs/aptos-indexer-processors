@@ -34,6 +34,19 @@ pub struct CoinProcessor {
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
+impl std::fmt::Debug for CoinProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
+}
+
 impl CoinProcessor {
     pub fn new(
         db_writer: crate::db_writer::DbWriter,
@@ -109,24 +122,26 @@ async fn insert_to_db(
 fn insert_coin_activities_query(
     items_to_insert: &[CoinActivity],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::coin_activities::dsl::*;
     (
-        diesel::insert_into(schema::coin_activities::table)
-            .values(items_to_insert)
-            .on_conflict((
-                transaction_version,
-                event_account_address,
-                event_creation_number,
-                event_sequence_number,
-            ))
-            .do_update()
-            .set((
-                entry_function_id_str.eq(excluded(entry_function_id_str)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::coin_activities::table)
+                .values(items_to_insert)
+                .on_conflict((
+                    transaction_version,
+                    event_account_address,
+                    event_creation_number,
+                    event_sequence_number,
+                ))
+                .do_update()
+                .set((
+                    entry_function_id_str.eq(excluded(entry_function_id_str)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+        ),
         None,
     )
 }
@@ -134,27 +149,29 @@ fn insert_coin_activities_query(
 fn insert_coin_infos_query(
     items_to_insert: &[CoinInfo],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::coin_infos::dsl::*;
 
     (
-        diesel::insert_into(schema::coin_infos::table)
-            .values(items_to_insert)
-            .on_conflict(coin_type_hash)
-            .do_update()
-            .set((
-                transaction_version_created.eq(excluded(transaction_version_created)),
-                creator_address.eq(excluded(creator_address)),
-                name.eq(excluded(name)),
-                symbol.eq(excluded(symbol)),
-                decimals.eq(excluded(decimals)),
-                transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
-                supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
-                supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::coin_infos::table)
+                .values(items_to_insert)
+                .on_conflict(coin_type_hash)
+                .do_update()
+                .set((
+                    transaction_version_created.eq(excluded(transaction_version_created)),
+                    creator_address.eq(excluded(creator_address)),
+                    name.eq(excluded(name)),
+                    symbol.eq(excluded(symbol)),
+                    decimals.eq(excluded(decimals)),
+                    transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+                    supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+                    supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
     )
 }
@@ -162,16 +179,18 @@ fn insert_coin_infos_query(
 fn insert_coin_balances_query(
     items_to_insert: &[CoinBalance],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::coin_balances::dsl::*;
 
     (
-        diesel::insert_into(schema::coin_balances::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, owner_address, coin_type_hash))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::coin_balances::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, owner_address, coin_type_hash))
+                .do_nothing(),
+        ),
         None,
     )
 }
@@ -179,22 +198,24 @@ fn insert_coin_balances_query(
 fn insert_current_coin_balances_query(
     items_to_insert: &[CurrentCoinBalance],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::current_coin_balances::dsl::*;
 
     (
-        diesel::insert_into(schema::current_coin_balances::table)
-            .values(items_to_insert)
-            .on_conflict((owner_address, coin_type_hash))
-            .do_update()
-            .set((
-                amount.eq(excluded(amount)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
+        Box::new(
+            diesel::insert_into(schema::current_coin_balances::table)
+                .values(items_to_insert)
+                .on_conflict((owner_address, coin_type_hash))
+                .do_update()
+                .set((
+                    amount.eq(excluded(amount)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                    inserted_at.eq(excluded(inserted_at)),
+                ))
+        ),
         Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
@@ -202,16 +223,18 @@ fn insert_current_coin_balances_query(
 fn inset_coin_supply_query(
     items_to_insert: &[CoinSupply],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
+    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
     Option<&'static str>,
 ) {
     use schema::coin_supply::dsl::*;
 
     (
-        diesel::insert_into(schema::coin_supply::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, coin_type_hash))
-            .do_nothing(),
+        Box::new(
+            diesel::insert_into(schema::coin_supply::table)
+                .values(items_to_insert)
+                .on_conflict((transaction_version, coin_type_hash))
+                .do_nothing(),
+        ),
         None,
     )
 }
