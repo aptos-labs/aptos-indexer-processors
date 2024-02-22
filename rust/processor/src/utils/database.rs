@@ -21,6 +21,7 @@ use diesel_async::{
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures_util::{future::BoxFuture, FutureExt};
+use regex::Regex;
 use std::{cmp::min, sync::Arc};
 
 pub type MyDbConnection = AsyncPgConnection;
@@ -192,6 +193,9 @@ where
     };
     let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
     let db_insertion_duration_in_secs = std::time::Instant::now();
+    let pattern = r#"INSERT INTO "(?P<table_name>\w+)"\s*\("#;
+    let re = Regex::new(pattern).unwrap();
+
     tracing::debug!("Executing query: {:?}", debug_string);
     let conn = &mut pool.get().await.map_err(|e| {
         tracing::warn!("Error getting connection from pool: {:?}", e);
@@ -201,11 +205,22 @@ where
         )
     })?;
     let res = final_query.execute(conn).await;
-    tracing::info!(
-        db_insertion_time = db_insertion_duration_in_secs.elapsed().as_secs_f64(),
-        "Executed query: {:?}",
-        debug_string
-    );
+
+    if let Some(captures) = re.captures(debug_string.as_str()) {
+        // Extract the table name from the named capture group
+        if let Some(table_name) = captures.name("table_name") {
+            tracing::info!(
+                db_insertion_time = db_insertion_duration_in_secs.elapsed().as_secs_f64(),
+                table_name = table_name.as_str(),
+            );
+        }
+    } else {
+        tracing::info!(
+            db_insertion_time = db_insertion_duration_in_secs.elapsed().as_secs_f64(),
+            // query = debug_string,
+            "table name not found",
+        );
+    }
     if let Err(ref e) = res {
         tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
     }
@@ -313,27 +328,32 @@ mod test {
     #[tokio::test]
     async fn test_get_chunks_logic() {
         assert_eq!(get_chunks(10, 5), vec![(0, 10)]);
-        assert_eq!(get_chunks(65535, 1), vec![
-            (0, 32767),
-            (32767, 65534),
-            (65534, 65535),
-        ]);
+        assert_eq!(
+            get_chunks(65535, 1),
+            vec![(0, 32767), (32767, 65534), (65534, 65535),]
+        );
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
-        assert_eq!(get_chunks(10000, 20), vec![
-            (0, 1638),
-            (1638, 3276),
-            (3276, 4914),
-            (4914, 6552),
-            (6552, 8190),
-            (8190, 9828),
-            (9828, 10000),
-        ]);
-        assert_eq!(get_chunks(65535, 2), vec![
-            (0, 16383),
-            (16383, 32766),
-            (32766, 49149),
-            (49149, 65532),
-            (65532, 65535),
-        ]);
+        assert_eq!(
+            get_chunks(10000, 20),
+            vec![
+                (0, 1638),
+                (1638, 3276),
+                (3276, 4914),
+                (4914, 6552),
+                (6552, 8190),
+                (8190, 9828),
+                (9828, 10000),
+            ]
+        );
+        assert_eq!(
+            get_chunks(65535, 2),
+            vec![
+                (0, 16383),
+                (16383, 32766),
+                (32766, 49149),
+                (49149, 65532),
+                (65532, 65535),
+            ]
+        );
     }
 }
