@@ -45,9 +45,9 @@ diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 diesel_async_migrations = { git = "https://github.com/niroco/diesel_async_migrations", rev = "11f331b73c5cfcc894380074f748d8fda710ac12" }
 enum_dispatch = "0.3.12"
 field_count = "0.1.1"
-futures = "0.3.30"
-futures-core = "0.3.25"
-futures-util = "0.3.21"
+futures = "0.3"
+futures-core = "0.3"
+futures-util = "0.3"
 gcloud-sdk = { version = "0.20.4", features = [
     "google-cloud-bigquery-storage-v1",
 ] }
@@ -87,7 +87,7 @@ tonic = { version = "0.10.2", features = [
     "gzip",
     "codegen",
 ] }
-tracing = "0.1.34"
+tracing = "0.1"
 unescape = "0.1.0"
 url = { version = "2.4.0", features = ["serde"] }
 warp = { version = "0.3.5", features = ["tls"] }
@@ -95,4 +95,4 @@ warp = { version = "0.3.5", features = ["tls"] }
 # Postgres SSL support
 native-tls = "0.2.11"
 postgres-native-tls = "0.5.0"
-tokio-postgres = "0.7.10"
+tokio-postgres = "=0.7.10"
