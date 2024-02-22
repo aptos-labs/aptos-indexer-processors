@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    db_writer::execute_in_chunks,
     models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
         move_modules::MoveModule,
@@ -12,7 +13,7 @@ use crate::{
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+    utils::database::get_config_table_chunk_size,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -23,49 +24,39 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::fmt::Debug;
-use tokio::join;
 use tracing::error;
 
 pub struct DefaultProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        db_writer: crate::db_writer::DbWriter,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
-            connection_pool,
+            db_writer,
             per_table_chunk_sizes,
         }
     }
 }
 
-impl Debug for DefaultProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "DefaultTransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
-    }
-}
-
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    txns: &[TransactionModel],
-    block_metadata_transactions: &[BlockMetadataTransactionModel],
-    wscs: &[WriteSetChangeModel],
+    txns: Vec<TransactionModel>,
+    block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
+    wscs: Vec<WriteSetChangeModel>,
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        &[MoveModule],
-        &[MoveResource],
-        &[TableItem],
-        &[CurrentTableItem],
-        &[TableMetadata],
+        Vec<MoveModule>,
+        Vec<MoveResource>,
+        Vec<TableItem>,
+        Vec<CurrentTableItem>,
+        Vec<TableMetadata>,
     ),
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
@@ -76,14 +67,15 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
+    let query_sender = db_writer.query_sender.clone();
     let txns_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_transactions_query,
         txns,
         get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
     );
     let bmt_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
         get_config_table_chunk_size::<BlockMetadataTransactionModel>(
@@ -92,7 +84,7 @@ async fn insert_to_db(
         ),
     );
     let wst_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_write_set_changes_query,
         wscs,
         get_config_table_chunk_size::<WriteSetChangeModel>(
@@ -101,28 +93,28 @@ async fn insert_to_db(
         ),
     );
     let mm_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_move_modules_query,
         move_modules,
         get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
     );
 
     let mr_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_move_resources_query,
         move_resources,
         get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
     );
 
     let ti_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_table_items_query,
         table_items,
         get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
     );
 
     let cti_res = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_current_table_items_query,
         current_table_items,
         get_config_table_chunk_size::<CurrentTableItem>(
@@ -132,28 +124,21 @@ async fn insert_to_db(
     );
 
     let tm_res = execute_in_chunks(
-        conn.clone(),
+        query_sender,
         insert_table_metadata_query,
         table_metadata,
         get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
     );
 
-    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
-        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
-
-    for res in [
-        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-    ] {
-        res?;
-    }
+    tokio::join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
 
     Ok(())
 }
 
 fn insert_transactions_query(
-    items_to_insert: Vec<TransactionModel>,
+    items_to_insert: &[TransactionModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::transactions::dsl::*;
@@ -172,9 +157,9 @@ fn insert_transactions_query(
 }
 
 fn insert_block_metadata_transactions_query(
-    items_to_insert: Vec<BlockMetadataTransactionModel>,
+    items_to_insert: &[BlockMetadataTransactionModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::block_metadata_transactions::dsl::*;
@@ -189,9 +174,9 @@ fn insert_block_metadata_transactions_query(
 }
 
 fn insert_write_set_changes_query(
-    items_to_insert: Vec<WriteSetChangeModel>,
+    items_to_insert: &[WriteSetChangeModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::write_set_changes::dsl::*;
@@ -206,9 +191,9 @@ fn insert_write_set_changes_query(
 }
 
 fn insert_move_modules_query(
-    items_to_insert: Vec<MoveModule>,
+    items_to_insert: &[MoveModule],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::move_modules::dsl::*;
@@ -223,9 +208,9 @@ fn insert_move_modules_query(
 }
 
 fn insert_move_resources_query(
-    items_to_insert: Vec<MoveResource>,
+    items_to_insert: &[MoveResource],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::move_resources::dsl::*;
@@ -240,9 +225,9 @@ fn insert_move_resources_query(
 }
 
 fn insert_table_items_query(
-    items_to_insert: Vec<TableItem>,
+    items_to_insert: &[TableItem],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::table_items::dsl::*;
@@ -257,9 +242,9 @@ fn insert_table_items_query(
 }
 
 fn insert_current_table_items_query(
-    items_to_insert: Vec<CurrentTableItem>,
+    items_to_insert: &[CurrentTableItem],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_table_items::dsl::*;
@@ -282,9 +267,9 @@ fn insert_current_table_items_query(
 }
 
 fn insert_table_metadata_query(
-    items_to_insert: Vec<TableMetadata>,
+    items_to_insert: &[TableMetadata],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::table_metadatas::dsl::*;
@@ -383,19 +368,19 @@ impl ProcessorTrait for DefaultProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &txns,
-            &block_metadata_transactions,
-            &write_set_changes,
+            txns,
+            block_metadata_transactions,
+            write_set_changes,
             (
-                &move_modules,
-                &move_resources,
-                &table_items,
-                &current_table_items,
-                &table_metadata,
+                move_modules,
+                move_resources,
+                table_items,
+                current_table_items,
+                table_metadata,
             ),
             &self.per_table_chunk_sizes,
         )
@@ -423,7 +408,7 @@ impl ProcessorTrait for DefaultProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

@@ -37,6 +37,7 @@ use self::{
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
+    db_writer::AnyGeneratesQuery,
     models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
@@ -50,7 +51,6 @@ use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProcessingResult {
@@ -64,7 +64,7 @@ pub struct ProcessingResult {
 /// Base trait for all processors
 #[async_trait]
 #[enum_dispatch]
-pub trait ProcessorTrait: Send + Sync + Debug {
+pub trait ProcessorTrait: Send + Sync {
     fn name(&self) -> &'static str;
 
     /// Process all transactions including writing to the database
@@ -76,16 +76,25 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult>;
 
+    /// Gets a reference to the `DbWriter`; everything else flows from this
+    fn db_writer(&self) -> &crate::db_writer::DbWriter;
+
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below
-    fn connection_pool(&self) -> &PgDbPool;
+    fn connection_pool(&self) -> &PgDbPool {
+        &self.db_writer().db_pool
+    }
+
+    /// Gets a query executor sender
+    fn query_sender(&self) -> kanal::AsyncSender<Box<AnyGeneratesQuery>> {
+        self.db_writer().query_sender.clone()
+    }
 
     //* Below are helper methods that don't need to be implemented *//
 
     /// Gets an instance of the connection pool
     fn get_pool(&self) -> PgDbPool {
-        let pool = self.connection_pool();
-        pool.clone()
+        self.connection_pool().clone()
     }
 
     /// Gets the connection.
@@ -142,6 +151,19 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         )
         .await?;
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for dyn ProcessorTrait {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
     }
 }
 

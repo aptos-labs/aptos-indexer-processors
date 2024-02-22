@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    db_writer::execute_in_chunks,
     models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
         ans_lookup_v2::{
@@ -12,8 +13,7 @@ use crate::{
     },
     schema,
     utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::get_config_table_chunk_size,
         util::standardize_address,
     },
 };
@@ -29,7 +29,6 @@ use diesel::{
     ExpressionMethods,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -41,14 +40,14 @@ pub struct AnsProcessorConfig {
 }
 
 pub struct AnsProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     config: AnsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AnsProcessor {
     pub fn new(
-        connection_pool: PgDbPool,
+        db_writer: crate::db_writer::DbWriter,
         per_table_chunk_sizes: AHashMap<String, usize>,
         config: AnsProcessorConfig,
     ) -> Self {
@@ -59,37 +58,26 @@ impl AnsProcessor {
             "init AnsProcessor"
         );
         Self {
-            connection_pool,
+            db_writer,
             per_table_chunk_sizes,
             config,
         }
     }
 }
 
-impl Debug for AnsProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "AnsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
-    }
-}
-
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_ans_lookups: &[CurrentAnsLookup],
-    ans_lookups: &[AnsLookup],
-    current_ans_primary_names: &[CurrentAnsPrimaryName],
-    ans_primary_names: &[AnsPrimaryName],
-    current_ans_lookups_v2: &[CurrentAnsLookupV2],
-    ans_lookups_v2: &[AnsLookupV2],
-    current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
-    ans_primary_names_v2: &[AnsPrimaryNameV2],
+    current_ans_lookups: Vec<CurrentAnsLookup>,
+    ans_lookups: Vec<AnsLookup>,
+    current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
+    ans_primary_names: Vec<AnsPrimaryName>,
+    current_ans_lookups_v2: Vec<CurrentAnsLookupV2>,
+    ans_lookups_v2: Vec<AnsLookupV2>,
+    current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2>,
+    ans_primary_names_v2: Vec<AnsPrimaryNameV2>,
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -98,8 +86,9 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
+    let query_sender = db_writer.query_sender.clone();
     let cal = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
         get_config_table_chunk_size::<CurrentAnsLookup>(
@@ -108,13 +97,13 @@ async fn insert_to_db(
         ),
     );
     let al = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_ans_lookups_query,
         ans_lookups,
         get_config_table_chunk_size::<AnsLookup>("ans_lookup", per_table_chunk_sizes),
     );
     let capn = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
         get_config_table_chunk_size::<CurrentAnsPrimaryName>(
@@ -123,13 +112,13 @@ async fn insert_to_db(
         ),
     );
     let apn = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
         get_config_table_chunk_size::<AnsPrimaryName>("ans_primary_name", per_table_chunk_sizes),
     );
     let cal_v2 = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
         get_config_table_chunk_size::<CurrentAnsLookupV2>(
@@ -138,13 +127,13 @@ async fn insert_to_db(
         ),
     );
     let al_v2 = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
         get_config_table_chunk_size::<AnsLookupV2>("ans_lookup_v2", per_table_chunk_sizes),
     );
     let capn_v2 = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
         get_config_table_chunk_size::<CurrentAnsPrimaryNameV2>(
@@ -153,7 +142,7 @@ async fn insert_to_db(
         ),
     );
     let apn_v2 = execute_in_chunks(
-        conn,
+        query_sender,
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,
         get_config_table_chunk_size::<AnsPrimaryNameV2>(
@@ -162,36 +151,22 @@ async fn insert_to_db(
         ),
     );
 
-    let (cal_res, al_res, capn_res, apn_res, cal_v2_res, al_v2_res, capn_v2_res, apn_v2_res) =
-        tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
-
-    for res in vec![
-        cal_res,
-        al_res,
-        capn_res,
-        apn_res,
-        cal_v2_res,
-        al_v2_res,
-        capn_v2_res,
-        apn_v2_res,
-    ] {
-        res?;
-    }
+    tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
 
     Ok(())
 }
 
 fn insert_current_ans_lookups_query(
-    item_to_insert: Vec<CurrentAnsLookup>,
+    items_to_insert: &[CurrentAnsLookup],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_ans_lookup::dsl::*;
 
     (
         diesel::insert_into(schema::current_ans_lookup::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((domain, subdomain))
             .do_update()
             .set((
@@ -207,16 +182,16 @@ fn insert_current_ans_lookups_query(
 }
 
 fn insert_ans_lookups_query(
-    item_to_insert: Vec<AnsLookup>,
+    items_to_insert: &[AnsLookup],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::ans_lookup::dsl::*;
 
     (
         diesel::insert_into(schema::ans_lookup::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
             .do_nothing(),
         None,
@@ -224,16 +199,16 @@ fn insert_ans_lookups_query(
 }
 
 fn insert_current_ans_primary_names_query(
-    item_to_insert: Vec<CurrentAnsPrimaryName>,
+    items_to_insert: &[CurrentAnsPrimaryName],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_ans_primary_name::dsl::*;
 
     (
         diesel::insert_into(schema::current_ans_primary_name::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict(registered_address)
             .do_update()
             .set((
@@ -249,16 +224,16 @@ fn insert_current_ans_primary_names_query(
 }
 
 fn insert_ans_primary_names_query(
-    item_to_insert: Vec<AnsPrimaryName>,
+    items_to_insert: &[AnsPrimaryName],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::ans_primary_name::dsl::*;
 
     (
         diesel::insert_into(schema::ans_primary_name::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
             .do_nothing(),
         None,
@@ -266,16 +241,16 @@ fn insert_ans_primary_names_query(
 }
 
 fn insert_current_ans_lookups_v2_query(
-    item_to_insert: Vec<CurrentAnsLookupV2>,
+    items_to_insert: &[CurrentAnsLookupV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_ans_lookup_v2::dsl::*;
 
     (
         diesel::insert_into(schema::current_ans_lookup_v2::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((domain, subdomain, token_standard))
             .do_update()
             .set((
@@ -291,16 +266,16 @@ fn insert_current_ans_lookups_v2_query(
 }
 
 fn insert_ans_lookups_v2_query(
-    item_to_insert: Vec<AnsLookupV2>,
+    items_to_insert: &[AnsLookupV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::ans_lookup_v2::dsl::*;
 
     (
         diesel::insert_into(schema::ans_lookup_v2::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
             .do_nothing(),
         None,
@@ -308,16 +283,16 @@ fn insert_ans_lookups_v2_query(
 }
 
 fn insert_current_ans_primary_names_v2_query(
-    item_to_insert: Vec<CurrentAnsPrimaryNameV2>,
+    items_to_insert: &[CurrentAnsPrimaryNameV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_ans_primary_name_v2::dsl::*;
 
     (
         diesel::insert_into(schema::current_ans_primary_name_v2::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((registered_address, token_standard))
             .do_update()
             .set((
@@ -333,9 +308,9 @@ fn insert_current_ans_primary_names_v2_query(
 }
 
 fn insert_ans_primary_names_v2_query(
-    items_to_insert: Vec<AnsPrimaryNameV2>,
+    items_to_insert: &[AnsPrimaryNameV2],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::ans_primary_name_v2::dsl::*;
@@ -386,18 +361,18 @@ impl ProcessorTrait for AnsProcessor {
 
         // Insert values to db
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &all_current_ans_lookups,
-            &all_ans_lookups,
-            &all_current_ans_primary_names,
-            &all_ans_primary_names,
-            &all_current_ans_lookups_v2,
-            &all_ans_lookups_v2,
-            &all_current_ans_primary_names_v2,
-            &all_ans_primary_names_v2,
+            all_current_ans_lookups,
+            all_ans_lookups,
+            all_current_ans_primary_names,
+            all_ans_primary_names,
+            all_current_ans_lookups_v2,
+            all_ans_lookups_v2,
+            all_current_ans_primary_names_v2,
+            all_ans_primary_names_v2,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -425,8 +400,8 @@ impl ProcessorTrait for AnsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 

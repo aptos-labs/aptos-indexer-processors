@@ -3,12 +3,10 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    db_writer::execute_in_chunks,
     models::events_models::events::EventModel,
     schema,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-    },
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::get_config_table_chunk_size},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -19,40 +17,31 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::fmt::Debug;
 use tracing::error;
 
 pub struct EventsProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        db_writer: crate::db_writer::DbWriter,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
-            connection_pool,
+            db_writer,
             per_table_chunk_sizes,
         }
     }
 }
 
-impl Debug for EventsProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "EventsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
-    }
-}
-
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    events: &[EventModel],
+    events: Vec<EventModel>,
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -62,7 +51,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
     execute_in_chunks(
-        conn,
+        db_writer.query_sender.clone(),
         insert_events_query,
         events,
         get_config_table_chunk_size::<EventModel>("events", per_table_chunk_sizes),
@@ -72,9 +61,9 @@ async fn insert_to_db(
 }
 
 fn insert_events_query(
-    items_to_insert: Vec<EventModel>,
+    items_to_insert: &[EventModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::events::dsl::*;
@@ -140,11 +129,11 @@ impl ProcessorTrait for EventsProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &events,
+            events,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -171,7 +160,7 @@ impl ProcessorTrait for EventsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

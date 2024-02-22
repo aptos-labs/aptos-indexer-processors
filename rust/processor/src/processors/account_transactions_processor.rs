@@ -3,49 +3,40 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::account_transaction_models::account_transactions::AccountTransaction,
-    schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+    db_writer::execute_in_chunks,
+    models::account_transaction_models::account_transactions::AccountTransaction, schema,
+    utils::database::get_config_table_chunk_size,
 };
 use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
-use std::fmt::Debug;
 use tracing::error;
 
 pub struct AccountTransactionsProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AccountTransactionsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        db_writer: crate::db_writer::DbWriter,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
-            connection_pool,
+            db_writer,
             per_table_chunk_sizes,
         }
     }
 }
 
-impl Debug for AccountTransactionsProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "AccountTransactionsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
-    }
-}
-
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    account_transactions: &[AccountTransaction],
+    account_transactions: Vec<AccountTransaction>,
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -55,7 +46,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
     execute_in_chunks(
-        conn.clone(),
+        db_writer.query_sender.clone(),
         insert_account_transactions_query,
         account_transactions,
         get_config_table_chunk_size::<AccountTransaction>(
@@ -68,16 +59,16 @@ async fn insert_to_db(
 }
 
 fn insert_account_transactions_query(
-    item_to_insert: Vec<AccountTransaction>,
+    items_to_insert: &[AccountTransaction],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::account_transactions::dsl::*;
 
     (
         diesel::insert_into(schema::account_transactions::table)
-            .values(item_to_insert)
+            .values(items_to_insert)
             .on_conflict((transaction_version, account_address))
             .do_nothing(),
         None,
@@ -118,11 +109,11 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &account_transactions,
+            account_transactions,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -149,7 +140,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

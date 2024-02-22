@@ -2,29 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
-use crate::utils::database::PgDbPool;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use std::fmt::Debug;
 
 pub struct MonitoringProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
 }
 
 impl MonitoringProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
-    }
-}
-
-impl Debug for MonitoringProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "MonitoringProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
     }
 }
 
@@ -50,7 +37,7 @@ impl ProcessorTrait for MonitoringProcessor {
         })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

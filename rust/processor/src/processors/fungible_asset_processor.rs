@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    db_writer::execute_in_chunks,
     models::{
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
@@ -20,7 +21,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool, PgPoolConnection},
+        database::{get_config_table_chunk_size, PgPoolConnection},
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
@@ -34,45 +35,36 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::fmt::Debug;
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 
 pub struct FungibleAssetProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl FungibleAssetProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        db_writer: crate::db_writer::DbWriter,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
-            connection_pool,
+            db_writer,
             per_table_chunk_sizes,
         }
     }
 }
 
-impl Debug for FungibleAssetProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "FungibleAssetTransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
-    }
-}
-
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    fungible_asset_activities: &[FungibleAssetActivity],
-    fungible_asset_metadata: &[FungibleAssetMetadataModel],
-    fungible_asset_balances: &[FungibleAssetBalance],
-    current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
+    fungible_asset_activities: Vec<FungibleAssetActivity>,
+    fungible_asset_metadata: Vec<FungibleAssetMetadataModel>,
+    fungible_asset_balances: Vec<FungibleAssetBalance>,
+    current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance>,
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -81,9 +73,9 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-
+    let query_sender = db_writer.query_sender.clone();
     let faa = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_fungible_asset_activities_query,
         fungible_asset_activities,
         get_config_table_chunk_size::<FungibleAssetActivity>(
@@ -92,7 +84,7 @@ async fn insert_to_db(
         ),
     );
     let fam = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_fungible_asset_metadata_query,
         fungible_asset_metadata,
         get_config_table_chunk_size::<FungibleAssetMetadataModel>(
@@ -101,7 +93,7 @@ async fn insert_to_db(
         ),
     );
     let fab = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_fungible_asset_balances_query,
         fungible_asset_balances,
         get_config_table_chunk_size::<FungibleAssetBalance>(
@@ -110,7 +102,7 @@ async fn insert_to_db(
         ),
     );
     let cfab = execute_in_chunks(
-        conn,
+        query_sender,
         insert_current_fungible_asset_balances_query,
         current_fungible_asset_balances,
         get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
@@ -118,18 +110,15 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
-    for res in [faa_res, fam_res, fab_res, cfab_res] {
-        res?;
-    }
+    tokio::join!(faa, fam, fab, cfab);
 
     Ok(())
 }
 
 fn insert_fungible_asset_activities_query(
-    items_to_insert: Vec<FungibleAssetActivity>,
+    items_to_insert: &[FungibleAssetActivity],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::fungible_asset_activities::dsl::*;
@@ -144,9 +133,9 @@ fn insert_fungible_asset_activities_query(
 }
 
 fn insert_fungible_asset_metadata_query(
-    items_to_insert: Vec<FungibleAssetMetadataModel>,
+    items_to_insert: &[FungibleAssetMetadataModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::fungible_asset_metadata::dsl::*;
@@ -177,9 +166,9 @@ fn insert_fungible_asset_metadata_query(
 }
 
 fn insert_fungible_asset_balances_query(
-    items_to_insert: Vec<FungibleAssetBalance>,
+    items_to_insert: &[FungibleAssetBalance],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::fungible_asset_balances::dsl::*;
@@ -198,9 +187,9 @@ fn insert_fungible_asset_balances_query(
 }
 
 fn insert_current_fungible_asset_balances_query(
-    items_to_insert: Vec<CurrentFungibleAssetBalance>,
+    items_to_insert: &[CurrentFungibleAssetBalance],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_fungible_asset_balances::dsl::*;
@@ -255,14 +244,14 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &fungible_asset_activities,
-            &fungible_asset_metadata,
-            &fungible_asset_balances,
-            &current_fungible_asset_balances,
+            fungible_asset_activities,
+            fungible_asset_metadata,
+            fungible_asset_balances,
+            current_fungible_asset_balances,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -288,8 +277,8 @@ impl ProcessorTrait for FungibleAssetProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 

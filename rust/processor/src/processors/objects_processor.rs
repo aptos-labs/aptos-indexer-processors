@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    db_writer::execute_in_chunks,
     models::{
         fungible_asset_models::{
             v2_fungible_asset_activities::FungibleAssetActivity,
@@ -17,10 +18,7 @@ use crate::{
         token_v2_models::v2_token_utils::TokenV2,
     },
     schema,
-    utils::{
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-        util::standardize_address,
-    },
+    utils::{database::get_config_table_chunk_size, util::standardize_address},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -31,40 +29,31 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::fmt::Debug;
 use tracing::error;
 
 pub struct ObjectsProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        db_writer: crate::db_writer::DbWriter,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
-            connection_pool,
+            db_writer,
             per_table_chunk_sizes,
         }
     }
 }
 
-impl Debug for ObjectsProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "ObjectsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
-    }
-}
-
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    (objects, current_objects): (&[Object], &[CurrentObject]),
+    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -74,14 +63,15 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
+    let query_sender = db_writer.get_query_sender();
     let io = execute_in_chunks(
-        conn.clone(),
+        query_sender.clone(),
         insert_objects_query,
         objects,
         get_config_table_chunk_size::<Object>("objects", per_table_chunk_sizes),
     );
     let co = execute_in_chunks(
-        conn,
+        query_sender,
         insert_current_objects_query,
         current_objects,
         get_config_table_chunk_size::<FungibleAssetActivity>(
@@ -89,18 +79,15 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let (io_res, co_res) = tokio::join!(io, co);
-    for res in [io_res, co_res] {
-        res?;
-    }
+    tokio::join!(io, co);
 
     Ok(())
 }
 
 fn insert_objects_query(
-    items_to_insert: Vec<Object>,
+    items_to_insert: &[Object],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::objects::dsl::*;
@@ -119,9 +106,9 @@ fn insert_objects_query(
 }
 
 fn insert_current_objects_query(
-    items_to_insert: Vec<CurrentObject>,
+    items_to_insert: &[CurrentObject],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + '_,
     Option<&'static str>,
 ) {
     use schema::current_objects::dsl::*;
@@ -284,11 +271,11 @@ impl ProcessorTrait for ObjectsProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         let tx_result = insert_to_db(
-            self.get_pool(),
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            (&all_objects, &all_current_objects),
+            (all_objects, all_current_objects),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -315,7 +302,7 @@ impl ProcessorTrait for ObjectsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
