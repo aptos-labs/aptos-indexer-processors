@@ -139,6 +139,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                         .eq(excluded(processor_status::last_transaction_timestamp)),
                 )),
             Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
+            1,
         )
         .await?;
         Ok(())

@@ -177,6 +177,7 @@ pub async fn execute_with_better_error<U>(
     pool: PgDbPool,
     query: U,
     mut additional_where_clause: Option<&'static str>,
+    num_rows: u64,
 ) -> QueryResult<usize>
 where
     U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
@@ -211,6 +212,7 @@ where
         if let Some(table_name) = captures.name("table_name") {
             tracing::info!(
                 db_insertion_time = db_insertion_duration_in_secs.elapsed().as_secs_f64(),
+                num_rows,
                 table_name = table_name.as_str(),
             );
         }
@@ -218,6 +220,7 @@ where
         tracing::info!(
             db_insertion_time = db_insertion_duration_in_secs.elapsed().as_secs_f64(),
             // query = debug_string,
+            num_rows,
             "table name not found",
         );
     }
@@ -278,13 +281,26 @@ where
     U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
 {
-    match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
+    match execute_with_better_error(
+        conn.clone(),
+        query,
+        additional_where_clause,
+        items.len() as u64,
+    )
+    .await
+    {
         Ok(_) => {},
         Err(_) => {
             let cleaned_items = clean_data_for_db(items, true);
+            let num_rows = cleaned_items.len() as u64;
             let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
-            match execute_with_better_error(conn.clone(), cleaned_query, additional_where_clause)
-                .await
+            match execute_with_better_error(
+                conn.clone(),
+                cleaned_query,
+                additional_where_clause,
+                num_rows,
+            )
+            .await
             {
                 Ok(_) => {},
                 Err(e) => {
