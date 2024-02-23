@@ -127,7 +127,7 @@ async fn insert_to_db(
 fn insert_coin_activities_query(
     items_to_insert: &[CoinActivity],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::coin_activities::dsl::*;
@@ -154,7 +154,7 @@ fn insert_coin_activities_query(
 fn insert_coin_infos_query(
     items_to_insert: &[CoinInfo],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::coin_infos::dsl::*;
@@ -184,7 +184,7 @@ fn insert_coin_infos_query(
 fn insert_coin_balances_query(
     items_to_insert: &[CoinBalance],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::coin_balances::dsl::*;
@@ -203,7 +203,7 @@ fn insert_coin_balances_query(
 fn insert_current_coin_balances_query(
     items_to_insert: &[CurrentCoinBalance],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_coin_balances::dsl::*;
@@ -228,7 +228,7 @@ fn insert_current_coin_balances_query(
 fn inset_coin_supply_query(
     items_to_insert: &[CoinSupply],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::coin_supply::dsl::*;

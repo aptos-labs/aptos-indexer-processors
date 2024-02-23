@@ -101,7 +101,7 @@ async fn insert_to_db(
     );
     let query_sender = db_writer.query_sender.clone();
     let cal = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
@@ -111,14 +111,14 @@ async fn insert_to_db(
         ),
     );
     let al = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_ans_lookups_query,
         ans_lookups,
         get_config_table_chunk_size::<AnsLookup>("ans_lookup", per_table_chunk_sizes),
     );
     let capn = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
@@ -128,14 +128,14 @@ async fn insert_to_db(
         ),
     );
     let apn = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
         get_config_table_chunk_size::<AnsPrimaryName>("ans_primary_name", per_table_chunk_sizes),
     );
     let cal_v2 = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
@@ -145,14 +145,14 @@ async fn insert_to_db(
         ),
     );
     let al_v2 = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
         get_config_table_chunk_size::<AnsLookupV2>("ans_lookup_v2", per_table_chunk_sizes),
     );
     let capn_v2 = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
@@ -162,7 +162,7 @@ async fn insert_to_db(
         ),
     );
     let apn_v2 = execute_in_chunks(
-&"TABLE_NAME_PLACEHOLDER",
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,
@@ -180,7 +180,7 @@ async fn insert_to_db(
 fn insert_current_ans_lookups_query(
     items_to_insert: &[CurrentAnsLookup],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_ans_lookup::dsl::*;
@@ -207,7 +207,7 @@ fn insert_current_ans_lookups_query(
 fn insert_ans_lookups_query(
     items_to_insert: &[AnsLookup],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::ans_lookup::dsl::*;
@@ -226,7 +226,7 @@ fn insert_ans_lookups_query(
 fn insert_current_ans_primary_names_query(
     items_to_insert: &[CurrentAnsPrimaryName],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_ans_primary_name::dsl::*;
@@ -253,7 +253,7 @@ fn insert_current_ans_primary_names_query(
 fn insert_ans_primary_names_query(
     items_to_insert: &[AnsPrimaryName],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::ans_primary_name::dsl::*;
@@ -272,7 +272,7 @@ fn insert_ans_primary_names_query(
 fn insert_current_ans_lookups_v2_query(
     items_to_insert: &[CurrentAnsLookupV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_ans_lookup_v2::dsl::*;
@@ -299,7 +299,7 @@ fn insert_current_ans_lookups_v2_query(
 fn insert_ans_lookups_v2_query(
     items_to_insert: &[AnsLookupV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::ans_lookup_v2::dsl::*;
@@ -318,7 +318,7 @@ fn insert_ans_lookups_v2_query(
 fn insert_current_ans_primary_names_v2_query(
     items_to_insert: &[CurrentAnsPrimaryNameV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_ans_primary_name_v2::dsl::*;
@@ -345,7 +345,7 @@ fn insert_current_ans_primary_names_v2_query(
 fn insert_ans_primary_names_v2_query(
     items_to_insert: &[AnsPrimaryNameV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::ans_primary_name_v2::dsl::*;

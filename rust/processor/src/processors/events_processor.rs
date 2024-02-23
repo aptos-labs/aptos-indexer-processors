@@ -64,6 +64,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
     execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         db_writer.query_sender.clone(),
         insert_events_query,
         events,
@@ -76,7 +77,7 @@ async fn insert_to_db(
 fn insert_events_query(
     items_to_insert: &[EventModel],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::events::dsl::*;

@@ -102,7 +102,7 @@ async fn insert_to_db(
 fn insert_objects_query(
     items_to_insert: &[Object],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::objects::dsl::*;
@@ -125,7 +125,7 @@ fn insert_objects_query(
 fn insert_current_objects_query(
     items_to_insert: &[CurrentObject],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_objects::dsl::*;
@@ -251,13 +251,13 @@ impl ProcessorTrait for ObjectsProcessor {
                             index,
                             &object_metadata_helper,
                         )
-                            .unwrap()
+                        .unwrap()
                         {
                             all_objects.push(object.clone());
                             all_current_objects
                                 .insert(object.object_address.clone(), current_object.clone());
                         }
-                    }
+                    },
                     Change::DeleteResource(inner) => {
                         // Passing all_current_objects into the function so that we can get the owner of the deleted
                         // resource if it was handled in the same batch
@@ -268,15 +268,15 @@ impl ProcessorTrait for ObjectsProcessor {
                             &all_current_objects,
                             &mut conn,
                         )
-                            .await
-                            .unwrap()
+                        .await
+                        .unwrap()
                         {
                             all_objects.push(object.clone());
                             all_current_objects
                                 .insert(object.object_address.clone(), current_object.clone());
                         }
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 };
             }
         }
@@ -298,7 +298,7 @@ impl ProcessorTrait for ObjectsProcessor {
             (all_objects, all_current_objects),
             &self.per_table_chunk_sizes,
         )
-            .await;
+        .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         match tx_result {
@@ -318,7 +318,7 @@ impl ProcessorTrait for ObjectsProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 

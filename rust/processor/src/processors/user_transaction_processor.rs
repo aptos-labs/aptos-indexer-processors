@@ -167,7 +167,7 @@ impl ProcessorTrait for UserTransactionProcessor {
                         "Transaction data doesn't exist"
                     );
                     continue;
-                }
+                },
             };
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
@@ -194,7 +194,7 @@ impl ProcessorTrait for UserTransactionProcessor {
             signatures,
             &self.per_table_chunk_sizes,
         )
-            .await;
+        .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
@@ -213,7 +213,7 @@ impl ProcessorTrait for UserTransactionProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 

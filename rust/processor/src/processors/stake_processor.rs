@@ -184,7 +184,7 @@ async fn insert_to_db(
 fn insert_current_stake_pool_voter_query(
     items_to_insert: &[CurrentStakingPoolVoter],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_staking_pool_voter::dsl::*;
@@ -212,7 +212,7 @@ fn insert_current_stake_pool_voter_query(
 fn insert_proposal_votes_query(
     items_to_insert: &[ProposalVote],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::proposal_votes::dsl::*;
@@ -231,7 +231,7 @@ fn insert_proposal_votes_query(
 fn insert_delegator_activities_query(
     items_to_insert: &[DelegatedStakingActivity],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::delegated_staking_activities::dsl::*;
@@ -250,7 +250,7 @@ fn insert_delegator_activities_query(
 fn insert_delegator_balances_query(
     items_to_insert: &[DelegatorBalance],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::delegator_balances::dsl::*;
@@ -269,7 +269,7 @@ fn insert_delegator_balances_query(
 fn insert_current_delegator_balances_query(
     items_to_insert: &[CurrentDelegatorBalance],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_delegator_balances::dsl::*;
@@ -296,7 +296,7 @@ fn insert_current_delegator_balances_query(
 fn insert_delegator_pools_query(
     items_to_insert: &[DelegatorPool],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::delegated_staking_pools::dsl::*;
@@ -321,7 +321,7 @@ fn insert_delegator_pools_query(
 fn insert_delegator_pool_balances_query(
     items_to_insert: &[DelegatorPoolBalance],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::delegated_staking_pool_balances::dsl::*;
@@ -340,7 +340,7 @@ fn insert_delegator_pool_balances_query(
 fn insert_current_delegator_pool_balances_query(
     items_to_insert: &[CurrentDelegatorPoolBalance],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_delegated_staking_pool_balances::dsl::*;
@@ -370,7 +370,7 @@ fn insert_current_delegator_pool_balances_query(
 fn insert_current_delegated_voter_query(
     items_to_insert: &[CurrentDelegatedVoter],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_delegated_voter::dsl::*;

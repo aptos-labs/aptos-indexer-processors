@@ -15,30 +15,31 @@ use tokio::task::JoinHandle;
 use tracing::info;
 
 pub type QueryGeneratorFn<
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+    'a,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a + 'static,
 > = fn(&[Item]) -> (Box<Query>, Option<&'static str>);
 
 /// A simple holder that allows us to move query generators cross threads and avoid cloning
-pub struct QueryGenerator<Query, Item>
+pub struct QueryGenerator<'a, Query, Item>
     where
-        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a + 'static,
 {
-    pub build_query_fn: QueryGeneratorFn<Query, Item>,
+    pub build_query_fn: QueryGeneratorFn<'a, Query, Item>,
     pub items: Vec<Item>,
     pub table_name: &'static str,
 }
 
-impl<Query, Item> QueryGenerator<Query, Item>
+impl<'a, Query, Item> QueryGenerator<'a, Query, Item>
     where
-        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a + 'static,
 {
     pub fn new(
         table_name: &'static str,
         items: Vec<Item>,
-        build_query_fn: QueryGeneratorFn<Query, Item>,
+        build_query_fn: QueryGeneratorFn<'a, Query, Item>,
     ) -> Self {
         Self {
             table_name,
@@ -59,7 +60,7 @@ impl<Query, Item> QueryGenerator<Query, Item>
     pub fn cleaned_query(
         self,
     ) -> (
-        Box<dyn QueryFragment<diesel::pg::Pg> + Send + Sync + 'static>,
+        Box<dyn QueryFragment<diesel::pg::Pg> + Send + Sync>,
         Option<&'static str>,
     ) {
         let QueryGenerator {
@@ -78,10 +79,10 @@ pub trait DbExecutable {
 }
 
 #[async_trait::async_trait]
-impl<Query, Item> DbExecutable for QueryGenerator<Query, Item>
+impl<'a, Query, Item> DbExecutable for QueryGenerator<'a, Query, Item>
     where
-        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a + 'static,
 {
     async fn execute_query(&self, conn: PgDbPool) -> QueryResult<usize> {
         let (query, _) = self.generate_query();
@@ -156,7 +157,7 @@ pub async fn execute_in_chunks<Query, Item>(
     items_to_insert: Vec<Item>,
     chunk_size: usize,
 ) where
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     let chunks = get_chunks(items_to_insert.len(), chunk_size);

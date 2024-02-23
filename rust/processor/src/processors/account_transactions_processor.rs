@@ -59,6 +59,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
     execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         db_writer.query_sender.clone(),
         insert_account_transactions_query,
         account_transactions,
@@ -74,7 +75,7 @@ async fn insert_to_db(
 fn insert_account_transactions_query(
     items_to_insert: &[AccountTransaction],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::account_transactions::dsl::*;

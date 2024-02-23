@@ -159,7 +159,7 @@ async fn insert_to_db(
 fn insert_transactions_query(
     items_to_insert: &[TransactionModel],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::transactions::dsl::*;
@@ -182,7 +182,7 @@ fn insert_transactions_query(
 fn insert_block_metadata_transactions_query(
     items_to_insert: &[BlockMetadataTransactionModel],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::block_metadata_transactions::dsl::*;
@@ -201,7 +201,7 @@ fn insert_block_metadata_transactions_query(
 fn insert_write_set_changes_query(
     items_to_insert: &[WriteSetChangeModel],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::write_set_changes::dsl::*;
@@ -220,7 +220,7 @@ fn insert_write_set_changes_query(
 fn insert_move_modules_query(
     items_to_insert: &[MoveModule],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::move_modules::dsl::*;
@@ -239,7 +239,7 @@ fn insert_move_modules_query(
 fn insert_move_resources_query(
     items_to_insert: &[MoveResource],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::move_resources::dsl::*;
@@ -258,7 +258,7 @@ fn insert_move_resources_query(
 fn insert_table_items_query(
     items_to_insert: &[TableItem],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::table_items::dsl::*;
@@ -277,7 +277,7 @@ fn insert_table_items_query(
 fn insert_current_table_items_query(
     items_to_insert: &[CurrentTableItem],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_table_items::dsl::*;
@@ -304,7 +304,7 @@ fn insert_current_table_items_query(
 fn insert_table_metadata_query(
     items_to_insert: &[TableMetadata],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::table_metadatas::dsl::*;
@@ -357,7 +357,7 @@ impl ProcessorTrait for DefaultProcessor {
                     WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
                     WriteSetChangeDetail::Resource(resource) => {
                         move_resources.push(resource.clone())
-                    }
+                    },
                     WriteSetChangeDetail::Table(item, current_item, metadata) => {
                         table_items.push(item.clone());
                         current_table_items.insert(
@@ -370,7 +370,7 @@ impl ProcessorTrait for DefaultProcessor {
                         if let Some(meta) = metadata {
                             table_metadata.insert(meta.handle.clone(), meta.clone());
                         }
-                    }
+                    },
                 }
             }
 
@@ -398,8 +398,8 @@ impl ProcessorTrait for DefaultProcessor {
                 ),
             )
         })
-            .await
-            .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
+        .await
+        .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -421,7 +421,7 @@ impl ProcessorTrait for DefaultProcessor {
             ),
             &self.per_table_chunk_sizes,
         )
-            .await;
+        .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
@@ -441,7 +441,7 @@ impl ProcessorTrait for DefaultProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 

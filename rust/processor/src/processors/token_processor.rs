@@ -189,7 +189,7 @@ async fn insert_to_db(
 fn insert_tokens_query(
     items_to_insert: &[Token],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::tokens::dsl::*;
@@ -207,7 +207,7 @@ fn insert_tokens_query(
 fn insert_token_ownerships_query(
     items_to_insert: &[TokenOwnership],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::token_ownerships::dsl::*;
@@ -231,7 +231,7 @@ fn insert_token_ownerships_query(
 fn insert_token_datas_query(
     items_to_insert: &[TokenData],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::token_datas::dsl::*;
@@ -249,7 +249,7 @@ fn insert_token_datas_query(
 fn insert_collection_datas_query(
     items_to_insert: &[CollectionData],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::collection_datas::dsl::*;
@@ -268,7 +268,7 @@ fn insert_collection_datas_query(
 fn insert_current_token_ownerships_query(
     items_to_insert: &[CurrentTokenOwnership],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_token_ownerships::dsl::*;
@@ -298,7 +298,7 @@ fn insert_current_token_ownerships_query(
 fn insert_current_token_datas_query(
     items_to_insert: &[CurrentTokenData],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_token_datas::dsl::*;
@@ -338,7 +338,7 @@ fn insert_current_token_datas_query(
 fn insert_current_collection_datas_query(
     items_to_insert: &[CurrentCollectionData],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_collection_datas::dsl::*;
@@ -371,7 +371,7 @@ fn insert_current_collection_datas_query(
 fn insert_token_activities_query(
     items_to_insert: &[TokenActivity],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::token_activities::dsl::*;
@@ -395,7 +395,7 @@ fn insert_token_activities_query(
 fn insert_current_token_claims_query(
     items_to_insert: &[CurrentTokenPendingClaim],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::current_token_pending_claims::dsl::*;
@@ -426,7 +426,7 @@ fn insert_current_token_claims_query(
 fn insert_nft_points_query(
     items_to_insert: &[NftPoints],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::nft_points::dsl::*;
@@ -588,7 +588,7 @@ impl ProcessorTrait for TokenProcessor {
             all_nft_points,
             &self.per_table_chunk_sizes,
         )
-            .await;
+        .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
@@ -608,7 +608,7 @@ impl ProcessorTrait for TokenProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            }
+            },
         }
     }
 
