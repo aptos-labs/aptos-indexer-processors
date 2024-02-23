@@ -100,18 +100,21 @@ async fn insert_to_db(
     let query_sender = db_writer.query_sender.clone();
 
     let coll_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_collections_v2_query,
         collections_v2,
         get_config_table_chunk_size::<CollectionV2>("collections_v2", per_table_chunk_sizes),
     );
     let td_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_token_datas_v2_query,
         token_datas_v2,
         get_config_table_chunk_size::<TokenDataV2>("token_datas_v2", per_table_chunk_sizes),
     );
     let to_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_token_ownerships_v2_query,
         token_ownerships_v2,
@@ -121,6 +124,7 @@ async fn insert_to_db(
         ),
     );
     let cc_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_collections_v2_query,
         current_collections_v2,
@@ -130,6 +134,7 @@ async fn insert_to_db(
         ),
     );
     let ctd_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_token_datas_v2_query,
         current_token_datas_v2,
@@ -139,6 +144,7 @@ async fn insert_to_db(
         ),
     );
     let cto_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
@@ -148,6 +154,7 @@ async fn insert_to_db(
         ),
     );
     let ta_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_token_activities_v2_query,
         token_activities_v2,
@@ -157,6 +164,7 @@ async fn insert_to_db(
         ),
     );
     let ct_v2 = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
@@ -174,7 +182,7 @@ async fn insert_to_db(
 fn insert_collections_v2_query(
     items_to_insert: &[CollectionV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::collections_v2::dsl::*;
@@ -192,7 +200,7 @@ fn insert_collections_v2_query(
 fn insert_token_datas_v2_query(
     items_to_insert: &[TokenDataV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::token_datas_v2::dsl::*;
@@ -211,7 +219,7 @@ fn insert_token_datas_v2_query(
 fn insert_token_ownerships_v2_query(
     items_to_insert: &[TokenOwnershipV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::token_ownerships_v2::dsl::*;
@@ -230,7 +238,7 @@ fn insert_token_ownerships_v2_query(
 fn insert_current_collections_v2_query(
     items_to_insert: &[CurrentCollectionV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::current_collections_v2::dsl::*;
@@ -265,7 +273,7 @@ fn insert_current_collections_v2_query(
 fn insert_current_token_datas_v2_query(
     items_to_insert: &[CurrentTokenDataV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::current_token_datas_v2::dsl::*;
@@ -300,7 +308,7 @@ fn insert_current_token_datas_v2_query(
 fn insert_current_token_ownerships_v2_query(
     items_to_insert: &[CurrentTokenOwnershipV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::current_token_ownerships_v2::dsl::*;
@@ -331,7 +339,7 @@ fn insert_current_token_ownerships_v2_query(
 fn insert_token_activities_v2_query(
     items_to_insert: &[TokenActivityV2],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::token_activities_v2::dsl::*;
@@ -354,7 +362,7 @@ fn insert_token_activities_v2_query(
 fn insert_current_token_v2_metadatas_query(
     items_to_insert: &[CurrentTokenV2Metadata],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send + 'static>,
     Option<&'static str>,
 ) {
     use schema::current_token_v2_metadata::dsl::*;

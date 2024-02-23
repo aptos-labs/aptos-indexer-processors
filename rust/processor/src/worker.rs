@@ -3,7 +3,7 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    db_writer::AnyGeneratesQuery,
+    db_writer::DbExecutable,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -69,7 +69,7 @@ pub struct Worker {
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
     pub db_writer: crate::db_writer::DbWriter,
-    pub query_receiver: kanal::AsyncReceiver<Box<dyn AnyGeneratesQuery>>,
+    pub query_receiver: kanal::AsyncReceiver<Box<dyn DbExecutable>>,
 }
 
 impl Worker {
@@ -112,7 +112,7 @@ impl Worker {
         let number_concurrent_processing_tasks = number_concurrent_processing_tasks.unwrap_or(10);
 
         let (query_sender, query_receiver) =
-            kanal::bounded_async::<Box<dyn AnyGeneratesQuery>>(query_executor_channel_size);
+            kanal::bounded_async::<Box<dyn DbExecutable>>(query_executor_channel_size);
         let db_writer = crate::db_writer::DbWriter::new(conn_pool.clone(), query_sender);
         Ok(Self {
             db_writer,

@@ -78,12 +78,14 @@ async fn insert_to_db(
 
     let query_sender = db_writer.query_sender.clone();
     let io = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_objects_query,
         objects,
         get_config_table_chunk_size::<Object>("objects", per_table_chunk_sizes),
     );
     let co = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_current_objects_query,
         current_objects,
@@ -143,7 +145,8 @@ fn insert_current_objects_query(
                     inserted_at.eq(excluded(inserted_at)),
                     is_token.eq(excluded(is_token)),
                     is_fungible_asset.eq(excluded(is_fungible_asset)),
-                )),
+                ))
+                .target,
         ),
         Some(
             " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
@@ -248,13 +251,13 @@ impl ProcessorTrait for ObjectsProcessor {
                             index,
                             &object_metadata_helper,
                         )
-                        .unwrap()
+                            .unwrap()
                         {
                             all_objects.push(object.clone());
                             all_current_objects
                                 .insert(object.object_address.clone(), current_object.clone());
                         }
-                    },
+                    }
                     Change::DeleteResource(inner) => {
                         // Passing all_current_objects into the function so that we can get the owner of the deleted
                         // resource if it was handled in the same batch
@@ -265,15 +268,15 @@ impl ProcessorTrait for ObjectsProcessor {
                             &all_current_objects,
                             &mut conn,
                         )
-                        .await
-                        .unwrap()
+                            .await
+                            .unwrap()
                         {
                             all_objects.push(object.clone());
                             all_current_objects
                                 .insert(object.object_address.clone(), current_object.clone());
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 };
             }
         }
@@ -295,7 +298,7 @@ impl ProcessorTrait for ObjectsProcessor {
             (all_objects, all_current_objects),
             &self.per_table_chunk_sizes,
         )
-        .await;
+            .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         match tx_result {
@@ -315,7 +318,7 @@ impl ProcessorTrait for ObjectsProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 

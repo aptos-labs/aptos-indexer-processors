@@ -101,6 +101,7 @@ async fn insert_to_db(
     );
     let query_sender = db_writer.query_sender.clone();
     let cal = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
@@ -110,12 +111,14 @@ async fn insert_to_db(
         ),
     );
     let al = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_ans_lookups_query,
         ans_lookups,
         get_config_table_chunk_size::<AnsLookup>("ans_lookup", per_table_chunk_sizes),
     );
     let capn = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
@@ -125,12 +128,14 @@ async fn insert_to_db(
         ),
     );
     let apn = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
         get_config_table_chunk_size::<AnsPrimaryName>("ans_primary_name", per_table_chunk_sizes),
     );
     let cal_v2 = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
@@ -140,12 +145,14 @@ async fn insert_to_db(
         ),
     );
     let al_v2 = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
         get_config_table_chunk_size::<AnsLookupV2>("ans_lookup_v2", per_table_chunk_sizes),
     );
     let capn_v2 = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
@@ -155,6 +162,7 @@ async fn insert_to_db(
         ),
     );
     let apn_v2 = execute_in_chunks(
+&"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,

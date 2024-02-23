@@ -69,6 +69,7 @@ async fn insert_to_db(
 
     let query_sender = db_writer.query_sender.clone();
     let ut = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_user_transactions_query,
         user_transactions,
@@ -78,6 +79,7 @@ async fn insert_to_db(
         ),
     );
     let is = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_signatures_query,
         signatures,
@@ -91,7 +93,7 @@ async fn insert_to_db(
 fn insert_user_transactions_query(
     items_to_insert: &[UserTransactionModel],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::user_transactions::dsl::*;
@@ -113,7 +115,7 @@ fn insert_user_transactions_query(
 fn insert_signatures_query(
     items_to_insert: &[Signature],
 ) -> (
-    Box<(dyn QueryFragment<Pg> + std::marker::Send + 'static)>,
+    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
     Option<&'static str>,
 ) {
     use schema::signatures::dsl::*;
@@ -165,7 +167,7 @@ impl ProcessorTrait for UserTransactionProcessor {
                         "Transaction data doesn't exist"
                     );
                     continue;
-                },
+                }
             };
             if let TxnData::User(inner) = txn_data {
                 let (user_transaction, sigs) = UserTransactionModel::from_transaction(
@@ -192,7 +194,7 @@ impl ProcessorTrait for UserTransactionProcessor {
             signatures,
             &self.per_table_chunk_sizes,
         )
-        .await;
+            .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
@@ -211,7 +213,7 @@ impl ProcessorTrait for UserTransactionProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 

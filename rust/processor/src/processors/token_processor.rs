@@ -99,30 +99,35 @@ async fn insert_to_db(
     );
     let query_sender = db_writer.query_sender.clone();
     let t = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_tokens_query,
         tokens,
         get_config_table_chunk_size::<Token>("tokens", per_table_chunk_sizes),
     );
     let to = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_token_ownerships_query,
         token_ownerships,
         get_config_table_chunk_size::<TokenOwnership>("token_ownerships", per_table_chunk_sizes),
     );
     let td = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_token_datas_query,
         token_datas,
         get_config_table_chunk_size::<TokenData>("token_datas", per_table_chunk_sizes),
     );
     let cd = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_collection_datas_query,
         collection_datas,
         get_config_table_chunk_size::<CollectionData>("collection_datas", per_table_chunk_sizes),
     );
     let cto = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_token_ownerships_query,
         current_token_ownerships,
@@ -132,6 +137,7 @@ async fn insert_to_db(
         ),
     );
     let ctd = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_token_datas_query,
         current_token_datas,
@@ -141,6 +147,7 @@ async fn insert_to_db(
         ),
     );
     let ccd = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_collection_datas_query,
         current_collection_datas,
@@ -150,12 +157,14 @@ async fn insert_to_db(
         ),
     );
     let ta = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_token_activities_query,
         token_activities,
         get_config_table_chunk_size::<TokenActivity>("token_activities", per_table_chunk_sizes),
     );
     let ctc = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_token_claims_query,
         current_token_claims,
@@ -165,6 +174,7 @@ async fn insert_to_db(
         ),
     );
     let np = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_nft_points_query,
         nft_points,
@@ -578,7 +588,7 @@ impl ProcessorTrait for TokenProcessor {
             all_nft_points,
             &self.per_table_chunk_sizes,
         )
-        .await;
+            .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
@@ -598,7 +608,7 @@ impl ProcessorTrait for TokenProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 

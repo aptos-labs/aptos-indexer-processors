@@ -89,6 +89,7 @@ async fn insert_to_db(
 
     let query_sender = db_writer.query_sender.clone();
     let cspv = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_stake_pool_voter_query,
         current_stake_pool_voters,
@@ -98,12 +99,14 @@ async fn insert_to_db(
         ),
     );
     let pv = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_proposal_votes_query,
         proposal_votes,
         get_config_table_chunk_size::<ProposalVote>("proposal_votes", per_table_chunk_sizes),
     );
     let da = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_delegator_activities_query,
         delegator_actvities,
@@ -113,6 +116,7 @@ async fn insert_to_db(
         ),
     );
     let db = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_delegator_balances_query,
         delegator_balances,
@@ -122,6 +126,7 @@ async fn insert_to_db(
         ),
     );
     let cdb = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_delegator_balances_query,
         current_delegator_balances,
@@ -131,6 +136,7 @@ async fn insert_to_db(
         ),
     );
     let dp = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_delegator_pools_query,
         delegator_pools,
@@ -140,6 +146,7 @@ async fn insert_to_db(
         ),
     );
     let dpb = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_delegator_pool_balances_query,
         delegator_pool_balances,
@@ -149,6 +156,7 @@ async fn insert_to_db(
         ),
     );
     let cdpb = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_delegator_pool_balances_query,
         current_delegator_pool_balances,
@@ -158,6 +166,7 @@ async fn insert_to_db(
         ),
     );
     let cdv = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_current_delegated_voter_query,
         current_delegated_voter,
@@ -465,7 +474,7 @@ impl ProcessorTrait for StakeProcessor {
                             write_resource,
                             txn_version,
                         )
-                        .unwrap()
+                            .unwrap()
                     {
                         active_pool_to_staking_pool.extend(map);
                     }
@@ -479,8 +488,8 @@ impl ProcessorTrait for StakeProcessor {
                     &active_pool_to_staking_pool,
                     &mut conn,
                 )
-                .await
-                .unwrap();
+                    .await
+                    .unwrap();
             all_delegator_balances.append(&mut delegator_balances);
             all_current_delegator_balances.extend(current_delegator_balances);
 
@@ -494,8 +503,8 @@ impl ProcessorTrait for StakeProcessor {
                         &all_vote_delegation_handle_to_pool_address,
                         &mut conn,
                     )
-                    .await
-                    .unwrap();
+                        .await
+                        .unwrap();
 
                     all_current_delegated_voter.extend(voter_map);
                 }
@@ -513,8 +522,8 @@ impl ProcessorTrait for StakeProcessor {
                             &all_current_delegated_voter,
                             &mut conn,
                         )
-                        .await
-                        .unwrap()
+                            .await
+                            .unwrap()
                     {
                         all_current_delegated_voter.insert(voter.pk(), voter);
                     }
@@ -573,7 +582,7 @@ impl ProcessorTrait for StakeProcessor {
             all_current_delegated_voter,
             &self.per_table_chunk_sizes,
         )
-        .await;
+            .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
@@ -592,7 +601,7 @@ impl ProcessorTrait for StakeProcessor {
                 "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 

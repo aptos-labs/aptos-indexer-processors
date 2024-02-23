@@ -80,24 +80,28 @@ async fn insert_to_db(
 
     let query_sender = db_writer.query_sender.clone();
     let ca = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_coin_activities_query,
         coin_activities,
         get_config_table_chunk_size::<CoinActivity>("coin_activities", per_table_chunk_sizes),
     );
     let ci = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_coin_infos_query,
         coin_infos,
         get_config_table_chunk_size::<CoinInfo>("coin_infos", per_table_chunk_sizes),
     );
     let cb = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_coin_balances_query,
         coin_balances,
         get_config_table_chunk_size::<CoinBalance>("coin_balances", per_table_chunk_sizes),
     );
     let ccb = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_coin_balances_query,
         current_coin_balances,
@@ -108,6 +112,7 @@ async fn insert_to_db(
     );
 
     let cs = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         inset_coin_supply_query,
         coin_supply,
@@ -305,8 +310,8 @@ impl ProcessorTrait for CoinProcessor {
                 all_coin_supply,
             )
         })
-        .await
-        .context("spawn_blocking for CoinProcessor thread failed")?;
+            .await
+            .context("spawn_blocking for CoinProcessor thread failed")?;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -323,7 +328,7 @@ impl ProcessorTrait for CoinProcessor {
             all_coin_supply,
             &self.per_table_chunk_sizes,
         )
-        .await;
+            .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
@@ -344,7 +349,7 @@ impl ProcessorTrait for CoinProcessor {
                     err
                 );
                 bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
-            },
+            }
         }
     }
 

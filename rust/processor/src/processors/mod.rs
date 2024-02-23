@@ -37,7 +37,7 @@ use self::{
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
-    db_writer::AnyGeneratesQuery,
+    db_writer::DbExecutable,
     models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
@@ -86,7 +86,7 @@ pub trait ProcessorTrait: Send + Sync {
     }
 
     /// Gets a query executor sender
-    fn query_sender(&self) -> kanal::AsyncSender<Box<dyn AnyGeneratesQuery>> {
+    fn query_sender(&self) -> kanal::AsyncSender<Box<dyn DbExecutable>> {
         self.db_writer().query_sender.clone()
     }
 

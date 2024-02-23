@@ -82,12 +82,14 @@ async fn insert_to_db(
 
     let query_sender = db_writer.query_sender.clone();
     let txns_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_transactions_query,
         txns,
         get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
     );
     let bmt_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
@@ -97,6 +99,7 @@ async fn insert_to_db(
         ),
     );
     let wst_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_write_set_changes_query,
         wscs,
@@ -106,6 +109,7 @@ async fn insert_to_db(
         ),
     );
     let mm_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_move_modules_query,
         move_modules,
@@ -113,6 +117,7 @@ async fn insert_to_db(
     );
 
     let mr_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_move_resources_query,
         move_resources,
@@ -120,6 +125,7 @@ async fn insert_to_db(
     );
 
     let ti_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_table_items_query,
         table_items,
@@ -127,6 +133,7 @@ async fn insert_to_db(
     );
 
     let cti_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender.clone(),
         insert_current_table_items_query,
         current_table_items,
@@ -137,6 +144,7 @@ async fn insert_to_db(
     );
 
     let tm_res = execute_in_chunks(
+        &"TABLE_NAME_PLACEHOLDER",
         query_sender,
         insert_table_metadata_query,
         table_metadata,
@@ -349,7 +357,7 @@ impl ProcessorTrait for DefaultProcessor {
                     WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
                     WriteSetChangeDetail::Resource(resource) => {
                         move_resources.push(resource.clone())
-                    },
+                    }
                     WriteSetChangeDetail::Table(item, current_item, metadata) => {
                         table_items.push(item.clone());
                         current_table_items.insert(
@@ -362,7 +370,7 @@ impl ProcessorTrait for DefaultProcessor {
                         if let Some(meta) = metadata {
                             table_metadata.insert(meta.handle.clone(), meta.clone());
                         }
-                    },
+                    }
                 }
             }
 
@@ -390,8 +398,8 @@ impl ProcessorTrait for DefaultProcessor {
                 ),
             )
         })
-        .await
-        .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
+            .await
+            .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -413,7 +421,7 @@ impl ProcessorTrait for DefaultProcessor {
             ),
             &self.per_table_chunk_sizes,
         )
-        .await;
+            .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
@@ -433,7 +441,7 @@ impl ProcessorTrait for DefaultProcessor {
                     "[Parser] Error inserting transactions to db",
                 );
                 bail!(e)
-            },
+            }
         }
     }
 
