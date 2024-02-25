@@ -9,11 +9,6 @@ services:
     volumes:
       - ./config.yaml:/config.yaml
     command: -c ./config.yaml
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
     restart: always
     logging:
       driver: "json-file"
