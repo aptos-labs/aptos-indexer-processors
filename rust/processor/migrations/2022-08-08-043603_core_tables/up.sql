@@ -215,9 +215,9 @@ CREATE TABLE events (
   "from" VARCHAR(100),
   entry_function_id_str VARCHAR,
   entry_function_payload jsonb,
-  c_type_1 VARCHAR(300),
-  c_type_2 VARCHAR(300),
-  c_type_3 VARCHAR(300),
+  module_address VARCHAR(300),
+  module_name VARCHAR(300),
+  event_name VARCHAR(300),
   data jsonb NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
@@ -232,9 +232,9 @@ CREATE INDEX ev_addr_type_index ON events (account_address);
 CREATE INDEX ev_insat_index ON events (inserted_at);
 CREATE INDEX ev_from_index ON events ("from");
 CREATE INDEX ev_entry_function_id_str_index ON events (entry_function_id_str);
-CREATE INDEX ev_c_type_1_index ON events (c_type_1);
-CREATE INDEX ev_c_type_2_index ON events (c_type_2);
-CREATE INDEX ev_c_type_3_index ON events (c_type_3);
+CREATE INDEX ev_module_address_index ON events (module_address);
+CREATE INDEX ev_module_name_index ON events (module_name);
+CREATE INDEX ev_event_name_index ON events (event_name);
 
 
 -- write set changes

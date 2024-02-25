@@ -709,9 +709,9 @@ diesel::table! {
         from -> Varchar,
         entry_function_id_str -> Varchar,
         entry_function_payload -> Jsonb,
-        c_type_1 -> Varchar,
-        c_type_2 -> Varchar,
-        c_type_3 -> Varchar,
+        module_address -> Varchar,
+        module_name -> Varchar,
+        event_name -> Varchar,
     }
 }
 

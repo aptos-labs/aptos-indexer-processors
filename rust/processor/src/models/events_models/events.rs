@@ -30,9 +30,9 @@ pub struct Event {
     pub from: String,
     pub entry_function_payload: serde_json::Value,
     pub entry_function_id_str: String,
-    pub c_type_1: String,
-    pub c_type_2: String,
-    pub c_type_3: String,
+    pub module_address: String,
+    pub module_name: String,
+    pub event_name: String,
 }
 
 impl Event {
@@ -79,9 +79,9 @@ impl Event {
                 from: from.to_string(),
                 entry_function_payload: entry_function_payload_json.unwrap_or_default(),
                 entry_function_id_str: entry_function_id_str.to_string(),
-                c_type_1: t.split("::").next().unwrap().to_string(),
-                c_type_2: t.split("::").nth(1).unwrap().to_string(),
-                c_type_3: t.split("::").nth(2).unwrap_or("").to_string(),
+                module_address: t.split("::").next().unwrap().to_string(),
+                module_name: t.split("::").nth(1).unwrap().to_string(),
+                event_name: t.split("::").nth(2).unwrap_or("").to_string(),
             }
         }
         else {
@@ -100,9 +100,9 @@ impl Event {
                 from: "".to_string(),
                 entry_function_payload: serde_json::Value::Null,
                 entry_function_id_str: "".to_string(),
-                c_type_1: t.split("::").next().unwrap().to_string(),
-                c_type_2: t.split("::").nth(1).unwrap().to_string(),
-                c_type_3: t.split("::").nth(2).unwrap_or("").to_string(),
+                module_address: t.split("::").next().unwrap().to_string(),
+                module_name: t.split("::").nth(1).unwrap().to_string(),
+                event_name: t.split("::").nth(2).unwrap_or("").to_string(),
             }
         }
     }
