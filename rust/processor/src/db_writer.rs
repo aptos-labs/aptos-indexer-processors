@@ -30,7 +30,7 @@ pub type QueryGeneratorFn<
 pub struct QueryGenerator<'a, Query, Item>
     where
         Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a,
 {
     pub build_query_fn: QueryGeneratorFn<'a, Query, Item>,
     pub items: Vec<Item>,
@@ -40,7 +40,7 @@ pub struct QueryGenerator<'a, Query, Item>
 impl<'a, Query, Item> QueryGenerator<'a, Query, Item>
     where
         Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a,
 {
     pub fn new(
         table_name: &'static str,
@@ -73,44 +73,47 @@ impl<'a, Query, Item> QueryGenerator<'a, Query, Item>
 
 #[async_trait::async_trait]
 pub trait DbExecutable: Send + Sync {
-    async fn execute_query(self, conn: PgDbPool) -> QueryResult<usize>;
+    async fn execute_query(self: Box<Self>, conn: PgDbPool) -> QueryResult<usize>;
 }
 
 #[async_trait::async_trait]
 impl<'a, Query, Item> DbExecutable for QueryGenerator<'a, Query, Item>
     where
         Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a,
 {
-    async fn execute_query(self, conn: PgDbPool) -> QueryResult<usize> {
-        let conn = &mut conn.get().await.map_err(|e| {
-            tracing::warn!("Error getting connection from pool: {:?}", e);
-            diesel::result::Error::DatabaseError(
-                diesel::result::DatabaseErrorKind::UnableToSendCommand,
-                Box::new(e.to_string()),
-            )
-        })?;
-
+    async fn execute_query(self: Box<Self>, conn: PgDbPool) -> QueryResult<usize> {
         let Self {
             build_query_fn,
             items,
             ..
-        } = self;
+        } = *self;
+        async move {
+            let conn = &mut conn.get().await.map_err(|e| {
+                tracing::warn!("Error getting connection from pool: {:?}", e);
+                diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UnableToSendCommand,
+                    Box::new(e.to_string()),
+                )
+            })?;
 
-        let res;
-        let debug_string;
-        let items = items.clone();
-        let (query, _) = (build_query_fn)(&items);
-        debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
-        tracing::debug!("Executing query: {:?}", debug_string);
-        res = query.execute(conn).await;
-        if let Err(ref e) = res {
-            tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
+            let res;
+            let debug_string;
+
+            let items = Arc::new(items);
+            let (query, _) = (build_query_fn)(&items);
+            debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+            tracing::debug!("Executing query: {:?}", debug_string);
+            {
+                res = query.execute(conn).await;
+                if let Err(ref e) = res {
+                    tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
+                }
+            }
+            drop(res);
+            Ok(0)
         }
-        drop(res);
-        Ok(0)
-        // TODO: retry
-        // TODO: handle the cleaning!!!
+            .await
     }
 }
 
@@ -155,6 +158,7 @@ pub fn launch_db_writer_task(
     conn: PgDbPool,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let query_receiver = query_receiver.clone();
         loop {
             match query_receiver.recv().await {
                 Ok(query_generator) => {
@@ -184,7 +188,7 @@ pub async fn execute_in_chunks<'a, Query, Item>(
 ) where
     Query:
     QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a + 'static,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a + 'static,
 {
     let chunks = get_chunks(items_to_insert.len(), chunk_size);
     for (start_ind, end_ind) in chunks {

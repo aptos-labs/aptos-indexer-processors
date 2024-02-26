@@ -90,10 +90,10 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_user_transactions_query(
-    items_to_insert: &[UserTransactionModel],
+fn insert_user_transactions_query<'a>(
+    items_to_insert: &'a [UserTransactionModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + 'a,
     Option<&'static str>,
 ) {
     use schema::user_transactions::dsl::*;
@@ -110,10 +110,10 @@ fn insert_user_transactions_query(
     )
 }
 
-fn insert_signatures_query(
-    items_to_insert: &[Signature],
+fn insert_signatures_query<'a>(
+    items_to_insert: &'a [Signature],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + 'a,
     Option<&'static str>,
 ) {
     use schema::signatures::dsl::*;
