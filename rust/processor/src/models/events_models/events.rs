@@ -49,6 +49,10 @@ impl Event {
             Some(r) => r.payload.as_ref(),
             None => None,
         };
+        let parts: Vec<&str> = t.split("::").collect();
+        let event_name = parts.get(2).unwrap_or(&"");
+        let event_name = event_name.split("<").next().unwrap_or("");
+
         if request_data.is_some(){
             let entry_function_payload_json = match request_data.unwrap().payload.as_ref().unwrap() {
                 aptos_protos::transaction::v1::transaction_payload::Payload::EntryFunctionPayload(entry_function_payload) => {
@@ -81,7 +85,7 @@ impl Event {
                 entry_function_id_str: entry_function_id_str.to_string(),
                 module_address: t.split("::").next().unwrap().to_string(),
                 module_name: t.split("::").nth(1).unwrap().to_string(),
-                event_name: t.split("::").nth(2).unwrap_or("").to_string(),
+                event_name: event_name.to_string(),
             }
         }
         else {
@@ -102,7 +106,7 @@ impl Event {
                 entry_function_id_str: "".to_string(),
                 module_address: t.split("::").next().unwrap().to_string(),
                 module_name: t.split("::").nth(1).unwrap().to_string(),
-                event_name: t.split("::").nth(2).unwrap_or("").to_string(),
+                event_name: event_name.to_string(),
             }
         }
     }
