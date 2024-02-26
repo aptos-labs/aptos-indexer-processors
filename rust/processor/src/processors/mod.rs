@@ -7,35 +7,9 @@
 // Note: For enum_dispatch to work nicely, it is easiest to have the trait and the enum
 // in the same file (ProcessorTrait and Processor).
 
-pub mod account_transactions_processor;
-pub mod ans_processor;
-pub mod coin_processor;
-pub mod default_processor;
-pub mod events_processor;
-pub mod fungible_asset_processor;
-pub mod monitoring_processor;
-pub mod nft_metadata_processor;
-pub mod objects_processor;
-pub mod stake_processor;
-pub mod token_processor;
-pub mod token_v2_processor;
 pub mod user_transaction_processor;
 
-use self::{
-    account_transactions_processor::AccountTransactionsProcessor,
-    ans_processor::{AnsProcessor, AnsProcessorConfig},
-    coin_processor::CoinProcessor,
-    default_processor::DefaultProcessor,
-    events_processor::EventsProcessor,
-    fungible_asset_processor::FungibleAssetProcessor,
-    monitoring_processor::MonitoringProcessor,
-    nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
-    objects_processor::ObjectsProcessor,
-    stake_processor::StakeProcessor,
-    token_processor::{TokenProcessor, TokenProcessorConfig},
-    token_v2_processor::TokenV2Processor,
-    user_transaction_processor::UserTransactionProcessor,
-};
+use self::user_transaction_processor::UserTransactionProcessor;
 use crate::{
     db_writer::DbExecutable,
     models::processor_status::ProcessorStatus,
@@ -186,18 +160,6 @@ pub trait ProcessorTrait: Send + Sync {
     strum(serialize_all = "snake_case")
 )]
 pub enum ProcessorConfig {
-    AccountTransactionsProcessor,
-    AnsProcessor(AnsProcessorConfig),
-    CoinProcessor,
-    DefaultProcessor,
-    EventsProcessor,
-    FungibleAssetProcessor,
-    MonitoringProcessor,
-    NftMetadataProcessor(NftMetadataProcessorConfig),
-    ObjectsProcessor,
-    StakeProcessor,
-    TokenProcessor(TokenProcessorConfig),
-    TokenV2Processor,
     UserTransactionProcessor,
 }
 
@@ -227,18 +189,6 @@ impl ProcessorConfig {
     )
 )]
 pub enum Processor {
-    AccountTransactionsProcessor,
-    AnsProcessor,
-    CoinProcessor,
-    DefaultProcessor,
-    EventsProcessor,
-    FungibleAssetProcessor,
-    MonitoringProcessor,
-    NftMetadataProcessor,
-    ObjectsProcessor,
-    StakeProcessor,
-    TokenProcessor,
-    TokenV2Processor,
     UserTransactionProcessor,
 }
 

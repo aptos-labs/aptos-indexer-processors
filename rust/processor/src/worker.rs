@@ -6,12 +6,6 @@ use crate::{
     db_writer::DbExecutable,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
-        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
-        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
-        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
     },
@@ -658,49 +652,9 @@ pub fn build_processor(
     db_writer: crate::db_writer::DbWriter,
 ) -> Processor {
     match config {
-        ProcessorConfig::AccountTransactionsProcessor => Processor::from(
-            AccountTransactionsProcessor::new(db_writer, per_table_chunk_sizes),
-        ),
-        ProcessorConfig::AnsProcessor(config) => Processor::from(AnsProcessor::new(
-            db_writer,
-            per_table_chunk_sizes,
-            config.clone(),
-        )),
-        ProcessorConfig::CoinProcessor => {
-            Processor::from(CoinProcessor::new(db_writer, per_table_chunk_sizes))
-        },
-        ProcessorConfig::DefaultProcessor => {
-            Processor::from(DefaultProcessor::new(db_writer, per_table_chunk_sizes))
-        },
-        ProcessorConfig::EventsProcessor => {
-            Processor::from(EventsProcessor::new(db_writer, per_table_chunk_sizes))
-        },
-        ProcessorConfig::FungibleAssetProcessor => Processor::from(FungibleAssetProcessor::new(
-            db_writer,
-            per_table_chunk_sizes,
-        )),
-        ProcessorConfig::MonitoringProcessor => {
-            Processor::from(MonitoringProcessor::new(db_writer))
-        },
-        ProcessorConfig::NftMetadataProcessor(config) => {
-            Processor::from(NftMetadataProcessor::new(db_writer, config.clone()))
-        },
-        ProcessorConfig::ObjectsProcessor => {
-            Processor::from(ObjectsProcessor::new(db_writer, per_table_chunk_sizes))
-        },
-        ProcessorConfig::StakeProcessor => {
-            Processor::from(StakeProcessor::new(db_writer, per_table_chunk_sizes))
-        },
-        ProcessorConfig::TokenProcessor(config) => Processor::from(TokenProcessor::new(
-            db_writer,
-            per_table_chunk_sizes,
-            config.clone(),
-        )),
-        ProcessorConfig::TokenV2Processor => {
-            Processor::from(TokenV2Processor::new(db_writer, per_table_chunk_sizes))
-        },
         ProcessorConfig::UserTransactionProcessor => Processor::from(
             UserTransactionProcessor::new(db_writer, per_table_chunk_sizes),
         ),
+        _ => unreachable!("Processor not implemented"),
     }
 }

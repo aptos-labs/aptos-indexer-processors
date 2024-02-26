@@ -69,10 +69,12 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.gap_detection_batch_size,
             self.pb_channel_txn_chunk_size,
             self.per_table_chunk_sizes.clone(),
+            10,
+            10,
             self.enable_verbose_logging,
         )
-        .await
-        .context("Failed to build worker")?;
+            .await
+            .context("Failed to build worker")?;
         worker.run().await;
         Ok(())
     }

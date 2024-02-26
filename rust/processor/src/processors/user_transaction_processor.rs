@@ -93,21 +93,19 @@ async fn insert_to_db(
 fn insert_user_transactions_query(
     items_to_insert: &[UserTransactionModel],
 ) -> (
-    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send,
     Option<&'static str>,
 ) {
     use schema::user_transactions::dsl::*;
     (
-        Box::new(
-            diesel::insert_into(schema::user_transactions::table)
-                .values(items_to_insert)
-                .on_conflict(version)
-                .do_update()
-                .set((
-                    expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-        ),
+        diesel::insert_into(schema::user_transactions::table)
+            .values(items_to_insert)
+            .on_conflict(version)
+            .do_update()
+            .set((
+                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
         None,
     )
 }
@@ -115,22 +113,20 @@ fn insert_user_transactions_query(
 fn insert_signatures_query(
     items_to_insert: &[Signature],
 ) -> (
-    Box<impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send>,
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send,
     Option<&'static str>,
 ) {
     use schema::signatures::dsl::*;
     (
-        Box::new(
-            diesel::insert_into(schema::signatures::table)
-                .values(items_to_insert)
-                .on_conflict((
-                    transaction_version,
-                    multi_agent_index,
-                    multi_sig_index,
-                    is_sender_primary,
-                ))
-                .do_nothing(),
-        ),
+        diesel::insert_into(schema::signatures::table)
+            .values(items_to_insert)
+            .on_conflict((
+                transaction_version,
+                multi_agent_index,
+                multi_sig_index,
+                is_sender_primary,
+            ))
+            .do_nothing(),
         None,
     )
 }
