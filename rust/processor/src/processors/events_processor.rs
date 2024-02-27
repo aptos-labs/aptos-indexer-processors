@@ -119,12 +119,17 @@ impl ProcessorTrait for EventsProcessor {
                 _ => &default,
             };
             let request_default = None;
-            let request =  match txn_data {
+            let tnx_user_request =  match txn_data {
                 TxnData::User(tx_inner) => &tx_inner.request,
                 _ => &request_default,
             };
+            //  If request is None, it means that the transaction is not a user transaction, skip
+            if tnx_user_request.is_none() {
+                continue;
+            }
+            let inserted_at = txn.timestamp.clone();
 
-            let txn_events = EventModel::from_events(raw_events, txn_version, block_height, request);
+            let txn_events = EventModel::from_events(raw_events, txn_version, block_height, tnx_user_request, &inserted_at);
             // println!("{:?}", txn_events);
             events.extend(txn_events);
         }

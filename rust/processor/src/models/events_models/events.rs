@@ -8,6 +8,8 @@ use crate::{
     utils::util::{standardize_address, truncate_str},
 };
 use aptos_protos::transaction::v1::{Event as EventPB, UserTransactionRequest};
+use aptos_protos::util::timestamp::Timestamp;
+use chrono::NaiveDateTime;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -33,15 +35,27 @@ pub struct Event {
     pub module_address: String,
     pub module_name: String,
     pub event_name: String,
+    pub inserted_at: chrono::NaiveDateTime,
 }
-
+fn timestamp_to_naive(t: &Option<Timestamp>) -> NaiveDateTime {
+    match t {
+        Some(timestamp) => {
+            let seconds = timestamp.seconds;
+            let nanos = timestamp.nanos; // this is in billionths of a second
+            let naive = NaiveDateTime::from_timestamp(seconds, nanos as u32);
+            naive
+        },
+        None => NaiveDateTime::from_timestamp(0, 0), // or any other default value
+    }
+}
 impl Event {
     pub fn from_event(
         event: &EventPB,
         transaction_version: i64,
         transaction_block_height: i64,
         event_index: i64,
-        request: &Option<UserTransactionRequest>
+        request: &Option<UserTransactionRequest>,
+        inserted_at: &Option<Timestamp>
     ) -> Self {
         let t: &str = event.type_str.as_ref();
         // GET request OR none
@@ -86,6 +100,7 @@ impl Event {
                 module_address: t.split("::").next().unwrap().to_string(),
                 module_name: t.split("::").nth(1).unwrap().to_string(),
                 event_name: event_name.to_string(),
+                inserted_at: timestamp_to_naive(inserted_at)
             }
         }
         else {
@@ -107,6 +122,7 @@ impl Event {
                 module_address: t.split("::").next().unwrap().to_string(),
                 module_name: t.split("::").nth(1).unwrap().to_string(),
                 event_name: event_name.to_string(),
+                inserted_at: timestamp_to_naive(inserted_at)
             }
         }
     }
@@ -115,7 +131,8 @@ impl Event {
         events: &[EventPB],
         transaction_version: i64,
         transaction_block_height: i64,
-        request: &Option<UserTransactionRequest>
+        request: &Option<UserTransactionRequest>,
+        inserted_at: &Option<Timestamp>
     ) -> Vec<Self> {
         events
             .iter()
@@ -127,6 +144,7 @@ impl Event {
                     transaction_block_height,
                     index as i64,
                     request,
+                    inserted_at
                 )
             })
             .collect::<Vec<EventModel>>()
