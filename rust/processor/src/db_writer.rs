@@ -79,9 +79,11 @@ impl<'a, Query, Item> DbExecutable for QueryGenerator<'a, Query, Item>
             ..
         } = *self;
 
-        let items_ref: &'a [Item] = &items;
+        //let items_ref: &'a [Item] = &items;
+        let items_ref = unsafe { std::mem::transmute::<&[Item], &'a [Item]>(&items) };
         let (query, _) = (build_query_fn)(items_ref);
         drop(query);
+        drop(items);
         Ok(0)
     }
 }
