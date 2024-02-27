@@ -109,17 +109,22 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let cfab = execute_in_chunks(
-        conn,
-        insert_current_fungible_asset_balances_query,
-        current_fungible_asset_balances,
-        get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
-            "current_fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
-    for res in [faa_res, fam_res, fab_res, cfab_res] {
+    // let cfab = execute_in_chunks(
+    //     conn,
+    //     insert_current_fungible_asset_balances_query,
+    //     current_fungible_asset_balances,
+    //     get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
+    //         "current_fungible_asset_balances",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
+    // for res in [faa_res, fam_res, fab_res, cfab_res] {
+    //     res?;
+    // }
+
+    let (faa_res, fam_res, fab_res) = tokio::join!(faa, fam, fab);
+    for res in [faa_res, fam_res, fab_res] {
         res?;
     }
 
