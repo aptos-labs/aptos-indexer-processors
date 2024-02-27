@@ -121,15 +121,15 @@ async fn insert_to_db(
         get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
     );
 
-    // let cti_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_current_table_items_query,
-    //     current_table_items,
-    //     get_config_table_chunk_size::<CurrentTableItem>(
-    //         "current_table_items",
-    //         per_table_chunk_sizes,
-    //     ),
-    // );
+    let cti_res = execute_in_chunks(
+        conn.clone(),
+        insert_current_table_items_query,
+        current_table_items,
+        get_config_table_chunk_size::<CurrentTableItem>(
+            "current_table_items",
+            per_table_chunk_sizes,
+        ),
+    );
 
     let tm_res = execute_in_chunks(
         conn.clone(),
@@ -138,19 +138,12 @@ async fn insert_to_db(
         get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
     );
 
-    // let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
-    //     join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
+    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
+        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
 
-    // for res in [
-    //     txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-    // ] {
-    //     res?;
-    // }
-
-    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, tm_res) =
-        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, tm_res);
-
-    for res in [txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, tm_res] {
+    for res in [
+        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
+    ] {
         res?;
     }
 
