@@ -108,6 +108,17 @@ impl Worker {
         let (query_sender, query_receiver) =
             kanal::bounded_async::<Box<dyn DbExecutable>>(query_executor_channel_size);
         let db_writer = crate::db_writer::DbWriter::new(conn_pool.clone(), query_sender);
+
+        let query_receiver_clone = query_receiver.clone();
+        tokio::spawn(async move {
+            crate::db_writer::launch_db_writer_tasks(
+                query_receiver_clone,
+                processor_name,
+                10,
+                conn_pool,
+            )
+                .await;
+        });
         Ok(Self {
             db_writer,
             processor_config,
@@ -184,7 +195,7 @@ impl Worker {
             self.auth_token.clone(),
             processor_name.to_string(),
         )
-        .await;
+            .await;
         self.check_or_update_chain_id(chain_id as i64)
             .await
             .unwrap();
@@ -225,7 +236,7 @@ impl Worker {
                 processor_name.to_string(),
                 pb_channel_txn_chunk_size,
             )
-            .await
+                .await
         });
 
         // Create a gap detector task that will panic if there is a gap in the processing
@@ -244,7 +255,7 @@ impl Worker {
                 starting_version,
                 gap_detection_batch_size,
             )
-            .await;
+                .await;
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -323,7 +334,7 @@ impl Worker {
                     receiver_clone.clone(),
                     task_index,
                 )
-                .await;
+                    .await;
 
                 let size_in_bytes = txn_pb.size_in_bytes as f64;
                 let first_txn = txn_pb.transactions.as_slice().first().unwrap();
@@ -378,7 +389,7 @@ impl Worker {
                     &auth_token,
                     false, // enable_verbose_logging
                 )
-                .await;
+                    .await;
 
                 let processing_result = match res {
                     Ok(versions) => {
@@ -386,7 +397,7 @@ impl Worker {
                             .with_label_values(&[processor_name])
                             .inc();
                         versions
-                    },
+                    }
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
@@ -402,7 +413,7 @@ impl Worker {
                             "[Parser][T#{}] Error processing '{:}' transactions: {:?}",
                             task_index, processor_name, e
                         );
-                    },
+                    }
                 };
 
                 let processing_time = processing_time.elapsed().as_secs_f64();
@@ -531,7 +542,7 @@ impl Worker {
                     "[Parser] Chain id matches! Continue to index...",
                 );
                 Ok(chain_id as u64)
-            },
+            }
             None => {
                 info!(
                     processor_name = processor_name,
@@ -547,10 +558,10 @@ impl Worker {
                         .on_conflict_do_nothing(),
                     None,
                 )
-                .await
-                .context("[Parser] Error updating chain_id!")
-                .map(|_| grpc_chain_id as u64)
-            },
+                    .await
+                    .context("[Parser] Error updating chain_id!")
+                    .map(|_| grpc_chain_id as u64)
+            }
         }
     }
 }
@@ -582,7 +593,7 @@ async fn fetch_transactions(
                 "[Parser][T#{}] Consumer thread timed out waiting for transactions",
                 task_index
             );
-        },
+        }
     }
 }
 

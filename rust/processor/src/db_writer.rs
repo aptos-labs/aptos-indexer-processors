@@ -9,30 +9,20 @@ use crate::{
     worker::PROCESSOR_SERVICE_TYPE,
 };
 use diesel::{query_builder::QueryFragment, QueryResult};
-use diesel_async::{methods::ExecuteDsl, RunQueryDsl};
+use diesel_async::RunQueryDsl;
 use kanal::{AsyncReceiver, AsyncSender};
 use tokio::task::JoinHandle;
 use tracing::info;
 
-pub type QueryGeneratorFn<
-    'a,
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-    Item: serde::Serialize
-    + for<'de> serde::Deserialize<'de>
-    + diesel::Identifiable
-    + Send
-    + Sync
-    + Clone
-    + 'static,
-> = fn(&'a [Item]) -> (Query, Option<&'static str>);
+// pub type fn(&'a [Item]) -> (Query, Option<&'static str>) = fn(&'a [Item]) -> (Query, Option<&'static str>);
 
 /// A simple holder that allows us to move query generators cross threads and avoid cloning
 pub struct QueryGenerator<'a, Query, Item>
     where
         Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
 {
-    pub build_query_fn: QueryGeneratorFn<'a, Query, Item>,
+    pub build_query_fn: fn(&'a [Item]) -> (Query, Option<&'static str>),
     pub items: Vec<Item>,
     pub table_name: &'static str,
 }
@@ -40,12 +30,12 @@ pub struct QueryGenerator<'a, Query, Item>
 impl<'a, Query, Item> QueryGenerator<'a, Query, Item>
     where
         Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
 {
     pub fn new(
         table_name: &'static str,
         items: Vec<Item>,
-        build_query_fn: QueryGeneratorFn<'a, Query, Item>,
+        build_query_fn: fn(&'a [Item]) -> (Query, Option<&'static str>),
     ) -> Self {
         Self {
             table_name,
@@ -80,7 +70,7 @@ pub trait DbExecutable: Send + Sync {
 impl<'a, Query, Item> DbExecutable for QueryGenerator<'a, Query, Item>
     where
         Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a,
+        Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
 {
     async fn execute_query(self: Box<Self>, conn: PgDbPool) -> QueryResult<usize> {
         let Self {
@@ -88,32 +78,11 @@ impl<'a, Query, Item> DbExecutable for QueryGenerator<'a, Query, Item>
             items,
             ..
         } = *self;
-        async move {
-            let conn = &mut conn.get().await.map_err(|e| {
-                tracing::warn!("Error getting connection from pool: {:?}", e);
-                diesel::result::Error::DatabaseError(
-                    diesel::result::DatabaseErrorKind::UnableToSendCommand,
-                    Box::new(e.to_string()),
-                )
-            })?;
 
-            let res;
-            let debug_string;
-
-            let items = Arc::new(items);
-            let (query, _) = (build_query_fn)(&items);
-            debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
-            tracing::debug!("Executing query: {:?}", debug_string);
-            {
-                res = query.execute(conn).await;
-                if let Err(ref e) = res {
-                    tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
-                }
-            }
-            drop(res);
-            Ok(0)
-        }
-            .await
+        let items_ref: &'a [Item] = &items;
+        let (query, _) = (build_query_fn)(items_ref);
+        drop(query);
+        Ok(0)
     }
 }
 
@@ -182,13 +151,13 @@ pub fn launch_db_writer_task(
 pub async fn execute_in_chunks<'a, Query, Item>(
     table_name: &'static str,
     query_sender: AsyncSender<Box<dyn DbExecutable>>,
-    build_query: QueryGeneratorFn<'a, Query, Item>,
+    build_query: fn(&'a [Item]) -> (Query, Option<&'static str>),
     items_to_insert: Vec<Item>,
     chunk_size: usize,
 ) where
     Query:
     QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a + 'static,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'a + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     let chunks = get_chunks(items_to_insert.len(), chunk_size);
     for (start_ind, end_ind) in chunks {
