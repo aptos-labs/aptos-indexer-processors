@@ -14,15 +14,28 @@ use kanal::{AsyncReceiver, AsyncSender};
 use tokio::task::JoinHandle;
 use tracing::info;
 
-pub struct QueryWrapper<'a> {
+pub struct BoxedQuery<'a> {
     query: Box<dyn QueryFragment<Pg> + 'a>,
 }
 
-impl<'a> QueryWrapper<'a> {
-    pub fn new(query: impl QueryFragment<Pg> + 'a) -> Self {
+impl<'a> BoxedQuery<'a> {
+    fn new(query: impl QueryFragment<Pg> + 'a) -> Self {
         Self {
             query: Box::new(query),
         }
+    }
+}
+
+pub trait BoxedQueryTrait<'a>: 'a {
+    fn boxed_query(self) -> BoxedQuery<'a>;
+}
+
+impl<'a, Query> BoxedQueryTrait<'a> for Query
+    where
+        Query: QueryFragment<Pg> + 'a,
+{
+    fn boxed_query(self) -> BoxedQuery<'a> {
+        BoxedQuery::new(self)
     }
 }
 
@@ -31,7 +44,7 @@ impl<'a> QueryWrapper<'a> {
 /// A simple holder that allows us to move query generators cross threads and avoid cloning
 pub struct QueryGenerator<Item>
 {
-    pub build_query_fn: fn(&[Item]) -> (QueryWrapper, Option<&'static str>),
+    pub build_query_fn: fn(&[Item]) -> (BoxedQuery, Option<&'static str>),
     pub items: Vec<Item>,
     pub table_name: &'static str,
 }
@@ -43,7 +56,7 @@ impl<Item> QueryGenerator<Item>
     pub fn new(
         table_name: &'static str,
         items: Vec<Item>,
-        build_query_fn: fn(&[Item]) -> (QueryWrapper, Option<&'static str>),
+        build_query_fn: fn(&[Item]) -> (BoxedQuery, Option<&'static str>),
     ) -> Self {
         Self {
             table_name,
@@ -152,7 +165,7 @@ pub fn launch_db_writer_task(
 pub async fn execute_in_chunks<Item>(
     table_name: &'static str,
     query_sender: AsyncSender<Box<dyn DbExecutable>>,
-    build_query: fn(&[Item]) -> (QueryWrapper, Option<&'static str>),
+    build_query: fn(&[Item]) -> (BoxedQuery, Option<&'static str>),
     items_to_insert: Vec<Item>,
     chunk_size: usize,
 ) where
