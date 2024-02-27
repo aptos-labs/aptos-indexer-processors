@@ -15,7 +15,7 @@ use crate::{
     },
     utils::{
         database::{PgDbPool, PgPoolConnection},
-        util::{parse_timestamp, standardize_address},
+        util::{parse_timestamp, remove_null_bytes, standardize_address},
     },
 };
 use ahash::AHashMap;
@@ -29,7 +29,7 @@ use std::{
     fmt::Debug,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tracing::info;
+use tracing::{error, info};
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -94,6 +94,10 @@ impl ProcessorTrait for NftMetadataProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
+        let db_chain_id = db_chain_id.unwrap_or_else(|| {
+            error!("[NFT Metadata Crawler] db_chain_id must not be null");
+            panic!();
+        });
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -116,15 +120,7 @@ impl ProcessorTrait for NftMetadataProcessor {
         // Publish all parsed token and collection data to Pubsub
         for token_data in token_datas {
             pubsub_messages.push(PubsubMessage {
-                data: format!(
-                    "{},{},{},{},{},false",
-                    token_data.token_data_id,
-                    token_data.token_uri,
-                    token_data.last_transaction_version,
-                    token_data.last_transaction_timestamp,
-                    db_chain_id.expect("db_chain_id must not be null"),
-                )
-                .into(),
+                data: clean_token_pubsub_message(token_data, db_chain_id).into(),
                 ordering_key: ordering_key.clone(),
                 ..Default::default()
             })
@@ -132,15 +128,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
         for collection in collections {
             pubsub_messages.push(PubsubMessage {
-                data: format!(
-                    "{},{},{},{},{},false",
-                    collection.collection_id,
-                    collection.uri,
-                    collection.last_transaction_version,
-                    collection.last_transaction_timestamp,
-                    db_chain_id.expect("db_chain_id must not be null"),
-                )
-                .into(),
+                data: clean_collection_pubsub_message(collection, db_chain_id).into(),
                 ordering_key: ordering_key.clone(),
                 ..Default::default()
             })
@@ -185,6 +173,28 @@ impl ProcessorTrait for NftMetadataProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
+}
+
+fn clean_token_pubsub_message(ctd: CurrentTokenDataV2, db_chain_id: u64) -> String {
+    remove_null_bytes(&format!(
+        "{},{},{},{},{},false",
+        ctd.token_data_id,
+        ctd.token_uri,
+        ctd.last_transaction_version,
+        ctd.last_transaction_timestamp,
+        db_chain_id,
+    ))
+}
+
+fn clean_collection_pubsub_message(cc: CurrentCollectionV2, db_chain_id: u64) -> String {
+    remove_null_bytes(&format!(
+        "{},{},{},{},{},false",
+        cc.collection_id,
+        cc.uri,
+        cc.last_transaction_version,
+        cc.last_transaction_timestamp,
+        db_chain_id,
+    ))
 }
 
 /// Copied from token_processor;
