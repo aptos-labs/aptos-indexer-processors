@@ -20,6 +20,7 @@ use diesel::{
     ExpressionMethods,
 };
 use tracing::error;
+use crate::db_writer::QueryWrapper;
 
 pub struct UserTransactionProcessor {
     db_writer: crate::db_writer::DbWriter,
@@ -93,19 +94,19 @@ async fn insert_to_db(
 fn insert_user_transactions_query(
     items_to_insert: &[UserTransactionModel],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_,
+    QueryWrapper,
     Option<&'static str>,
 ) {
     use schema::user_transactions::dsl::*;
     (
-        diesel::insert_into(schema::user_transactions::table)
+        QueryWrapper::new(diesel::insert_into(schema::user_transactions::table)
             .values(items_to_insert)
             .on_conflict(version)
             .do_update()
             .set((
                 expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
                 inserted_at.eq(excluded(inserted_at)),
-            )),
+            ))),
         None,
     )
 }
@@ -113,12 +114,12 @@ fn insert_user_transactions_query(
 fn insert_signatures_query(
     items_to_insert: &[Signature],
 ) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_,
+    QueryWrapper,
     Option<&'static str>,
 ) {
     use schema::signatures::dsl::*;
     (
-        diesel::insert_into(schema::signatures::table)
+        QueryWrapper::new(diesel::insert_into(schema::signatures::table)
             .values(items_to_insert)
             .on_conflict((
                 transaction_version,
@@ -126,7 +127,7 @@ fn insert_signatures_query(
                 multi_sig_index,
                 is_sender_primary,
             ))
-            .do_nothing(),
+            .do_nothing()),
         None,
     )
 }
