@@ -134,26 +134,24 @@ impl FungibleAssetMetadataModel {
     /// 1. If metadata is present without token object, then it's not a token
     /// 2. If metadata is not present, we will do a lookup in the db.
     pub async fn is_address_fungible_asset(
-        _: &mut PgPoolConnection<'_>,
-        _: &str,
-        _: &ObjectAggregatedDataMapping,
-        _: i64,
+        conn: &mut PgPoolConnection<'_>,
+        address: &str,
+        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
+        txn_version: i64,
     ) -> bool {
-        // Always index for testing purposes
-        return true;
-        // // 1. If metadata is present without token object, then it's not a token
-        // if let Some(object_data) = object_aggregated_data_mapping.get(address) {
-        //     if object_data.fungible_asset_metadata.is_some() {
-        //         return object_data.token.is_none();
-        //     }
-        // }
-        // // 2. If metadata is not present, we will do a lookup in the db.
-        // // The object must exist in current_objects table for this processor to proceed
-        // // If it doesn't exist or is null, then you probably need to backfill objects processor
-        // let object = Object::get_current_object(conn, address, txn_version).await;
-        // if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
-        //     return is_fa && !is_token;
-        // }
-        // panic!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
+        // 1. If metadata is present without token object, then it's not a token
+        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
+            if object_data.fungible_asset_metadata.is_some() {
+                return object_data.token.is_none();
+            }
+        }
+        // 2. If metadata is not present, we will do a lookup in the db.
+        // The object must exist in current_objects table for this processor to proceed
+        // If it doesn't exist or is null, then you probably need to backfill objects processor
+        let object = Object::get_current_object(conn, address, txn_version).await;
+        if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
+            return is_fa && !is_token;
+        }
+        panic!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
     }
 }

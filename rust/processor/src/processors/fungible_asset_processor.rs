@@ -82,15 +82,15 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    // let faa = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_fungible_asset_activities_query,
-    //     fungible_asset_activities,
-    //     get_config_table_chunk_size::<FungibleAssetActivity>(
-    //         "fungible_asset_activities",
-    //         per_table_chunk_sizes,
-    //     ),
-    // );
+    let faa = execute_in_chunks(
+        conn.clone(),
+        insert_fungible_asset_activities_query,
+        fungible_asset_activities,
+        get_config_table_chunk_size::<FungibleAssetActivity>(
+            "fungible_asset_activities",
+            per_table_chunk_sizes,
+        ),
+    );
     let fam = execute_in_chunks(
         conn.clone(),
         insert_fungible_asset_metadata_query,
@@ -118,13 +118,8 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    // let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
-    // for res in [faa_res, fam_res, fab_res, cfab_res] {
-    //     res?;
-    // }
-
-    let (fam_res, fab_res, cfab_res) = tokio::join!(fam, fab, cfab);
-    for res in [fam_res, fab_res, cfab_res] {
+    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
+    for res in [faa_res, fam_res, fab_res, cfab_res] {
         res?;
     }
 
