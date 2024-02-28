@@ -8,18 +8,18 @@ use crate::{
     utils::database::{get_chunks, PgDbPool},
     worker::PROCESSOR_SERVICE_TYPE,
 };
-use diesel::{query_builder::QueryFragment, QueryResult};
-use diesel::pg::Pg;
+use diesel::{pg::Pg, query_builder::QueryFragment, QueryResult};
+use diesel_async::RunQueryDsl;
 use kanal::{AsyncReceiver, AsyncSender};
 use tokio::task::JoinHandle;
 use tracing::info;
 
 pub struct BoxedQuery<'a> {
-    query: Box<dyn QueryFragment<Pg> + 'a>,
+    query: Box<dyn QueryFragment<Pg> + Send + 'a>,
 }
 
 impl<'a> BoxedQuery<'a> {
-    fn new(query: impl QueryFragment<Pg> + 'a) -> Self {
+    fn new(query: impl QueryFragment<Pg> + Send + 'a) -> Self {
         Self {
             query: Box::new(query),
         }
@@ -32,7 +32,7 @@ pub trait BoxedQueryTrait<'a>: 'a {
 
 impl<'a, Query> BoxedQueryTrait<'a> for Query
     where
-        Query: QueryFragment<Pg> + 'a,
+        Query: QueryFragment<Pg> + Send + 'a,
 {
     fn boxed_query(self) -> BoxedQuery<'a> {
         BoxedQuery::new(self)
@@ -42,8 +42,7 @@ impl<'a, Query> BoxedQueryTrait<'a> for Query
 // pub type fn(&'a [Item]) -> (Query, Option<&'static str>) = fn(&'a [Item]) -> (Query, Option<&'static str>);
 
 /// A simple holder that allows us to move query generators cross threads and avoid cloning
-pub struct QueryGenerator<Item>
-{
+pub struct QueryGenerator<Item> {
     pub build_query_fn: fn(&[Item]) -> (BoxedQuery, Option<&'static str>),
     pub items: Vec<Item>,
     pub table_name: &'static str,
@@ -92,10 +91,28 @@ impl<Item> DbExecutable for QueryGenerator<Item>
     where
         Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
 {
-    async fn execute_query(self: Box<Self>, conn: PgDbPool) -> QueryResult<usize> {
-
+    async fn execute_query(self: Box<Self>, pool: PgDbPool) -> QueryResult<usize> {
         //let items_ref: &'a [Item] = &items;
         let (query, _) = (self.build_query_fn)(&self.items);
+
+        let conn = &mut pool
+            .get()
+            .await
+            .map_err(|e| {
+                tracing::warn!("Error getting connection from pool: {:?}", e);
+                diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UnableToSendCommand,
+                    Box::new(e.to_string()),
+                )
+            })
+            .expect("Error getting connection from pool");
+
+        query
+            .query
+            .execute(conn)
+            .await
+            .expect("Error executing query");
+
         Ok(0)
     }
 }
