@@ -7,7 +7,7 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, TokenV2Burned},
+    v2_token_utils::{TokenStandard, TokenV2Burned, TokenV2BurnedMap},
 };
 use crate::{
     models::{
@@ -294,37 +294,46 @@ impl TokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
+        tokens_burned_map: &TokenV2BurnedMap,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         if let Some(token_address) =
             tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
         {
-            let latest_nft_ownership = match prior_nft_ownership.get(token_address) {
-                Some(inner) => inner.clone(),
-                None => {
-                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                        conn,
-                        token_address,
-                    )
-                    .await
-                    {
-                        Ok(nft) => nft,
-                        Err(_) => {
-                            tracing::error!(
-                                transaction_version = txn_version,
-                                lookup_key = &token_address,
-                                "Failed to find NFT for burned token. You probably should backfill db."
-                            );
-                            return Ok(None);
-                        },
-                    }
-                },
+            // 1. Try to lookup token address in burn event mapping
+            let previous_owner = if let Some(burn_event) =
+                tokens_burned_map.get(&standardize_address(&write_resource.address.to_string()))
+            {
+                burn_event.get_previous_owner_address()
+            } else {
+                // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
+                // Do a lookup to get preivous owner.
+                let latest_nft_ownership = match prior_nft_ownership.get(token_address) {
+                    Some(inner) => inner.clone(),
+                    None => {
+                        match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
+                            conn,
+                            token_address,
+                        )
+                        .await
+                        {
+                            Ok(nft) => nft,
+                            Err(_) => {
+                                tracing::error!(
+                                    transaction_version = txn_version,
+                                    lookup_key = &token_address,
+                                    "Failed to find NFT for burned token. You probably should backfill db."
+                                );
+                                return Ok(None);
+                            },
+                        }
+                    },
+                };
+                latest_nft_ownership.owner_address.clone()
             };
 
             let token_data_id = token_address.clone();
-            let owner_address = latest_nft_ownership.owner_address.clone();
             let storage_id = token_data_id.clone();
-            let is_soulbound = latest_nft_ownership.is_soulbound;
 
             return Ok(Some((
                 Self {
@@ -332,31 +341,31 @@ impl TokenOwnershipV2 {
                     write_set_change_index,
                     token_data_id: token_data_id.clone(),
                     property_version_v1: BigDecimal::zero(),
-                    owner_address: Some(owner_address.clone()),
+                    owner_address: Some(previous_owner.clone()),
                     storage_id: storage_id.clone(),
                     amount: BigDecimal::zero(),
                     table_type_v1: None,
                     token_properties_mutated_v1: None,
-                    is_soulbound_v2: is_soulbound,
+                    is_soulbound_v2: Some(false),
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2: Some(false),
                     transaction_timestamp: txn_timestamp,
-                    non_transferrable_by_owner: is_soulbound,
+                    non_transferrable_by_owner: Some(false),
                 },
                 CurrentTokenOwnershipV2 {
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
-                    owner_address,
+                    owner_address: previous_owner,
                     storage_id,
                     amount: BigDecimal::zero(),
                     table_type_v1: None,
                     token_properties_mutated_v1: None,
-                    is_soulbound_v2: is_soulbound,
+                    is_soulbound_v2: Some(false),
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2: Some(false),
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
-                    non_transferrable_by_owner: is_soulbound,
+                    non_transferrable_by_owner: Some(false),
                 },
             )));
         }

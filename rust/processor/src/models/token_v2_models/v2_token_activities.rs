@@ -7,7 +7,6 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_ownerships::CurrentTokenOwnershipV2Query,
     v2_token_utils::{TokenStandard, TokenV2Minted, V2TokenEvent},
 };
 use crate::{
@@ -155,8 +154,6 @@ impl TokenActivityV2 {
         entry_function_id_str: &Option<String>,
         token_v2_metadata: &ObjectAggregatedDataMapping,
         tokens_minted: &TokenV2Minted,
-        // needed to find owner of the burnt nft
-        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) =
@@ -250,28 +247,8 @@ impl TokenActivityV2 {
                     transaction_timestamp: txn_timestamp,
                 }));
             }
-            // This should only happen in the case where we have a burn event and mint event in the same
-            // transaction. Basically token doesn't exist in metadata but there's a mint event
-            if tokens_minted.get(&token_data_id).is_some() {
-                return Ok(Some(Self {
-                    transaction_version: txn_version,
-                    event_index,
-                    event_account_address,
-                    token_data_id,
-                    property_version_v1: BigDecimal::zero(),
-                    type_: event_type,
-                    from_address: owner_address.clone(),
-                    to_address: None,
-                    token_amount: BigDecimal::one(),
-                    before_value: None,
-                    after_value: None,
-                    entry_function_id_str: entry_function_id_str.clone(),
-                    token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: Some(false),
-                    transaction_timestamp: txn_timestamp,
-                }));
-            }
-            // Otherwise the burn happened previously and we have to partially fill the row
+            // If the object metadata isn't found in the transaction, then it's a burn event.
+            // This should only happen in the case when the token is minted and burnt in the same transaction.
             return Ok(Some(Self {
                 transaction_version: txn_version,
                 event_index,
@@ -279,7 +256,7 @@ impl TokenActivityV2 {
                 token_data_id,
                 property_version_v1: BigDecimal::zero(),
                 type_: event_type,
-                from_address: owner_address,
+                from_address: owner_address.clone(),
                 to_address: None,
                 token_amount: BigDecimal::one(),
                 before_value: None,

@@ -22,8 +22,8 @@ use crate::{
             },
             v2_token_utils::{
                 AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
-                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
-                TransferEvent, UnlimitedSupply,
+                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2BurnedMap,
+                TokenV2Minted, TransferEvent, UnlimitedSupply,
             },
         },
     },
@@ -482,6 +482,7 @@ async fn parse_v2_token(
 
             // Get burn events for token v2 by object
             let mut tokens_burned: TokenV2Burned = AHashSet::new();
+            let mut tokens_burned_map: TokenV2BurnedMap = AHashMap::new();
 
             // Get mint events for token v2 by object
             let mut tokens_minted: TokenV2Minted = AHashSet::new();
@@ -577,6 +578,7 @@ async fn parse_v2_token(
             for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address());
+                    tokens_burned_map.insert(burn_event.get_token_address(), burn_event);
                 }
                 if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address());
@@ -623,7 +625,6 @@ async fn parse_v2_token(
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
                     &tokens_minted,
-                    conn,
                 )
                 .await
                 .unwrap()
@@ -892,6 +893,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
+                                &tokens_burned_map,
                                 conn,
                             )
                             .await

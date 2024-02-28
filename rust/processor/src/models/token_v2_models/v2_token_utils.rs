@@ -17,7 +17,7 @@ use crate::{
         DerivedStringSnapshot,
     },
 };
-use ahash::AHashSet;
+use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
@@ -29,6 +29,8 @@ pub const TOKEN_V2_ADDR: &str =
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 pub type TokenV2Burned = AHashSet<CurrentObjectPK>;
+/// Same as above, but includes a map to burn events with previous owner
+pub type TokenV2BurnedMap = AHashMap<CurrentObjectPK, Burn>;
 pub type TokenV2Minted = AHashSet<CurrentObjectPK>;
 pub type TokenV2MintedPK = (CurrentObjectPK, i64);
 
