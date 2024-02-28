@@ -169,12 +169,6 @@ impl TokenActivityV2 {
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
-            // the new burn event has owner address now!
-            let owner_address = if let V2TokenEvent::Burn(inner) = token_event {
-                Some(inner.get_previous_owner_address())
-            } else {
-                None
-            };
 
             if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
                 let object_core = &metadata.object.object_core;
@@ -245,26 +239,35 @@ impl TokenActivityV2 {
                     is_fungible_v2: Some(false),
                     transaction_timestamp: txn_timestamp,
                 }));
+            } else {
+                // If the object metadata isn't found in the transaction, then the token was burnt.
+
+                // the new burn event has owner address now!
+                let owner_address = if let V2TokenEvent::Burn(inner) = token_event {
+                    Some(inner.get_previous_owner_address())
+                } else {
+                    // To handle a case with the old burn events, when a token is minted and burnt in the same transaction
+                    None
+                };
+
+                return Ok(Some(Self {
+                    transaction_version: txn_version,
+                    event_index,
+                    event_account_address,
+                    token_data_id,
+                    property_version_v1: BigDecimal::zero(),
+                    type_: event_type,
+                    from_address: owner_address.clone(),
+                    to_address: None,
+                    token_amount: BigDecimal::one(),
+                    before_value: None,
+                    after_value: None,
+                    entry_function_id_str: entry_function_id_str.clone(),
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: Some(false),
+                    transaction_timestamp: txn_timestamp,
+                }));
             }
-            // If the object metadata isn't found in the transaction, then it's a burn event.
-            // This should only happen in the case when the token is minted and burnt in the same transaction.
-            return Ok(Some(Self {
-                transaction_version: txn_version,
-                event_index,
-                event_account_address,
-                token_data_id,
-                property_version_v1: BigDecimal::zero(),
-                type_: event_type,
-                from_address: owner_address.clone(),
-                to_address: None,
-                token_amount: BigDecimal::one(),
-                before_value: None,
-                after_value: None,
-                entry_function_id_str: entry_function_id_str.clone(),
-                token_standard: TokenStandard::V2.to_string(),
-                is_fungible_v2: Some(false),
-                transaction_timestamp: txn_timestamp,
-            }));
         }
         Ok(None)
     }
