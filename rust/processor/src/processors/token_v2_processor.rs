@@ -624,7 +624,6 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
-                    &tokens_minted,
                 )
                 .await
                 .unwrap()
