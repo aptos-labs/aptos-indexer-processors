@@ -365,6 +365,10 @@ impl Burn {
     pub fn get_token_address(&self) -> String {
         standardize_address(&self.token)
     }
+
+    pub fn get_previous_owner_address(&self) -> String {
+        standardize_address(&self.previous_owner)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

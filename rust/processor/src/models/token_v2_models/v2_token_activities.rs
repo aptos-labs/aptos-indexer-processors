@@ -173,6 +173,12 @@ impl TokenActivityV2 {
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
+            // the new burn event has owner address now!
+            let owner_address = if let V2TokenEvent::Burn(inner) = token_event {
+                Some(inner.get_previous_owner_address())
+            } else {
+                None
+            };
 
             if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
                 let object_core = &metadata.object.object_core;
@@ -243,48 +249,10 @@ impl TokenActivityV2 {
                     is_fungible_v2: Some(false),
                     transaction_timestamp: txn_timestamp,
                 }));
-            } else {
-                // This should only happen in the case where we have a burn event and mint event in the same
-                // transaction.
-                if tokens_minted.get(&token_data_id).is_some() {
-                    return Ok(Some(Self {
-                        transaction_version: txn_version,
-                        event_index,
-                        event_account_address,
-                        token_data_id,
-                        property_version_v1: BigDecimal::zero(),
-                        type_: event_type,
-                        from_address: None,
-                        to_address: None,
-                        token_amount: BigDecimal::one(),
-                        before_value: None,
-                        after_value: None,
-                        entry_function_id_str: entry_function_id_str.clone(),
-                        token_standard: TokenStandard::V2.to_string(),
-                        is_fungible_v2: Some(false),
-                        transaction_timestamp: txn_timestamp,
-                    }));
-                }
-
-                // This should only happen in the case where we have a burn event where the token is gone
-                // and the previous instance of the token wasn't in the batch. We need to look up in the db
-                let latest_nft_ownership =
-                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                        conn,
-                        &token_data_id,
-                    )
-                    .await
-                    {
-                        Ok(nft) => nft,
-                        Err(_) => {
-                            tracing::error!(
-                            transaction_version = txn_version,
-                            lookup_key = &token_data_id,
-                            "Failed to find NFT for burned token. You probably should backfill db."
-                        );
-                            return Ok(None);
-                        },
-                    };
+            }
+            // This should only happen in the case where we have a burn event and mint event in the same
+            // transaction. Basically token doesn't exist in metadata but there's a mint event
+            if tokens_minted.get(&token_data_id).is_some() {
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     event_index,
@@ -292,7 +260,7 @@ impl TokenActivityV2 {
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
                     type_: event_type,
-                    from_address: Some(latest_nft_ownership.owner_address),
+                    from_address: owner_address.clone(),
                     to_address: None,
                     token_amount: BigDecimal::one(),
                     before_value: None,
@@ -303,6 +271,24 @@ impl TokenActivityV2 {
                     transaction_timestamp: txn_timestamp,
                 }));
             }
+            // Otherwise the burn happened previously and we have to partially fill the row
+            return Ok(Some(Self {
+                transaction_version: txn_version,
+                event_index,
+                event_account_address,
+                token_data_id,
+                property_version_v1: BigDecimal::zero(),
+                type_: event_type,
+                from_address: owner_address,
+                to_address: None,
+                token_amount: BigDecimal::one(),
+                before_value: None,
+                after_value: None,
+                entry_function_id_str: entry_function_id_str.clone(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
+                transaction_timestamp: txn_timestamp,
+            }));
         }
         Ok(None)
     }
