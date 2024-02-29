@@ -19,6 +19,7 @@ pub mod objects_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
+pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
 
 use self::{
@@ -34,6 +35,7 @@ use self::{
     stake_processor::StakeProcessor,
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::TokenV2Processor,
+    transaction_metadata_processor::TransactionMetadataProcessor,
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
@@ -191,6 +193,7 @@ pub enum ProcessorConfig {
     StakeProcessor,
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor,
+    TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
 
@@ -232,6 +235,7 @@ pub enum Processor {
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,
+    TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
 

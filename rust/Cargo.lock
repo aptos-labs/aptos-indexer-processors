@@ -120,7 +120,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c#5d1cefad0ea0d37fb08e9aec7847080745c83f9c"
+source = "git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.10.0#b24f6cd08f84b179e49090c7e51a501c535096ca"
 dependencies = [
  "futures-core",
  "pbjson",
