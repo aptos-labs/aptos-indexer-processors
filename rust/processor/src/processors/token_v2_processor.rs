@@ -409,7 +409,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_token_datas_v2,
             token_activities_v2,
             current_token_v2_metadata,
-        ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+        ) = parse_v2_token(&transactions, &table_handle_to_owner).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -461,7 +461,7 @@ impl ProcessorTrait for TokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut PgPoolConnection<'_>,
+    // conn: &mut PgPoolConnection<'_>,
 ) -> (
     Vec<CollectionV2>,
     Vec<TokenDataV2>,
@@ -667,7 +667,7 @@ async fn parse_v2_token(
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
                     &tokens_minted,
-                    conn,
+                    // conn,
                 )
                 .await
                 .unwrap()
@@ -682,7 +682,7 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
-                    conn,
+                    // conn,
                 )
                 .await
                 .unwrap()
@@ -702,7 +702,7 @@ async fn parse_v2_token(
                                 wsc_index,
                                 txn_timestamp,
                                 table_handle_to_owner,
-                                conn,
+                                // conn,
                             )
                             .await
                             .unwrap()
@@ -892,7 +892,7 @@ async fn parse_v2_token(
                                 wsc_index,
                                 txn_timestamp,
                                 &token_v2_metadata_helper,
-                                conn,
+                                // conn,
                             )
                             .await
                             .unwrap()
@@ -936,7 +936,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
-                                conn,
+                                // conn,
                             )
                             .await
                             .unwrap()

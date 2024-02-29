@@ -474,7 +474,7 @@ impl ProcessorTrait for TokenProcessor {
                 current_token_datas,
                 current_collection_datas,
                 current_token_claims,
-            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn).await;
+            ) = Token::from_transaction(txn, &table_handle_to_owner).await;
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);

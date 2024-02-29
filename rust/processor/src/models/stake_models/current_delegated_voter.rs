@@ -76,7 +76,7 @@ impl CurrentDelegatedVoter {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         vote_delegation_handle_to_pool_address: &VoteDelegationTableHandleToPool,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<CurrentDelegatedVoterMap> {
         let mut delegated_voter_map: CurrentDelegatedVoterMap = AHashMap::new();
 
@@ -91,18 +91,17 @@ impl CurrentDelegatedVoter {
         {
             let pool_address = match vote_delegation_handle_to_pool_address.get(&table_handle) {
                 Some(pool_address) => pool_address.clone(),
-                None => {
-                    // look up from db
-                    Self::get_delegation_pool_address_by_table_handle(conn, &table_handle).await
-                        .unwrap_or_else(|_| {
-                            tracing::error!(
-                                transaction_version = txn_version,
-                                lookup_key = &table_handle,
-                                "Missing pool address for table handle. You probably should backfill db.",
-                            );
-                            "".to_string()
-                        })
-                },
+                None => "".to_string(),
+                // look up from db
+                // Self::get_delegation_pool_address_by_table_handle(conn, &table_handle).await
+                //     .unwrap_or_else(|_| {
+                //         tracing::error!(
+                //             transaction_version = txn_version,
+                //             lookup_key = &table_handle,
+                //             "Missing pool address for table handle. You probably should backfill db.",
+                //         );
+                //         "".to_string()
+                //     })
             };
             if !pool_address.is_empty() {
                 for inner in vote_delegation_vector {
@@ -136,7 +135,7 @@ impl CurrentDelegatedVoter {
         txn_timestamp: chrono::NaiveDateTime,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
         previous_delegated_voters: &CurrentDelegatedVoterMap,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         if let Some((_, active_balance)) =
             CurrentDelegatorBalance::get_active_share_from_write_table_item(
@@ -155,8 +154,9 @@ impl CurrentDelegatedVoter {
             {
                 Some(_) => true,
                 None => {
+                    false
                     // look up from db
-                    Self::get_existence_by_pk(conn, &delegator_address, &pool_address).await
+                    // Self::get_existence_by_pk(conn, &delegator_address, &pool_address).await
                 },
             };
             if !already_exists {
@@ -174,76 +174,76 @@ impl CurrentDelegatedVoter {
         Ok(None)
     }
 
-    pub async fn get_delegation_pool_address_by_table_handle(
-        conn: &mut PgPoolConnection<'_>,
-        table_handle: &str,
-    ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match CurrentDelegatedVoterQuery::get_by_table_handle(conn, table_handle).await {
-                Ok(current_delegated_voter_query_result) => {
-                    return Ok(current_delegated_voter_query_result.delegation_pool_address);
-                },
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
-        }
-        Err(anyhow::anyhow!(
-            "Failed to get delegation pool address from vote delegation write table handle"
-        ))
-    }
+    // pub async fn get_delegation_pool_address_by_table_handle(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     table_handle: &str,
+    // ) -> anyhow::Result<String> {
+    //     let mut retried = 0;
+    //     while retried < QUERY_RETRIES {
+    //         retried += 1;
+    //         match CurrentDelegatedVoterQuery::get_by_table_handle(conn, table_handle).await {
+    //             Ok(current_delegated_voter_query_result) => {
+    //                 return Ok(current_delegated_voter_query_result.delegation_pool_address);
+    //             },
+    //             Err(_) => {
+    //                 tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+    //                     .await;
+    //             },
+    //         }
+    //     }
+    //     Err(anyhow::anyhow!(
+    //         "Failed to get delegation pool address from vote delegation write table handle"
+    //     ))
+    // }
 
-    pub async fn get_existence_by_pk(
-        conn: &mut PgPoolConnection<'_>,
-        delegator_address: &str,
-        delegation_pool_address: &str,
-    ) -> bool {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match CurrentDelegatedVoterQuery::get_by_pk(
-                conn,
-                delegator_address,
-                delegation_pool_address,
-            )
-            .await
-            {
-                Ok(_) => return true,
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
-        }
-        false
-    }
+    // pub async fn get_existence_by_pk(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     delegator_address: &str,
+    //     delegation_pool_address: &str,
+    // ) -> bool {
+    //     let mut retried = 0;
+    //     while retried < QUERY_RETRIES {
+    //         retried += 1;
+    //         match CurrentDelegatedVoterQuery::get_by_pk(
+    //             conn,
+    //             delegator_address,
+    //             delegation_pool_address,
+    //         )
+    //         .await
+    //         {
+    //             Ok(_) => return true,
+    //             Err(_) => {
+    //                 tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+    //                     .await;
+    //             },
+    //         }
+    //     }
+    //     false
+    // }
 }
 
 impl CurrentDelegatedVoterQuery {
-    pub async fn get_by_table_handle(
-        conn: &mut PgPoolConnection<'_>,
-        table_handle: &str,
-    ) -> diesel::QueryResult<Self> {
-        current_delegated_voter::table
-            .filter(current_delegated_voter::table_handle.eq(table_handle))
-            .first::<Self>(conn)
-            .await
-    }
+    // pub async fn get_by_table_handle(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     table_handle: &str,
+    // ) -> diesel::QueryResult<Self> {
+    //     current_delegated_voter::table
+    //         .filter(current_delegated_voter::table_handle.eq(table_handle))
+    //         .first::<Self>(conn)
+    //         .await
+    // }
 
-    pub async fn get_by_pk(
-        conn: &mut PgPoolConnection<'_>,
-        delegator_address: &str,
-        delegation_pool_address: &str,
-    ) -> diesel::QueryResult<Self> {
-        current_delegated_voter::table
-            .filter(current_delegated_voter::delegator_address.eq(delegator_address))
-            .filter(current_delegated_voter::delegation_pool_address.eq(delegation_pool_address))
-            .first::<Self>(conn)
-            .await
-    }
+    // pub async fn get_by_pk(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     delegator_address: &str,
+    //     delegation_pool_address: &str,
+    // ) -> diesel::QueryResult<Self> {
+    //     current_delegated_voter::table
+    //         .filter(current_delegated_voter::delegator_address.eq(delegator_address))
+    //         .filter(current_delegated_voter::delegation_pool_address.eq(delegation_pool_address))
+    //         .first::<Self>(conn)
+    //         .await
+    // }
 }
 
 impl Ord for CurrentDelegatedVoter {

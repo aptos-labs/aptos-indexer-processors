@@ -294,31 +294,31 @@ impl TokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         if let Some(token_address) =
             tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
         {
             let latest_nft_ownership = match prior_nft_ownership.get(token_address) {
                 Some(inner) => inner.clone(),
-                None => {
-                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                        conn,
-                        token_address,
-                    )
-                    .await
-                    {
-                        Ok(nft) => nft,
-                        Err(_) => {
-                            tracing::error!(
-                                transaction_version = txn_version,
-                                lookup_key = &token_address,
-                                "Failed to find NFT for burned token. You probably should backfill db."
-                            );
-                            return Ok(None);
-                        },
-                    }
-                },
+                None => return Ok(None), // None => {
+                                         //     match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
+                                         //         conn,
+                                         //         token_address,
+                                         //     )
+                                         //     .await
+                                         //     {
+                                         //         Ok(nft) => nft,
+                                         //         Err(_) => {
+                                         //             tracing::error!(
+                                         //                 transaction_version = txn_version,
+                                         //                 lookup_key = &token_address,
+                                         //                 "Failed to find NFT for burned token. You probably should backfill db."
+                                         //             );
+                                         //             return Ok(None);
+                                         //         },
+                                         //     }
+                                         // },
             };
 
             let token_data_id = token_address.clone();
@@ -370,7 +370,7 @@ impl TokenOwnershipV2 {
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
@@ -394,16 +394,16 @@ impl TokenOwnershipV2 {
                 let object_core = &object_data.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(
-                    conn,
-                    &token_data_id,
-                    object_metadatas,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
+                // if !TokenDataV2::is_address_fungible_token(
+                //     conn,
+                //     &token_data_id,
+                //     object_metadatas,
+                //     txn_version,
+                // )
+                // .await
+                // {
+                //     return Ok(None);
+                // }
                 let storage_id = resource.address.clone();
                 let is_soulbound = inner.frozen;
                 let amount = inner.balance;
@@ -607,41 +607,41 @@ impl TokenOwnershipV2 {
 }
 
 impl CurrentTokenOwnershipV2Query {
-    pub async fn get_latest_owned_nft_by_token_data_id(
-        conn: &mut PgPoolConnection<'_>,
-        token_data_id: &str,
-    ) -> anyhow::Result<NFTOwnershipV2> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id).await {
-                Ok(inner) => {
-                    return Ok(NFTOwnershipV2 {
-                        token_data_id: inner.token_data_id.clone(),
-                        owner_address: inner.owner_address.clone(),
-                        is_soulbound: inner.is_soulbound_v2,
-                    });
-                },
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
-        }
-        Err(anyhow::anyhow!(
-            "Failed to get nft by token data id: {}",
-            token_data_id
-        ))
-    }
+    // pub async fn get_latest_owned_nft_by_token_data_id(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     token_data_id: &str,
+    // ) -> anyhow::Result<NFTOwnershipV2> {
+    //     let mut retried = 0;
+    //     while retried < QUERY_RETRIES {
+    //         retried += 1;
+    //         match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id).await {
+    //             Ok(inner) => {
+    //                 return Ok(NFTOwnershipV2 {
+    //                     token_data_id: inner.token_data_id.clone(),
+    //                     owner_address: inner.owner_address.clone(),
+    //                     is_soulbound: inner.is_soulbound_v2,
+    //                 });
+    //             },
+    //             Err(_) => {
+    //                 tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+    //                     .await;
+    //             },
+    //         }
+    //     }
+    //     Err(anyhow::anyhow!(
+    //         "Failed to get nft by token data id: {}",
+    //         token_data_id
+    //     ))
+    // }
 
-    async fn get_latest_owned_nft_by_token_data_id_impl(
-        conn: &mut PgPoolConnection<'_>,
-        token_data_id: &str,
-    ) -> diesel::QueryResult<Self> {
-        current_token_ownerships_v2::table
-            .filter(current_token_ownerships_v2::token_data_id.eq(token_data_id))
-            .filter(current_token_ownerships_v2::amount.gt(BigDecimal::zero()))
-            .first::<Self>(conn)
-            .await
-    }
+    // async fn get_latest_owned_nft_by_token_data_id_impl(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     token_data_id: &str,
+    // ) -> diesel::QueryResult<Self> {
+    //     current_token_ownerships_v2::table
+    //         .filter(current_token_ownerships_v2::token_data_id.eq(token_data_id))
+    //         .filter(current_token_ownerships_v2::amount.gt(BigDecimal::zero()))
+    //         .first::<Self>(conn)
+    //         .await
+    // }
 }

@@ -249,7 +249,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
-        ) = parse_v2_coin(&transactions, &mut conn).await;
+        ) = parse_v2_coin(&transactions).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -296,7 +296,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
 async fn parse_v2_coin(
     transactions: &[Transaction],
-    conn: &mut PgPoolConnection<'_>,
+    // conn: &mut PgPoolConnection<'_>,
 ) -> (
     Vec<FungibleAssetActivity>,
     Vec<FungibleAssetMetadataModel>,
@@ -472,7 +472,7 @@ async fn parse_v2_coin(
                 index as i64,
                 &entry_function_id_str,
                 &fungible_asset_object_helper,
-                conn,
+                // conn,
             )
             .await
             .unwrap_or_else(|e| {
@@ -528,7 +528,7 @@ async fn parse_v2_coin(
                         txn_version,
                         txn_timestamp,
                         &fungible_asset_object_helper,
-                        conn,
+                        // conn,
                     )
                     .await
                     .unwrap_or_else(|e| {

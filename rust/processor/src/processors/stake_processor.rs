@@ -454,7 +454,7 @@ impl ProcessorTrait for StakeProcessor {
                 CurrentDelegatorBalance::from_transaction(
                     txn,
                     &active_pool_to_staking_pool,
-                    &mut conn,
+                    // &mut conn,
                 )
                 .await
                 .unwrap();
@@ -469,7 +469,7 @@ impl ProcessorTrait for StakeProcessor {
                         txn_version,
                         txn_timestamp,
                         &all_vote_delegation_handle_to_pool_address,
-                        &mut conn,
+                        // &mut conn,
                     )
                     .await
                     .unwrap();
@@ -488,7 +488,7 @@ impl ProcessorTrait for StakeProcessor {
                             txn_timestamp,
                             &active_pool_to_staking_pool,
                             &all_current_delegated_voter,
-                            &mut conn,
+                            // &mut conn,
                         )
                         .await
                         .unwrap()

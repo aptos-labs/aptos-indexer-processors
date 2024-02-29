@@ -230,30 +230,27 @@ impl TokenDataV2 {
         Ok(None)
     }
 
-    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
-    /// 1. If metadata is present with a token object, then is a token
-    /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_fungible_token(
-        conn: &mut PgPoolConnection<'_>,
-        address: &str,
-        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
-        txn_version: i64,
-    ) -> bool {
-        // 1. If metadata is present, the object is a token iff token struct is also present in the object
-        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
-            if object_data.fungible_asset_metadata.is_some() {
-                return object_data.token.is_some();
-            }
-        }
-        // 2. If metadata is not present, we will do a lookup in the db.
-        //  The object must exist in current_objects table for this processor to proceed
-        let object = Object::get_current_object(conn, address, txn_version).await;
-        if let Some(is_token) = object.is_token {
-            return is_token;
-        }
-        panic!(
-            "is_token is null for object_address: {}. You should probably backfill db.",
-            address
-        );
-    }
+    // pub async fn is_address_fungible_token(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     address: &str,
+    //     object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
+    //     txn_version: i64,
+    // ) -> bool {
+    //     // 1. If metadata is present, the object is a token iff token struct is also present in the object
+    //     if let Some(object_data) = object_aggregated_data_mapping.get(address) {
+    //         if object_data.fungible_asset_metadata.is_some() {
+    //             return object_data.token.is_some();
+    //         }
+    //     }
+    //     // 2. If metadata is not present, we will do a lookup in the db.
+    //     //  The object must exist in current_objects table for this processor to proceed
+    //     let object = Object::get_current_object(conn, address, txn_version).await;
+    //     if let Some(is_token) = object.is_token {
+    //         return is_token;
+    //     }
+    //     panic!(
+    //         "is_token is null for object_address: {}. You should probably backfill db.",
+    //         address
+    //     );
+    // }
 }

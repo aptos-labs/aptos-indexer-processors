@@ -71,7 +71,7 @@ impl FungibleAssetBalance {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
         {
@@ -82,16 +82,16 @@ impl FungibleAssetBalance {
                 let owner_address = object.get_owner_address();
                 let asset_type = inner.metadata.get_reference_address();
                 // If it's a fungible token, return early
-                if !FungibleAssetMetadataModel::is_address_fungible_asset(
-                    conn,
-                    &storage_id,
-                    object_metadatas,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
+                // if !FungibleAssetMetadataModel::is_address_fungible_asset(
+                //     conn,
+                //     &storage_id,
+                //     object_metadatas,
+                //     txn_version,
+                // )
+                // .await
+                // {
+                //     return Ok(None);
+                // }
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);
 
                 let coin_balance = Self {

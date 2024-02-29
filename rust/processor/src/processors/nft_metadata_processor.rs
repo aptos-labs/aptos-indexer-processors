@@ -115,7 +115,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
         // Publish CurrentTokenDataV2 and CurrentCollectionV2 from transactions
         let (token_datas, collections) =
-            parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+            parse_v2_token(&transactions, &table_handle_to_owner).await;
         let mut pubsub_messages: Vec<PubsubMessage> =
             Vec::with_capacity(token_datas.len() + collections.len());
 
@@ -203,7 +203,7 @@ fn clean_collection_pubsub_message(cc: CurrentCollectionV2, db_chain_id: u64) ->
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut PgPoolConnection<'_>,
+    // conn: &mut PgPoolConnection<'_>,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
     let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         AHashMap::new();
@@ -265,7 +265,7 @@ async fn parse_v2_token(
                             wsc_index,
                             txn_timestamp,
                             table_handle_to_owner,
-                            conn,
+                            // conn,
                         )
                         .await
                         .unwrap()

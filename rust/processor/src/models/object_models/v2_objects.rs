@@ -124,7 +124,7 @@ impl Object {
         txn_version: i64,
         write_set_change_index: i64,
         object_mapping: &AHashMap<CurrentObjectPK, CurrentObject>,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
         if delete_resource.type_str == "0x1::object::ObjectGroup" {
             let resource = MoveResource::from_delete_resource(
@@ -134,92 +134,95 @@ impl Object {
                 0, // Placeholder, this isn't used anyway
             );
             let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
-                object.clone()
+                Some(object.clone())
             } else {
-                Self::get_current_object(conn, &resource.address, txn_version).await
+                None
+                // Self::get_current_object(conn, &resource.address, txn_version).await
             };
-            Ok(Some((
-                Self {
-                    transaction_version: txn_version,
-                    write_set_change_index,
-                    object_address: resource.address.clone(),
-                    owner_address: previous_object.owner_address.clone(),
-                    state_key_hash: resource.state_key_hash.clone(),
-                    guid_creation_num: previous_object.last_guid_creation_num.clone(),
-                    allow_ungated_transfer: previous_object.allow_ungated_transfer,
-                    is_token: previous_object.is_token,
-                    is_fungible_asset: previous_object.is_fungible_asset,
-                    is_deleted: true,
-                },
-                CurrentObject {
-                    object_address: resource.address,
-                    owner_address: previous_object.owner_address.clone(),
-                    state_key_hash: resource.state_key_hash,
-                    last_guid_creation_num: previous_object.last_guid_creation_num.clone(),
-                    allow_ungated_transfer: previous_object.allow_ungated_transfer,
-                    last_transaction_version: txn_version,
-                    is_token: previous_object.is_token,
-                    is_fungible_asset: previous_object.is_fungible_asset,
-                    is_deleted: true,
-                },
-            )))
+
+            if let Some(previous_object) = previous_object {
+                Ok(Some((
+                    Self {
+                        transaction_version: txn_version,
+                        write_set_change_index,
+                        object_address: resource.address.clone(),
+                        owner_address: previous_object.owner_address.clone(),
+                        state_key_hash: resource.state_key_hash.clone(),
+                        guid_creation_num: previous_object.last_guid_creation_num.clone(),
+                        allow_ungated_transfer: previous_object.allow_ungated_transfer,
+                        is_token: previous_object.is_token,
+                        is_fungible_asset: previous_object.is_fungible_asset,
+                        is_deleted: true,
+                    },
+                    CurrentObject {
+                        object_address: resource.address,
+                        owner_address: previous_object.owner_address.clone(),
+                        state_key_hash: resource.state_key_hash,
+                        last_guid_creation_num: previous_object.last_guid_creation_num.clone(),
+                        allow_ungated_transfer: previous_object.allow_ungated_transfer,
+                        last_transaction_version: txn_version,
+                        is_token: previous_object.is_token,
+                        is_fungible_asset: previous_object.is_fungible_asset,
+                        is_deleted: true,
+                    },
+                )))
+            } else {
+                Ok(None)
+            }
         } else {
             Ok(None)
         }
     }
 
-    /// This is actually not great because object owner can change. The best we can do now though.
-    /// This will loop forever until we get the object from the db
-    pub async fn get_current_object(
-        conn: &mut PgPoolConnection<'_>,
-        object_address: &str,
-        transaction_version: i64,
-    ) -> CurrentObject {
-        let mut retries = 0;
-        while retries < QUERY_RETRIES {
-            retries += 1;
-            match CurrentObjectQuery::get_by_address(object_address, conn).await {
-                Ok(res) => {
-                    return CurrentObject {
-                        object_address: res.object_address,
-                        owner_address: res.owner_address,
-                        state_key_hash: res.state_key_hash,
-                        allow_ungated_transfer: res.allow_ungated_transfer,
-                        last_guid_creation_num: res.last_guid_creation_num,
-                        last_transaction_version: res.last_transaction_version,
-                        is_token: res.is_token,
-                        is_fungible_asset: res.is_fungible_asset,
-                        is_deleted: res.is_deleted,
-                    };
-                },
-                Err(e) => {
-                    warn!(
-                        transaction_version,
-                        error = ?e,
-                        object_address,
-                        retry_ms = QUERY_RETRY_DELAY_MS,
-                        "Failed to get object from current_objects table for object_address: {}, retrying in {} ms. ",
-                        object_address,
-                        QUERY_RETRY_DELAY_MS,
-                    );
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
-        }
-        panic!("Failed to get object from current_objects table for object_address: {}. You should probably backfill db.", object_address);
-    }
+    // pub async fn get_current_object(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     object_address: &str,
+    //     transaction_version: i64,
+    // ) -> CurrentObject {
+    //     let mut retries = 0;
+    //     while retries < QUERY_RETRIES {
+    //         retries += 1;
+    //         match CurrentObjectQuery::get_by_address(object_address, conn).await {
+    //             Ok(res) => {
+    //                 return CurrentObject {
+    //                     object_address: res.object_address,
+    //                     owner_address: res.owner_address,
+    //                     state_key_hash: res.state_key_hash,
+    //                     allow_ungated_transfer: res.allow_ungated_transfer,
+    //                     last_guid_creation_num: res.last_guid_creation_num,
+    //                     last_transaction_version: res.last_transaction_version,
+    //                     is_token: res.is_token,
+    //                     is_fungible_asset: res.is_fungible_asset,
+    //                     is_deleted: res.is_deleted,
+    //                 };
+    //             },
+    //             Err(e) => {
+    //                 warn!(
+    //                     transaction_version,
+    //                     error = ?e,
+    //                     object_address,
+    //                     retry_ms = QUERY_RETRY_DELAY_MS,
+    //                     "Failed to get object from current_objects table for object_address: {}, retrying in {} ms. ",
+    //                     object_address,
+    //                     QUERY_RETRY_DELAY_MS,
+    //                 );
+    //                 tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+    //                     .await;
+    //             },
+    //         }
+    //     }
+    //     panic!("Failed to get object from current_objects table for object_address: {}. You should probably backfill db.", object_address);
+    // }
 }
 
 impl CurrentObjectQuery {
-    /// TODO: Change this to a KV store
-    pub async fn get_by_address(
-        object_address: &str,
-        conn: &mut PgPoolConnection<'_>,
-    ) -> diesel::QueryResult<Self> {
-        current_objects::table
-            .filter(current_objects::object_address.eq(object_address))
-            .first::<Self>(conn)
-            .await
-    }
+    // pub async fn get_by_address(
+    //     object_address: &str,
+    //     conn: &mut PgPoolConnection<'_>,
+    // ) -> diesel::QueryResult<Self> {
+    //     current_objects::table
+    //         .filter(current_objects::object_address.eq(object_address))
+    //         .first::<Self>(conn)
+    //         .await
+    // }
 }
