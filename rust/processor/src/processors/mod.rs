@@ -9,6 +9,7 @@
 
 pub mod account_transactions_processor;
 pub mod ans_processor;
+pub mod aptos_tournament_processor;
 pub mod coin_processor;
 pub mod default_processor;
 pub mod events_processor;
@@ -24,6 +25,7 @@ pub mod user_transaction_processor;
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
     ans_processor::{AnsProcessor, AnsProcessorConfig},
+    aptos_tournament_processor::{AptosTournamentProcessor, AptosTournamentProcessorConfig},
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
     events_processor::EventsProcessor,
@@ -181,6 +183,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 pub enum ProcessorConfig {
     AccountTransactionsProcessor,
     AnsProcessor(AnsProcessorConfig),
+    AptosTournamentProcessor(AptosTournamentProcessorConfig),
     CoinProcessor,
     DefaultProcessor,
     EventsProcessor,
@@ -222,6 +225,7 @@ impl ProcessorConfig {
 pub enum Processor {
     AccountTransactionsProcessor,
     AnsProcessor,
+    AptosTournamentProcessor,
     CoinProcessor,
     DefaultProcessor,
     EventsProcessor,

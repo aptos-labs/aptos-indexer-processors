@@ -96,6 +96,7 @@ async fn insert_to_db(
         CollectionV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_token_datas_v2_query,
@@ -103,6 +104,7 @@ async fn insert_to_db(
         TokenDataV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_token_ownerships_v2_query,
@@ -110,6 +112,7 @@ async fn insert_to_db(
         TokenOwnershipV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_current_collections_v2_query,
@@ -117,6 +120,7 @@ async fn insert_to_db(
         CurrentCollectionV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_current_token_datas_v2_query,
@@ -124,6 +128,7 @@ async fn insert_to_db(
         CurrentTokenDataV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_current_token_ownerships_v2_query,
@@ -131,6 +136,7 @@ async fn insert_to_db(
         CurrentTokenOwnershipV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_token_activities_v2_query,
@@ -138,6 +144,7 @@ async fn insert_to_db(
         TokenActivityV2::field_count(),
     )
     .await?;
+
     execute_in_chunks(
         conn.clone(),
         insert_current_token_v2_metadatas_query,
@@ -145,6 +152,7 @@ async fn insert_to_db(
         CurrentTokenV2Metadata::field_count(),
     )
     .await?;
+
     Ok(())
 }
 

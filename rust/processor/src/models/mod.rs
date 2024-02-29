@@ -3,6 +3,7 @@
 
 pub mod account_transaction_models;
 pub mod ans_models;
+pub mod aptos_tournament_models;
 pub mod coin_models;
 pub mod default_models;
 pub mod events_models;
