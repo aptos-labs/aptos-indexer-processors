@@ -93,6 +93,8 @@ impl ProcessorTrait for NftMetadataProcessor {
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
         let db_chain_id = db_chain_id.unwrap_or_else(|| {
             error!("[NFT Metadata Crawler] db_chain_id must not be null");
@@ -113,7 +115,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
         // Publish CurrentTokenDataV2 and CurrentCollectionV2 from transactions
         let (token_datas, collections) =
-            parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+            parse_v2_token(&transactions, &table_handle_to_owner).await;
         let mut pubsub_messages: Vec<PubsubMessage> =
             Vec::with_capacity(token_datas.len() + collections.len());
 
@@ -166,7 +168,7 @@ impl ProcessorTrait for NftMetadataProcessor {
             end_version,
             processing_duration_in_secs,
             db_insertion_duration_in_secs,
-            last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+            last_transaction_timestamp,
         })
     }
 
@@ -201,7 +203,7 @@ fn clean_collection_pubsub_message(cc: CurrentCollectionV2, db_chain_id: u64) ->
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut PgPoolConnection<'_>,
+    // conn: &mut PgPoolConnection<'_>,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
     let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         AHashMap::new();
@@ -263,7 +265,7 @@ async fn parse_v2_token(
                             wsc_index,
                             txn_timestamp,
                             table_handle_to_owner,
-                            conn,
+                            // conn,
                         )
                         .await
                         .unwrap()

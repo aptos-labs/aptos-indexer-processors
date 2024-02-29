@@ -136,7 +136,7 @@ impl CurrentDelegatorBalance {
         write_set_change_index: i64,
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -149,24 +149,25 @@ impl CurrentDelegatorBalance {
                 .map(|metadata| metadata.staking_pool_address.clone())
             {
                 Some(pool_address) => pool_address,
-                None => {
-                    match Self::get_staking_pool_from_inactive_share_handle(
-                        conn,
-                        &inactive_pool_handle,
-                    )
-                    .await
-                    {
-                        Ok(pool) => pool,
-                        Err(_) => {
-                            tracing::error!(
-                                transaction_version = txn_version,
-                                lookup_key = &inactive_pool_handle,
-                                "Failed to get staking pool address from inactive share handle. You probably should backfill db.",
-                            );
-                            return Ok(None);
-                        },
-                    }
-                },
+                None => "".to_string(),
+                // None => {
+                //     match Self::get_staking_pool_from_inactive_share_handle(
+                //         conn,
+                //         &inactive_pool_handle,
+                //     )
+                //     .await
+                //     {
+                //         Ok(pool) => pool,
+                //         Err(_) => {
+                //             tracing::error!(
+                //                 transaction_version = txn_version,
+                //                 lookup_key = &inactive_pool_handle,
+                //                 "Failed to get staking pool address from inactive share handle. You probably should backfill db.",
+                //             );
+                //             return Ok(None);
+                //         },
+                //     }
+                // },
             };
             let delegator_address = standardize_address(&write_table_item.key.to_string());
             // Convert to TableItem model. Some fields are just placeholders
@@ -256,7 +257,7 @@ impl CurrentDelegatorBalance {
         write_set_change_index: i64,
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -269,13 +270,14 @@ impl CurrentDelegatorBalance {
                 .map(|metadata| metadata.staking_pool_address.clone())
             {
                 Some(pool_address) => pool_address,
-                None => {
-                    Self::get_staking_pool_from_inactive_share_handle(conn, &inactive_pool_handle)
-                        .await
-                        .context(format!("Failed to get staking pool address from inactive share handle {}, txn version {}",
-                                         inactive_pool_handle, txn_version
-                        ))?
-                }
+                None => "".to_string(),
+                // None => {
+                //     Self::get_staking_pool_from_inactive_share_handle(conn, &inactive_pool_handle)
+                //         .await
+                //         .context(format!("Failed to get staking pool address from inactive share handle {}, txn version {}",
+                //                          inactive_pool_handle, txn_version
+                //         ))?
+                // }
             };
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
@@ -361,32 +363,32 @@ impl CurrentDelegatorBalance {
         }
     }
 
-    pub async fn get_staking_pool_from_inactive_share_handle(
-        conn: &mut PgPoolConnection<'_>,
-        table_handle: &str,
-    ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match CurrentDelegatorBalanceQuery::get_by_inactive_share_handle(conn, table_handle)
-                .await
-            {
-                Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
-        }
-        Err(anyhow::anyhow!(
-            "Failed to get staking pool address from inactive share handle"
-        ))
-    }
+    // pub async fn get_staking_pool_from_inactive_share_handle(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     table_handle: &str,
+    // ) -> anyhow::Result<String> {
+    //     let mut retried = 0;
+    //     while retried < QUERY_RETRIES {
+    //         retried += 1;
+    //         match CurrentDelegatorBalanceQuery::get_by_inactive_share_handle(conn, table_handle)
+    //             .await
+    //         {
+    //             Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
+    //             Err(_) => {
+    //                 tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+    //                     .await;
+    //             },
+    //         }
+    //     }
+    //     Err(anyhow::anyhow!(
+    //         "Failed to get staking pool address from inactive share handle"
+    //     ))
+    // }
 
     pub async fn from_transaction(
         transaction: &Transaction,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<(Vec<DelegatorBalance>, CurrentDelegatorBalanceMap)> {
         let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = AHashMap::new();
         let mut inactive_share_to_pool: ShareToPoolMapping = AHashMap::new();
@@ -435,7 +437,7 @@ impl CurrentDelegatorBalance {
                             index as i64,
                             &inactive_pool_to_staking_pool,
                             &inactive_share_to_pool,
-                            conn,
+                            // conn,
                         )
                         .await
                         .unwrap()
@@ -460,7 +462,7 @@ impl CurrentDelegatorBalance {
                             index as i64,
                             &inactive_pool_to_staking_pool,
                             &inactive_share_to_pool,
-                            conn,
+                            // conn,
                         )
                         .await
                         .unwrap()
@@ -485,13 +487,13 @@ impl CurrentDelegatorBalance {
 }
 
 impl CurrentDelegatorBalanceQuery {
-    pub async fn get_by_inactive_share_handle(
-        conn: &mut PgPoolConnection<'_>,
-        table_handle: &str,
-    ) -> diesel::QueryResult<Self> {
-        current_delegator_balances::table
-            .filter(current_delegator_balances::parent_table_handle.eq(table_handle))
-            .first::<Self>(conn)
-            .await
-    }
+    // pub async fn get_by_inactive_share_handle(
+    //     conn: &mut PgPoolConnection<'_>,
+    //     table_handle: &str,
+    // ) -> diesel::QueryResult<Self> {
+    //     current_delegator_balances::table
+    //         .filter(current_delegator_balances::parent_table_handle.eq(table_handle))
+    //         .first::<Self>(conn)
+    //         .await
+    // }
 }

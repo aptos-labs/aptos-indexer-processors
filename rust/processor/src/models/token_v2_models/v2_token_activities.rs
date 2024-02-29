@@ -78,7 +78,7 @@ impl TokenActivityV2 {
         event_index: i64,
         entry_function_id_str: &Option<String>,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(fa_event) =
@@ -94,16 +94,16 @@ impl TokenActivityV2 {
                 let fungible_asset = object_data.fungible_asset_store.as_ref().unwrap();
                 let token_data_id = fungible_asset.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(
-                    conn,
-                    &token_data_id,
-                    object_metadatas,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
+                // if !TokenDataV2::is_address_fungible_token(
+                //     conn,
+                //     &token_data_id,
+                //     object_metadatas,
+                //     txn_version,
+                // )
+                // .await
+                // {
+                //     return Ok(None);
+                // }
 
                 let token_activity_helper = match fa_event {
                     FungibleAssetEvent::WithdrawEvent(inner) => TokenActivityHelperV2 {
@@ -156,7 +156,7 @@ impl TokenActivityV2 {
         token_v2_metadata: &ObjectAggregatedDataMapping,
         tokens_minted: &TokenV2Minted,
         // needed to find owner of the burnt nft
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) =
@@ -268,23 +268,23 @@ impl TokenActivityV2 {
 
                 // This should only happen in the case where we have a burn event where the token is gone
                 // and the previous instance of the token wasn't in the batch. We need to look up in the db
-                let latest_nft_ownership =
-                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                        conn,
-                        &token_data_id,
-                    )
-                    .await
-                    {
-                        Ok(nft) => nft,
-                        Err(_) => {
-                            tracing::error!(
-                            transaction_version = txn_version,
-                            lookup_key = &token_data_id,
-                            "Failed to find NFT for burned token. You probably should backfill db."
-                        );
-                            return Ok(None);
-                        },
-                    };
+                // let latest_nft_ownership =
+                //     match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
+                //         conn,
+                //         &token_data_id,
+                //     )
+                //     .await
+                //     {
+                //         Ok(nft) => nft,
+                //         Err(_) => {
+                //             tracing::error!(
+                //             transaction_version = txn_version,
+                //             lookup_key = &token_data_id,
+                //             "Failed to find NFT for burned token. You probably should backfill db."
+                //         );
+                //             return Ok(None);
+                //         },
+                //     };
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     event_index,
@@ -292,7 +292,7 @@ impl TokenActivityV2 {
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
                     type_: event_type,
-                    from_address: Some(latest_nft_ownership.owner_address),
+                    from_address: None,
                     to_address: None,
                     token_amount: BigDecimal::one(),
                     before_value: None,

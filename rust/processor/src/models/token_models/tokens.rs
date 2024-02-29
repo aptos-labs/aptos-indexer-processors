@@ -72,7 +72,7 @@ impl Token {
     pub async fn from_transaction(
         transaction: &Transaction,
         table_handle_to_owner: &TableHandleToOwner,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> (
         Vec<Self>,
         Vec<TokenOwnership>,
@@ -155,7 +155,7 @@ impl Token {
                                 txn_version,
                                 txn_timestamp,
                                 table_handle_to_owner,
-                                conn,
+                                // conn,
                             )
                             .await
                             .unwrap(),
