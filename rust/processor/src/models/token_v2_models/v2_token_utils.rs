@@ -28,9 +28,8 @@ pub const TOKEN_V2_ADDR: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000004";
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
-pub type TokenV2Burned = AHashSet<CurrentObjectPK>;
-/// Same as above, but includes a map to burn events with previous owner
-pub type TokenV2BurnedMap = AHashMap<CurrentObjectPK, Burn>;
+/// Maps address to burn event (new). The event is None if it's an old burn event.
+pub type TokenV2Burned = AHashMap<CurrentObjectPK, Option<Burn>>;
 pub type TokenV2Minted = AHashSet<CurrentObjectPK>;
 pub type TokenV2MintedPK = (CurrentObjectPK, i64);
 

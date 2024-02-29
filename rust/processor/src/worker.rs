@@ -283,7 +283,8 @@ impl Worker {
                             "[Parser][T#{}] Channel closed; stream ended.",
                             task_index
                         );
-                        panic!("[Parser][T#{}] Channel closed", task_index);
+                        // If channel is closed, stop fetching and process the remaining transactions
+                        break;
                     },
                 };
 
@@ -657,6 +658,12 @@ impl Worker {
             MULTI_BATCH_PROCESSING_TIME_IN_SECS
                 .with_label_values(&[processor_name])
                 .set(processing_time.elapsed().as_secs_f64());
+
+            if let Some(ending_version) = ending_version {
+                if ending_version == batch_end {
+                    panic!("Reached ending version. Stopping processing.")
+                }
+            }
         }
     }
 

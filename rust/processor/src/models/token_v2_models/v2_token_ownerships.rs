@@ -7,7 +7,7 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, TokenV2Burned, TokenV2BurnedMap},
+    v2_token_utils::{TokenStandard, TokenV2Burned},
 };
 use crate::{
     models::{
@@ -236,14 +236,15 @@ impl TokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         tokens_burned: &TokenV2Burned,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
-        if let Some(token_address) =
-            tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
+        let token_data_id = standardize_address(&write_resource.address.to_string());
+        if tokens_burned
+            .get(&standardize_address(&token_data_id))
+            .is_some()
         {
             if let Some(object) =
                 &ObjectWithMetadata::from_write_resource(write_resource, txn_version)?
             {
                 let object_core = &object.object_core;
-                let token_data_id = token_address.clone();
                 let owner_address = object_core.get_owner_address();
                 let storage_id = token_data_id.clone();
                 let is_soulbound = !object_core.allow_ungated_transfer;
@@ -294,26 +295,22 @@ impl TokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        tokens_burned_map: &TokenV2BurnedMap,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
-        if let Some(token_address) =
-            tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
-        {
+        let token_address = standardize_address(&write_resource.address.to_string());
+        if let Some(burn_event) = tokens_burned.get(&token_address) {
             // 1. Try to lookup token address in burn event mapping
-            let previous_owner = if let Some(burn_event) =
-                tokens_burned_map.get(&standardize_address(&write_resource.address.to_string()))
-            {
+            let previous_owner = if let Some(burn_event) = burn_event {
                 burn_event.get_previous_owner_address()
             } else {
                 // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
                 // Do a lookup to get preivous owner.
-                let latest_nft_ownership = match prior_nft_ownership.get(token_address) {
+                let latest_nft_ownership = match prior_nft_ownership.get(&token_address) {
                     Some(inner) => inner.clone(),
                     None => {
                         match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                             conn,
-                            token_address,
+                            &token_address,
                         )
                         .await
                         {
@@ -346,11 +343,11 @@ impl TokenOwnershipV2 {
                     amount: BigDecimal::zero(),
                     table_type_v1: None,
                     token_properties_mutated_v1: None,
-                    is_soulbound_v2: None, // no-op
+                    is_soulbound_v2: None, // default
                     token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: None, // no-op
+                    is_fungible_v2: None, // default
                     transaction_timestamp: txn_timestamp,
-                    non_transferrable_by_owner: None, // no-op
+                    non_transferrable_by_owner: None, // default
                 },
                 CurrentTokenOwnershipV2 {
                     token_data_id,
@@ -360,12 +357,12 @@ impl TokenOwnershipV2 {
                     amount: BigDecimal::zero(),
                     table_type_v1: None,
                     token_properties_mutated_v1: None,
-                    is_soulbound_v2: None, // no-op
+                    is_soulbound_v2: None, // default
                     token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: None, // no-op
+                    is_fungible_v2: None, // default
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
-                    non_transferrable_by_owner: None, // no-op
+                    non_transferrable_by_owner: None, // default
                 },
             )));
         }
