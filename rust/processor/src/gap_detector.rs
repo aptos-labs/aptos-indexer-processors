@@ -7,11 +7,10 @@ use crate::{
 };
 use ahash::AHashMap;
 use kanal::AsyncReceiver;
-use std::sync::Arc;
 use tracing::{error, info};
 
 // Number of batches processed before gap detected
-pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 50;
+pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 100;
 // Number of seconds between each processor status update
 const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
@@ -70,7 +69,7 @@ impl GapDetector {
 
 pub async fn create_gap_detector_status_tracker_loop(
     gap_detector_receiver: AsyncReceiver<ProcessingResult>,
-    processor: Arc<Processor>,
+    processor: Processor,
     starting_version: u64,
     gap_detection_batch_size: u64,
 ) {
@@ -117,7 +116,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                         processor
                             .update_last_processed_version(
                                 res_last_success_batch.end_version,
-                                res_last_success_batch.last_transaction_timstamp.clone(),
+                                res_last_success_batch.last_transaction_timestamp.clone(),
                             )
                             .await
                             .unwrap();
@@ -132,7 +131,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                     error = ?e,
                     "[Parser] Gap detector task has panicked"
                 );
-                panic!();
+                panic!("[Parser] Gap detector task has panicked: {:?}", e);
             },
         }
     }
@@ -152,7 +151,7 @@ mod test {
             let result = ProcessingResult {
                 start_version: 100 + i * 100,
                 end_version: 199 + i * 100,
-                last_transaction_timstamp: None,
+                last_transaction_timestamp: None,
                 processing_duration_in_secs: 0.0,
                 db_insertion_duration_in_secs: 0.0,
             };
@@ -167,7 +166,7 @@ mod test {
             .process_versions(ProcessingResult {
                 start_version: 0,
                 end_version: 99,
-                last_transaction_timstamp: None,
+                last_transaction_timestamp: None,
                 processing_duration_in_secs: 0.0,
                 db_insertion_duration_in_secs: 0.0,
             })

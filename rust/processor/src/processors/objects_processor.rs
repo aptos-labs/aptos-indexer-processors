@@ -4,7 +4,10 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
+        fungible_asset_models::{
+            v2_fungible_asset_activities::FungibleAssetActivity,
+            v2_fungible_asset_utils::FungibleAssetStore,
+        },
         object_models::{
             v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
@@ -15,7 +18,7 @@ use crate::{
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
         util::standardize_address,
     },
 };
@@ -28,17 +31,20 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
 pub struct ObjectsProcessor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -58,7 +64,8 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
+    (objects, current_objects): (&[Object], &[CurrentObject]),
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -67,20 +74,25 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let io = execute_in_chunks(
         conn.clone(),
         insert_objects_query,
         objects,
-        Object::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<Object>("objects", per_table_chunk_sizes),
+    );
+    let co = execute_in_chunks(
         conn,
         insert_current_objects_query,
         current_objects,
-        CurrentObject::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<FungibleAssetActivity>(
+            "current_objects",
+            per_table_chunk_sizes,
+        ),
+    );
+    let (io_res, co_res) = tokio::join!(io, co);
+    for res in [io_res, co_res] {
+        res?;
+    }
 
     Ok(())
 }
@@ -149,6 +161,8 @@ impl ProcessorTrait for ObjectsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
 
         // Moving object handling here because we need a single object
@@ -274,7 +288,8 @@ impl ProcessorTrait for ObjectsProcessor {
             self.name(),
             start_version,
             end_version,
-            (all_objects, all_current_objects),
+            (&all_objects, &all_current_objects),
+            &self.per_table_chunk_sizes,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
@@ -285,7 +300,7 @@ impl ProcessorTrait for ObjectsProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(

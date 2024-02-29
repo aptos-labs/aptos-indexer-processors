@@ -88,7 +88,7 @@ pub struct NFTOwnershipV2 {
 }
 
 /// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
-#[derive(Debug, Identifiable, Queryable, Clone)]
+#[derive(Clone, Debug, Identifiable, Queryable)]
 #[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
 #[diesel(table_name = current_token_ownerships_v2)]
 pub struct CurrentTokenOwnershipV2Query {
