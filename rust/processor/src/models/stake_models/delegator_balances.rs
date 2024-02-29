@@ -18,7 +18,7 @@ use aptos_protos::transaction::v1::{
     write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, Zero};
-use diesel::{prelude::*, ExpressionMethods};
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

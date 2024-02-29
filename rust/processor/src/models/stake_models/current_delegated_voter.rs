@@ -15,7 +15,7 @@ use crate::{
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteTableItem;
-use diesel::{prelude::*, ExpressionMethods};
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
