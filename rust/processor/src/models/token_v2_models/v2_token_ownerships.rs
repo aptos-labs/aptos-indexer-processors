@@ -346,11 +346,11 @@ impl TokenOwnershipV2 {
                     amount: BigDecimal::zero(),
                     table_type_v1: None,
                     token_properties_mutated_v1: None,
-                    is_soulbound_v2: Some(false),
+                    is_soulbound_v2: None, // no-op
                     token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: Some(false),
+                    is_fungible_v2: None, // no-op
                     transaction_timestamp: txn_timestamp,
-                    non_transferrable_by_owner: Some(false),
+                    non_transferrable_by_owner: None, // no-op
                 },
                 CurrentTokenOwnershipV2 {
                     token_data_id,
@@ -360,12 +360,12 @@ impl TokenOwnershipV2 {
                     amount: BigDecimal::zero(),
                     table_type_v1: None,
                     token_properties_mutated_v1: None,
-                    is_soulbound_v2: Some(false),
+                    is_soulbound_v2: None, // no-op
                     token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: Some(false),
+                    is_fungible_v2: None, // no-op
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
-                    non_transferrable_by_owner: Some(false),
+                    non_transferrable_by_owner: None, // no-op
                 },
             )));
         }
