@@ -177,7 +177,7 @@ impl ProcessorTrait for NftMetadataProcessor {
 
 fn clean_token_pubsub_message(ctd: CurrentTokenDataV2, db_chain_id: u64) -> String {
     remove_null_bytes(&format!(
-        "{},{},{},{},{},false",
+        "{},{},{},{},{},true",
         ctd.token_data_id,
         ctd.token_uri,
         ctd.last_transaction_version,
@@ -188,7 +188,7 @@ fn clean_token_pubsub_message(ctd: CurrentTokenDataV2, db_chain_id: u64) -> Stri
 
 fn clean_collection_pubsub_message(cc: CurrentCollectionV2, db_chain_id: u64) -> String {
     remove_null_bytes(&format!(
-        "{},{},{},{},{},false",
+        "{},{},{},{},{},true",
         cc.collection_id,
         cc.uri,
         cc.last_transaction_version,
