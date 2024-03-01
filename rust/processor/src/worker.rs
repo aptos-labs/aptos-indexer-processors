@@ -364,40 +364,12 @@ impl Worker {
                 let gap_detector_sender = gap_detector_sender.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
-                    let start_version = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .first()
-                        .unwrap()
-                        .version;
-                    let end_version = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .last()
-                        .unwrap()
-                        .version;
-                    let start_txn_timestamp = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .first()
-                        .unwrap()
-                        .timestamp
-                        .clone();
-                    let end_txn_timestamp = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .last()
-                        .unwrap()
-                        .timestamp
-                        .clone();
-                    let txn_time = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .first()
-                        .unwrap()
-                        .timestamp
-                        .clone();
-                    if let Some(ref t) = txn_time {
+                    let start_version = transactions_pb.start_version;
+                    let end_version = transactions_pb.end_version;
+                    let start_txn_timestamp = transactions_pb.start_txn_timestamp;
+                    let end_txn_timestamp = transactions_pb.end_txn_timestamp;
+
+                    if let Some(ref t) = start_txn_timestamp {
                         PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS
                             .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
@@ -427,22 +399,23 @@ impl Worker {
                             db_chain_id,
                         ) // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
                         .await;
-                    if let Some(ref t) = txn_time {
+                    if let Some(ref t) = start_txn_timestamp {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
                             .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
 
                     let start_txn_timestamp_unix = start_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_unixtime(&t))
+                        .as_ref()
+                        .map(timestamp_to_unixtime)
                         .unwrap_or_default();
                     let start_txn_timestamp_iso = start_txn_timestamp
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default();
                     let end_txn_timestamp_iso = end_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default();
 
                     LATEST_PROCESSED_VERSION

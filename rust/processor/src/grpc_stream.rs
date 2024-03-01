@@ -291,7 +291,7 @@ pub async fn create_fetcher_loop(
                         .unwrap_or_default(),
                     end_txn_timestamp_iso = end_txn_timestamp
                         .as_ref()
-                        .map(|t| timestamp_to_iso(t))
+                        .map(timestamp_to_iso)
                         .unwrap_or_default(),
                     num_of_transactions = end_version - start_version + 1,
                     channel_size = buffer_size - txn_sender.capacity(),
@@ -336,7 +336,7 @@ pub async fn create_fetcher_loop(
                     .set(
                         start_txn_timestamp
                             .as_ref()
-                            .map(|t| timestamp_to_unixtime(t))
+                            .map(timestamp_to_unixtime)
                             .unwrap_or_default(),
                     );
                 PROCESSED_BYTES_COUNT
@@ -375,21 +375,19 @@ pub async fn create_fetcher_loop(
                 let num_txn_post_filter = txn_pb.transactions.len();
                 let num_filtered_txns = num_txns - num_txn_post_filter;
 
-                if num_txn_post_filter > 0 {
-                    match txn_sender.send(txn_pb).await {
-                        Ok(()) => {},
-                        Err(e) => {
-                            error!(
-                                processor_name = processor_name,
-                                stream_address = indexer_grpc_data_service_address.to_string(),
-                                connection_id,
-                                channel_size = buffer_size - txn_sender.capacity(),
-                                error = ?e,
-                                "[Parser] Error sending GRPC response to channel."
-                            );
-                            panic!("[Parser] Error sending GRPC response to channel.")
-                        },
-                    }
+                match txn_sender.send(txn_pb).await {
+                    Ok(()) => {},
+                    Err(e) => {
+                        error!(
+                            processor_name = processor_name,
+                            stream_address = indexer_grpc_data_service_address.to_string(),
+                            connection_id,
+                            channel_size = buffer_size - txn_sender.capacity(),
+                            error = ?e,
+                            "[Parser] Error sending GRPC response to channel."
+                        );
+                        panic!("[Parser] Error sending GRPC response to channel.")
+                    },
                 }
 
                 let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
