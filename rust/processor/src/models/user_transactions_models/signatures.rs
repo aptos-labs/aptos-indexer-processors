@@ -421,7 +421,7 @@ impl Signature {
     ) -> Vec<u8> {
         match signature_variant {
             Some(SignatureVariant::Ed25519(sig)) => sig.signature.clone(),
-            Some(SignatureVariant::Zkid(sig)) => sig.signature.clone(),
+            Some(SignatureVariant::Keyless(sig)) => sig.signature.clone(),
             Some(SignatureVariant::Webauthn(sig)) => sig.signature.clone(),
             Some(SignatureVariant::Secp256k1Ecdsa(sig)) => sig.signature.clone(),
             None => {
@@ -449,7 +449,7 @@ impl Signature {
         };
         match signature_variant {
             Some(SignatureVariant::Ed25519(_)) => format!("{}_ed25519_signature", prefix),
-            Some(SignatureVariant::Zkid(_)) => format!("{}_zkid_signature", prefix),
+            Some(SignatureVariant::Keyless(_)) => format!("{}_keyless_signature", prefix),
             Some(SignatureVariant::Webauthn(_)) => format!("{}_webauthn_signature", prefix),
             Some(SignatureVariant::Secp256k1Ecdsa(_)) => {
                 format!("{}_secp256k1_ecdsa_signature", prefix)
