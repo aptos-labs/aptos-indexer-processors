@@ -3,6 +3,7 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
+    grpc_stream::TransactionsPBResponse,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -33,7 +34,6 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
-use aptos_protos::transaction::v1::Transaction;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 use tracing::{error, info};
@@ -46,13 +46,6 @@ const BUFFER_SIZE: usize = 50;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
-
-#[derive(Clone)]
-pub struct TransactionsPBResponse {
-    pub transactions: Vec<Transaction>,
-    pub chain_id: u64,
-    pub size_in_bytes: u64,
-}
 
 pub struct Worker {
     pub db_pool: PgDbPool,
@@ -318,8 +311,7 @@ impl Worker {
                             .unwrap(),
                     );
                 }
-                let current_fetched_version =
-                    txn_pb.transactions.as_slice().first().unwrap().version;
+                let current_fetched_version = txn_pb.start_version;
                 if last_fetched_version + 1 != current_fetched_version as i64 {
                     error!(
                         batch_start_version = batch_start_version,
@@ -329,8 +321,7 @@ impl Worker {
                     );
                     panic!("[Parser] Received batch with gap from GRPC stream");
                 }
-                last_fetched_version =
-                    txn_pb.transactions.as_slice().last().unwrap().version as i64;
+                last_fetched_version = txn_pb.end_version as i64;
                 transactions_batches.push(txn_pb);
             }
 
@@ -340,20 +331,12 @@ impl Worker {
             let batch_start_txn_timestamp = transactions_batches
                 .first()
                 .unwrap()
-                .transactions
-                .as_slice()
-                .first()
-                .unwrap()
-                .timestamp
+                .start_txn_timestamp
                 .clone();
             let batch_end_txn_timestamp = transactions_batches
                 .last()
                 .unwrap()
-                .transactions
-                .as_slice()
-                .last()
-                .unwrap()
-                .timestamp
+                .end_txn_timestamp
                 .clone();
             GRPC_LATENCY_BY_PROCESSOR_IN_SECS
                 .with_label_values(&[processor_name])

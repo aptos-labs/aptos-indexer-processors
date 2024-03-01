@@ -1,15 +1,14 @@
-use crate::{
-    utils::{
-        counters::{
-            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
-            NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
-        },
-        util::{timestamp_to_iso, timestamp_to_unixtime},
+use crate::utils::{
+    counters::{
+        ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
+        NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
-    worker::TransactionsPBResponse,
+    util::{timestamp_to_iso, timestamp_to_unixtime},
 };
-use aptos_protos::indexer::v1::{
-    raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
+use aptos_protos::{
+    indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
+    transaction::v1::Transaction,
+    util::timestamp::Timestamp,
 };
 use futures_util::StreamExt;
 use kanal::AsyncSender;
@@ -30,6 +29,18 @@ const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 pub const RECONNECTION_MAX_RETRIES: u64 = 65;
 /// 256MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
+
+#[derive(Clone)]
+pub struct TransactionsPBResponse {
+    pub transactions: Vec<Transaction>,
+    pub chain_id: u64,
+    // We put start/end versions here as filtering means there are potential "gaps" here now
+    pub start_version: u64,
+    pub end_version: u64,
+    pub start_txn_timestamp: Option<Timestamp>,
+    pub end_txn_timestamp: Option<Timestamp>,
+    pub size_in_bytes: u64,
+}
 
 pub fn grpc_request_builder(
     starting_version: u64,
@@ -279,7 +290,8 @@ pub async fn create_fetcher_loop(
                         .map(|t| timestamp_to_iso(&t))
                         .unwrap_or_default(),
                     end_txn_timestamp_iso = end_txn_timestamp
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(|t| timestamp_to_iso(t))
                         .unwrap_or_default(),
                     num_of_transactions = end_version - start_version + 1,
                     channel_size = buffer_size - txn_sender.capacity(),
@@ -323,7 +335,8 @@ pub async fn create_fetcher_loop(
                     ])
                     .set(
                         start_txn_timestamp
-                            .map(|t| timestamp_to_unixtime(&t))
+                            .as_ref()
+                            .map(|t| timestamp_to_unixtime(t))
                             .unwrap_or_default(),
                     );
                 PROCESSED_BYTES_COUNT
@@ -345,6 +358,10 @@ pub async fn create_fetcher_loop(
                 let mut txn_pb = TransactionsPBResponse {
                     transactions: r.transactions,
                     chain_id,
+                    start_version,
+                    end_version,
+                    start_txn_timestamp,
+                    end_txn_timestamp,
                     size_in_bytes,
                 };
                 let size_in_bytes = txn_pb.size_in_bytes;
