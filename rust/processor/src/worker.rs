@@ -11,6 +11,7 @@ use crate::{
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        transaction_metadata_processor::TransactionMetadataProcessor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
     },
@@ -760,6 +761,9 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
             Processor::from(TokenProcessor::new(db_pool, config.clone()))
         },
         ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
+        ProcessorConfig::TransactionMetadataProcessor => {
+            Processor::from(TransactionMetadataProcessor::new(db_pool))
+        },
         ProcessorConfig::UserTransactionProcessor => {
             Processor::from(UserTransactionProcessor::new(db_pool))
         },
