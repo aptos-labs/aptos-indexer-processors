@@ -16,6 +16,7 @@ use crate::{
         ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
+    transaction_filter::TransactionFilter,
     utils::{
         counters::{
             ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
@@ -65,6 +66,7 @@ pub struct Worker {
     pub number_concurrent_processing_tasks: usize,
     pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
+    pub transaction_filter: TransactionFilter,
 }
 
 impl Worker {
@@ -80,6 +82,7 @@ impl Worker {
         db_pool_size: Option<u32>,
         gap_detection_batch_size: u64,
         enable_verbose_logging: Option<bool>,
+        transaction_filter: TransactionFilter,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -110,6 +113,7 @@ impl Worker {
             number_concurrent_processing_tasks,
             gap_detection_batch_size,
             enable_verbose_logging,
+            transaction_filter,
         })
     }
 
@@ -186,6 +190,7 @@ impl Worker {
         let (tx, receiver) = kanal::bounded_async::<TransactionsPBResponse>(BUFFER_SIZE);
         let request_ending_version = self.ending_version;
         let auth_token = self.auth_token.clone();
+        let transaction_filter = self.transaction_filter.clone();
         tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
@@ -205,6 +210,7 @@ impl Worker {
                 processor_name.to_string(),
                 batch_start_version,
                 BUFFER_SIZE,
+                transaction_filter,
             )
             .await
         });

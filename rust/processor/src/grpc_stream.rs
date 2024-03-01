@@ -214,6 +214,7 @@ pub async fn create_fetcher_loop(
     processor_name: String,
     batch_start_version: u64,
     buffer_size: usize,
+    transaction_filter: crate::transaction_filter::TransactionFilter,
 ) {
     let mut grpc_channel_recv_latency = std::time::Instant::now();
     let mut next_version_to_fetch = batch_start_version;
@@ -341,51 +342,64 @@ pub async fn create_fetcher_loop(
                     .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
-                let txn_pb = TransactionsPBResponse {
+                let mut txn_pb = TransactionsPBResponse {
                     transactions: r.transactions,
                     chain_id,
                     size_in_bytes,
                 };
                 let size_in_bytes = txn_pb.size_in_bytes;
-                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-                let tps = (txn_pb.transactions.len() as f64
-                    / txn_channel_send_latency.elapsed().as_secs_f64())
-                    as u64;
-                let bytes_per_sec =
-                    txn_pb.size_in_bytes as f64 / txn_channel_send_latency.elapsed().as_secs_f64();
+                let num_txns = txn_pb.transactions.len();
 
-                match txn_sender.send(txn_pb).await {
-                    Ok(()) => {},
-                    Err(e) => {
-                        error!(
-                            processor_name = processor_name,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
-                            channel_size = buffer_size - txn_sender.capacity(),
-                            error = ?e,
-                            "[Parser] Error sending GRPC response to channel."
-                        );
-                        panic!("[Parser] Error sending GRPC response to channel.")
-                    },
+                // Filter out the txns we don't care about
+                txn_pb
+                    .transactions
+                    .retain(|txn| transaction_filter.include(txn));
+
+                let num_txn_post_filter = txn_pb.transactions.len();
+                let num_filtered_txns = num_txns - num_txn_post_filter;
+
+                if num_txn_post_filter > 0 {
+                    match txn_sender.send(txn_pb).await {
+                        Ok(()) => {},
+                        Err(e) => {
+                            error!(
+                                processor_name = processor_name,
+                                stream_address = indexer_grpc_data_service_address.to_string(),
+                                connection_id,
+                                channel_size = buffer_size - txn_sender.capacity(),
+                                error = ?e,
+                                "[Parser] Error sending GRPC response to channel."
+                            );
+                            panic!("[Parser] Error sending GRPC response to channel.")
+                        },
+                    }
                 }
+
+                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
+                let tps = (num_txns as f64 / duration_in_secs) as u64;
+                let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
+
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     connection_id,
-                    start_version = start_version,
-                    end_version = end_version,
+                    start_version,
+                    end_version,
                     channel_size = buffer_size - txn_sender.capacity(),
-                    size_in_bytes = size_in_bytes,
-                    duration_in_secs = duration_in_secs,
-                    bytes_per_sec = bytes_per_sec,
-                    tps = tps,
+                    size_in_bytes,
+                    duration_in_secs,
+                    bytes_per_sec,
+                    tps,
+                    num_filtered_txns,
                     "[Parser] Successfully sent transactions to channel."
                 );
                 FETCHER_THREAD_CHANNEL_SIZE
                     .with_label_values(&[&processor_name])
                     .set((buffer_size - txn_sender.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
+                // TODO: Add a metric for the number of transactions filtered out
+
                 true
             },
             Some(Err(rpc_error)) => {
