@@ -8,3 +8,7 @@ This script attempts to get the signer of the resource account and deploy code t
 ## How to run this code?
 `aptos move compile && aptos move run-script --compiled-script-path build/run_script/bytecode_scripts/main.mv --profile blah`
   * If you haven't created a profile before run `aptos init --profile blah`
+
+## Notes
+  * This is meant to be a template. You should build your own script.
+  * In `Move.toml`, you can change the revision for the frameworks to test new code, from `main` for example.
