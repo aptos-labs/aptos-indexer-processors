@@ -267,7 +267,7 @@ pub async fn create_fetcher_loop(
     let mut batch_start_version = batch_start_version;
     loop {
         let is_success = match resp_stream.next().await {
-            Some(Ok(r)) => {
+            Some(Ok(mut r)) => {
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
                 let start_txn_timestamp =
@@ -278,6 +278,9 @@ pub async fn create_fetcher_loop(
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
 
+                // Filter out the txns we don't care about
+                r.transactions.retain(|txn| transaction_filter.include(txn));
+
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -286,8 +289,8 @@ pub async fn create_fetcher_loop(
                     start_version,
                     end_version,
                     start_txn_timestamp_iso = start_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default(),
                     end_txn_timestamp_iso = end_txn_timestamp
                         .as_ref()
@@ -355,7 +358,7 @@ pub async fn create_fetcher_loop(
                     .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
-                let mut txn_pb = TransactionsPBResponse {
+                let txn_pb = TransactionsPBResponse {
                     transactions: r.transactions,
                     chain_id,
                     start_version,
@@ -366,11 +369,6 @@ pub async fn create_fetcher_loop(
                 };
                 let size_in_bytes = txn_pb.size_in_bytes;
                 let num_txns = txn_pb.transactions.len();
-
-                // Filter out the txns we don't care about
-                txn_pb
-                    .transactions
-                    .retain(|txn| transaction_filter.include(txn));
 
                 let num_txn_post_filter = txn_pb.transactions.len();
                 let num_filtered_txns = num_txns - num_txn_post_filter;
