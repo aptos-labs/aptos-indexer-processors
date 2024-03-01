@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// The criteria are combined with `AND`
 /// If a criteria is not set, it is ignored
 /// Criteria will be loaded from the config file
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransactionFilter {
     // Only allow transactions from these contract addresses
@@ -46,23 +46,23 @@ impl TransactionFilter {
             return true;
         }
 
-        if let Some(txn_data) = transaction.txn_data.as_ref() {
-            if let TxnData::User(user_transaction) = txn_data {
-                if let Some(utr) = user_transaction.request.as_ref() {
-                    // Skip if sender is in the skip list
-                    if let Some(skip_sender_addresses) = &self.skip_sender_addresses {
-                        return !skip_sender_addresses.contains(&utr.sender);
+        if let Some(TxnData::User(user_transaction)) = transaction.txn_data.as_ref() {
+            if let Some(utr) = user_transaction.request.as_ref() {
+                // Skip if sender is in the skip list
+                if let Some(skip_sender_addresses) = &self.skip_sender_addresses {
+                    if skip_sender_addresses.contains(&utr.sender) {
+                        return false;
                     }
+                }
 
-                    if let Some(focus_contract_addresses) = &self.focus_contract_addresses {
-                        // Skip if focus contract addresses are set and the transaction isn't in the list
-                        if let Some(payload) = utr.payload.as_ref() {
-                            if let Some(Payload::EntryFunctionPayload(efp)) =
-                                payload.payload.as_ref()
-                            {
-                                if let Some(function) = efp.function.as_ref() {
-                                    if let Some(module) = function.module.as_ref() {
-                                        return focus_contract_addresses.contains(&module.address);
+                if let Some(focus_contract_addresses) = &self.focus_contract_addresses {
+                    // Skip if focus contract addresses are set and the transaction isn't in the list
+                    if let Some(payload) = utr.payload.as_ref() {
+                        if let Some(Payload::EntryFunctionPayload(efp)) = payload.payload.as_ref() {
+                            if let Some(function) = efp.function.as_ref() {
+                                if let Some(module) = function.module.as_ref() {
+                                    if !focus_contract_addresses.contains(&module.address) {
+                                        return false;
                                     }
                                 }
                             }
