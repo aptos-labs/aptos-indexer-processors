@@ -37,6 +37,7 @@ impl TransactionFilter {
     /// Returns true if the transaction should be included
     pub fn include(&self, transaction: &Transaction) -> bool {
         // If we're only focusing on user transactions, skip if it's not a user transaction
+
         let is_user_txn = transaction.r#type == TransactionType::User as i32;
         if self.focus_user_transactions && !is_user_txn {
             return false;

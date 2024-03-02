@@ -1,7 +1,8 @@
 use crate::utils::{
     counters::{
         ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
-        NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
+        NUM_TRANSACTIONS_FILTERED_OUT_COUNT, NUM_TRANSACTIONS_PROCESSED_COUNT,
+        PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
     util::{timestamp_to_iso, timestamp_to_unixtime},
 };
@@ -278,8 +279,13 @@ pub async fn create_fetcher_loop(
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
 
+                let num_txns = r.transactions.len();
+
                 // Filter out the txns we don't care about
                 r.transactions.retain(|txn| transaction_filter.include(txn));
+
+                let num_txn_post_filter = r.transactions.len();
+                let num_filtered_txns = num_txns - num_txn_post_filter;
 
                 info!(
                     processor_name = processor_name,
@@ -368,10 +374,6 @@ pub async fn create_fetcher_loop(
                     size_in_bytes,
                 };
                 let size_in_bytes = txn_pb.size_in_bytes;
-                let num_txns = txn_pb.transactions.len();
-
-                let num_txn_post_filter = txn_pb.transactions.len();
-                let num_filtered_txns = num_txns - num_txn_post_filter;
 
                 match txn_sender.send(txn_pb).await {
                     Ok(()) => {},
@@ -411,8 +413,10 @@ pub async fn create_fetcher_loop(
                     .with_label_values(&[&processor_name])
                     .set((buffer_size - txn_sender.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
-                // TODO: Add a metric for the number of transactions filtered out
 
+                NUM_TRANSACTIONS_FILTERED_OUT_COUNT
+                    .with_label_values(&[&processor_name])
+                    .inc_by(num_filtered_txns as u64);
                 true
             },
             Some(Err(rpc_error)) => {
