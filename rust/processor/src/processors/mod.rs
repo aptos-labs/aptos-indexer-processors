@@ -68,7 +68,7 @@ pub struct ProcessingResult {
 /// Base trait for all processors
 #[async_trait]
 #[enum_dispatch]
-pub trait ProcessorTrait: Send + Sync + Debug + ToOwned {
+pub trait ProcessorTrait: Send + Sync + Debug {
     fn name(&self) -> &'static str;
 
     /// Process all transactions including writing to the database
