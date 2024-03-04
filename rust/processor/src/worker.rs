@@ -3,6 +3,7 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
+    grpc_stream::TransactionsPBResponse,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -16,6 +17,7 @@ use crate::{
         ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
+    transaction_filter::TransactionFilter,
     utils::{
         counters::{
             ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
@@ -32,7 +34,6 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
-use aptos_protos::transaction::v1::Transaction;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 use tracing::{error, info};
@@ -46,13 +47,6 @@ const BUFFER_SIZE: usize = 50;
 const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub(crate) const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
-#[derive(Clone)]
-pub struct TransactionsPBResponse {
-    pub transactions: Vec<Transaction>,
-    pub chain_id: u64,
-    pub size_in_bytes: u64,
-}
-
 pub struct Worker {
     pub db_pool: PgDbPool,
     pub processor_config: ProcessorConfig,
@@ -65,6 +59,7 @@ pub struct Worker {
     pub number_concurrent_processing_tasks: usize,
     pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
+    pub transaction_filter: TransactionFilter,
 }
 
 impl Worker {
@@ -80,6 +75,7 @@ impl Worker {
         db_pool_size: Option<u32>,
         gap_detection_batch_size: u64,
         enable_verbose_logging: Option<bool>,
+        transaction_filter: TransactionFilter,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -110,6 +106,7 @@ impl Worker {
             number_concurrent_processing_tasks,
             gap_detection_batch_size,
             enable_verbose_logging,
+            transaction_filter,
         })
     }
 
@@ -186,6 +183,7 @@ impl Worker {
         let (tx, receiver) = kanal::bounded_async::<TransactionsPBResponse>(BUFFER_SIZE);
         let request_ending_version = self.ending_version;
         let auth_token = self.auth_token.clone();
+        let transaction_filter = self.transaction_filter.clone();
         tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
@@ -205,6 +203,7 @@ impl Worker {
                 processor_name.to_string(),
                 batch_start_version,
                 BUFFER_SIZE,
+                transaction_filter,
             )
             .await
         });
@@ -312,8 +311,7 @@ impl Worker {
                             .unwrap(),
                     );
                 }
-                let current_fetched_version =
-                    txn_pb.transactions.as_slice().first().unwrap().version;
+                let current_fetched_version = txn_pb.start_version;
                 if last_fetched_version + 1 != current_fetched_version as i64 {
                     error!(
                         batch_start_version = batch_start_version,
@@ -323,8 +321,7 @@ impl Worker {
                     );
                     panic!("[Parser] Received batch with gap from GRPC stream");
                 }
-                last_fetched_version =
-                    txn_pb.transactions.as_slice().last().unwrap().version as i64;
+                last_fetched_version = txn_pb.end_version as i64;
                 transactions_batches.push(txn_pb);
             }
 
@@ -334,20 +331,12 @@ impl Worker {
             let batch_start_txn_timestamp = transactions_batches
                 .first()
                 .unwrap()
-                .transactions
-                .as_slice()
-                .first()
-                .unwrap()
-                .timestamp
+                .start_txn_timestamp
                 .clone();
             let batch_end_txn_timestamp = transactions_batches
                 .last()
                 .unwrap()
-                .transactions
-                .as_slice()
-                .last()
-                .unwrap()
-                .timestamp
+                .end_txn_timestamp
                 .clone();
             GRPC_LATENCY_BY_PROCESSOR_IN_SECS
                 .with_label_values(&[processor_name])
@@ -375,40 +364,12 @@ impl Worker {
                 let gap_detector_sender = gap_detector_sender.clone();
                 let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
-                    let start_version = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .first()
-                        .unwrap()
-                        .version;
-                    let end_version = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .last()
-                        .unwrap()
-                        .version;
-                    let start_txn_timestamp = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .first()
-                        .unwrap()
-                        .timestamp
-                        .clone();
-                    let end_txn_timestamp = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .last()
-                        .unwrap()
-                        .timestamp
-                        .clone();
-                    let txn_time = transactions_pb
-                        .transactions
-                        .as_slice()
-                        .first()
-                        .unwrap()
-                        .timestamp
-                        .clone();
-                    if let Some(ref t) = txn_time {
+                    let start_version = transactions_pb.start_version;
+                    let end_version = transactions_pb.end_version;
+                    let start_txn_timestamp = transactions_pb.start_txn_timestamp;
+                    let end_txn_timestamp = transactions_pb.end_txn_timestamp;
+
+                    if let Some(ref t) = start_txn_timestamp {
                         PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS
                             .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
@@ -438,22 +399,23 @@ impl Worker {
                             db_chain_id,
                         ) // TODO: Change how we fetch chain_id, ideally can be accessed by processors when they are initiallized (e.g. so they can have a chain_id field set on new() funciton)
                         .await;
-                    if let Some(ref t) = txn_time {
+                    if let Some(ref t) = start_txn_timestamp {
                         PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS
                             .with_label_values(&[auth_token.as_str(), processor_name])
                             .set(time_diff_since_pb_timestamp_in_secs(t));
                     }
 
                     let start_txn_timestamp_unix = start_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_unixtime(&t))
+                        .as_ref()
+                        .map(timestamp_to_unixtime)
                         .unwrap_or_default();
                     let start_txn_timestamp_iso = start_txn_timestamp
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default();
                     let end_txn_timestamp_iso = end_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default();
 
                     LATEST_PROCESSED_VERSION
