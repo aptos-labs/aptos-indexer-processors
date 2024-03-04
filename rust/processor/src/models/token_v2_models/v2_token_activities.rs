@@ -78,7 +78,7 @@ impl TokenActivityV2 {
         event_index: i64,
         entry_function_id_str: &Option<String>,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(fa_event) =
@@ -93,17 +93,17 @@ impl TokenActivityV2 {
                 let object_core = &object_data.object.object_core;
                 let fungible_asset = object_data.fungible_asset_store.as_ref().unwrap();
                 let token_data_id = fungible_asset.metadata.get_reference_address();
-                // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(
-                    conn,
-                    &token_data_id,
-                    object_metadatas,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
+                // // Exit early if it's not a token
+                // if !TokenDataV2::is_address_fungible_token(
+                //     conn,
+                //     &token_data_id,
+                //     object_metadatas,
+                //     txn_version,
+                // )
+                // .await
+                // {
+                //     return Ok(None);
+                // }
 
                 let token_activity_helper = match fa_event {
                     FungibleAssetEvent::WithdrawEvent(inner) => TokenActivityHelperV2 {

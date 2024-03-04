@@ -28,6 +28,7 @@ pub struct IndexerGrpcProcessorConfig {
     #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
     pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
+    #[serde(default)]
     pub transaction_filter: TransactionFilter,
 }
 

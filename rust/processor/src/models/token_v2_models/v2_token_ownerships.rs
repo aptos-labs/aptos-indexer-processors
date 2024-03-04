@@ -370,7 +370,7 @@ impl TokenOwnershipV2 {
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
+        // conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
@@ -394,16 +394,16 @@ impl TokenOwnershipV2 {
                 let object_core = &object_data.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(
-                    conn,
-                    &token_data_id,
-                    object_metadatas,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
+                // if !TokenDataV2::is_address_fungible_token(
+                //     conn,
+                //     &token_data_id,
+                //     object_metadatas,
+                //     txn_version,
+                // )
+                // .await
+                // {
+                //     return Ok(None);
+                // }
                 let storage_id = resource.address.clone();
                 let is_soulbound = inner.frozen;
                 let amount = inner.balance;
