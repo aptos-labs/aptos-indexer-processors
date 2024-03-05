@@ -155,8 +155,8 @@ impl FungibleAssetMetadataModel {
                 }
 
                 tracing::error!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
-                // By default, don't index
-                false
+                // By default, assume it's not a fungible token and index it as a fungible asset
+                true
             },
             Err(_) => {
                 tracing::error!(
@@ -165,8 +165,8 @@ impl FungibleAssetMetadataModel {
                     "Missing current_object for object_address: {}. You probably should backfill db.",
                     address,
                 );
-                // By default, don't index
-                false
+                // By default, assume it's not a fungible token and index it as a fungible asset
+                true
             },
         }
     }
