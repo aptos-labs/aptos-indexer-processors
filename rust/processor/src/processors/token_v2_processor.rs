@@ -625,7 +625,7 @@ async fn parse_v2_token(
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
                     &tokens_minted,
-                    conn,
+                    conn, // needed to find owner of burnt token
                 )
                 .await
                 .unwrap()
@@ -640,7 +640,7 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
-                    conn,
+                    // conn,
                 )
                 .await
                 .unwrap()
@@ -660,7 +660,7 @@ async fn parse_v2_token(
                                 wsc_index,
                                 txn_timestamp,
                                 table_handle_to_owner,
-                                conn,
+                                conn, // needed to find creator address of a collection
                             )
                             .await
                             .unwrap()
@@ -850,7 +850,7 @@ async fn parse_v2_token(
                                 wsc_index,
                                 txn_timestamp,
                                 &token_v2_metadata_helper,
-                                conn,
+                                // conn,
                             )
                             .await
                             .unwrap()
@@ -894,7 +894,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
-                                conn,
+                                conn, // needed to find owner of burnt token
                             )
                             .await
                             .unwrap()
