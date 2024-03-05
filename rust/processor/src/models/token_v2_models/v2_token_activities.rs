@@ -7,8 +7,7 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_ownerships::CurrentTokenOwnershipV2Query,
-    v2_token_utils::{TokenStandard, TokenV2Minted, V2TokenEvent},
+    v2_token_utils::{TokenStandard, V2TokenEvent},
 };
 use crate::{
     models::{
@@ -154,9 +153,6 @@ impl TokenActivityV2 {
         event_index: i64,
         entry_function_id_str: &Option<String>,
         token_v2_metadata: &ObjectAggregatedDataMapping,
-        tokens_minted: &TokenV2Minted,
-        // needed to find owner of the burnt nft
-        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) =
@@ -167,9 +163,9 @@ impl TokenActivityV2 {
             // burn and mint events are attached to the collection. The rest should be attached to the token
             let token_data_id = match token_event {
                 V2TokenEvent::MintEvent(inner) => inner.get_token_address(),
-                V2TokenEvent::ConcurrentMintEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::Mint(inner) => inner.get_token_address(),
                 V2TokenEvent::BurnEvent(inner) => inner.get_token_address(),
-                V2TokenEvent::ConcurrentBurnEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::Burn(inner) => inner.get_token_address(),
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
@@ -185,7 +181,7 @@ impl TokenActivityV2 {
                         after_value: None,
                         event_type: event_type.clone(),
                     },
-                    V2TokenEvent::ConcurrentMintEvent(_) => TokenActivityHelperV2 {
+                    V2TokenEvent::Mint(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
                         to_address: None,
                         token_amount: BigDecimal::one(),
@@ -209,7 +205,7 @@ impl TokenActivityV2 {
                         after_value: None,
                         event_type: event_type.clone(),
                     },
-                    V2TokenEvent::ConcurrentBurnEvent(_) => TokenActivityHelperV2 {
+                    V2TokenEvent::Burn(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
                         to_address: None,
                         token_amount: BigDecimal::one(),
@@ -244,47 +240,16 @@ impl TokenActivityV2 {
                     transaction_timestamp: txn_timestamp,
                 }));
             } else {
-                // This should only happen in the case where we have a burn event and mint event in the same
-                // transaction.
-                if tokens_minted.get(&token_data_id).is_some() {
-                    return Ok(Some(Self {
-                        transaction_version: txn_version,
-                        event_index,
-                        event_account_address,
-                        token_data_id,
-                        property_version_v1: BigDecimal::zero(),
-                        type_: event_type,
-                        from_address: None,
-                        to_address: None,
-                        token_amount: BigDecimal::one(),
-                        before_value: None,
-                        after_value: None,
-                        entry_function_id_str: entry_function_id_str.clone(),
-                        token_standard: TokenStandard::V2.to_string(),
-                        is_fungible_v2: Some(false),
-                        transaction_timestamp: txn_timestamp,
-                    }));
-                }
+                // If the object metadata isn't found in the transaction, then the token was burnt.
 
-                // This should only happen in the case where we have a burn event where the token is gone
-                // and the previous instance of the token wasn't in the batch. We need to look up in the db
-                let latest_nft_ownership =
-                    match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                        conn,
-                        &token_data_id,
-                    )
-                    .await
-                    {
-                        Ok(nft) => nft,
-                        Err(_) => {
-                            tracing::error!(
-                            transaction_version = txn_version,
-                            lookup_key = &token_data_id,
-                            "Failed to find NFT for burned token. You probably should backfill db."
-                        );
-                            return Ok(None);
-                        },
-                    };
+                // the new burn event has owner address now!
+                let owner_address = if let V2TokenEvent::Burn(inner) = token_event {
+                    Some(inner.get_previous_owner_address())
+                } else {
+                    // To handle a case with the old burn events, when a token is minted and burnt in the same transaction
+                    None
+                };
+
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     event_index,
@@ -292,7 +257,7 @@ impl TokenActivityV2 {
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
                     type_: event_type,
-                    from_address: Some(latest_nft_ownership.owner_address),
+                    from_address: owner_address.clone(),
                     to_address: None,
                     token_amount: BigDecimal::one(),
                     before_value: None,

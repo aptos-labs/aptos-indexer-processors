@@ -21,9 +21,9 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, ConcurrentBurnEvent, ConcurrentSupply, FixedSupply,
-                MintEvent, PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned,
-                TokenV2Minted, TransferEvent, UnlimitedSupply,
+                AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
+                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
+                TransferEvent, UnlimitedSupply,
             },
         },
     },
@@ -79,6 +79,7 @@ async fn insert_to_db(
     current_collections_v2: Vec<CurrentCollectionV2>,
     current_token_datas_v2: Vec<CurrentTokenDataV2>,
     current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
+    current_burned_token_ownerships_v2: Vec<CurrentTokenOwnershipV2>,
     token_activities_v2: Vec<TokenActivityV2>,
     current_token_v2_metadata: Vec<CurrentTokenV2Metadata>,
 ) -> Result<(), diesel::result::Error> {
@@ -128,6 +129,13 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
+        CurrentTokenOwnershipV2::field_count(),
+    )
+    .await?;
+    execute_in_chunks(
+        conn.clone(),
+        insert_current_burned_token_ownerships_v2_query,
+        current_burned_token_ownerships_v2,
         CurrentTokenOwnershipV2::field_count(),
     )
     .await?;
@@ -293,6 +301,29 @@ fn insert_current_token_ownerships_v2_query(
     )
 }
 
+fn insert_current_burned_token_ownerships_v2_query(
+    items_to_insert: Vec<CurrentTokenOwnershipV2>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_token_ownerships_v2::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_token_ownerships_v2::table)
+            .values(items_to_insert)
+            .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
+            .do_update()
+            .set((
+                amount.eq(excluded(amount)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
 fn insert_token_activities_v2_query(
     items_to_insert: Vec<TokenActivityV2>,
 ) -> (
@@ -365,6 +396,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_ownerships_v2,
             current_collections_v2,
             current_token_ownerships_v2,
+            current_burned_token_ownerships_v2,
             current_token_datas_v2,
             token_activities_v2,
             current_token_v2_metadata,
@@ -383,6 +415,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_ownerships_v2,
             current_collections_v2,
             current_token_ownerships_v2,
+            current_burned_token_ownerships_v2,
             current_token_datas_v2,
             token_activities_v2,
             current_token_v2_metadata,
@@ -427,6 +460,7 @@ async fn parse_v2_token(
     Vec<CurrentCollectionV2>,
     Vec<CurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
+    Vec<CurrentTokenOwnershipV2>, // burned token ownerships
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
 ) {
@@ -443,6 +477,7 @@ async fn parse_v2_token(
         CurrentTokenOwnershipV2PK,
         CurrentTokenOwnershipV2,
     > = AHashMap::new();
+    let mut current_burned_token_ownerships_v2 = vec![];
     // Tracks prior ownership in case a token gets burned
     let mut prior_nft_ownership: AHashMap<String, NFTOwnershipV2> = AHashMap::new();
     // Get Metadata for token v2 by object
@@ -481,7 +516,7 @@ async fn parse_v2_token(
             let entry_function_id_str = get_entry_function_from_user_request(user_request);
 
             // Get burn events for token v2 by object
-            let mut tokens_burned: TokenV2Burned = AHashSet::new();
+            let mut tokens_burned: TokenV2Burned = AHashMap::new();
 
             // Get mint events for token v2 by object
             let mut tokens_minted: TokenV2Minted = AHashSet::new();
@@ -562,10 +597,10 @@ async fn parse_v2_token(
                         {
                             aggregated_data.fungible_asset_store = Some(fungible_asset_store);
                         }
-                        if let Some(oken_identifier) =
+                        if let Some(token_identifier) =
                             TokenIdentifiers::from_write_resource(wr, txn_version).unwrap()
                         {
-                            aggregated_data.token_identifier = Some(oken_identifier);
+                            aggregated_data.token_identifier = Some(token_identifier);
                         }
                     }
                 }
@@ -575,13 +610,11 @@ async fn parse_v2_token(
             // This needs to be here because we need the metadata above for token activities
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
-                if let Some(burn_event) =
-                    ConcurrentBurnEvent::from_event(event, txn_version).unwrap()
-                {
-                    tokens_burned.insert(burn_event.get_token_address());
+                if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
+                    tokens_burned.insert(burn_event.get_token_address(), Some(burn_event));
                 }
                 if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address());
+                    tokens_burned.insert(burn_event.get_token_address(), None);
                 }
                 if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap() {
                     tokens_minted.insert(mint_event.get_token_address());
@@ -624,8 +657,6 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
-                    &tokens_minted,
-                    conn,
                 )
                 .await
                 .unwrap()
@@ -739,15 +770,7 @@ async fn parse_v2_token(
                                         is_soulbound: cto.is_soulbound_v2,
                                     },
                                 );
-                                current_token_ownerships_v2.insert(
-                                    (
-                                        cto.token_data_id.clone(),
-                                        cto.property_version_v1.clone(),
-                                        cto.owner_address.clone(),
-                                        cto.storage_id.clone(),
-                                    ),
-                                    cto,
-                                );
+                                current_burned_token_ownerships_v2.push(cto);
                             }
                         }
                     },
@@ -831,15 +854,7 @@ async fn parse_v2_token(
                                     is_soulbound: current_nft_ownership.is_soulbound_v2,
                                 },
                             );
-                            current_token_ownerships_v2.insert(
-                                (
-                                    current_nft_ownership.token_data_id.clone(),
-                                    current_nft_ownership.property_version_v1.clone(),
-                                    current_nft_ownership.owner_address.clone(),
-                                    current_nft_ownership.storage_id.clone(),
-                                ),
-                                current_nft_ownership,
-                            );
+                            current_burned_token_ownerships_v2.push(current_nft_ownership);
                         }
 
                         // Add fungible token handling
@@ -908,15 +923,7 @@ async fn parse_v2_token(
                                     is_soulbound: current_nft_ownership.is_soulbound_v2,
                                 },
                             );
-                            current_token_ownerships_v2.insert(
-                                (
-                                    current_nft_ownership.token_data_id.clone(),
-                                    current_nft_ownership.property_version_v1.clone(),
-                                    current_nft_ownership.owner_address.clone(),
-                                    current_nft_ownership.storage_id.clone(),
-                                ),
-                                current_nft_ownership,
-                            );
+                            current_burned_token_ownerships_v2.push(current_nft_ownership);
                         }
                     },
                     _ => {},
@@ -967,6 +974,7 @@ async fn parse_v2_token(
         current_collections_v2,
         current_token_datas_v2,
         current_token_ownerships_v2,
+        current_burned_token_ownerships_v2,
         token_activities_v2,
         current_token_v2_metadata,
     )

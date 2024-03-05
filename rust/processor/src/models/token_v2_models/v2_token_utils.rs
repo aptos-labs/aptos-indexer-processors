@@ -17,7 +17,7 @@ use crate::{
         DerivedStringSnapshot,
     },
 };
-use ahash::AHashSet;
+use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
@@ -28,7 +28,8 @@ pub const TOKEN_V2_ADDR: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000004";
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
-pub type TokenV2Burned = AHashSet<CurrentObjectPK>;
+/// Maps address to burn event (new). The event is None if it's an old burn event.
+pub type TokenV2Burned = AHashMap<CurrentObjectPK, Option<Burn>>;
 pub type TokenV2Minted = AHashSet<CurrentObjectPK>;
 pub type TokenV2MintedPK = (CurrentObjectPK, i64);
 
@@ -300,13 +301,13 @@ impl MintEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConcurrentMintEvent {
-    collection_addr: String,
+pub struct Mint {
+    collection: String,
     pub index: AggregatorSnapshotU64,
     token: String,
 }
 
-impl ConcurrentMintEvent {
+impl Mint {
     pub fn get_token_address(&self) -> String {
         standardize_address(&self.token)
     }
@@ -343,16 +344,17 @@ impl BurnEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConcurrentBurnEvent {
-    collection_addr: String,
+pub struct Burn {
+    collection: String,
     #[serde(deserialize_with = "deserialize_from_string")]
     index: BigDecimal,
     token: String,
+    previous_owner: String,
 }
 
-impl ConcurrentBurnEvent {
+impl Burn {
     pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
-        if let Some(V2TokenEvent::ConcurrentBurnEvent(inner)) =
+        if let Some(V2TokenEvent::Burn(inner)) =
             V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
         {
             Ok(Some(inner))
@@ -363,6 +365,10 @@ impl ConcurrentBurnEvent {
 
     pub fn get_token_address(&self) -> String {
         standardize_address(&self.token)
+    }
+
+    pub fn get_previous_owner_address(&self) -> String {
+        standardize_address(&self.previous_owner)
     }
 }
 
@@ -545,10 +551,10 @@ impl V2TokenResource {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2TokenEvent {
-    ConcurrentMintEvent(ConcurrentMintEvent),
+    Mint(Mint),
     MintEvent(MintEvent),
     TokenMutationEvent(TokenMutationEvent),
-    ConcurrentBurnEvent(ConcurrentBurnEvent),
+    Burn(Burn),
     BurnEvent(BurnEvent),
     TransferEvent(TransferEvent),
 }
@@ -556,8 +562,8 @@ pub enum V2TokenEvent {
 impl V2TokenEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<Self>> {
         match data_type {
-            "0x4::collection::ConcurrentMintEvent" => {
-                serde_json::from_str(data).map(|inner| Some(Self::ConcurrentMintEvent(inner)))
+            "0x4::collection::Mint" => {
+                serde_json::from_str(data).map(|inner| Some(Self::Mint(inner)))
             },
             "0x4::collection::MintEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::MintEvent(inner)))
@@ -565,8 +571,8 @@ impl V2TokenEvent {
             "0x4::token::MutationEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
             },
-            "0x4::collection::ConcurrentBurnEvent" => {
-                serde_json::from_str(data).map(|inner| Some(Self::ConcurrentBurnEvent(inner)))
+            "0x4::collection::Burn" => {
+                serde_json::from_str(data).map(|inner| Some(Self::Burn(inner)))
             },
             "0x4::collection::BurnEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
