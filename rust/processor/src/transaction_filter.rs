@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Criteria will be loaded from the config file
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[serde(default)]
 pub struct TransactionFilter {
     // Only allow transactions from these contract addresses
     focus_contract_addresses: Option<ahash::HashSet<String>>,
