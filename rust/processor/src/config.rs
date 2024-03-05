@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig, worker::Worker,
+    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig,
+    transaction_filter::TransactionFilter, worker::Worker,
 };
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ pub struct IndexerGrpcProcessorConfig {
     #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
     pub gap_detection_batch_size: u64,
     pub enable_verbose_logging: Option<bool>,
+    pub transaction_filter: TransactionFilter,
 }
 
 impl IndexerGrpcProcessorConfig {
@@ -50,6 +52,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.db_pool_size,
             self.gap_detection_batch_size,
             self.enable_verbose_logging,
+            self.transaction_filter.clone(),
         )
         .await
         .context("Failed to build worker")?;

@@ -19,5 +19,6 @@ pub mod grpc_stream;
 pub mod models;
 pub mod processors;
 pub mod schema;
+pub mod transaction_filter;
 pub mod utils;
 pub mod worker;

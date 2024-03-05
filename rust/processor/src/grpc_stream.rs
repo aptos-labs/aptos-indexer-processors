@@ -1,15 +1,15 @@
-use crate::{
-    utils::{
-        counters::{
-            ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
-            NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
-        },
-        util::{timestamp_to_iso, timestamp_to_unixtime},
+use crate::utils::{
+    counters::{
+        ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
+        NUM_TRANSACTIONS_FILTERED_OUT_COUNT, NUM_TRANSACTIONS_PROCESSED_COUNT,
+        PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
-    worker::TransactionsPBResponse,
+    util::{timestamp_to_iso, timestamp_to_unixtime},
 };
-use aptos_protos::indexer::v1::{
-    raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
+use aptos_protos::{
+    indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
+    transaction::v1::Transaction,
+    util::timestamp::Timestamp,
 };
 use futures_util::StreamExt;
 use kanal::AsyncSender;
@@ -30,6 +30,18 @@ const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 pub const RECONNECTION_MAX_RETRIES: u64 = 65;
 /// 256MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
+
+#[derive(Clone)]
+pub struct TransactionsPBResponse {
+    pub transactions: Vec<Transaction>,
+    pub chain_id: u64,
+    // We put start/end versions here as filtering means there are potential "gaps" here now
+    pub start_version: u64,
+    pub end_version: u64,
+    pub start_txn_timestamp: Option<Timestamp>,
+    pub end_txn_timestamp: Option<Timestamp>,
+    pub size_in_bytes: u64,
+}
 
 pub fn grpc_request_builder(
     starting_version: u64,
@@ -214,6 +226,7 @@ pub async fn create_fetcher_loop(
     processor_name: String,
     batch_start_version: u64,
     buffer_size: usize,
+    transaction_filter: crate::transaction_filter::TransactionFilter,
 ) {
     let mut grpc_channel_recv_latency = std::time::Instant::now();
     let mut next_version_to_fetch = batch_start_version;
@@ -255,7 +268,7 @@ pub async fn create_fetcher_loop(
     let mut batch_start_version = batch_start_version;
     loop {
         let is_success = match resp_stream.next().await {
-            Some(Ok(r)) => {
+            Some(Ok(mut r)) => {
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
                 let start_txn_timestamp =
@@ -266,6 +279,14 @@ pub async fn create_fetcher_loop(
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
 
+                let num_txns = r.transactions.len();
+
+                // Filter out the txns we don't care about
+                r.transactions.retain(|txn| transaction_filter.include(txn));
+
+                let num_txn_post_filter = r.transactions.len();
+                let num_filtered_txns = num_txns - num_txn_post_filter;
+
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -274,11 +295,12 @@ pub async fn create_fetcher_loop(
                     start_version,
                     end_version,
                     start_txn_timestamp_iso = start_txn_timestamp
-                        .clone()
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default(),
                     end_txn_timestamp_iso = end_txn_timestamp
-                        .map(|t| timestamp_to_iso(&t))
+                        .as_ref()
+                        .map(timestamp_to_iso)
                         .unwrap_or_default(),
                     num_of_transactions = end_version - start_version + 1,
                     channel_size = buffer_size - txn_sender.capacity(),
@@ -322,7 +344,8 @@ pub async fn create_fetcher_loop(
                     ])
                     .set(
                         start_txn_timestamp
-                            .map(|t| timestamp_to_unixtime(&t))
+                            .as_ref()
+                            .map(timestamp_to_unixtime)
                             .unwrap_or_default(),
                     );
                 PROCESSED_BYTES_COUNT
@@ -344,15 +367,13 @@ pub async fn create_fetcher_loop(
                 let txn_pb = TransactionsPBResponse {
                     transactions: r.transactions,
                     chain_id,
+                    start_version,
+                    end_version,
+                    start_txn_timestamp,
+                    end_txn_timestamp,
                     size_in_bytes,
                 };
                 let size_in_bytes = txn_pb.size_in_bytes;
-                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-                let tps = (txn_pb.transactions.len() as f64
-                    / txn_channel_send_latency.elapsed().as_secs_f64())
-                    as u64;
-                let bytes_per_sec =
-                    txn_pb.size_in_bytes as f64 / txn_channel_send_latency.elapsed().as_secs_f64();
 
                 match txn_sender.send(txn_pb).await {
                     Ok(()) => {},
@@ -368,24 +389,34 @@ pub async fn create_fetcher_loop(
                         panic!("[Parser] Error sending GRPC response to channel.")
                     },
                 }
+
+                let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
+                let tps = (num_txns as f64 / duration_in_secs) as u64;
+                let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
+
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     connection_id,
-                    start_version = start_version,
-                    end_version = end_version,
+                    start_version,
+                    end_version,
                     channel_size = buffer_size - txn_sender.capacity(),
-                    size_in_bytes = size_in_bytes,
-                    duration_in_secs = duration_in_secs,
-                    bytes_per_sec = bytes_per_sec,
-                    tps = tps,
+                    size_in_bytes,
+                    duration_in_secs,
+                    bytes_per_sec,
+                    tps,
+                    num_filtered_txns,
                     "[Parser] Successfully sent transactions to channel."
                 );
                 FETCHER_THREAD_CHANNEL_SIZE
                     .with_label_values(&[&processor_name])
                     .set((buffer_size - txn_sender.capacity()) as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
+
+                NUM_TRANSACTIONS_FILTERED_OUT_COUNT
+                    .with_label_values(&[&processor_name])
+                    .inc_by(num_filtered_txns as u64);
                 true
             },
             Some(Err(rpc_error)) => {
