@@ -84,7 +84,7 @@ impl FungibleAssetBalance {
                 // If it's a fungible token, return early
                 if !FungibleAssetMetadataModel::is_address_fungible_asset(
                     conn,
-                    &storage_id,
+                    &asset_type,
                     object_metadatas,
                     txn_version,
                 )

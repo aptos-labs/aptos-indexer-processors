@@ -93,7 +93,7 @@ impl Object {
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     is_token: Some(object_aggregated_metadata.token.is_some()),
                     is_fungible_asset: Some(
-                        object_aggregated_metadata.fungible_asset_store.is_some(),
+                        object_aggregated_metadata.fungible_asset_metadata.is_some(),
                     ),
                     is_deleted: false,
                 },
@@ -106,7 +106,7 @@ impl Object {
                     last_transaction_version: txn_version,
                     is_token: Some(object_aggregated_metadata.token.is_some()),
                     is_fungible_asset: Some(
-                        object_aggregated_metadata.fungible_asset_store.is_some(),
+                        object_aggregated_metadata.fungible_asset_metadata.is_some(),
                     ),
                     is_deleted: false,
                 },
