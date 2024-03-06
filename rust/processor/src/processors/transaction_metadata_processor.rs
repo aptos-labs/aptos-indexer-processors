@@ -8,23 +8,27 @@ use crate::{
         write_set_size_info::WriteSetSize,
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::{error, warn};
 
 pub struct TransactionMetadataProcessor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl TransactionMetadataProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -44,9 +48,10 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    transaction_sizes: Vec<TransactionSize>,
-    event_sizes: Vec<EventSize>,
-    write_set_sizes: Vec<WriteSetSize>,
+    transaction_sizes: &[TransactionSize],
+    event_sizes: &[EventSize],
+    write_set_sizes: &[WriteSetSize],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -59,21 +64,24 @@ async fn insert_to_db(
         conn.clone(),
         insert_transaction_sizes_query,
         transaction_sizes,
-        TransactionSize::field_count(),
+        get_config_table_chunk_size::<TransactionSize>(
+            "transaction_size_info",
+            per_table_chunk_sizes,
+        ),
     )
     .await?;
     execute_in_chunks(
         conn.clone(),
         insert_event_sizes_query,
         event_sizes,
-        EventSize::field_count(),
+        get_config_table_chunk_size::<EventSize>("event_size_info", per_table_chunk_sizes),
     )
     .await?;
     execute_in_chunks(
         conn,
         insert_write_set_sizes_query,
         write_set_sizes,
-        WriteSetSize::field_count(),
+        get_config_table_chunk_size::<WriteSetSize>("write_set_size_info", per_table_chunk_sizes),
     )
     .await?;
 
@@ -182,9 +190,10 @@ impl ProcessorTrait for TransactionMetadataProcessor {
             self.name(),
             start_version,
             end_version,
-            transaction_sizes,
-            event_sizes,
-            write_set_sizes,
+            &transaction_sizes,
+            &event_sizes,
+            &write_set_sizes,
+            &self.per_table_chunk_sizes,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
@@ -194,7 +203,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
             }),
             Err(e) => {
                 error!(

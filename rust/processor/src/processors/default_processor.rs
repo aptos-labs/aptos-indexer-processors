@@ -4,7 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::default_models::{
-        block_metadata_transactions::BlockMetadataTransactionModel,
+        block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
         move_modules::MoveModule,
         move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
@@ -12,7 +12,7 @@ use crate::{
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -23,17 +23,21 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use std::fmt::Debug;
+use tokio::join;
 use tracing::error;
 
 pub struct DefaultProcessor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -53,16 +57,17 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    txns: Vec<TransactionModel>,
-    block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
-    wscs: Vec<WriteSetChangeModel>,
+    txns: &[TransactionModel],
+    block_metadata_transactions: &[BlockMetadataTransactionModel],
+    wscs: &[WriteSetChangeModel],
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        Vec<MoveModule>,
-        Vec<MoveResource>,
-        Vec<TableItem>,
-        Vec<CurrentTableItem>,
-        Vec<TableMetadata>,
+        &[MoveModule],
+        &[MoveResource],
+        &[TableItem],
+        &[CurrentTableItem],
+        &[TableMetadata],
     ),
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -71,62 +76,76 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let txns_res = execute_in_chunks(
         conn.clone(),
         insert_transactions_query,
         txns,
-        TransactionModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
+    );
+    let bmt_res = execute_in_chunks(
         conn.clone(),
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
-        BlockMetadataTransactionModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<BlockMetadataTransactionModel>(
+            "block_metadata_transactions",
+            per_table_chunk_sizes,
+        ),
+    );
+    let wst_res = execute_in_chunks(
         conn.clone(),
         insert_write_set_changes_query,
         wscs,
-        WriteSetChangeModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<WriteSetChangeModel>(
+            "write_set_changes",
+            per_table_chunk_sizes,
+        ),
+    );
+    let mm_res = execute_in_chunks(
         conn.clone(),
         insert_move_modules_query,
         move_modules,
-        MoveModule::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
+    );
+
+    let mr_res = execute_in_chunks(
         conn.clone(),
         insert_move_resources_query,
         move_resources,
-        MoveResource::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
+    );
+
+    let ti_res = execute_in_chunks(
         conn.clone(),
         insert_table_items_query,
         table_items,
-        TableItem::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
+    );
+
+    let cti_res = execute_in_chunks(
         conn.clone(),
         insert_current_table_items_query,
         current_table_items,
-        CurrentTableItem::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentTableItem>(
+            "current_table_items",
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let tm_res = execute_in_chunks(
         conn.clone(),
         insert_table_metadata_query,
         table_metadata,
-        TableMetadata::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
+    );
+
+    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
+        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
+
+    for res in [
+        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
+    ] {
+        res?;
+    }
 
     Ok(())
 }
@@ -293,47 +312,15 @@ impl ProcessorTrait for DefaultProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let (txns, block_metadata_txns, write_set_changes, wsc_details) =
-            TransactionModel::from_transactions(&transactions);
-
-        let mut block_metadata_transactions = vec![];
-        for block_metadata_txn in block_metadata_txns {
-            block_metadata_transactions.push(block_metadata_txn.clone());
-        }
-        let mut move_modules = vec![];
-        let mut move_resources = vec![];
-        let mut table_items = vec![];
-        let mut current_table_items = AHashMap::new();
-        let mut table_metadata = AHashMap::new();
-        for detail in wsc_details {
-            match detail {
-                WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
-                WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
-                WriteSetChangeDetail::Table(item, current_item, metadata) => {
-                    table_items.push(item.clone());
-                    current_table_items.insert(
-                        (
-                            current_item.table_handle.clone(),
-                            current_item.key_hash.clone(),
-                        ),
-                        current_item.clone(),
-                    );
-                    if let Some(meta) = metadata {
-                        table_metadata.insert(meta.handle.clone(), meta.clone());
-                    }
-                },
-            }
-        }
-
-        // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
-        let mut current_table_items = current_table_items
-            .into_values()
-            .collect::<Vec<CurrentTableItem>>();
-        let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
-        // Sort by PK
-        current_table_items
-            .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
-        table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let (
+            txns,
+            block_metadata_transactions,
+            write_set_changes,
+            (move_modules, move_resources, table_items, current_table_items, table_metadata),
+        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+            .await
+            .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -343,16 +330,17 @@ impl ProcessorTrait for DefaultProcessor {
             self.name(),
             start_version,
             end_version,
-            txns,
-            block_metadata_transactions,
-            write_set_changes,
+            &txns,
+            &block_metadata_transactions,
+            &write_set_changes,
             (
-                move_modules,
-                move_resources,
-                table_items,
-                current_table_items,
-                table_metadata,
+                &move_modules,
+                &move_resources,
+                &table_items,
+                &current_table_items,
+                &table_metadata,
             ),
+            &self.per_table_chunk_sizes,
         )
         .await;
 
@@ -363,7 +351,7 @@ impl ProcessorTrait for DefaultProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(
@@ -381,4 +369,73 @@ impl ProcessorTrait for DefaultProcessor {
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
+}
+
+fn process_transactions(
+    transactions: Vec<Transaction>,
+) -> (
+    Vec<crate::models::default_models::transactions::Transaction>,
+    Vec<BlockMetadataTransaction>,
+    Vec<WriteSetChangeModel>,
+    (
+        Vec<MoveModule>,
+        Vec<MoveResource>,
+        Vec<TableItem>,
+        Vec<CurrentTableItem>,
+        Vec<TableMetadata>,
+    ),
+) {
+    let (txns, block_metadata_txns, write_set_changes, wsc_details) =
+        TransactionModel::from_transactions(&transactions);
+    let mut block_metadata_transactions = vec![];
+    for block_metadata_txn in block_metadata_txns {
+        block_metadata_transactions.push(block_metadata_txn.clone());
+    }
+    let mut move_modules = vec![];
+    let mut move_resources = vec![];
+    let mut table_items = vec![];
+    let mut current_table_items = AHashMap::new();
+    let mut table_metadata = AHashMap::new();
+    for detail in wsc_details {
+        match detail {
+            WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
+            WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
+            WriteSetChangeDetail::Table(item, current_item, metadata) => {
+                table_items.push(item.clone());
+                current_table_items.insert(
+                    (
+                        current_item.table_handle.clone(),
+                        current_item.key_hash.clone(),
+                    ),
+                    current_item.clone(),
+                );
+                if let Some(meta) = metadata {
+                    table_metadata.insert(meta.handle.clone(), meta.clone());
+                }
+            },
+        }
+    }
+
+    // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
+    let mut current_table_items = current_table_items
+        .into_values()
+        .collect::<Vec<CurrentTableItem>>();
+    let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+    // Sort by PK
+    current_table_items
+        .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
+    table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
+    (
+        txns,
+        block_metadata_transactions,
+        write_set_changes,
+        (
+            move_modules,
+            move_resources,
+            table_items,
+            current_table_items,
+            table_metadata,
+        ),
+    )
 }
