@@ -26,6 +26,7 @@ aptos-moving-average = { path = "moving-average" }
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.62"
 async-trait = "0.1.53"
+aptos-in-memory-cache = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "e08c95fa312580617f406bfa467a34ccb17a4d8b" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", tag = "aptos-node-v1.10.0" }
 backtrace = "0.3.58"
 base64 = "0.13.0"
@@ -64,6 +65,7 @@ pbjson = "0.5.1"
 prometheus = { version = "0.13.0", default-features = false }
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
+quick_cache = "0.4.1"
 regex = "1.5.5"
 reqwest = { version = "0.11.20", features = [
     "blocking",

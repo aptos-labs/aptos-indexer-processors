@@ -11,6 +11,7 @@ pub mod account_transactions_processor;
 pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
+pub mod event_stream_processor;
 pub mod events_processor;
 pub mod fungible_asset_processor;
 pub mod monitoring_processor;
@@ -27,6 +28,7 @@ use self::{
     ans_processor::{AnsProcessor, AnsProcessorConfig},
     coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
+    event_stream_processor::EventStreamProcessor,
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
     monitoring_processor::MonitoringProcessor,
@@ -183,6 +185,7 @@ pub enum ProcessorConfig {
     AnsProcessor(AnsProcessorConfig),
     CoinProcessor,
     DefaultProcessor,
+    EventStreamProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
     MonitoringProcessor,
@@ -225,6 +228,7 @@ pub enum Processor {
     AnsProcessor,
     CoinProcessor,
     DefaultProcessor,
+    EventStreamProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
     MonitoringProcessor,

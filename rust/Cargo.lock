@@ -111,6 +111,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
+name = "aptos-in-memory-cache"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=e08c95fa312580617f406bfa467a34ccb17a4d8b#e08c95fa312580617f406bfa467a34ccb17a4d8b"
+dependencies = [
+ "quick_cache",
+]
+
+[[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
 dependencies = [
@@ -1918,6 +1926,7 @@ version = "1.0.0"
 dependencies = [
  "ahash",
  "anyhow",
+ "aptos-in-memory-cache",
  "aptos-moving-average",
  "aptos-protos",
  "async-trait",
@@ -1947,6 +1956,7 @@ dependencies = [
  "prometheus",
  "prost 0.12.3",
  "prost-types 0.12.3",
+ "quick_cache",
  "regex",
  "serde",
  "serde_json",
@@ -1960,6 +1970,7 @@ dependencies = [
  "tracing",
  "unescape",
  "url",
+ "warp",
 ]
 
 [[package]]
@@ -2054,6 +2065,18 @@ checksum = "96a8c1bda5ae1af7f99a2962e49df150414a43d62404644d98dd5c3a93d07457"
 dependencies = [
  "idna 0.3.0",
  "psl-types",
+]
+
+[[package]]
+name = "quick_cache"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58c20af3800cee5134b79a3bd4a3d4b583c16ccfa5f53338f46400851a5b3819"
+dependencies = [
+ "ahash",
+ "equivalent",
+ "hashbrown 0.14.0",
+ "parking_lot",
 ]
 
 [[package]]

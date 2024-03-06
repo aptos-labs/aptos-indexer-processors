@@ -4,11 +4,15 @@
 use crate::{
     config::IndexerGrpcHttp2Config,
     grpc_stream::TransactionsPBResponse,
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    models::{
+        events_models::events::CachedEvent, ledger_info::LedgerInfo,
+        processor_status::ProcessorStatusQuery,
+    },
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        event_stream_processor::EventStreamProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
@@ -29,16 +33,26 @@ use crate::{
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
+        event_ordering::{EventOrdering, TransactionEvents},
+        filter::EventFilter,
+        filter_editor::spawn_filter_editor,
+        stream::spawn_stream,
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
+use aptos_in_memory_cache::Cache;
 use aptos_moving_average::MovingAverage;
 use diesel::Connection;
-use tokio::task::JoinHandle;
+use futures::StreamExt;
+use kanal::AsyncSender;
+use quick_cache::sync::Cache as S3FIFOCache;
+use std::sync::Arc;
+use tokio::{sync::RwLock, task::JoinHandle};
 use tracing::{debug, error, info};
 use url::Url;
+use warp::Filter;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
@@ -47,6 +61,26 @@ pub const BUFFER_SIZE: usize = 100;
 // Consumer thread will wait X seconds before panicking if it doesn't receive any data
 pub const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
+
+/// Handles WebSocket connection from /filter endpoint
+async fn handle_websocket<C: Cache<(i64, i64), CachedEvent> + 'static>(
+    websocket: warp::ws::WebSocket,
+    query_params: AHashMap<String, String>,
+    cache: Arc<RwLock<C>>,
+) {
+    let (tx, rx) = websocket.split();
+    let filter = Arc::new(RwLock::new(EventFilter::new()));
+
+    let start = query_params
+        .get("start")
+        .map(|s| s.parse().unwrap())
+        .unwrap_or(0);
+
+    let filter_edit = filter.clone();
+    tokio::spawn(async move { spawn_filter_editor(rx, filter_edit).await });
+
+    spawn_stream(tx, filter.clone(), cache.clone(), (start, 0)).await;
+}
 
 pub struct Worker {
     pub db_pool: PgDbPool,
@@ -223,6 +257,9 @@ impl Worker {
             .await
         });
 
+        let (transaction_events_tx, transaction_events_rx) =
+            kanal::bounded_async::<TransactionEvents>(10000);
+
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
@@ -231,6 +268,7 @@ impl Worker {
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
+            transaction_events_tx.clone(),
         );
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
@@ -241,6 +279,40 @@ impl Worker {
             )
             .await;
         });
+
+        if self.processor_config.name() == "event_stream_processor".to_string() {
+            let cache = Arc::new(RwLock::new(
+                S3FIFOCache::<(i64, i64), CachedEvent>::with_weighter(
+                    100000,
+                    100000,
+                    quick_cache::UnitWeighter,
+                ),
+            ));
+
+            // Add events to cache in order
+            let cache_order = cache.clone();
+            tokio::spawn(async move {
+                let event_ordering = EventOrdering::new(transaction_events_rx, cache_order);
+                event_ordering.run(starting_version as i64).await;
+            });
+
+            // Create web server
+            let cache_ws = cache.clone();
+            let cache_ws = warp::any().map(move || cache_ws.clone());
+            tokio::spawn(async move {
+                let ws_route = warp::path("stream")
+                    .and(warp::ws())
+                    .and(warp::query::<AHashMap<String, String>>())
+                    .and(cache_ws)
+                    .map(|ws: warp::ws::Ws, query_params, cache_ws| {
+                        ws.on_upgrade(move |socket| {
+                            handle_websocket(socket, query_params, cache_ws)
+                        })
+                    });
+
+                warp::serve(ws_route).run(([0, 0, 0, 0], 12345)).await;
+            });
+        }
 
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
@@ -260,7 +332,12 @@ impl Worker {
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
             let join_handle = self
-                .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
+                .launch_processor_task(
+                    task_index,
+                    receiver.clone(),
+                    gap_detector_sender.clone(),
+                    transaction_events_tx.clone(),
+                )
                 .await;
             processor_tasks.push(join_handle);
         }
@@ -284,6 +361,7 @@ impl Worker {
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
+        channel: AsyncSender<TransactionEvents>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -295,6 +373,7 @@ impl Worker {
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
+            channel,
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -663,6 +742,7 @@ pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
     db_pool: PgDbPool,
+    channel: AsyncSender<TransactionEvents>,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -681,6 +761,9 @@ pub fn build_processor(
         },
         ProcessorConfig::EventsProcessor => {
             Processor::from(EventsProcessor::new(db_pool, per_table_chunk_sizes))
+        },
+        ProcessorConfig::EventStreamProcessor => {
+            Processor::from(EventStreamProcessor::new(db_pool, channel))
         },
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool, per_table_chunk_sizes))
