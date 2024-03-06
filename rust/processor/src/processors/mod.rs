@@ -13,12 +13,14 @@ pub mod coin_processor;
 pub mod default_processor;
 pub mod events_processor;
 pub mod fungible_asset_processor;
+pub mod fungible_asset_processor_light;
 pub mod monitoring_processor;
 pub mod nft_metadata_processor;
 pub mod objects_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
+pub mod token_v2_processor_light;
 pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
 
@@ -40,6 +42,10 @@ use self::{
 };
 use crate::{
     models::processor_status::ProcessorStatus,
+    processors::{
+        fungible_asset_processor_light::FungibleAssetProcessorLight,
+        token_v2_processor_light::TokenV2ProcessorLight,
+    },
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
@@ -187,12 +193,14 @@ pub enum ProcessorConfig {
     DefaultProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
+    FungibleAssetProcessorLight,
     MonitoringProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
     ObjectsProcessor,
     StakeProcessor,
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor,
+    TokenV2ProcessorLight,
     TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
@@ -229,12 +237,14 @@ pub enum Processor {
     DefaultProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
+    FungibleAssetProcessorLight,
     MonitoringProcessor,
     NftMetadataProcessor,
     ObjectsProcessor,
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,
+    TokenV2ProcessorLight,
     TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
