@@ -4,7 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
+        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
         object_models::{
             v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
@@ -209,11 +209,11 @@ impl ProcessorTrait for ObjectsProcessor {
                             // Object is a token if it has 0x4::token::Token struct
                             aggregated_data.token = Some(token);
                         }
-                        if let Some(fungible_asset_store) =
-                            FungibleAssetStore::from_write_resource(wr, txn_version).unwrap()
+                        if let Some(fungible_asset_metadata) =
+                            FungibleAssetMetadata::from_write_resource(wr, txn_version).unwrap()
                         {
-                            // Object is a fungible asset if it has a 0x1::fungible_asset::FungibleAssetStore
-                            aggregated_data.fungible_asset_store = Some(fungible_asset_store);
+                            // Object is a fungible asset if it has a 0x1::fungible_asset::FungibleAssetMetadata
+                            aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
                         }
                     }
                 }
