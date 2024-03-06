@@ -6,17 +6,21 @@ use crate::utils::{
     },
     util::{timestamp_to_iso, timestamp_to_unixtime},
 };
+use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
     util::timestamp::Timestamp,
 };
+use bigdecimal::Zero;
 use futures_util::StreamExt;
+use itertools::Itertools;
 use kanal::AsyncSender;
 use prost::Message;
 use std::time::Duration;
+use tokio::time::timeout;
 use tonic::{Response, Streaming};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use url::Url;
 
 /// GRPC request metadata key for the token ID.
@@ -27,7 +31,7 @@ const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 /// GRPC connection id
 const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 /// We will try to reconnect to GRPC 5 times in case upstream connection is being updated
-pub const RECONNECTION_MAX_RETRIES: u64 = 65;
+pub const RECONNECTION_MAX_RETRIES: u64 = 5;
 /// 256MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
 
@@ -111,7 +115,39 @@ pub async fn get_stream(
         end_version = ending_version,
         "[Parser] Setting up GRPC client"
     );
-    let mut rpc_client = match RawDataClient::connect(channel).await {
+
+    // TODO: move this to a config file
+    // Retry this connection a few times before giving up
+    let mut connect_retries = 0;
+    let connect_res = loop {
+        let res = timeout(
+            Duration::from_secs(5),
+            RawDataClient::connect(channel.clone()),
+        )
+        .await;
+        match res {
+            Ok(client) => break Ok(client),
+            Err(e) => {
+                error!(
+                    processor_name = processor_name,
+                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    start_version = starting_version,
+                    end_version = ending_version,
+                    retries = connect_retries,
+                    error = ?e,
+                    "[Parser] Error connecting to GRPC client"
+                );
+                connect_retries += 1;
+                if connect_retries >= RECONNECTION_MAX_RETRIES {
+                    break Err(e);
+                }
+            },
+        }
+    }
+    .expect("[Parser] Timeout connecting to GRPC server");
+
+    let mut rpc_client = match connect_res {
         Ok(client) => client
             .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
             .send_compressed(tonic::codec::CompressionEncoding::Gzip)
@@ -224,13 +260,10 @@ pub async fn create_fetcher_loop(
     request_ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
-    batch_start_version: u64,
-    buffer_size: usize,
     transaction_filter: crate::transaction_filter::TransactionFilter,
+    // The number of transactions per protobuf batch
+    pb_channel_txn_chunk_size: usize,
 ) {
-    let mut grpc_channel_recv_latency = std::time::Instant::now();
-    let mut next_version_to_fetch = batch_start_version;
-    let mut reconnection_retries = 0;
     info!(
         processor_name = processor_name,
         service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -264,8 +297,13 @@ pub async fn create_fetcher_loop(
         "[Parser] Successfully connected to GRPC stream",
     );
 
-    let mut last_fetched_version = batch_start_version as i64 - 1;
-    let mut batch_start_version = batch_start_version;
+    let mut grpc_channel_recv_latency = std::time::Instant::now();
+    let mut next_version_to_fetch = starting_version;
+    let mut reconnection_retries = 0;
+    let mut last_fetched_version = starting_version as i64 - 1;
+    let mut fetch_ma = MovingAverage::new(3000);
+    let mut send_ma = MovingAverage::new(3000);
+
     loop {
         let is_success = match resp_stream.next().await {
             Some(Ok(mut r)) => {
@@ -275,9 +313,14 @@ pub async fn create_fetcher_loop(
                     r.transactions.as_slice().first().unwrap().timestamp.clone();
                 let end_version = r.transactions.as_slice().last().unwrap().version;
                 let end_txn_timestamp = r.transactions.as_slice().last().unwrap().timestamp.clone();
+
                 next_version_to_fetch = end_version + 1;
+
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
+                let num_txns = r.transactions.len();
+                let duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64();
+                fetch_ma.tick_now(num_txns as u64);
 
                 let num_txns = r.transactions.len();
 
@@ -286,6 +329,8 @@ pub async fn create_fetcher_loop(
 
                 let num_txn_post_filter = r.transactions.len();
                 let num_filtered_txns = num_txns - num_txn_post_filter;
+                let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
+                let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
 
                 info!(
                     processor_name = processor_name,
@@ -303,45 +348,33 @@ pub async fn create_fetcher_loop(
                         .map(timestamp_to_iso)
                         .unwrap_or_default(),
                     num_of_transactions = end_version - start_version + 1,
-                    channel_size = buffer_size - txn_sender.capacity(),
-                    size_in_bytes = r.encoded_len() as f64,
-                    duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64(),
-                    tps = (r.transactions.len() as f64
-                        / grpc_channel_recv_latency.elapsed().as_secs_f64())
-                        as u64,
-                    bytes_per_sec =
-                        r.encoded_len() as f64 / grpc_channel_recv_latency.elapsed().as_secs_f64(),
-                    step = ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
+                    num_filtered_txns,
+                    channel_size = txn_sender.len(),
+                    size_in_bytes,
+                    duration_in_secs,
+                    tps = fetch_ma.avg() as u64,
+                    bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
+                    step,
                     "{}",
-                    ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
+                    label,
                 );
 
-                let current_fetched_version = start_version;
-                if last_fetched_version + 1 != current_fetched_version as i64 {
+                if last_fetched_version + 1 != start_version as i64 {
                     error!(
-                        batch_start_version = batch_start_version,
-                        last_fetched_version = last_fetched_version,
-                        current_fetched_version = current_fetched_version,
+                        batch_start_version = last_fetched_version + 1,
+                        last_fetched_version,
+                        current_fetched_version = start_version,
                         "[Parser] Received batch with gap from GRPC stream"
                     );
                     panic!("[Parser] Received batch with gap from GRPC stream");
                 }
                 last_fetched_version = end_version as i64;
-                batch_start_version = (last_fetched_version + 1) as u64;
 
                 LATEST_PROCESSED_VERSION
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .set(end_version as i64);
                 TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .set(
                         start_txn_timestamp
                             .as_ref()
@@ -349,59 +382,94 @@ pub async fn create_fetcher_loop(
                             .unwrap_or_default(),
                     );
                 PROCESSED_BYTES_COUNT
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .inc_by(size_in_bytes);
                 NUM_TRANSACTIONS_PROCESSED_COUNT
-                    .with_label_values(&[
-                        &processor_name,
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_step(),
-                        ProcessorStep::ReceivedTxnsFromGrpc.get_label(),
-                    ])
+                    .with_label_values(&[&processor_name, step, label, "-"])
                     .inc_by(end_version - start_version + 1);
 
                 let txn_channel_send_latency = std::time::Instant::now();
-                let txn_pb = TransactionsPBResponse {
-                    transactions: r.transactions,
-                    chain_id,
-                    start_version,
-                    end_version,
-                    start_txn_timestamp,
-                    end_txn_timestamp,
-                    size_in_bytes,
-                };
-                let size_in_bytes = txn_pb.size_in_bytes;
 
-                match txn_sender.send(txn_pb).await {
-                    Ok(()) => {},
-                    Err(e) => {
-                        error!(
-                            processor_name = processor_name,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
-                            channel_size = buffer_size - txn_sender.capacity(),
-                            error = ?e,
-                            "[Parser] Error sending GRPC response to channel."
-                        );
-                        panic!("[Parser] Error sending GRPC response to channel.")
-                    },
+                //potentially break txn_pb into many `TransactionsPBResponse` that are each `pb_channel_txn_chunk_size` txns max in size
+                if num_txn_post_filter < pb_channel_txn_chunk_size {
+                    // We only need to send one; avoid the chunk/clone
+                    let txn_pb = TransactionsPBResponse {
+                        transactions: r.transactions,
+                        chain_id,
+                        start_version,
+                        end_version,
+                        start_txn_timestamp,
+                        end_txn_timestamp,
+                        size_in_bytes,
+                    };
+
+                    match txn_sender.send(txn_pb).await {
+                        Ok(()) => {},
+                        Err(e) => {
+                            error!(
+                                processor_name = processor_name,
+                                stream_address = indexer_grpc_data_service_address.to_string(),
+                                connection_id,
+                                error = ?e,
+                                "[Parser] Error sending GRPC response to channel."
+                            );
+                            panic!("[Parser] Error sending GRPC response to channel.")
+                        },
+                    }
+                } else {
+                    // We are breaking down a big batch into small batches; this involves an iterator
+                    let average_size_in_bytes = size_in_bytes / num_txns as u64;
+
+                    let pb_txn_chunks: Vec<Vec<Transaction>> = r
+                        .transactions
+                        .into_iter()
+                        .chunks(pb_channel_txn_chunk_size)
+                        .into_iter()
+                        .map(|chunk| chunk.collect())
+                        .collect();
+                    for txns in pb_txn_chunks {
+                        let size_in_bytes = average_size_in_bytes * txns.len() as u64;
+                        let txn_pb = TransactionsPBResponse {
+                            transactions: txns,
+                            chain_id,
+                            start_version,
+                            end_version,
+                            // TODO: this is only for gap checker + filtered txns, but this is wrong
+                            start_txn_timestamp: start_txn_timestamp.clone(),
+                            end_txn_timestamp: end_txn_timestamp.clone(),
+                            size_in_bytes,
+                        };
+
+                        match txn_sender.send(txn_pb).await {
+                            Ok(()) => {},
+                            Err(e) => {
+                                error!(
+                                    processor_name = processor_name,
+                                    stream_address = indexer_grpc_data_service_address.to_string(),
+                                    connection_id,
+                                    error = ?e,
+                                    "[Parser] Error sending GRPC response to channel."
+                                );
+                                panic!("[Parser] Error sending GRPC response to channel.")
+                            },
+                        }
+                    }
                 }
 
                 let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-                let tps = (num_txns as f64 / duration_in_secs) as u64;
+                send_ma.tick_now(num_txns as u64);
+                let tps = send_ma.avg() as u64;
                 let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
 
-                info!(
+                let channel_size = txn_sender.len();
+                debug!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     connection_id,
                     start_version,
                     end_version,
-                    channel_size = buffer_size - txn_sender.capacity(),
+                    channel_size,
                     size_in_bytes,
                     duration_in_secs,
                     bytes_per_sec,
@@ -411,7 +479,7 @@ pub async fn create_fetcher_loop(
                 );
                 FETCHER_THREAD_CHANNEL_SIZE
                     .with_label_values(&[&processor_name])
-                    .set((buffer_size - txn_sender.capacity()) as i64);
+                    .set(channel_size as i64);
                 grpc_channel_recv_latency = std::time::Instant::now();
 
                 NUM_TRANSACTIONS_FILTERED_OUT_COUNT
@@ -463,19 +531,19 @@ pub async fn create_fetcher_loop(
             );
             // Wait for the fetched transactions to finish processing before closing the channel
             loop {
-                let channel_capacity = txn_sender.capacity();
+                let channel_size = txn_sender.len();
                 info!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     connection_id,
-                    channel_size = buffer_size - channel_capacity,
+                    channel_size,
                     "[Parser] Waiting for channel to be empty"
                 );
-                if channel_capacity == buffer_size {
+                if channel_size.is_zero() {
                     break;
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
             info!(
                 processor_name = processor_name,
@@ -493,7 +561,7 @@ pub async fn create_fetcher_loop(
 
             // Sleep for 100ms between reconnect tries
             // TODO: Turn this into exponential backoff
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
 
             if reconnection_retries >= RECONNECTION_MAX_RETRIES {
                 error!(
