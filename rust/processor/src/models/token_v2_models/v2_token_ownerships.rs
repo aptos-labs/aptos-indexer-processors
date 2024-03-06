@@ -19,6 +19,7 @@ use crate::{
             token_utils::TokenWriteSet,
             tokens::TableHandleToOwner,
         },
+        token_v2_models::v2_token_utils::DEFAULT_OWNER_ADDRESS,
     },
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     utils::{
@@ -304,10 +305,9 @@ impl TokenOwnershipV2 {
                 burn_event.get_previous_owner_address()
             } else {
                 // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
-                // Do a lookup to get preivous owner.
-                // Hotfix
-                let latest_nft_ownership = match prior_nft_ownership.get(&token_address) {
-                    Some(inner) => inner.clone(),
+                // Do a lookup to get previous owner. This is necessary because preivous owner is part of current token ownerships primary key.
+                match prior_nft_ownership.get(&token_address) {
+                    Some(inner) => inner.owner_address.clone(),
                     None => {
                         match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                             conn,
@@ -315,19 +315,18 @@ impl TokenOwnershipV2 {
                         )
                         .await
                         {
-                            Ok(nft) => nft,
+                            Ok(nft) => nft.owner_address.clone(),
                             Err(_) => {
                                 tracing::error!(
                                     transaction_version = txn_version,
                                     lookup_key = &token_address,
-                                    "Failed to find NFT for burned token. You probably should backfill db."
+                                    "Failed to find current_token_ownership_v2 for burned token. You probably should backfill db."
                                 );
-                                return Ok(None);
+                                DEFAULT_OWNER_ADDRESS.to_string()
                             },
                         }
                     },
-                };
-                latest_nft_ownership.owner_address.clone()
+                }
             };
 
             let token_data_id = token_address.clone();
