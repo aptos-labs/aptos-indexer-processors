@@ -247,13 +247,28 @@ impl TokenDataV2 {
         }
         // 2. If metadata is not present, we will do a lookup in the db.
         //  The object must exist in current_objects table for this processor to proceed
-        let object = Object::get_current_object(conn, address, txn_version).await;
-        if let Some(is_token) = object.is_token {
-            return is_token;
+        match Object::get_current_object(conn, address, txn_version).await {
+            Ok(object) => {
+                if let Some(is_token) = object.is_token {
+                    return is_token;
+                }
+                tracing::error!(
+                    "is_token is null for object_address: {}. You should probably backfill db.",
+                    address
+                );
+                // By default, don't index
+                false
+            },
+            Err(_) => {
+                tracing::error!(
+                    transaction_version = txn_version,
+                    lookup_key = address,
+                    "Missing current_object for object_address: {}. You probably should backfill db.",
+                    address,
+                );
+                // By default, don't index
+                false
+            },
         }
-        panic!(
-            "is_token is null for object_address: {}. You should probably backfill db.",
-            address
-        );
     }
 }

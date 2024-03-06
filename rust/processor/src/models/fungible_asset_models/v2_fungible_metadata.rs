@@ -148,10 +148,26 @@ impl FungibleAssetMetadataModel {
         // 2. If metadata is not present, we will do a lookup in the db.
         // The object must exist in current_objects table for this processor to proceed
         // If it doesn't exist or is null, then you probably need to backfill objects processor
-        let object = Object::get_current_object(conn, address, txn_version).await;
-        if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
-            return is_fa && !is_token;
+        match Object::get_current_object(conn, address, txn_version).await {
+            Ok(object) => {
+                if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
+                    return is_fa && !is_token;
+                }
+
+                tracing::error!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
+                // By default, assume it's not a fungible token and index it as a fungible asset
+                true
+            },
+            Err(_) => {
+                tracing::error!(
+                    transaction_version = txn_version,
+                    lookup_key = address,
+                    "Missing current_object for object_address: {}. You probably should backfill db.",
+                    address,
+                );
+                // By default, assume it's not a fungible token and index it as a fungible asset
+                true
+            },
         }
-        panic!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
     }
 }
