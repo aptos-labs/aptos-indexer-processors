@@ -9,9 +9,11 @@ use crate::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        fungible_asset_processor_light::FungibleAssetProcessorLight,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
         token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        token_v2_processor_light::TokenV2ProcessorLight,
         transaction_metadata_processor::TransactionMetadataProcessor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
@@ -713,6 +715,9 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool))
         },
+        ProcessorConfig::FungibleAssetProcessorLight => {
+            Processor::from(FungibleAssetProcessorLight::new(db_pool))
+        },
         ProcessorConfig::MonitoringProcessor => Processor::from(MonitoringProcessor::new(db_pool)),
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
@@ -723,6 +728,9 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
             Processor::from(TokenProcessor::new(db_pool, config.clone()))
         },
         ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
+        ProcessorConfig::TokenV2ProcessorLight => {
+            Processor::from(TokenV2ProcessorLight::new(db_pool))
+        },
         ProcessorConfig::TransactionMetadataProcessor => {
             Processor::from(TransactionMetadataProcessor::new(db_pool))
         },
