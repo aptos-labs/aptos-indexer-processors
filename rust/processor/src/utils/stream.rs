@@ -64,7 +64,8 @@ impl<C: Cache<(i64, i64), CachedEvent> + 'static> Stream<C> {
                         });
                         let msg = serde_json::to_string(&event).unwrap_or_default();
                         if let Err(e) = self.tx.send(warp::ws::Message::text(msg)).await {
-                            warn!(error = ?e,
+                            warn!(
+                                error = ?e,
                                 "[Event Stream] Failed to send message to WebSocket"
                             );
                             break;

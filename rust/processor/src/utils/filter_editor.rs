@@ -20,17 +20,9 @@ impl FilterEditor {
 
     /// Maintains websocket connection and sends messages from channel
     pub async fn run(&mut self) {
-        let msg = self.rx.next().await;
-        if let Some(msg) = msg {
+        while let Some(Ok(msg)) = self.rx.next().await {
             let mut filter = self.filter.write().await;
-            let policy = msg.unwrap_or_else(|e| {
-                error!(
-                    error = ?e,
-                    "[Event Stream] Failed to receive message from channel"
-                );
-                panic!();
-            });
-            if let Ok(policy) = policy.to_str() {
+            if let Ok(policy) = msg.to_str() {
                 let policy = policy.split(",").collect::<Vec<&str>>();
                 match policy[0] {
                     "account" => match policy[1] {
