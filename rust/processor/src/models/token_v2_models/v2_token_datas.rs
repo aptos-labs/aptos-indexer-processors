@@ -8,14 +8,19 @@
 use super::v2_token_utils::{TokenStandard, TokenV2};
 use crate::{
     models::{
-        object_models::{v2_object_utils::ObjectAggregatedDataMapping, v2_objects::Object},
-        token_models::token_utils::TokenWriteSet,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        token_models::{
+            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            token_utils::TokenWriteSet,
+        },
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -60,6 +65,27 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub decimals: i64,
+}
+
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(primary_key(token_data_id))]
+#[diesel(table_name = current_token_datas_v2)]
+pub struct CurrentTokenDataV2Query {
+    pub token_data_id: String,
+    pub collection_id: String,
+    pub token_name: String,
+    pub maximum: Option<BigDecimal>,
+    pub supply: BigDecimal,
+    pub largest_property_version_v1: Option<BigDecimal>,
+    pub token_uri: String,
+    pub description: String,
+    pub token_properties: serde_json::Value,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub inserted_at: chrono::NaiveDateTime,
     pub decimals: i64,
 }
 
@@ -235,40 +261,92 @@ impl TokenDataV2 {
     /// 2. If metadata is not present, we will do a lookup in the db.
     pub async fn is_address_fungible_token(
         conn: &mut PgPoolConnection<'_>,
-        address: &str,
+        token_data_id: &str,
         object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
         txn_version: i64,
     ) -> bool {
         // 1. If metadata is present, the object is a token iff token struct is also present in the object
-        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
+        if let Some(object_data) = object_aggregated_data_mapping.get(token_data_id) {
             if object_data.fungible_asset_metadata.is_some() {
                 return object_data.token.is_some();
             }
         }
         // 2. If metadata is not present, we will do a lookup in the db.
-        //  The object must exist in current_objects table for this processor to proceed
-        match Object::get_current_object(conn, address, txn_version).await {
-            Ok(object) => {
-                if let Some(is_token) = object.is_token {
-                    return is_token;
+        match CurrentTokenDataV2::get_current_token_data_v2(conn, txn_version, token_data_id).await
+        {
+            Ok(token_data) => {
+                if let Some(is_fungible_v2) = token_data.is_fungible_v2 {
+                    return is_fungible_v2;
                 }
-                tracing::error!(
-                    "is_token is null for object_address: {}. You should probably backfill db.",
-                    address
-                );
-                // By default, don't index
+                // If is_fungible_v2 is null, that's likely because it's a v1 token, which are not fungible
                 false
             },
             Err(_) => {
                 tracing::error!(
                     transaction_version = txn_version,
-                    lookup_key = address,
-                    "Missing current_object for object_address: {}. You probably should backfill db.",
-                    address,
+                    lookup_key = token_data_id,
+                    "Missing current_token_data_v2 for token_data_id: {}. You probably should backfill db.",
+                    token_data_id,
                 );
-                // By default, don't index
+                // Default
                 false
             },
         }
+    }
+}
+
+impl CurrentTokenDataV2 {
+    pub async fn get_current_token_data_v2(
+        conn: &mut PgPoolConnection<'_>,
+        txn_version: i64,
+        token_data_id: &str,
+    ) -> anyhow::Result<Self> {
+        let mut retries = 0;
+        while retries < QUERY_RETRIES {
+            retries += 1;
+            match CurrentTokenDataV2Query::get_by_token_data_id(conn, token_data_id).await {
+                Ok(res) => {
+                    return Ok(CurrentTokenDataV2 {
+                        token_data_id: res.token_data_id,
+                        collection_id: res.collection_id,
+                        token_name: res.token_name,
+                        maximum: res.maximum,
+                        supply: res.supply,
+                        largest_property_version_v1: res.largest_property_version_v1,
+                        token_uri: res.token_uri,
+                        token_properties: res.token_properties,
+                        description: res.description,
+                        token_standard: res.token_standard,
+                        is_fungible_v2: res.is_fungible_v2,
+                        last_transaction_version: res.last_transaction_version,
+                        last_transaction_timestamp: res.last_transaction_timestamp,
+                        decimals: res.decimals,
+                    });
+                },
+                Err(_) => {
+                    tracing::error!(
+                        transaction_version = txn_version,
+                        lookup_key = token_data_id,
+                        "Missing current_token_data_v2 for token_data_id: {}. You probably should backfill db.",
+                        token_data_id,
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                        .await;
+                },
+            }
+        }
+        Err(anyhow::anyhow!("Failed to get token data"))
+    }
+}
+
+impl CurrentTokenDataV2Query {
+    pub async fn get_by_token_data_id(
+        conn: &mut PgPoolConnection<'_>,
+        token_data_id: &str,
+    ) -> diesel::QueryResult<Self> {
+        current_token_datas_v2::table
+            .filter(current_token_datas_v2::token_data_id.eq(token_data_id))
+            .first::<Self>(conn)
+            .await
     }
 }

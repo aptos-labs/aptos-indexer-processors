@@ -3,15 +3,9 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-        object_models::{
-            v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-            },
-            v2_objects::{CurrentObject, Object},
-        },
-        token_v2_models::v2_token_utils::TokenV2,
+    models::object_models::{
+        v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
+        v2_objects::{CurrentObject, Object},
     },
     schema,
     utils::{
@@ -103,11 +97,7 @@ fn insert_objects_query(
             .values(items_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
             .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                is_token.eq(excluded(is_token)),
-                is_fungible_asset.eq(excluded(is_fungible_asset)),
-            )),
+            .set((inserted_at.eq(excluded(inserted_at)),)),
         None,
     )
 }
@@ -132,8 +122,6 @@ fn insert_current_objects_query(
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
-                is_token.eq(excluded(is_token)),
-                is_fungible_asset.eq(excluded(is_fungible_asset)),
             )),
         Some(
             " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
@@ -205,29 +193,7 @@ impl ProcessorTrait for ObjectsProcessor {
                 }
             }
 
-            // Second pass to get all other structs related to the object
-            for wsc in changes.iter() {
-                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    let address = standardize_address(&wr.address.to_string());
-
-                    // Find structs related to object
-                    if let Some(aggregated_data) = object_metadata_helper.get_mut(&address) {
-                        if let Some(token) = TokenV2::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            // Object is a token if it has 0x4::token::Token struct
-                            aggregated_data.token = Some(token);
-                        }
-                        if let Some(fungible_asset_metadata) =
-                            FungibleAssetMetadata::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            // Object is a fungible asset if it has a 0x1::fungible_asset::FungibleAssetMetadata
-                            aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
-                        }
-                    }
-                }
-            }
-
-            // Third pass to construct the object data
+            // Second pass to construct the object data
             for (index, wsc) in changes.iter().enumerate() {
                 let index: i64 = index as i64;
                 match wsc.change.as_ref().unwrap() {
