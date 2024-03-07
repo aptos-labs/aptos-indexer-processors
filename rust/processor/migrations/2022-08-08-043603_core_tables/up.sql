@@ -235,6 +235,7 @@ CREATE INDEX ev_entry_function_id_str_index ON events (entry_function_id_str);
 CREATE INDEX ev_module_name_index ON events (module_name);
 CREATE INDEX ev_event_name_index ON events (event_name);
 CREATE INDEX ev_module_address_module_name_event_name_transaction_version_index ON events (module_address, module_name, event_name, transaction_version);
+CREATE INDEX ev_module_address_transaction_version_index ON events (module_address, transaction_version);
 
 
 -- write set changes
