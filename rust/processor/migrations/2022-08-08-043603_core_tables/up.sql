@@ -230,12 +230,15 @@ CREATE TABLE events (
 );
 CREATE INDEX ev_addr_type_index ON events (account_address);
 CREATE INDEX ev_insat_index ON events (inserted_at);
-CREATE INDEX ev_from_index ON events ("from");
+CREATE INDEX ev_from_entry_function_id_str_index ON events ("from", entry_function_id_str);
+CREATE INDEX ev_from_transaction_version_module_address ON events ("from", transaction_version, module_address, module_name, event_name);
+CREATE INDEX ev_from_module_address_transaction_version ON events ("from", module_address, module_name, event_name, transaction_version);
 CREATE INDEX ev_entry_function_id_str_index ON events (entry_function_id_str);
-CREATE INDEX ev_module_address_index ON events (module_address);
+-- CREATE INDEX ev_module_address_index ON events (module_address);
 CREATE INDEX ev_module_name_index ON events (module_name);
 CREATE INDEX ev_event_name_index ON events (event_name);
-CREATE INDEX ev_module_address_module_name_event_name_index ON events (module_address, module_name, event_name);
+CREATE INDEX ev_module_address_transaction_version ON events (module_address, transaction_version);
+CREATE INDEX ev_module_address_module_name_event_name_transaction_version_index ON events (module_address, module_name, event_name, transaction_version);
 
 
 -- write set changes
