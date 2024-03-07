@@ -27,6 +27,8 @@ use std::fmt::{self, Formatter};
 pub const TOKEN_V2_ADDR: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000004";
 
+pub const DEFAULT_OWNER_ADDRESS: &str = "unknown";
+
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 /// Maps address to burn event (new). The event is None if it's an old burn event.
 pub type TokenV2Burned = AHashMap<CurrentObjectPK, Option<Burn>>;
