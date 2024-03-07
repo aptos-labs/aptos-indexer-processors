@@ -305,6 +305,7 @@ impl TokenOwnershipV2 {
             } else {
                 // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
                 // Do a lookup to get preivous owner.
+                // Hotfix
                 let latest_nft_ownership = match prior_nft_ownership.get(&token_address) {
                     Some(inner) => inner.clone(),
                     None => {
