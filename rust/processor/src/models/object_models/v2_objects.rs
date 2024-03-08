@@ -34,8 +34,6 @@ pub struct Object {
     pub state_key_hash: String,
     pub guid_creation_num: BigDecimal,
     pub allow_ungated_transfer: bool,
-    pub is_token: Option<bool>,
-    pub is_fungible_asset: Option<bool>,
     pub is_deleted: bool,
 }
 
@@ -49,8 +47,6 @@ pub struct CurrentObject {
     pub allow_ungated_transfer: bool,
     pub last_guid_creation_num: BigDecimal,
     pub last_transaction_version: i64,
-    pub is_token: Option<bool>,
-    pub is_fungible_asset: Option<bool>,
     pub is_deleted: bool,
 }
 
@@ -66,8 +62,6 @@ pub struct CurrentObjectQuery {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
     pub inserted_at: chrono::NaiveDateTime,
-    pub is_token: Option<bool>,
-    pub is_fungible_asset: Option<bool>,
 }
 
 impl Object {
@@ -91,10 +85,6 @@ impl Object {
                     state_key_hash: object_with_metadata.state_key_hash.clone(),
                     guid_creation_num: object_core.guid_creation_num.clone(),
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
-                    is_token: Some(object_aggregated_metadata.token.is_some()),
-                    is_fungible_asset: Some(
-                        object_aggregated_metadata.fungible_asset_metadata.is_some(),
-                    ),
                     is_deleted: false,
                 },
                 CurrentObject {
@@ -104,10 +94,6 @@ impl Object {
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     last_guid_creation_num: object_core.guid_creation_num.clone(),
                     last_transaction_version: txn_version,
-                    is_token: Some(object_aggregated_metadata.token.is_some()),
-                    is_fungible_asset: Some(
-                        object_aggregated_metadata.fungible_asset_metadata.is_some(),
-                    ),
                     is_deleted: false,
                 },
             )))
@@ -158,8 +144,6 @@ impl Object {
                     state_key_hash: resource.state_key_hash.clone(),
                     guid_creation_num: previous_object.last_guid_creation_num.clone(),
                     allow_ungated_transfer: previous_object.allow_ungated_transfer,
-                    is_token: previous_object.is_token,
-                    is_fungible_asset: previous_object.is_fungible_asset,
                     is_deleted: true,
                 },
                 CurrentObject {
@@ -169,8 +153,6 @@ impl Object {
                     last_guid_creation_num: previous_object.last_guid_creation_num.clone(),
                     allow_ungated_transfer: previous_object.allow_ungated_transfer,
                     last_transaction_version: txn_version,
-                    is_token: previous_object.is_token,
-                    is_fungible_asset: previous_object.is_fungible_asset,
                     is_deleted: true,
                 },
             )))
@@ -198,8 +180,6 @@ impl Object {
                         allow_ungated_transfer: res.allow_ungated_transfer,
                         last_guid_creation_num: res.last_guid_creation_num,
                         last_transaction_version: res.last_transaction_version,
-                        is_token: res.is_token,
-                        is_fungible_asset: res.is_fungible_asset,
                         is_deleted: res.is_deleted,
                     });
                 },
