@@ -449,8 +449,6 @@ diesel::table! {
         last_transaction_version -> Int8,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
-        is_token -> Nullable<Bool>,
-        is_fungible_asset -> Nullable<Bool>,
     }
 }
 
@@ -791,6 +789,7 @@ diesel::table! {
         #[max_length = 10]
         token_standard -> Varchar,
         inserted_at -> Timestamp,
+        is_token_v2 -> Nullable<Bool>,
     }
 }
 
@@ -873,8 +872,6 @@ diesel::table! {
         allow_ungated_transfer -> Bool,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
-        is_token -> Nullable<Bool>,
-        is_fungible_asset -> Nullable<Bool>,
     }
 }
 

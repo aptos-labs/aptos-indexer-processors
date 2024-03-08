@@ -9,7 +9,7 @@ use super::v2_fungible_asset_utils::FungibleAssetMetadata;
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
-        object_models::{v2_object_utils::ObjectAggregatedDataMapping, v2_objects::Object},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,
@@ -17,7 +17,8 @@ use crate::{
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
-use diesel::sql_types::Text;
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -42,12 +43,27 @@ pub struct FungibleAssetMetadataModel {
     pub supply_aggregator_table_handle_v1: Option<String>,
     pub supply_aggregator_table_key_v1: Option<String>,
     pub token_standard: String,
+    pub is_token_v2: Option<bool>,
 }
 
-#[derive(Debug, QueryableByName)]
-pub struct AssetTypeFromTable {
-    #[diesel(sql_type = Text)]
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(primary_key(asset_type))]
+#[diesel(table_name = fungible_asset_metadata)]
+pub struct FungibleAssetMetadataQuery {
     pub asset_type: String,
+    pub creator_address: String,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: i32,
+    pub icon_uri: Option<String>,
+    pub project_uri: Option<String>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub supply_aggregator_table_handle_v1: Option<String>,
+    pub supply_aggregator_table_key_v1: Option<String>,
+    pub token_standard: String,
+    pub inserted_at: chrono::NaiveDateTime,
+    pub is_token_v2: Option<bool>,
 }
 
 impl FungibleAssetMetadataModel {
@@ -65,10 +81,7 @@ impl FungibleAssetMetadataModel {
             let asset_type = standardize_address(&write_resource.address.to_string());
             if let Some(object_metadata) = object_metadatas.get(&asset_type) {
                 let object = &object_metadata.object.object_core;
-                // Do not write here if asset is fungible token
-                if object_metadata.token.is_some() {
-                    return Ok(None);
-                }
+                let is_token_v2 = object_metadata.token.is_some();
 
                 return Ok(Some(Self {
                     asset_type: asset_type.clone(),
@@ -83,6 +96,7 @@ impl FungibleAssetMetadataModel {
                     supply_aggregator_table_handle_v1: None,
                     supply_aggregator_table_key_v1: None,
                     token_standard: TokenStandard::V2.to_string(),
+                    is_token_v2: Some(is_token_v2),
                 }));
             }
         }
@@ -121,6 +135,7 @@ impl FungibleAssetMetadataModel {
                         supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
                         supply_aggregator_table_key_v1: supply_aggregator_table_key,
                         token_standard: TokenStandard::V1.to_string(),
+                        is_token_v2: Some(false),
                     }))
                 } else {
                     Ok(None)
@@ -135,39 +150,48 @@ impl FungibleAssetMetadataModel {
     /// 2. If metadata is not present, we will do a lookup in the db.
     pub async fn is_address_fungible_asset(
         conn: &mut PgPoolConnection<'_>,
-        address: &str,
+        asset_type: &str,
         object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
         txn_version: i64,
     ) -> bool {
         // 1. If metadata is present without token object, then it's not a token
-        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
+        if let Some(object_data) = object_aggregated_data_mapping.get(asset_type) {
             if object_data.fungible_asset_metadata.is_some() {
                 return object_data.token.is_none();
             }
         }
         // 2. If metadata is not present, we will do a lookup in the db.
-        // The object must exist in current_objects table for this processor to proceed
-        // If it doesn't exist or is null, then you probably need to backfill objects processor
-        match Object::get_current_object(conn, address, txn_version).await {
-            Ok(object) => {
-                if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
-                    return is_fa && !is_token;
+        match FungibleAssetMetadataQuery::get_by_asset_type(conn, asset_type).await {
+            Ok(metadata) => {
+                if let Some(is_token_v2) = metadata.is_token_v2 {
+                    return !is_token_v2;
                 }
 
-                tracing::error!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
-                // By default, assume it's not a fungible token and index it as a fungible asset
-                true
+                // If is_token_v2 is null, then the metadata is a v1 coin info, and it's not a token
+                false
             },
             Err(_) => {
                 tracing::error!(
                     transaction_version = txn_version,
-                    lookup_key = address,
-                    "Missing current_object for object_address: {}. You probably should backfill db.",
-                    address,
+                    lookup_key = asset_type,
+                    "Missing fungible_asset_metadata for asset_type: {}. You probably should backfill db.",
+                    asset_type,
                 );
-                // By default, assume it's not a fungible token and index it as a fungible asset
+                // Default
                 true
             },
         }
+    }
+}
+
+impl FungibleAssetMetadataQuery {
+    pub async fn get_by_asset_type(
+        conn: &mut PgPoolConnection<'_>,
+        asset_type: &str,
+    ) -> diesel::QueryResult<Self> {
+        fungible_asset_metadata::table
+            .filter(fungible_asset_metadata::asset_type.eq(asset_type))
+            .first::<Self>(conn)
+            .await
     }
 }
