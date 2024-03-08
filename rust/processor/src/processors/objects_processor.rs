@@ -4,15 +4,9 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
-    models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-        object_models::{
-            v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-            },
-            v2_objects::{CurrentObject, Object},
-        },
-        token_v2_models::v2_token_utils::TokenV2,
+    models::object_models::{
+        v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
+        v2_objects::{CurrentObject, Object},
     },
     schema,
     utils::util::standardize_address,
@@ -21,7 +15,7 @@ use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
 use tracing::error;
 
 pub struct ObjectsProcessor {
@@ -105,8 +99,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentObject> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

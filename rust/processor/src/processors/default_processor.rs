@@ -192,7 +192,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTableItem> {
         &self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_table_items::dsl::*;
+        use crate::{diesel::query_dsl::methods::FilterDsl, schema::current_table_items::dsl::*};
 
         let query = diesel::insert_into(schema::current_table_items::table)
             .values(self)
@@ -205,8 +205,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTableItem> {
                 is_deleted.eq(excluded(is_deleted)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

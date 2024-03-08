@@ -22,7 +22,7 @@ use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -189,8 +189,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnership> {
                 collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                 table_type.eq(excluded(table_type)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_ownerships.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -227,8 +228,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenData> {
                 collection_data_id_hash.eq(excluded(collection_data_id_hash)),
                 description.eq(excluded(description)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_datas.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -257,8 +259,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentCollectionData> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 table_handle.eq(excluded(table_handle)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_collection_datas.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -311,8 +314,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenPendingClaim> {
                 inserted_at.eq(excluded(inserted_at)),
                 token_data_id.eq(excluded(token_data_id)),
                 collection_id.eq(excluded(collection_id)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

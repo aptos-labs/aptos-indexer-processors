@@ -30,7 +30,7 @@ use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -114,25 +114,23 @@ impl crate::db_writer::DbExecutable for Vec<FungibleAssetMetadataModel> {
             .values(self)
             .on_conflict(asset_type)
             .do_update()
-            .set(
-                (
-                    creator_address.eq(excluded(creator_address)),
-                    name.eq(excluded(name)),
-                    symbol.eq(excluded(symbol)),
-                    decimals.eq(excluded(decimals)),
-                    icon_uri.eq(excluded(icon_uri)),
-                    project_uri.eq(excluded(project_uri)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
-                    supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
-                    token_standard.eq(excluded(token_standard)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    is_token_v2.eq(excluded(is_token_v2)),
-                )
-            )
-            .filter(last_transaction_version.le(excluded(last_transaction_version)))
-        crate::db_writer::execute_with_better_error(conn, None).await
+            .set((
+                creator_address.eq(excluded(creator_address)),
+                name.eq(excluded(name)),
+                symbol.eq(excluded(symbol)),
+                decimals.eq(excluded(decimals)),
+                icon_uri.eq(excluded(icon_uri)),
+                project_uri.eq(excluded(project_uri)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
+                supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
+                token_standard.eq(excluded(token_standard)),
+                inserted_at.eq(excluded(inserted_at)),
+                is_token_v2.eq(excluded(is_token_v2)),
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -180,7 +178,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentFungibleAssetBalance> {
                 inserted_at.eq(excluded(inserted_at)),
             ))
             .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, None).await
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

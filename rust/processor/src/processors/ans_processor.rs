@@ -19,7 +19,7 @@ use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, ExpressionMethods};
+use diesel::{pg::upsert::excluded, query_dsl::methods::FilterDsl, ExpressionMethods};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -115,8 +115,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsLookup> {
                 token_name.eq(excluded(token_name)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(excluded(last_transaction_version).ge(last_transaction_version));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -155,8 +156,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsPrimaryName> {
                 is_deleted.eq(excluded(is_deleted)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(excluded(last_transaction_version).ge(last_transaction_version));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -195,8 +197,10 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsLookupV2> {
                 token_name.eq(excluded(token_name)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(excluded(last_transaction_version).ge(last_transaction_version));
+
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -235,8 +239,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsPrimaryNameV2> {
                 is_deleted.eq(excluded(is_deleted)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_ans_primary_name_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(excluded(last_transaction_version).ge(last_transaction_version));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

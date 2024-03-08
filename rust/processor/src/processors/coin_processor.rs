@@ -19,7 +19,7 @@ use ahash::AHashMap;
 use anyhow::{bail, Context};
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
 use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -124,8 +124,9 @@ impl crate::db_writer::DbExecutable for Vec<CoinInfo> {
                 supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
                 supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "))).await
+            ))
+            .filter(transaction_version_created.ge(excluded(transaction_version_created)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -162,8 +163,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentCoinBalance> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

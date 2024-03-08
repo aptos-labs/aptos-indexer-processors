@@ -635,7 +635,6 @@ impl Worker {
                             chain_id: grpc_chain_id,
                         })
                         .on_conflict_do_nothing(),
-                    None,
                 )
                 .await
                 .context("[Parser] Error updating chain_id!")

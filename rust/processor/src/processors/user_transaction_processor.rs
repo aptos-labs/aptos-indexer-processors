@@ -3,6 +3,8 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    db_writer::execute_with_better_error,
+    diesel::ExpressionMethods,
     models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
@@ -11,8 +13,8 @@ use crate::{
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
+use diesel::upsert::excluded;
 use tracing::error;
-
 pub struct UserTransactionProcessor {
     db_writer: crate::db_writer::DbWriter,
 }
@@ -56,6 +58,47 @@ async fn insert_to_db(
 
     tokio::join!(ut, is);
     Ok(())
+}
+
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<UserTransactionModel> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::user_transactions::dsl::*;
+
+        let query = diesel::insert_into(crate::schema::user_transactions::table)
+            .values(self)
+            .on_conflict(version)
+            .do_update()
+            .set((
+                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+                inserted_at.eq(excluded(inserted_at)),
+            ));
+        execute_with_better_error(conn, query).await
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::db_writer::DbExecutable for Vec<Signature> {
+    async fn execute_query(
+        &self,
+        conn: crate::utils::database::PgDbPool,
+    ) -> diesel::QueryResult<usize> {
+        use crate::schema::signatures::dsl::*;
+
+        let query = diesel::insert_into(crate::schema::signatures::table)
+            .values(self)
+            .on_conflict((
+                transaction_version,
+                multi_agent_index,
+                multi_sig_index,
+                is_sender_primary,
+            ))
+            .do_nothing();
+        execute_with_better_error(conn, query).await
+    }
 }
 
 #[async_trait]

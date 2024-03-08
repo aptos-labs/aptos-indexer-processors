@@ -24,7 +24,7 @@ use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
 use tracing::error;
 
 pub struct StakeProcessor {
@@ -108,8 +108,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentStakingPoolVoter> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
                 operator_address.eq(excluded(operator_address)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_staking_pool_voter.last_transaction_version <= EXCLUDED.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -178,8 +179,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorBalance> {
                 inserted_at.eq(excluded(inserted_at)),
                 shares.eq(excluded(shares)),
                 parent_table_handle.eq(excluded(parent_table_handle)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_delegator_balances.last_transaction_version <= EXCLUDED.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -198,8 +200,9 @@ impl crate::db_writer::DbExecutable for Vec<DelegatorPool> {
             .set((
                 first_transaction_version.eq(excluded(first_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE delegated_staking_pools.first_transaction_version >= EXCLUDED.first_transaction_version "))).await
+            ))
+            .filter(first_transaction_version.ge(excluded(first_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -241,8 +244,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorPoolBalance> {
                 operator_commission_percentage.eq(excluded(operator_commission_percentage)),
                 inactive_table_handle.eq(excluded(inactive_table_handle)),
                 active_table_handle.eq(excluded(active_table_handle)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_delegated_staking_pool_balances.last_transaction_version <= EXCLUDED.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -265,8 +269,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDelegatedVoter> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 table_handle.eq(excluded(table_handle)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_delegated_voter.last_transaction_version <= EXCLUDED.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 

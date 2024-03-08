@@ -40,6 +40,7 @@ use self::{
 };
 use crate::{
     db_writer::QueryGenerator,
+    diesel::query_dsl::methods::FilterDsl,
     models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
@@ -148,8 +149,11 @@ pub trait ProcessorTrait: Send + Sync {
                     processor_status::last_updated.eq(excluded(processor_status::last_updated)),
                     processor_status::last_transaction_timestamp
                         .eq(excluded(processor_status::last_transaction_timestamp)),
-                )),
-            Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
+                ))
+                .filter(
+                    processor_status::last_success_version
+                        .le(excluded(processor_status::last_success_version)),
+                ),
         )
         .await?;
         Ok(())

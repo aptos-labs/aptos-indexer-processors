@@ -39,7 +39,7 @@ use ahash::{AHashMap, AHashSet};
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
 use tracing::error;
 
 pub struct TokenV2Processor {
@@ -181,8 +181,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentCollectionV2> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_collections_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -213,8 +214,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenDataV2> {
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 decimals.eq(excluded(decimals)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -246,8 +248,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnershipV2> {
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -273,8 +276,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDeletedTokenOwnershipV2> {
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
@@ -315,8 +319,9 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenV2Metadata> {
                 state_key_hash.eq(excluded(state_key_hash)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, crate::utils::database::UpsertFilterLatestTransactionQuery::new(query, Some(" WHERE current_token_v2_metadata.last_transaction_version <= excluded.last_transaction_version "))).await
+            ))
+            .filter(last_transaction_version.le(excluded(last_transaction_version)));
+        crate::db_writer::execute_with_better_error(conn, query).await
     }
 }
 
