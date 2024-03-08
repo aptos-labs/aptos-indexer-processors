@@ -66,6 +66,10 @@ impl<C: Cache<(i64, i64), CachedEvent> + 'static> EventOrdering<C> {
         let cache_mutex = self.cache.clone();
         let pop_thread = tokio::spawn(async move {
             loop {
+                println!(
+                    "next_transaction_version: {:?}",
+                    next_transaction_version.load(Ordering::SeqCst)
+                );
                 let mut heap_locked = heap_pop.lock().await;
                 if let Some(transaction_events) = heap_locked.peek() {
                     if transaction_events.transaction_version

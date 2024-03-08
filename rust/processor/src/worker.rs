@@ -283,8 +283,8 @@ impl Worker {
         if self.processor_config.name() == "event_stream_processor".to_string() {
             let cache = Arc::new(RwLock::new(
                 S3FIFOCache::<(i64, i64), CachedEvent>::with_weighter(
-                    100000,
-                    100000,
+                    1000000,
+                    1000000,
                     quick_cache::UnitWeighter,
                 ),
             ));
