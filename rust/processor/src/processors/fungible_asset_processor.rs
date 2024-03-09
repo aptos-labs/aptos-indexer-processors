@@ -154,6 +154,7 @@ fn insert_fungible_asset_metadata_query(
                     supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
                     token_standard.eq(excluded(token_standard)),
                     inserted_at.eq(excluded(inserted_at)),
+                    is_token_v2.eq(excluded(is_token_v2)),
                 )
             ),
         Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
