@@ -7,6 +7,7 @@ use crate::{
     schema::events,
     utils::util::{standardize_address, truncate_str},
 };
+use aptos_in_memory_cache::Weighted;
 use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -112,19 +113,16 @@ impl EventStreamMessage {
 pub struct CachedEvent {
     pub event_stream_message: EventStreamMessage,
     pub num_events_in_transaction: usize,
-    pub weight: usize,
 }
 
 impl CachedEvent {
     pub fn from_event_stream_message(
         event_stream_message: &EventStreamMessage,
         num_events_in_transaction: usize,
-        weight: usize,
     ) -> Self {
         CachedEvent {
             event_stream_message: event_stream_message.clone(),
             num_events_in_transaction,
-            weight,
         }
     }
 
@@ -143,7 +141,12 @@ impl CachedEvent {
                 transaction_timestamp: chrono::NaiveDateTime::default(),
             },
             num_events_in_transaction: 0,
-            weight: 0, // TODO: Fix
         }
+    }
+}
+
+impl Weighted for CachedEvent {
+    fn weight(&self) -> u64 {
+        std::mem::size_of_val(&*self) as u64
     }
 }

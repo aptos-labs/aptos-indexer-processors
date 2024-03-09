@@ -36,18 +36,17 @@ use crate::{
         event_ordering::{EventOrdering, TransactionEvents},
         filter::EventFilter,
         filter_editor::spawn_filter_editor,
-        stream::spawn_stream,
+        stream::{spawn_stream, EventCacheKey},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
-use aptos_in_memory_cache::Cache;
+use aptos_in_memory_cache::{caches::fifo::FIFOCache, Cache, Ordered};
 use aptos_moving_average::MovingAverage;
 use diesel::Connection;
 use futures::StreamExt;
 use kanal::AsyncSender;
-use quick_cache::sync::Cache as S3FIFOCache;
 use std::sync::Arc;
 use tokio::{sync::RwLock, task::JoinHandle};
 use tracing::{debug, error, info};
@@ -63,7 +62,9 @@ pub const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 /// Handles WebSocket connection from /filter endpoint
-async fn handle_websocket<C: Cache<(i64, i64), CachedEvent> + 'static>(
+async fn handle_websocket<
+    C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static,
+>(
     websocket: warp::ws::WebSocket,
     query_params: AHashMap<String, String>,
     cache: Arc<RwLock<C>>,
@@ -79,7 +80,13 @@ async fn handle_websocket<C: Cache<(i64, i64), CachedEvent> + 'static>(
     let filter_edit = filter.clone();
     tokio::spawn(async move { spawn_filter_editor(rx, filter_edit).await });
 
-    spawn_stream(tx, filter.clone(), cache.clone(), (start, 0)).await;
+    spawn_stream(
+        tx,
+        filter.clone(),
+        cache.clone(),
+        EventCacheKey::new(start, 0),
+    )
+    .await;
 }
 
 pub struct Worker {
@@ -281,13 +288,9 @@ impl Worker {
         });
 
         if self.processor_config.name() == "event_stream_processor".to_string() {
-            let cache = Arc::new(RwLock::new(
-                S3FIFOCache::<(i64, i64), CachedEvent>::with_weighter(
-                    1000000,
-                    1000000,
-                    quick_cache::UnitWeighter,
-                ),
-            ));
+            let cache = Arc::new(RwLock::new(FIFOCache::<EventCacheKey, CachedEvent>::new(
+                1000000000,
+            )));
 
             // Add events to cache in order
             let cache_order = cache.clone();

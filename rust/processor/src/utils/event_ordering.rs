@@ -1,5 +1,6 @@
+use super::stream::EventCacheKey;
 use crate::models::events_models::events::{CachedEvent, EventModel, EventStreamMessage};
-use aptos_in_memory_cache::Cache;
+use aptos_in_memory_cache::{Cache, Ordered};
 use kanal::AsyncReceiver;
 use std::{
     collections::BinaryHeap,
@@ -31,12 +32,12 @@ impl PartialOrd for TransactionEvents {
     }
 }
 
-pub struct EventOrdering<C: Cache<(i64, i64), CachedEvent> + 'static> {
+pub struct EventOrdering<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> {
     rx: AsyncReceiver<TransactionEvents>,
     cache: Arc<RwLock<C>>,
 }
 
-impl<C: Cache<(i64, i64), CachedEvent> + 'static> EventOrdering<C> {
+impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> EventOrdering<C> {
     pub fn new(rx: AsyncReceiver<TransactionEvents>, cache: Arc<RwLock<C>>) -> Self {
         Self { rx, cache }
     }
@@ -66,10 +67,6 @@ impl<C: Cache<(i64, i64), CachedEvent> + 'static> EventOrdering<C> {
         let cache_mutex = self.cache.clone();
         let pop_thread = tokio::spawn(async move {
             loop {
-                println!(
-                    "next_transaction_version: {:?}",
-                    next_transaction_version.load(Ordering::SeqCst)
-                );
                 let mut heap_locked = heap_pop.lock().await;
                 if let Some(transaction_events) = heap_locked.peek() {
                     if transaction_events.transaction_version
@@ -86,22 +83,23 @@ impl<C: Cache<(i64, i64), CachedEvent> + 'static> EventOrdering<C> {
                         if num_events == 0 {
                             // Add empty event if transaction doesn't have any events
                             cache.insert(
-                                (transaction_events.transaction_version, 0),
+                                EventCacheKey::new(transaction_events.transaction_version, 0),
                                 CachedEvent::empty(transaction_events.transaction_version),
                             );
                         } else {
                             // Add all events to cache
                             for event in transaction_events.events {
-                                // println!("Event: {:?}", event);
                                 cache.insert(
-                                    (event.transaction_version, event.event_index),
+                                    EventCacheKey::new(
+                                        event.transaction_version,
+                                        event.event_index,
+                                    ),
                                     CachedEvent::from_event_stream_message(
                                         &EventStreamMessage::from_event(
                                             &event,
                                             transaction_timestamp,
                                         ),
                                         num_events,
-                                        1,
                                     ),
                                 );
                             }
