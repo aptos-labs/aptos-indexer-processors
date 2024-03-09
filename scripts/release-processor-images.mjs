@@ -106,7 +106,7 @@ await $`${crane} copy ${imageSource} ${imageGitShaTarget}`;
 console.info(chalk.green(`INFO: Tagging image as latest`));
 await $`${crane} tag ${imageGitShaTarget} latest`;
 
-if(parsedArgs.VERSION_TAG !== null) {
+if(parsedArgs.VERSION_TAG !== null || parsedArgs.VERSION_TAG !== "") {
     console.info(chalk.green(`INFO: Tagging image as ${parsedArgs.VERSION_TAG} and ${parsedArgs.VERSION_TAG}_${parsedArgs.GIT_SHA}`));
     await $`${crane} tag ${imageGitShaTarget} ${parsedArgs.VERSION_TAG}`; // just the version tag
     await $`${crane} tag ${imageGitShaTarget} ${parsedArgs.VERSION_TAG}_${parsedArgs.GIT_SHA}`; // version tag with git sha
