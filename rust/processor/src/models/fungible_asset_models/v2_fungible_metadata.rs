@@ -168,7 +168,7 @@ impl FungibleAssetMetadataModel {
                 }
 
                 // If is_token_v2 is null, then the metadata is a v1 coin info, and it's not a token
-                false
+                true
             },
             Err(_) => {
                 tracing::error!(
