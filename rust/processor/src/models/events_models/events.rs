@@ -97,8 +97,8 @@ impl Event {
                 from: from.to_string(),
                 entry_function_payload: entry_function_payload_json.unwrap_or_default(),
                 entry_function_id_str: entry_function_id_str.to_string(),
-                module_address: t.split("::").next().unwrap().to_string(),
-                module_name: t.split("::").nth(1).unwrap().to_string(),
+                module_address: t.split("::").next().unwrap_or("").to_string(),
+                module_name: t.split("::").nth(1).unwrap_or("").to_string(),
                 event_name: event_name.to_string(),
                 inserted_at: timestamp_to_naive(inserted_at)
             }
