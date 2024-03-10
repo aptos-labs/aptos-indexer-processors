@@ -400,7 +400,7 @@ impl TokenOwnershipV2 {
                 let object_core = &object_data.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(
+                if !TokenDataV2::is_address_token(
                     conn,
                     &token_data_id,
                     object_metadatas,
