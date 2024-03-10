@@ -49,8 +49,8 @@ pub struct AnsProcessor {
 impl AnsProcessor {
     pub fn new(
         connection_pool: PgDbPool,
-        per_table_chunk_sizes: AHashMap<String, usize>,
         config: AnsProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
     ) -> Self {
         tracing::info!(
             ans_v1_primary_names_table_handle = config.ans_v1_primary_names_table_handle,
@@ -60,8 +60,8 @@ impl AnsProcessor {
         );
         Self {
             connection_pool,
-            per_table_chunk_sizes,
             config,
+            per_table_chunk_sizes,
         }
     }
 }

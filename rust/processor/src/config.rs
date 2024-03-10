@@ -12,6 +12,9 @@ use server_framework::RunnableConfig;
 use std::time::Duration;
 use url::Url;
 
+pub const QUERY_DEFAULT_RETRIES: u32 = 5;
+pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcProcessorConfig {
@@ -47,6 +50,14 @@ pub struct IndexerGrpcProcessorConfig {
 impl IndexerGrpcProcessorConfig {
     pub const fn default_gap_detection_batch_size() -> u64 {
         DEFAULT_GAP_DETECTION_BATCH_SIZE
+    }
+
+    pub const fn default_query_retries() -> u32 {
+        QUERY_DEFAULT_RETRIES
+    }
+
+    pub const fn default_query_retry_delay_ms() -> u64 {
+        QUERY_DEFAULT_RETRY_DELAY_MS
     }
 
     /// Make the default very large on purpose so that by default it's not chunked

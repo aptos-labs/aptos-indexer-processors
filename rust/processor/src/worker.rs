@@ -670,8 +670,8 @@ pub fn build_processor(
         ),
         ProcessorConfig::AnsProcessor(config) => Processor::from(AnsProcessor::new(
             db_pool,
-            per_table_chunk_sizes,
             config.clone(),
+            per_table_chunk_sizes,
         )),
         ProcessorConfig::CoinProcessor => {
             Processor::from(CoinProcessor::new(db_pool, per_table_chunk_sizes))
@@ -689,20 +689,26 @@ pub fn build_processor(
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
         },
-        ProcessorConfig::ObjectsProcessor => {
-            Processor::from(ObjectsProcessor::new(db_pool, per_table_chunk_sizes))
-        },
-        ProcessorConfig::StakeProcessor => {
-            Processor::from(StakeProcessor::new(db_pool, per_table_chunk_sizes))
-        },
+        ProcessorConfig::ObjectsProcessor(config) => Processor::from(ObjectsProcessor::new(
+            db_pool,
+            config.clone(),
+            per_table_chunk_sizes,
+        )),
+        ProcessorConfig::StakeProcessor(config) => Processor::from(StakeProcessor::new(
+            db_pool,
+            config.clone(),
+            per_table_chunk_sizes,
+        )),
         ProcessorConfig::TokenProcessor(config) => Processor::from(TokenProcessor::new(
             db_pool,
-            per_table_chunk_sizes,
             config.clone(),
+            per_table_chunk_sizes,
         )),
-        ProcessorConfig::TokenV2Processor => {
-            Processor::from(TokenV2Processor::new(db_pool, per_table_chunk_sizes))
-        },
+        ProcessorConfig::TokenV2Processor(config) => Processor::from(TokenV2Processor::new(
+            db_pool,
+            config.clone(),
+            per_table_chunk_sizes,
+        )),
         ProcessorConfig::TransactionMetadataProcessor => Processor::from(
             TransactionMetadataProcessor::new(db_pool, per_table_chunk_sizes),
         ),
