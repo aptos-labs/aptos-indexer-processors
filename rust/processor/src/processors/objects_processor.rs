@@ -12,6 +12,7 @@ use crate::{
         database::{execute_in_chunks, PgDbPool},
         util::standardize_address,
     },
+    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -23,16 +24,29 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectsProcessorConfig {
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
+}
 pub struct ObjectsProcessor {
     connection_pool: PgDbPool,
+    config: ObjectsProcessorConfig,
 }
 
 impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, config: ObjectsProcessorConfig) -> Self {
+        Self {
+            connection_pool,
+            config,
+        }
     }
 }
 
@@ -138,6 +152,8 @@ impl ProcessorTrait for ObjectsProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         // Moving object handling here because we need a single object
         // map through transactions for lookups
@@ -212,6 +228,8 @@ impl ProcessorTrait for ObjectsProcessor {
                             index,
                             &all_current_objects,
                             &mut conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()

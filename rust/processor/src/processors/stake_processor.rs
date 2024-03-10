@@ -21,6 +21,7 @@ use crate::{
         database::{execute_in_chunks, PgDbPool},
         util::{parse_timestamp, standardize_address},
     },
+    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -32,16 +33,30 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StakeProcessorConfig {
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
+}
+
 pub struct StakeProcessor {
     connection_pool: PgDbPool,
+    config: StakeProcessorConfig,
 }
 
 impl StakeProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, config: StakeProcessorConfig) -> Self {
+        Self {
+            connection_pool,
+            config,
+        }
     }
 }
 
@@ -352,6 +367,8 @@ impl ProcessorTrait for StakeProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         let mut all_current_stake_pool_voters: StakingPoolVoterMap = AHashMap::new();
         let mut all_proposal_votes = vec![];
@@ -426,6 +443,8 @@ impl ProcessorTrait for StakeProcessor {
                     txn,
                     &active_pool_to_staking_pool,
                     &mut conn,
+                    query_retries,
+                    query_retry_delay_ms,
                 )
                 .await
                 .unwrap();
@@ -441,6 +460,8 @@ impl ProcessorTrait for StakeProcessor {
                         txn_timestamp,
                         &all_vote_delegation_handle_to_pool_address,
                         &mut conn,
+                        query_retries,
+                        query_retry_delay_ms,
                     )
                     .await
                     .unwrap();
@@ -460,6 +481,8 @@ impl ProcessorTrait for StakeProcessor {
                             &active_pool_to_staking_pool,
                             &all_current_delegated_voter,
                             &mut conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()
