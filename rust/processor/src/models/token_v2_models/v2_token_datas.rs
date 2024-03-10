@@ -27,6 +27,9 @@ use serde::{Deserialize, Serialize};
 // PK of current_token_datas_v2, i.e. token_data_id
 pub type CurrentTokenDataV2PK = String;
 
+const QUERY_EXISTENCE_RETRIES: u32 = 1;
+const QUERY_EXISTENCE_RETRY_DELAY_MS: u64 = 50;
+
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = token_datas_v2)]
@@ -274,14 +277,19 @@ impl TokenDataV2 {
         // 2. If metadata is not present, we will do a lookup in the db.
         match CurrentTokenDataV2::get_current_token_data_v2(conn, txn_version, token_data_id).await
         {
-            Ok(token_data) => {
+            Ok(Some(token_data)) => {
                 if let Some(is_fungible_v2) = token_data.is_fungible_v2 {
                     return is_fungible_v2;
                 }
                 // If is_fungible_v2 is null, that's likely because it's a v1 token, which are not fungible
                 false
             },
+            Ok(None) => {
+                // Doesn't exist in the curent_token_data_v2, so it's not a fungible token
+                false
+            },
             Err(_) => {
+                // Doesn't exist in the curent_token_data_v2, so it's not a fungible token
                 tracing::error!(
                     transaction_version = txn_version,
                     lookup_key = token_data_id,
@@ -300,13 +308,13 @@ impl CurrentTokenDataV2 {
         conn: &mut PgPoolConnection<'_>,
         txn_version: i64,
         token_data_id: &str,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<Option<Self>> {
         let mut retries = 0;
-        while retries < QUERY_RETRIES {
+        while retries < QUERY_EXISTENCE_RETRIES {
             retries += 1;
             match CurrentTokenDataV2Query::get_by_token_data_id(conn, token_data_id).await {
                 Ok(res) => {
-                    return Ok(CurrentTokenDataV2 {
+                    return Ok(Some(CurrentTokenDataV2 {
                         token_data_id: res.token_data_id,
                         collection_id: res.collection_id,
                         token_name: res.token_name,
@@ -321,21 +329,24 @@ impl CurrentTokenDataV2 {
                         last_transaction_version: res.last_transaction_version,
                         last_transaction_timestamp: res.last_transaction_timestamp,
                         decimals: res.decimals,
-                    });
+                    }));
                 },
                 Err(_) => {
                     tracing::error!(
                         transaction_version = txn_version,
                         lookup_key = token_data_id,
-                        "Missing current_token_data_v2 for token_data_id: {}. You probably should backfill db.",
+                        "Missing current_token_data_v2 for token_data_id: {}. Retrying...",
                         token_data_id,
                     );
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        QUERY_EXISTENCE_RETRY_DELAY_MS,
+                    ))
+                    .await;
                 },
             }
         }
-        Err(anyhow::anyhow!("Failed to get token data"))
+        // Couldn't find in current_token_data_v2
+        Ok(None)
     }
 }
 
