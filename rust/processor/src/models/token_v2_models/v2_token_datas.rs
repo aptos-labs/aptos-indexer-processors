@@ -9,10 +9,7 @@ use super::v2_token_utils::{TokenStandard, TokenV2};
 use crate::{
     models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::{
-            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-            token_utils::TokenWriteSet,
-        },
+        token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
@@ -302,7 +299,8 @@ impl CurrentTokenDataV2 {
         token_data_id: &str,
     ) -> anyhow::Result<Self> {
         let mut retries = 0;
-        while retries < QUERY_RETRIES {
+        // Temp fix to unblock
+        while retries < 1 {
             retries += 1;
             match CurrentTokenDataV2Query::get_by_token_data_id(conn, token_data_id).await {
                 Ok(res) => {
@@ -330,8 +328,8 @@ impl CurrentTokenDataV2 {
                         "Missing current_token_data_v2 for token_data_id: {}. You probably should backfill db.",
                         token_data_id,
                     );
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    // Temp fix to unblock
                 },
             }
         }
