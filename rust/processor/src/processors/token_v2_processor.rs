@@ -33,6 +33,7 @@ use crate::{
         database::{execute_in_chunks, PgDbPool, PgPoolConnection},
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
+    IndexerGrpcProcessorConfig,
 };
 use ahash::{AHashMap, AHashSet};
 use anyhow::bail;
@@ -44,16 +45,30 @@ use diesel::{
     ExpressionMethods,
 };
 use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TokenV2ProcessorConfig {
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
+}
+
 pub struct TokenV2Processor {
     connection_pool: PgDbPool,
+    config: TokenV2ProcessorConfig,
 }
 
 impl TokenV2Processor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, config: TokenV2ProcessorConfig) -> Self {
+        Self {
+            connection_pool,
+            config,
+        }
     }
 }
 
@@ -389,6 +404,8 @@ impl ProcessorTrait for TokenV2Processor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
         // Token V2 processing which includes token v1
         let (
             collections_v2,
@@ -400,7 +417,14 @@ impl ProcessorTrait for TokenV2Processor {
             current_deleted_token_ownerships_v2,
             token_activities_v2,
             current_token_v2_metadata,
-        ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+        ) = parse_v2_token(
+            &transactions,
+            &table_handle_to_owner,
+            &mut conn,
+            query_retries,
+            query_retry_delay_ms,
+        )
+        .await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -453,6 +477,8 @@ async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
+    query_retries: u32,
+    query_retry_delay_ms: u64,
 ) -> (
     Vec<CollectionV2>,
     Vec<TokenDataV2>,
@@ -692,6 +718,8 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 table_handle_to_owner,
                                 conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
                             .await
                             .unwrap()
@@ -926,6 +954,8 @@ async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
                             .await
                             .unwrap()

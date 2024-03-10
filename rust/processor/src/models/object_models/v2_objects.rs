@@ -7,10 +7,7 @@
 
 use super::v2_object_utils::{CurrentObjectPK, ObjectAggregatedDataMapping};
 use crate::{
-    models::{
-        default_models::move_resources::MoveResource,
-        token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    },
+    models::default_models::move_resources::MoveResource,
     schema::{current_objects, objects},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
@@ -111,6 +108,8 @@ impl Object {
         write_set_change_index: i64,
         object_mapping: &AHashMap<CurrentObjectPK, CurrentObject>,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
         if delete_resource.type_str == "0x1::object::ObjectGroup" {
             let resource = MoveResource::from_delete_resource(
@@ -122,7 +121,15 @@ impl Object {
             let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
                 object.clone()
             } else {
-                match Self::get_current_object(conn, &resource.address, txn_version).await {
+                match Self::get_current_object(
+                    conn,
+                    &resource.address,
+                    txn_version,
+                    query_retries,
+                    query_retry_delay_ms,
+                )
+                .await
+                {
                     Ok(object) => object,
                     Err(_) => {
                         tracing::error!(
@@ -167,9 +174,11 @@ impl Object {
         conn: &mut PgPoolConnection<'_>,
         object_address: &str,
         transaction_version: i64,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<CurrentObject> {
         let mut retries = 0;
-        while retries < QUERY_RETRIES {
+        while retries < query_retries {
             retries += 1;
             match CurrentObjectQuery::get_by_address(object_address, conn).await {
                 Ok(res) => {
@@ -188,12 +197,10 @@ impl Object {
                         transaction_version,
                         error = ?e,
                         object_address,
-                        retry_ms = QUERY_RETRY_DELAY_MS,
-                        "Failed to get object from current_objects table for object_address: {}, retrying in {} ms. ",
-                        object_address,
-                        QUERY_RETRY_DELAY_MS,
+                        retry_ms = query_retry_delay_ms,
+                        "Failed to get object from current_objects table.",
                     );
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
+                    tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
                         .await;
                 },
             }

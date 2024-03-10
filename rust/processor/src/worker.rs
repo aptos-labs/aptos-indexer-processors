@@ -717,12 +717,18 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: PgDbPool) -> Processor
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
         },
-        ProcessorConfig::ObjectsProcessor => Processor::from(ObjectsProcessor::new(db_pool)),
-        ProcessorConfig::StakeProcessor => Processor::from(StakeProcessor::new(db_pool)),
+        ProcessorConfig::ObjectsProcessor(config) => {
+            Processor::from(ObjectsProcessor::new(db_pool, config.clone()))
+        },
+        ProcessorConfig::StakeProcessor(config) => {
+            Processor::from(StakeProcessor::new(db_pool, config.clone()))
+        },
         ProcessorConfig::TokenProcessor(config) => {
             Processor::from(TokenProcessor::new(db_pool, config.clone()))
         },
-        ProcessorConfig::TokenV2Processor => Processor::from(TokenV2Processor::new(db_pool)),
+        ProcessorConfig::TokenV2Processor(config) => {
+            Processor::from(TokenV2Processor::new(db_pool, config.clone()))
+        },
         ProcessorConfig::TransactionMetadataProcessor => {
             Processor::from(TransactionMetadataProcessor::new(db_pool))
         },
