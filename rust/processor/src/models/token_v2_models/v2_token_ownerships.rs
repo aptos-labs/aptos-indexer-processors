@@ -619,9 +619,9 @@ impl CurrentTokenOwnershipV2Query {
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<NFTOwnershipV2> {
-        let mut retried = 0;
-        while retried < query_retries {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id).await {
                 Ok(inner) => {
                     return Ok(NFTOwnershipV2 {
@@ -631,8 +631,10 @@ impl CurrentTokenOwnershipV2Query {
                     });
                 },
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

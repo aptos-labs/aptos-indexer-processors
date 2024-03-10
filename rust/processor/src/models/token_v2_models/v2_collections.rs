@@ -314,14 +314,16 @@ impl CollectionV2 {
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < query_retries {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match Self::get_by_table_handle(conn, table_handle).await {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

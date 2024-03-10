@@ -124,7 +124,6 @@ impl Object {
                 match Self::get_current_object(
                     conn,
                     &resource.address,
-                    txn_version,
                     query_retries,
                     query_retry_delay_ms,
                 )
@@ -173,13 +172,12 @@ impl Object {
     pub async fn get_current_object(
         conn: &mut PgPoolConnection<'_>,
         object_address: &str,
-        transaction_version: i64,
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<CurrentObject> {
-        let mut retries = 0;
-        while retries < query_retries {
-            retries += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match CurrentObjectQuery::get_by_address(object_address, conn).await {
                 Ok(res) => {
                     return Ok(CurrentObject {
@@ -192,16 +190,11 @@ impl Object {
                         is_deleted: res.is_deleted,
                     });
                 },
-                Err(e) => {
-                    warn!(
-                        transaction_version,
-                        error = ?e,
-                        object_address,
-                        retry_ms = query_retry_delay_ms,
-                        "Failed to get object from current_objects table.",
-                    );
-                    tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
-                        .await;
+                Err(_) => {
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

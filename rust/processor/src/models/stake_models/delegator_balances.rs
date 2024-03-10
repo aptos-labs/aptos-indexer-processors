@@ -374,16 +374,18 @@ impl CurrentDelegatorBalance {
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < query_retries {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match CurrentDelegatorBalanceQuery::get_by_inactive_share_handle(conn, table_handle)
                 .await
             {
                 Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }
