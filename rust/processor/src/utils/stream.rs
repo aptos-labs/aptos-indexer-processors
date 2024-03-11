@@ -77,7 +77,6 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> St
                     println!("next event is less than first key");
                     next_event = cache.last_key().expect("Cache is empty");
                 } else {
-                    println!("next event is greater than last key");
                     tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
                 }
             }

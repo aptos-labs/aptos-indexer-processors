@@ -68,44 +68,34 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Ev
         let pop_thread = tokio::spawn(async move {
             loop {
                 let mut heap_locked = heap_pop.lock().await;
-                if let Some(transaction_events) = heap_locked.peek() {
-                    if transaction_events.transaction_version
+                while !heap_locked.is_empty()
+                    && heap_locked.peek().unwrap().transaction_version
                         == next_transaction_version.load(Ordering::SeqCst)
-                    {
-                        let transaction_timestamp = transaction_events.transaction_timestamp;
-                        let transaction_events = heap_locked.pop().unwrap_or_else(|| {
-                            error!("Failed to pop events from the heap");
-                            panic!();
-                        });
+                {
+                    let transaction_events = heap_locked.pop().unwrap();
+                    let transaction_timestamp = transaction_events.transaction_timestamp;
 
-                        let num_events = transaction_events.events.len();
-                        let mut cache = cache_mutex.write().await;
-                        if num_events == 0 {
-                            // Add empty event if transaction doesn't have any events
+                    let num_events = transaction_events.events.len();
+                    let mut cache = cache_mutex.write().await;
+                    if num_events == 0 {
+                        // Add empty event if transaction doesn't have any events
+                        cache.insert(
+                            EventCacheKey::new(transaction_events.transaction_version, 0),
+                            CachedEvent::empty(transaction_events.transaction_version),
+                        );
+                    } else {
+                        // Add all events to cache
+                        for event in transaction_events.events {
                             cache.insert(
-                                EventCacheKey::new(transaction_events.transaction_version, 0),
-                                CachedEvent::empty(transaction_events.transaction_version),
+                                EventCacheKey::new(event.transaction_version, event.event_index),
+                                CachedEvent::from_event_stream_message(
+                                    &EventStreamMessage::from_event(&event, transaction_timestamp),
+                                    num_events,
+                                ),
                             );
-                        } else {
-                            // Add all events to cache
-                            for event in transaction_events.events {
-                                cache.insert(
-                                    EventCacheKey::new(
-                                        event.transaction_version,
-                                        event.event_index,
-                                    ),
-                                    CachedEvent::from_event_stream_message(
-                                        &EventStreamMessage::from_event(
-                                            &event,
-                                            transaction_timestamp,
-                                        ),
-                                        num_events,
-                                    ),
-                                );
-                            }
                         }
-                        next_transaction_version.fetch_add(1, Ordering::SeqCst);
                     }
+                    next_transaction_version.fetch_add(1, Ordering::SeqCst);
                 }
             }
         });

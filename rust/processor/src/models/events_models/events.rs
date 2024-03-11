@@ -7,7 +7,6 @@ use crate::{
     schema::events,
     utils::util::{standardize_address, truncate_str},
 };
-use aptos_in_memory_cache::Weighted;
 use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -142,11 +141,5 @@ impl CachedEvent {
             },
             num_events_in_transaction: 0,
         }
-    }
-}
-
-impl Weighted for CachedEvent {
-    fn weight(&self) -> u64 {
-        std::mem::size_of_val(&*self) as u64
     }
 }
