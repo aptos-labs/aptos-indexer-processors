@@ -62,11 +62,10 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Ev
                 let num_events = transaction_events.events.len();
                 if num_events == 0 {
                     // Add empty event if transaction doesn't have any events
-                    let (gcc, gcs) = self.cache.insert(
+                    self.cache.insert(
                         EventCacheKey::new(transaction_events.transaction_version, 0),
                         CachedEvent::empty(transaction_events.transaction_version),
                     );
-                    println!("gcc: {:?}, gcs: {:?}", gcc, gcs);
                 } else {
                     // Add all events to cache
                     for event in transaction_events.events {

@@ -265,7 +265,7 @@ impl Worker {
         });
 
         let (transaction_events_tx, transaction_events_rx) =
-            kanal::bounded_async::<Vec<TransactionEvents>>(1000000);
+            kanal::bounded_async::<Vec<TransactionEvents>>(1000000000);
 
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
