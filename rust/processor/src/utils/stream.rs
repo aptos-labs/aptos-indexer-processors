@@ -7,22 +7,17 @@ use crate::{
 use aptos_in_memory_cache::{Cache, Incrementable, Ordered};
 use futures::{stream::SplitSink, SinkExt};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 use warp::filters::ws::{Message, WebSocket};
 
 pub struct Stream<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> {
     tx: SplitSink<WebSocket, Message>,
-    filter: Arc<RwLock<EventFilter>>,
-    cache: Arc<RwLock<C>>,
+    filter: Arc<EventFilter>,
+    cache: Arc<C>,
 }
 
 impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Stream<C> {
-    pub fn new(
-        tx: SplitSink<WebSocket, Message>,
-        filter: Arc<RwLock<EventFilter>>,
-        cache: Arc<RwLock<C>>,
-    ) -> Self {
+    pub fn new(tx: SplitSink<WebSocket, Message>, filter: Arc<EventFilter>, cache: Arc<C>) -> Self {
         info!("Received WebSocket connection");
         Self { tx, filter, cache }
     }
@@ -32,11 +27,9 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> St
         let mut next_event = starting_event;
         loop {
             // Do not continue if filter is empty
-            let filter = self.filter.read().await;
-            if !filter.is_empty() {
+            if !self.filter.is_empty() {
                 // Try to get next event from cache
-                let cache = self.cache.read().await;
-                if let Some(cached_event) = cache.get(&next_event) {
+                if let Some(cached_event) = self.cache.get(&next_event) {
                     // Calculate what the next event to check would be first so we don't have to recalculate it later
                     let possible_next_event = next_event.next(&cached_event);
 
@@ -48,8 +41,8 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> St
 
                     // If filter matches, send event
                     let event = cached_event.event_stream_message;
-                    if filter.accounts.contains(&event.account_address)
-                        || filter.types.contains(&event.type_)
+                    if self.filter.accounts.contains(&event.account_address)
+                        || self.filter.types.contains(&event.type_)
                     {
                         GRPC_TO_PROCESSOR_1_SERVE_LATENCY_IN_SECS.set({
                             use chrono::TimeZone;
@@ -73,9 +66,9 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> St
                     }
 
                     next_event = possible_next_event;
-                } else if next_event < cache.first_key().expect("Cache is empty") {
+                } else if next_event < self.cache.first_key().expect("Cache is empty") {
                     println!("next event is less than first key");
-                    next_event = cache.last_key().expect("Cache is empty");
+                    next_event = self.cache.last_key().expect("Cache is empty");
                 } else {
                     tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
                 }
@@ -88,8 +81,8 @@ pub async fn spawn_stream<
     C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static,
 >(
     tx: SplitSink<WebSocket, Message>,
-    filter: Arc<RwLock<EventFilter>>,
-    cache: Arc<RwLock<C>>,
+    filter: Arc<EventFilter>,
+    cache: Arc<C>,
     starting_event: EventCacheKey,
 ) {
     let mut stream = Stream::new(tx, filter, cache);

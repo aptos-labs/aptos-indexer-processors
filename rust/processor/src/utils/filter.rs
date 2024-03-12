@@ -1,16 +1,16 @@
-use std::collections::HashSet;
+use dashmap::DashSet;
 
 #[derive(Clone, Debug, Default)]
 pub struct EventFilter {
-    pub accounts: HashSet<String>,
-    pub types: HashSet<String>,
+    pub accounts: DashSet<String>,
+    pub types: DashSet<String>,
 }
 
 impl EventFilter {
     pub fn new() -> Self {
         Self {
-            accounts: HashSet::new(),
-            types: HashSet::new(),
+            accounts: DashSet::new(),
+            types: DashSet::new(),
         }
     }
 

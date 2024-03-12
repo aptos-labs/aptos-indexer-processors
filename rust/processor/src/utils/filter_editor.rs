@@ -3,17 +3,16 @@
 use crate::utils::filter::EventFilter;
 use futures::{stream::SplitStream, StreamExt};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{error, info};
 use warp::filters::ws::WebSocket;
 
 pub struct FilterEditor {
     rx: SplitStream<WebSocket>,
-    filter: Arc<RwLock<EventFilter>>,
+    filter: Arc<EventFilter>,
 }
 
 impl FilterEditor {
-    pub fn new(rx: SplitStream<WebSocket>, filter: Arc<RwLock<EventFilter>>) -> Self {
+    pub fn new(rx: SplitStream<WebSocket>, filter: Arc<EventFilter>) -> Self {
         info!("Received WebSocket connection");
         Self { rx, filter }
     }
@@ -21,16 +20,15 @@ impl FilterEditor {
     /// Maintains websocket connection and sends messages from channel
     pub async fn run(&mut self) {
         while let Some(Ok(msg)) = self.rx.next().await {
-            let mut filter = self.filter.write().await;
             if let Ok(policy) = msg.to_str() {
                 let policy = policy.split(",").collect::<Vec<&str>>();
                 match policy[0] {
                     "account" => match policy[1] {
                         "add" => {
-                            filter.accounts.insert(policy[2].to_string());
+                            self.filter.accounts.insert(policy[2].to_string());
                         },
                         "remove" => {
-                            filter.accounts.remove(policy[2]);
+                            self.filter.accounts.remove(policy[2]);
                         },
                         _ => {
                             error!("[Event Stream] Invalid filter command: {}", policy[1]);
@@ -38,10 +36,10 @@ impl FilterEditor {
                     },
                     "type" => match policy[1] {
                         "add" => {
-                            filter.types.insert(policy[2].to_string());
+                            self.filter.types.insert(policy[2].to_string());
                         },
                         "remove" => {
-                            filter.types.remove(policy[2]);
+                            self.filter.types.remove(policy[2]);
                         },
                         _ => {
                             error!("[Event Stream] Invalid filter command: {}", policy[1]);
@@ -56,7 +54,7 @@ impl FilterEditor {
     }
 }
 
-pub async fn spawn_filter_editor(rx: SplitStream<WebSocket>, filter: Arc<RwLock<EventFilter>>) {
+pub async fn spawn_filter_editor(rx: SplitStream<WebSocket>, filter: Arc<EventFilter>) {
     let mut filter = FilterEditor::new(rx, filter);
     filter.run().await;
 }

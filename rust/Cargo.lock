@@ -113,10 +113,11 @@ checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 [[package]]
 name = "aptos-in-memory-cache"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=2d3cdb0d586befaecf60b1d8533b4cc6f346279c#2d3cdb0d586befaecf60b1d8533b4cc6f346279c"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=6c1264d3dd8e9a9bf674a1c1b432b4deb78eaa0d#6c1264d3dd8e9a9bf674a1c1b432b4deb78eaa0d"
 dependencies = [
  "dashmap",
  "quick_cache",
+ "tokio",
 ]
 
 [[package]]
@@ -1949,6 +1950,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "clap",
+ "dashmap",
  "diesel",
  "diesel-async",
  "diesel_async_migrations",

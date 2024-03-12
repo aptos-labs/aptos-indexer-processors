@@ -48,7 +48,7 @@ use diesel::Connection;
 use futures::StreamExt;
 use kanal::AsyncSender;
 use std::sync::Arc;
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
 use warp::Filter;
@@ -67,10 +67,10 @@ async fn handle_websocket<
 >(
     websocket: warp::ws::WebSocket,
     query_params: AHashMap<String, String>,
-    cache: Arc<RwLock<C>>,
+    cache: Arc<C>,
 ) {
     let (tx, rx) = websocket.split();
-    let filter = Arc::new(RwLock::new(EventFilter::new()));
+    let filter = Arc::new(EventFilter::new());
 
     let start = query_params
         .get("start")
@@ -288,9 +288,7 @@ impl Worker {
         });
 
         if self.processor_config.name() == "event_stream_processor".to_string() {
-            let cache = Arc::new(RwLock::new(FIFOCache::<EventCacheKey, CachedEvent>::new(
-                1000000000,
-            )));
+            let cache = Arc::new(FIFOCache::<EventCacheKey, CachedEvent>::new(1000000000));
 
             // Add events to cache in order
             let cache_order = cache.clone();
