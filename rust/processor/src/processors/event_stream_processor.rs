@@ -13,11 +13,11 @@ use std::fmt::Debug;
 
 pub struct EventStreamProcessor {
     connection_pool: PgDbPool,
-    channel: AsyncSender<TransactionEvents>,
+    channel: AsyncSender<Vec<TransactionEvents>>,
 }
 
 impl EventStreamProcessor {
-    pub fn new(connection_pool: PgDbPool, channel: AsyncSender<TransactionEvents>) -> Self {
+    pub fn new(connection_pool: PgDbPool, channel: AsyncSender<Vec<TransactionEvents>>) -> Self {
         Self {
             connection_pool,
             channel,
@@ -50,6 +50,7 @@ impl ProcessorTrait for EventStreamProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let mut batch = vec![];
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
@@ -63,15 +64,14 @@ impl ProcessorTrait for EventStreamProcessor {
                 _ => &default,
             };
 
-            self.channel
-                .send(TransactionEvents {
-                    transaction_version: txn_version,
-                    transaction_timestamp: txn_timestamp,
-                    events: EventModel::from_events(raw_events, txn_version, block_height),
-                })
-                .await?;
+            batch.push(TransactionEvents {
+                transaction_version: txn_version,
+                transaction_timestamp: txn_timestamp,
+                events: EventModel::from_events(raw_events, txn_version, block_height),
+            });
         }
 
+        self.channel.send(batch).await?;
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         Ok(ProcessingResult {
             start_version,

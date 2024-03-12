@@ -3,14 +3,12 @@ use crate::{
     models::events_models::events::{CachedEvent, EventModel, EventStreamMessage},
     utils::counters::LAST_TRANSACTION_VERSION_IN_CACHE,
 };
+use ahash::AHashMap;
 use aptos_in_memory_cache::{Cache, Ordered};
 use kanal::AsyncReceiver;
-use std::{
-    collections::BinaryHeap,
-    sync::{
-        atomic::{AtomicI64, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicI64, Ordering},
+    Arc,
 };
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
@@ -36,23 +34,23 @@ impl PartialOrd for TransactionEvents {
 }
 
 pub struct EventOrdering<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> {
-    rx: AsyncReceiver<TransactionEvents>,
+    rx: AsyncReceiver<Vec<TransactionEvents>>,
     cache: Arc<RwLock<C>>,
 }
 
 impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> EventOrdering<C> {
-    pub fn new(rx: AsyncReceiver<TransactionEvents>, cache: Arc<RwLock<C>>) -> Self {
+    pub fn new(rx: AsyncReceiver<Vec<TransactionEvents>>, cache: Arc<RwLock<C>>) -> Self {
         Self { rx, cache }
     }
 
     pub async fn run(&self, starting_version: i64) {
-        let heap_arc_lock = Arc::new(Mutex::new(BinaryHeap::new()));
+        let map_arc_lock = Arc::new(Mutex::new(AHashMap::new()));
         let rx = self.rx.clone();
 
-        let heap_push = heap_arc_lock.clone();
+        let map_write = map_arc_lock.clone();
         let push_thread = tokio::spawn(async move {
             loop {
-                let event = rx.recv().await.unwrap_or_else(|e| {
+                let batch_events = rx.recv().await.unwrap_or_else(|e| {
                     error!(
                         error = ?e,
                         "[Event Stream] Failed to receive message from channel"
@@ -60,22 +58,25 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Ev
                     panic!();
                 });
 
-                let mut heap_locked = heap_push.lock().await;
-                heap_locked.push(event);
+                let mut map_locked = map_write.lock().await;
+                for events in batch_events {
+                    map_locked.insert(events.transaction_version, events);
+                }
             }
         });
 
-        let heap_pop = heap_arc_lock.clone();
+        let ma_read = map_arc_lock.clone();
         let next_transaction_version = AtomicI64::new(starting_version);
         let cache_mutex = self.cache.clone();
         let pop_thread = tokio::spawn(async move {
             loop {
-                let mut heap_locked = heap_pop.lock().await;
-                while !heap_locked.is_empty()
-                    && heap_locked.peek().unwrap().transaction_version
-                        == next_transaction_version.load(Ordering::SeqCst)
+                let mut map_locked = ma_read.lock().await;
+                while !map_locked.is_empty()
+                    && map_locked.contains_key(&next_transaction_version.load(Ordering::SeqCst))
                 {
-                    let transaction_events = heap_locked.pop().unwrap();
+                    let transaction_events = map_locked
+                        .remove(&next_transaction_version.load(Ordering::SeqCst))
+                        .unwrap();
                     let transaction_timestamp = transaction_events.transaction_timestamp;
 
                     let num_events = transaction_events.events.len();

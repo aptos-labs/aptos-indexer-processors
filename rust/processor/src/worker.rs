@@ -265,7 +265,7 @@ impl Worker {
         });
 
         let (transaction_events_tx, transaction_events_rx) =
-            kanal::bounded_async::<TransactionEvents>(1000000);
+            kanal::bounded_async::<Vec<TransactionEvents>>(1000000);
 
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
@@ -364,7 +364,7 @@ impl Worker {
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
-        channel: AsyncSender<TransactionEvents>,
+        channel: AsyncSender<Vec<TransactionEvents>>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -476,7 +476,7 @@ impl Worker {
                     chain_id,
                     processor_name,
                     &auth_token,
-                    false , // enable_verbose_logging
+                    false, // enable_verbose_logging
                 )
                 .await;
 
@@ -745,7 +745,7 @@ pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
     db_pool: PgDbPool,
-    channel: AsyncSender<TransactionEvents>,
+    channel: AsyncSender<Vec<TransactionEvents>>,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
