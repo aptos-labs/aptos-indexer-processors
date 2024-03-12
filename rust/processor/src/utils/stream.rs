@@ -33,9 +33,9 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> St
         loop {
             // Do not continue if filter is empty
             let filter = self.filter.read().await;
-            let cache = self.cache.read().await;
             if !filter.is_empty() {
                 // Try to get next event from cache
+                let cache = self.cache.read().await;
                 if let Some(cached_event) = cache.get(&next_event) {
                     // Calculate what the next event to check would be first so we don't have to recalculate it later
                     let possible_next_event = next_event.next(&cached_event);

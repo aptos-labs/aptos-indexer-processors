@@ -1,5 +1,8 @@
 use super::stream::EventCacheKey;
-use crate::models::events_models::events::{CachedEvent, EventModel, EventStreamMessage};
+use crate::{
+    models::events_models::events::{CachedEvent, EventModel, EventStreamMessage},
+    utils::counters::LAST_TRANSACTION_VERSION_IN_CACHE,
+};
 use aptos_in_memory_cache::{Cache, Ordered};
 use kanal::AsyncReceiver;
 use std::{
@@ -95,6 +98,8 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Ev
                             );
                         }
                     }
+                    LAST_TRANSACTION_VERSION_IN_CACHE
+                        .set(cache.last_key().unwrap().transaction_version);
                     next_transaction_version.fetch_add(1, Ordering::SeqCst);
                 }
             }

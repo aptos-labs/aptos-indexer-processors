@@ -4,7 +4,8 @@
 use once_cell::sync::Lazy;
 use prometheus::{
     register_gauge, register_gauge_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge_vec, Gauge, GaugeVec, IntCounter, IntCounterVec, IntGaugeVec,
+    register_int_gauge, register_int_gauge_vec, Gauge, GaugeVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 
 pub enum ProcessorStep {
@@ -260,6 +261,15 @@ pub static GRPC_TO_PROCESSOR_1_SERVE_LATENCY_IN_SECS: Lazy<Gauge> = Lazy::new(||
     register_gauge!(
         "indexer_grpc_to_processor_1_serve_latency_in_secs",
         "Indexer gRPC to Processor 1 serve latency"
+    )
+    .unwrap()
+});
+
+/// Last value in cache
+pub static LAST_TRANSACTION_VERSION_IN_CACHE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "indexer_last_transaction_version_in_cache",
+        "Last value in cache"
     )
     .unwrap()
 });
