@@ -288,7 +288,7 @@ impl Worker {
         });
 
         if self.processor_config.name() == "event_stream_processor".to_string() {
-            let cache = Arc::new(FIFOCache::<EventCacheKey, CachedEvent>::new(1000000000));
+            let cache = Arc::new(FIFOCache::<EventCacheKey, CachedEvent>::new(1000000));
 
             // Add events to cache in order
             let cache_order = cache.clone();

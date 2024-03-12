@@ -273,3 +273,8 @@ pub static LAST_TRANSACTION_VERSION_IN_CACHE: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Size of cache in bytes
+pub static CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!("indexer_cache_size_in_bytes", "Size of cache in bytes").unwrap()
+});

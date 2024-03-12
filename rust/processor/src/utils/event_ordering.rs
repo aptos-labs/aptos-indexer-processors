@@ -1,4 +1,4 @@
-use super::stream::EventCacheKey;
+use super::{counters::CACHE_SIZE_IN_BYTES, stream::EventCacheKey};
 use crate::{
     models::events_models::events::{CachedEvent, EventModel, EventStreamMessage},
     utils::counters::LAST_TRANSACTION_VERSION_IN_CACHE,
@@ -62,10 +62,11 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Ev
                 let num_events = transaction_events.events.len();
                 if num_events == 0 {
                     // Add empty event if transaction doesn't have any events
-                    self.cache.insert(
+                    let (gcc, gcs) = self.cache.insert(
                         EventCacheKey::new(transaction_events.transaction_version, 0),
                         CachedEvent::empty(transaction_events.transaction_version),
                     );
+                    println!("gcc: {:?}, gcs: {:?}", gcc, gcs);
                 } else {
                     // Add all events to cache
                     for event in transaction_events.events {
@@ -80,6 +81,7 @@ impl<C: Cache<EventCacheKey, CachedEvent> + Ordered<EventCacheKey> + 'static> Ev
                 }
                 LAST_TRANSACTION_VERSION_IN_CACHE
                     .set(self.cache.last_key().unwrap().transaction_version);
+                CACHE_SIZE_IN_BYTES.set(self.cache.total_size() as i64);
                 next_transaction_version += 1;
             }
         }
