@@ -71,6 +71,7 @@ use crate::{
     config::IndexerGrpcHttp2Config,
     db_writer::QueryGenerator,
     grpc_stream::TransactionsPBResponse,
+    latest_version_tracker::VersionTrackerItem,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -124,7 +125,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
-    pub gap_detection_batch_size: u64,
+    pub num_db_tables: u64,
     pub grpc_chain_id: Option<u64>,
     pub pb_channel_txn_chunk_size: usize,
     pub enable_verbose_logging: bool,
@@ -146,7 +147,7 @@ impl Worker {
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: usize,
-        gap_detection_batch_size: u64,
+        num_db_tables: u64,
         // The number of transactions per protobuf batch
         pb_channel_txn_chunk_size: usize,
         // Number of parallel db writer tasks
@@ -181,7 +182,7 @@ impl Worker {
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
-            gap_detection_batch_size,
+            num_db_tables,
             grpc_chain_id: None,
             query_receiver,
             pb_channel_txn_chunk_size,
@@ -294,6 +295,9 @@ impl Worker {
             .await
         });
 
+        let (version_tracker_sender, version_tracker_receiver) =
+            kanal::bounded_async::<VersionTrackerItem>(PB_FETCH_QUEUE_SIZE);
+
         let query_receiver = self.query_receiver.clone();
         let number_concurrent_db_writer_tasks = self.number_concurrent_db_writer_tasks;
         let db_pool = self.db_writer.db_pool.clone();
@@ -305,6 +309,7 @@ impl Worker {
             );
             crate::db_writer::launch_db_writer_tasks(
                 query_receiver,
+                version_tracker_sender,
                 processor_name,
                 number_concurrent_db_writer_tasks,
                 db_pool,
@@ -312,17 +317,15 @@ impl Worker {
             .await;
         });
 
-        // Create a gap detector task that will panic if there is a gap in the processing
-        let (gap_detector_sender, gap_detector_receiver) =
-            kanal::bounded_async::<ProcessingResult>(PB_FETCH_QUEUE_SIZE);
-        let gap_detection_batch_size = self.gap_detection_batch_size;
+        // Create a version tracker task that will track and store latest version processed
         let processor = build_processor(&self.processor_config, self.db_writer.clone());
+        let num_db_tables = self.num_db_tables;
         tokio::spawn(async move {
-            crate::gap_detector::create_gap_detector_status_tracker_loop(
-                gap_detector_receiver,
+            crate::latest_version_tracker::create_version_tracker_loop(
+                version_tracker_receiver,
                 processor,
                 starting_version,
-                gap_detection_batch_size,
+                num_db_tables,
             )
             .await;
         });
@@ -345,7 +348,7 @@ impl Worker {
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
             let join_handle = self
-                .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
+                .launch_processor_task(task_index, receiver.clone())
                 .await;
             processor_tasks.push(join_handle);
         }
@@ -372,7 +375,6 @@ impl Worker {
         &self,
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
-        gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -570,12 +572,6 @@ impl Worker {
                 DB_EXECUTOR_CHANNEL_QUEUE_TIME_IN_SECS
                     .with_label_values(&[processor_name, &task_index_str])
                     .set(processing_result.db_channel_insertion_duration_in_secs);
-
-                // Send the result to the gap detector
-                gap_detector_sender
-                    .send(processing_result)
-                    .await
-                    .expect("[Parser] Failed to send versions to gap detector");
             }
         })
     }

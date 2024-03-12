@@ -3,7 +3,6 @@
 
 use crate::{
     db_writer::QueryGenerator,
-    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE,
     processors::ProcessorConfig,
     transaction_filter::TransactionFilter,
     utils::database::{new_db_pool, DEFAULT_MAX_POOL_SIZE},
@@ -30,15 +29,15 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     // Version to end indexing at
     pub ending_version: Option<u64>,
+    // Number of tables this processor writes to. This is used in the version tracker.
+    // Since DB table writes are parallel, it needs to know when all tables have been written to before it can move the latest version forward.
+    pub number_db_tables: u64,
     // Number of tasks waiting to pull transaction batches from the channel and process them
     #[serde(default = "IndexerGrpcProcessorConfig::number_concurrent_processing_tasks")]
     pub number_concurrent_processing_tasks: usize,
     // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
     #[serde(default = "IndexerGrpcProcessorConfig::default_db_pool_size")]
     pub db_pool_size: u32,
-    // Maximum number of batches "missing" before we assume we have an issue with gaps and abort
-    #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
-    pub gap_detection_batch_size: u64,
     // Number of protobuff transactions to send per chunk to the processor tasks
     #[serde(default = "IndexerGrpcProcessorConfig::default_pb_channel_txn_chunk_size")]
     pub pb_channel_txn_chunk_size: usize,
@@ -61,10 +60,6 @@ pub struct IndexerGrpcProcessorConfig {
 }
 
 impl IndexerGrpcProcessorConfig {
-    pub const fn default_gap_detection_batch_size() -> u64 {
-        DEFAULT_GAP_DETECTION_BATCH_SIZE
-    }
-
     /// Make the default very large on purpose so that by default it's not chunked
     /// This prevents any unexpected changes in behavior
     pub const fn default_pb_channel_txn_chunk_size() -> usize {
@@ -124,7 +119,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.ending_version,
             self.number_concurrent_processing_tasks,
-            self.gap_detection_batch_size,
+            self.number_db_tables,
             self.pb_channel_txn_chunk_size,
             self.number_concurrent_db_writer_tasks,
             self.enable_verbose_logging,

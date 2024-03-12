@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
@@ -17,7 +18,7 @@ use crate::{
         stake_utils::DelegationVoteGovernanceRecordsResource,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
-    schema,
+    schema::{self},
     utils::util::{parse_timestamp, standardize_address},
 };
 use ahash::AHashMap;
@@ -55,6 +56,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     current_stake_pool_voters: Vec<CurrentStakingPoolVoter>,
     proposal_votes: Vec<ProposalVote>,
     delegator_actvities: Vec<DelegatedStakingActivity>,
@@ -72,50 +74,65 @@ async fn insert_to_db(
         "Finished parsing, sending to DB",
     );
 
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
+
     let cspv = db_writer.send_in_chunks(
         "current_staking_pool_voter",
         current_stake_pool_voters,
         insert_current_staking_pool_voters_query,
+        version_tracker_item.clone(),
     );
     let pv = db_writer.send_in_chunks(
         "proposal_votes",
         proposal_votes,
         insert_proposal_votes_query,
+        version_tracker_item.clone(),
     );
     let da = db_writer.send_in_chunks(
         "delegated_staking_activities",
         delegator_actvities,
         insert_delegated_staking_activities_query,
+        version_tracker_item.clone(),
     );
     let db = db_writer.send_in_chunks(
         "delegator_balances",
         delegator_balances,
         insert_delegator_balances_query,
+        version_tracker_item.clone(),
     );
     let cdb = db_writer.send_in_chunks(
         "current_delegator_balances",
         current_delegator_balances,
         insert_current_delegator_balances_query,
+        version_tracker_item.clone(),
     );
     let dp = db_writer.send_in_chunks(
         "delegated_staking_pools",
         delegator_pools,
         insert_delegated_staking_pools_query,
+        version_tracker_item.clone(),
     );
     let dpb = db_writer.send_in_chunks(
         "delegated_staking_pool_balances",
         delegator_pool_balances,
         insert_delegated_staking_pool_balances_query,
+        version_tracker_item.clone(),
     );
     let cdpb = db_writer.send_in_chunks(
         "current_delegated_staking_pool_balances",
         current_delegator_pool_balances,
         insert_current_delegated_staking_pool_balances_query,
+        version_tracker_item.clone(),
     );
     let cdv = db_writer.send_in_chunks(
         "current_delegated_voter",
         current_delegated_voter,
         insert_current_delegated_voters_query,
+        version_tracker_item,
     );
 
     tokio::join!(cspv, pv, da, db, cdb, dp, dpb, cdpb, cdv);
@@ -434,6 +451,7 @@ impl ProcessorTrait for StakeProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             all_current_stake_pool_voters,
             all_proposal_votes,
             all_delegator_activities,

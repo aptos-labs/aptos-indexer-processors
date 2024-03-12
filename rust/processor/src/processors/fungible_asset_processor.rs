@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::{
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
@@ -63,6 +64,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     fungible_asset_activities: Vec<FungibleAssetActivity>,
     fungible_asset_metadata: Vec<FungibleAssetMetadataModel>,
     fungible_asset_balances: Vec<FungibleAssetBalance>,
@@ -74,25 +76,34 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
     let faa = db_writer.send_in_chunks(
         "fungible_asset_activities",
         fungible_asset_activities,
         insert_fungible_asset_activities_query,
+        version_tracker_item.clone(),
     );
     let fam = db_writer.send_in_chunks(
         "fungible_asset_metadata",
         fungible_asset_metadata,
         insert_fungible_asset_metadatas_query,
+        version_tracker_item.clone(),
     );
     let fab = db_writer.send_in_chunks(
         "fungible_asset_balances",
         fungible_asset_balances,
         insert_fungible_asset_balances_query,
+        version_tracker_item.clone(),
     );
     let cfab = db_writer.send_in_chunks(
         "current_fungible_asset_balances",
         current_fungible_asset_balances,
         insert_current_fungible_asset_balances_query,
+        version_tracker_item,
     );
     tokio::join!(faa, fam, fab, cfab);
 }
@@ -205,6 +216,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             fungible_asset_activities,
             fungible_asset_metadata,
             fungible_asset_balances,

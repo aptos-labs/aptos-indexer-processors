@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
@@ -41,6 +42,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     user_transactions: Vec<UserTransactionModel>,
     signatures: Vec<Signature>,
 ) {
@@ -50,13 +52,23 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
-
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
     let ut = db_writer.send_in_chunks(
         "user_transactions",
         user_transactions,
         insert_user_transactions_query,
+        version_tracker_item.clone(),
     );
-    let is = db_writer.send_in_chunks("signatures", signatures, insert_signatures_query);
+    let is = db_writer.send_in_chunks(
+        "signatures",
+        signatures,
+        insert_signatures_query,
+        version_tracker_item,
+    );
 
     tokio::join!(ut, is);
 }
@@ -147,6 +159,7 @@ impl ProcessorTrait for UserTransactionProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             user_transactions,
             signatures,
         )

@@ -3,7 +3,10 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    diesel::ExpressionMethods, models::events_models::events::EventModel, schema,
+    diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
+    models::events_models::events::EventModel,
+    schema,
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
@@ -105,8 +108,13 @@ impl ProcessorTrait for EventsProcessor {
             end_version = end_version,
             "Finished parsing, sending to DB",
         );
+        let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+            start_version,
+            end_version,
+            last_transaction_timestamp: last_transaction_timestamp.clone(),
+        });
         self.db_writer()
-            .send_in_chunks("events", events, insert_events_query)
+            .send_in_chunks("events", events, insert_events_query, version_tracker_item)
             .await;
 
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();

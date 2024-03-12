@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::token_models::{
         collection_datas::{CollectionData, CurrentCollectionData},
         nft_points::NftPoints,
@@ -61,6 +62,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     (tokens, token_ownerships, token_datas, collection_datas): (
         Vec<Token>,
         Vec<TokenOwnership>,
@@ -82,44 +84,73 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
-    let t = db_writer.send_in_chunks("tokens", tokens, insert_tokens_query);
+
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
+
+    let t = db_writer.send_in_chunks(
+        "tokens",
+        tokens,
+        insert_tokens_query,
+        version_tracker_item.clone(),
+    );
     let to = db_writer.send_in_chunks(
         "token_ownerships",
         token_ownerships,
         insert_token_ownerships_query,
+        version_tracker_item.clone(),
     );
-    let td = db_writer.send_in_chunks("token_datas", token_datas, insert_token_datas_query);
+    let td = db_writer.send_in_chunks(
+        "token_datas",
+        token_datas,
+        insert_token_datas_query,
+        version_tracker_item.clone(),
+    );
     let cd = db_writer.send_in_chunks(
         "collection_datas",
         collection_datas,
         insert_collection_datas_query,
+        version_tracker_item.clone(),
     );
     let cto = db_writer.send_in_chunks(
         "current_token_ownerships",
         current_token_ownerships,
         insert_current_token_ownerships_query,
+        version_tracker_item.clone(),
     );
     let ctd = db_writer.send_in_chunks(
         "current_token_datas",
         current_token_datas,
         insert_current_token_datas_query,
+        version_tracker_item.clone(),
     );
     let ccd = db_writer.send_in_chunks(
         "current_collection_datas",
         current_collection_datas,
         insert_current_collection_datas_query,
+        version_tracker_item.clone(),
     );
     let ta = db_writer.send_in_chunks(
         "token_activities",
         token_activities,
         insert_token_activities_query,
+        version_tracker_item.clone(),
     );
     let ctc = db_writer.send_in_chunks(
         "current_token_pending_claims",
         current_token_claims,
         insert_current_token_pending_claims_query,
+        version_tracker_item.clone(),
     );
-    let np = db_writer.send_in_chunks("nft_points", nft_points, insert_nft_points_query);
+    let np = db_writer.send_in_chunks(
+        "nft_points",
+        nft_points,
+        insert_nft_points_query,
+        version_tracker_item,
+    );
 
     tokio::join!(t, to, td, cd, cto, ctd, ccd, ta, ctc, np);
 }
@@ -442,6 +473,7 @@ impl ProcessorTrait for TokenProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             (
                 all_tokens,
                 all_token_ownerships,
