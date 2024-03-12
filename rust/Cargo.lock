@@ -113,7 +113,7 @@ checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 [[package]]
 name = "aptos-in-memory-cache"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=a57dcf9cf35e47c235eba17d534bcb7b74d482f5#a57dcf9cf35e47c235eba17d534bcb7b74d482f5"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4bface43e64cfc2633d660847f007a2648924a95#4bface43e64cfc2633d660847f007a2648924a95"
 dependencies = [
  "dashmap",
  "quick_cache",
