@@ -69,7 +69,7 @@ impl crate::db_writer::DbExecutable for Vec<EventModel> {
 }
 
 pub fn insert_events_query<'a>(
-    items_to_insert: Cow<'a, [EventModel]>,
+    items_to_insert: &'a [EventModel],
     conn: crate::utils::database::PgDbPool,
 ) -> Pin<Box<dyn Future<Output = QueryResult<usize>> + Send + 'a>> {
     Box::pin(async move {
