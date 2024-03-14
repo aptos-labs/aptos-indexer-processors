@@ -19,6 +19,7 @@ use crate::{
 };
 use ahash::{AHashMap, AHashSet};
 use diesel::{
+    query_builder::QueryFragment,
     result::{DatabaseErrorKind, Error},
     QueryResult,
 };
@@ -189,11 +190,11 @@ impl DbWriter {
         get_config_table_chunk_size::<Item>(table_name, &self.per_table_chunk_sizes)
     }
 
-    pub async fn send_in_chunks_with_query<Item, F>(
+    pub async fn send_in_chunks_with_query<'a, Item, Query>(
         &self,
         table_name: &'static str,
         items_to_insert: Vec<Item>,
-        query_fn: F,
+        query_fn: fn(&'a [Item]) -> Query,
     ) where
         Item: field_count::FieldCount
             + serde::Serialize
@@ -202,14 +203,7 @@ impl DbWriter {
             + Sync
             + Clone
             + 'static,
-        F: Fn(
-                Cow<'static, [Item]>,
-                PgDbPool,
-            ) -> Pin<Box<dyn Future<Output = QueryResult<usize>> + Send + 'static>>
-            + Send
-            + Sync
-            + Copy
-            + 'static,
+        Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
     {
         // TODO: ideally this kind of skip is done much earlier in the process
         if self.skip_tables.contains(table_name) {
