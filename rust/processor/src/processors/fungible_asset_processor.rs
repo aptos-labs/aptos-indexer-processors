@@ -89,7 +89,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<FungibleAssetActivity> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::fungible_asset_activities::dsl::*;
@@ -105,7 +105,7 @@ impl crate::db_writer::DbExecutable for Vec<FungibleAssetActivity> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<FungibleAssetMetadataModel> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::fungible_asset_metadata::dsl::*;
@@ -137,7 +137,7 @@ impl crate::db_writer::DbExecutable for Vec<FungibleAssetMetadataModel> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<FungibleAssetBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::fungible_asset_balances::dsl::*;
@@ -157,7 +157,7 @@ impl crate::db_writer::DbExecutable for Vec<FungibleAssetBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentFungibleAssetBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_fungible_asset_balances::dsl::*;

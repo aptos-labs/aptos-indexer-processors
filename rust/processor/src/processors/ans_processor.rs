@@ -99,7 +99,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentAnsLookup> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_ans_lookup::dsl::*;
@@ -124,7 +124,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsLookup> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<AnsLookup> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::ans_lookup::dsl::*;
@@ -140,7 +140,7 @@ impl crate::db_writer::DbExecutable for Vec<AnsLookup> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentAnsPrimaryName> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_ans_primary_name::dsl::*;
@@ -165,7 +165,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsPrimaryName> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<AnsPrimaryName> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::ans_primary_name::dsl::*;
@@ -181,7 +181,7 @@ impl crate::db_writer::DbExecutable for Vec<AnsPrimaryName> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentAnsLookupV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_ans_lookup_v2::dsl::*;
@@ -207,7 +207,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsLookupV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<AnsLookupV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::ans_lookup_v2::dsl::*;
@@ -223,7 +223,7 @@ impl crate::db_writer::DbExecutable for Vec<AnsLookupV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentAnsPrimaryNameV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_ans_primary_name_v2::dsl::*;
@@ -248,7 +248,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentAnsPrimaryNameV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<AnsPrimaryNameV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::ans_primary_name_v2::dsl::*;

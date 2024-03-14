@@ -65,7 +65,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TransactionSize> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use schema::transaction_size_info::dsl::*;
@@ -81,7 +81,7 @@ impl crate::db_writer::DbExecutable for Vec<TransactionSize> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<EventSize> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use schema::event_size_info::dsl::*;
@@ -97,7 +97,7 @@ impl crate::db_writer::DbExecutable for Vec<EventSize> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<WriteSetSize> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use schema::write_set_size_info::dsl::*;

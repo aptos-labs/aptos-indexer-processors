@@ -54,7 +54,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<AccountTransaction> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::account_transactions::dsl::*;

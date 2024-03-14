@@ -93,7 +93,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentStakingPoolVoter> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_staking_pool_voter::dsl::*;
@@ -117,7 +117,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentStakingPoolVoter> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<ProposalVote> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::proposal_votes::dsl::*;
@@ -133,7 +133,7 @@ impl crate::db_writer::DbExecutable for Vec<ProposalVote> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<DelegatedStakingActivity> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::delegated_staking_activities::dsl::*;
@@ -149,7 +149,7 @@ impl crate::db_writer::DbExecutable for Vec<DelegatedStakingActivity> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<DelegatorBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::delegator_balances::dsl::*;
@@ -165,7 +165,7 @@ impl crate::db_writer::DbExecutable for Vec<DelegatorBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_delegator_balances::dsl::*;
@@ -188,7 +188,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<DelegatorPool> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::delegated_staking_pools::dsl::*;
@@ -209,7 +209,7 @@ impl crate::db_writer::DbExecutable for Vec<DelegatorPool> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<DelegatorPoolBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::delegated_staking_pool_balances::dsl::*;
@@ -225,7 +225,7 @@ impl crate::db_writer::DbExecutable for Vec<DelegatorPoolBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorPoolBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::{
@@ -253,7 +253,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorPoolBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentDelegatedVoter> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_delegated_voter::dsl::*;

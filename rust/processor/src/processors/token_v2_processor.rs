@@ -109,7 +109,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CollectionV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::collections_v2::dsl::*;
@@ -125,7 +125,7 @@ impl crate::db_writer::DbExecutable for Vec<CollectionV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TokenDataV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::token_datas_v2::dsl::*;
@@ -141,7 +141,7 @@ impl crate::db_writer::DbExecutable for Vec<TokenDataV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TokenOwnershipV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::token_ownerships_v2::dsl::*;
@@ -157,7 +157,7 @@ impl crate::db_writer::DbExecutable for Vec<TokenOwnershipV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentCollectionV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_collections_v2::dsl::*;
@@ -190,7 +190,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentCollectionV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentTokenDataV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_datas_v2::dsl::*;
@@ -223,7 +223,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenDataV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnershipV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_ownerships_v2::dsl::*;
@@ -257,7 +257,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnershipV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentDeletedTokenOwnershipV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_ownerships_v2::dsl::*;
@@ -285,7 +285,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentDeletedTokenOwnershipV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TokenActivityV2> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::token_activities_v2::dsl::*;
@@ -305,7 +305,7 @@ impl crate::db_writer::DbExecutable for Vec<TokenActivityV2> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentTokenV2Metadata> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_v2_metadata::dsl::*;

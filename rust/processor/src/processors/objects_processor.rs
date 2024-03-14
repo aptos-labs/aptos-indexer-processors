@@ -65,7 +65,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<Object> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::objects::dsl::*;
@@ -82,7 +82,7 @@ impl crate::db_writer::DbExecutable for Vec<Object> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentObject> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_objects::dsl::*;

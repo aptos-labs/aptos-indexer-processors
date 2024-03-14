@@ -18,7 +18,10 @@ use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::{QueryFragment, QueryId},
+};
 use tracing::error;
 
 pub struct DefaultProcessor {
@@ -67,164 +70,139 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let txns_res = db_writer.send_in_chunks("transactions", txns);
-    let bmt_res =
-        db_writer.send_in_chunks("block_metadata_transactions", block_metadata_transactions);
-    let wst_res = db_writer.send_in_chunks("write_set_changes", wscs);
-    let mm_res = db_writer.send_in_chunks("move_modules", move_modules);
+    let txns_res = db_writer.send_in_chunks("transactions", txns, insert_tranasctions_query);
+    let bmt_res = db_writer.send_in_chunks(
+        "block_metadata_transactions",
+        block_metadata_transactions,
+        insert_block_metadata_transactions_query,
+    );
+    let wst_res =
+        db_writer.send_in_chunks("write_set_changes", wscs, insert_write_set_changes_query);
+    let mm_res = db_writer.send_in_chunks("move_modules", move_modules, insert_move_modules_query);
 
-    let mr_res = db_writer.send_in_chunks("move_resources", move_resources);
+    let mr_res = db_writer.send_in_chunks(
+        "move_resources",
+        move_resources,
+        insert_move_resources_query,
+    );
 
-    let ti_res = db_writer.send_in_chunks("table_items", table_items);
+    let ti_res = db_writer.send_in_chunks("table_items", table_items, insert_table_items_query);
 
-    let cti_res = db_writer.send_in_chunks("current_table_items", current_table_items);
+    let cti_res = db_writer.send_in_chunks(
+        "current_table_items",
+        current_table_items,
+        insert_current_table_items_query,
+    );
 
-    let tm_res = db_writer.send_in_chunks("table_metadatas", table_metadata);
+    let tm_res = db_writer.send_in_chunks(
+        "table_metadatas",
+        table_metadata,
+        insert_table_metadata_query,
+    );
 
     tokio::join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
 
     Ok(())
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TransactionModel> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::transactions::dsl::*;
+pub fn insert_tranasctions_query(
+    items_to_insert: &[TransactionModel],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::transactions::dsl::*;
 
-        let query = diesel::insert_into(schema::transactions::table)
-            .values(self)
-            .on_conflict(version)
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                payload_type.eq(excluded(payload_type)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::transactions::table)
+        .values(items_to_insert)
+        .on_conflict(version)
+        .do_update()
+        .set((
+            inserted_at.eq(excluded(inserted_at)),
+            payload_type.eq(excluded(payload_type)),
+        ))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<BlockMetadataTransactionModel> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::block_metadata_transactions::dsl::*;
+pub fn insert_block_metadata_transactions_query(
+    items_to_insert: &[BlockMetadataTransactionModel],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::block_metadata_transactions::dsl::*;
 
-        let query = diesel::insert_into(schema::block_metadata_transactions::table)
-            .values(self)
-            .on_conflict(version)
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::block_metadata_transactions::table)
+        .values(items_to_insert)
+        .on_conflict(version)
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<WriteSetChangeModel> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::write_set_changes::dsl::*;
-
-        let query = diesel::insert_into(schema::write_set_changes::table)
-            .values(self)
-            .on_conflict((transaction_version, index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+pub fn insert_write_set_changes_query(
+    items_to_insert: &[WriteSetChangeModel],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::write_set_changes::dsl::*;
+    diesel::insert_into(schema::write_set_changes::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<MoveModule> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::move_modules::dsl::*;
+pub fn insert_move_modules_query(
+    items_to_insert: &[MoveModule],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::move_modules::dsl::*;
 
-        let query = diesel::insert_into(schema::move_modules::table)
-            .values(self)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::move_modules::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<MoveResource> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::move_resources::dsl::*;
+pub fn insert_move_resources_query(
+    items_to_insert: &[MoveResource],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::move_resources::dsl::*;
 
-        let query = diesel::insert_into(schema::move_resources::table)
-            .values(self)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::move_resources::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TableItem> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::table_items::dsl::*;
+pub fn insert_table_items_query(
+    items_to_insert: &[TableItem],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::table_items::dsl::*;
 
-        let query = diesel::insert_into(schema::table_items::table)
-            .values(self)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::table_items::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentTableItem> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::{diesel::query_dsl::methods::FilterDsl, schema::current_table_items::dsl::*};
+pub fn insert_current_table_items_query(
+    items_to_insert: &[CurrentTableItem],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::{diesel::query_dsl::methods::FilterDsl, schema::current_table_items::dsl::*};
 
-        let query = diesel::insert_into(schema::current_table_items::table)
-            .values(self)
-            .on_conflict((table_handle, key_hash))
-            .do_update()
-            .set((
-                key.eq(excluded(key)),
-                decoded_key.eq(excluded(decoded_key)),
-                decoded_value.eq(excluded(decoded_value)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_table_items::table)
+        .values(items_to_insert)
+        .on_conflict((table_handle, key_hash))
+        .do_update()
+        .set((
+            key.eq(excluded(key)),
+            decoded_key.eq(excluded(decoded_key)),
+            decoded_value.eq(excluded(decoded_value)),
+            is_deleted.eq(excluded(is_deleted)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TableMetadata> {
-    async fn execute_query(
-        &self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::table_metadatas::dsl::*;
+pub fn insert_table_metadata_query(
+    items_to_insert: &[TableMetadata],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::table_metadatas::dsl::*;
 
-        let query = diesel::insert_into(schema::table_metadatas::table)
-            .values(self)
-            .on_conflict(handle)
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::table_metadatas::table)
+        .values(items_to_insert)
+        .on_conflict(handle)
+        .do_nothing()
 }
 
 #[async_trait]

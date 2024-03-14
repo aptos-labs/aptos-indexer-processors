@@ -101,7 +101,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<Token> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::tokens::dsl::*;
@@ -117,7 +117,7 @@ impl crate::db_writer::DbExecutable for Vec<Token> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TokenOwnership> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::token_ownerships::dsl::*;
@@ -138,7 +138,7 @@ impl crate::db_writer::DbExecutable for Vec<TokenOwnership> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TokenData> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::token_datas::dsl::*;
@@ -154,7 +154,7 @@ impl crate::db_writer::DbExecutable for Vec<TokenData> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CollectionData> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::collection_datas::dsl::*;
@@ -170,7 +170,7 @@ impl crate::db_writer::DbExecutable for Vec<CollectionData> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnership> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_ownerships::dsl::*;
@@ -198,7 +198,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnership> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentTokenData> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_datas::dsl::*;
@@ -237,7 +237,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenData> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentCollectionData> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_collection_datas::dsl::*;
@@ -268,7 +268,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentCollectionData> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<TokenActivity> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::token_activities::dsl::*;
@@ -289,7 +289,7 @@ impl crate::db_writer::DbExecutable for Vec<TokenActivity> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentTokenPendingClaim> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_token_pending_claims::dsl::*;
@@ -323,7 +323,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentTokenPendingClaim> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<NftPoints> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::nft_points::dsl::*;

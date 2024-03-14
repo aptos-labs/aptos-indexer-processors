@@ -80,7 +80,7 @@ async fn insert_to_db(
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CoinActivity> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::coin_activities::dsl::*;
@@ -105,7 +105,7 @@ impl crate::db_writer::DbExecutable for Vec<CoinActivity> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CoinInfo> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::coin_infos::dsl::*;
@@ -133,7 +133,7 @@ impl crate::db_writer::DbExecutable for Vec<CoinInfo> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CoinBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::coin_balances::dsl::*;
@@ -149,7 +149,7 @@ impl crate::db_writer::DbExecutable for Vec<CoinBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CurrentCoinBalance> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::current_coin_balances::dsl::*;
@@ -172,7 +172,7 @@ impl crate::db_writer::DbExecutable for Vec<CurrentCoinBalance> {
 #[async_trait::async_trait]
 impl crate::db_writer::DbExecutable for Vec<CoinSupply> {
     async fn execute_query(
-        &self,
+        &'_ self,
         conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
         use crate::schema::coin_supply::dsl::*;

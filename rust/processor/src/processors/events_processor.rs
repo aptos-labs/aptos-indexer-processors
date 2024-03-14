@@ -3,10 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    diesel::ExpressionMethods,
-    models::events_models::events::EventModel,
-    schema,
-    schema::events::{event_index, indexed_type, inserted_at, transaction_version},
+    diesel::ExpressionMethods, models::events_models::events::EventModel, schema,
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
 use anyhow::bail;
@@ -14,8 +11,7 @@ use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
-    query_builder::{QueryFragment, SqlQuery},
-    QueryDsl, Table,
+    query_builder::QueryFragment,
 };
 use tracing::error;
 
@@ -61,19 +57,9 @@ async fn insert_to_db(
     Ok(())
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<EventModel> {
-    async fn execute_query(
-        &self,
-        _conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        unimplemented!("execute_query")
-    }
-}
-
-pub fn insert_events_query<'a>(
-    items_to_insert: &'a [EventModel],
-) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + 'a {
+pub fn insert_events_query(
+    items_to_insert: &[EventModel],
+) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
     use schema::events::dsl::*;
 
     diesel::insert_into(schema::events::table)

@@ -5,57 +5,27 @@
 */
 
 use crate::{
-    db_writer::{DbCleanable, DbExecutable, DbRowCountable},
+    db_writer::{execute_with_better_error, DbCleanable, DbExecutable, DbRowCountable},
     utils::{database::PgDbPool, util::remove_null_bytes},
 };
 use diesel::{query_builder::QueryFragment, QueryResult};
 use std::pin::Pin;
 
-/*
-pub trait GenQueryFun<Item, F, Query>: Copy
+pub struct DataWithQuery<'a, Query, Item>
 where
-    Query: for<'a> QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
-    fn generate_query(&self, items: &[Item]) -> Query;
-}
-
-impl<Item, F, Query> GenQueryFun<Item, F, Query> for F
-where
-    Query: for<'a> QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
-    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
-{
-    fn generate_query(&self, items: &[Item]) -> Query {
-        (self)(items)
-    }
-}*/
-
-pub struct DataWithQuery<Item, F, Query>
-where
-    Query: for<'a> QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + Send
-        + Sync
-        + 'static,
-    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
-{
-    pub build_query_fn: F,
+    pub build_query_fn: fn(&'a [Item]) -> Query,
     pub items: Pin<Box<Vec<Item>>>,
 }
 
-impl<Item, F, Query> DataWithQuery<Item, F, Query>
+impl<'a, Query, Item> DataWithQuery<'a, Query, Item>
 where
-    Query: for<'a> QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + Send
-        + Sync
-        + 'static,
-    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
-    pub fn new(items: Vec<Item>, build_query_fn: F) -> Self {
+    pub fn new(items: Vec<Item>, build_query_fn: fn(&'a [Item]) -> Query) -> Self {
         Self {
             build_query_fn,
             items: Box::pin(items),
@@ -79,14 +49,9 @@ where
      */
 }
 
-impl<Item, F, Query> DbCleanable for DataWithQuery<Item, F, Query>
+impl<'a, Query, Item> DbCleanable for DataWithQuery<'a, Query, Item>
 where
-    Query: for<'a> QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + Send
-        + Sync
-        + 'static,
-    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     fn clean(&mut self) {
@@ -95,10 +60,9 @@ where
     }
 }
 
-impl<Item, F, Query> DbRowCountable for DataWithQuery<Item, F, Query>
+impl<'a, Query, Item> DbRowCountable for DataWithQuery<'a, Query, Item>
 where
-    Query: for<'a> QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync,
-    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     fn len(&self) -> usize {
@@ -106,25 +70,66 @@ where
     }
 }
 
-unsafe fn extend_lifetime<'a, T: ?Sized>(r: &'a T) -> &'static T {
-    std::mem::transmute::<&'a T, &'static T>(r)
-}
-
 #[async_trait::async_trait]
-impl<Item, F, Query> DbExecutable for DataWithQuery<Item, F, Query>
+impl<'a, Query, Item> DbExecutable for DataWithQuery<'a, Query, Item>
 where
-    Query: for<'a> QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + Send
-        + Sync
-        + 'static,
-    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
-    async fn execute_query(&self, conn: PgDbPool) -> QueryResult<usize> {
-        let items_ref = unsafe { std::mem::transmute::<&[Item], &'static [Item]>(&self.items) };
+    /**
+    This function will execute the query with the given db pool
+
+    The unsafe block is used to extend the lifetime of `&[Item]` from whatever it originally is to `'a`.
+    This is dangerous as it fundamentally alters Rust's guarantees about lifetimes and memory safety.
+    We could not find a way of convincing the compiler in a safe way.
+
+    It can be safe if and only if the following conditions are met:
+    1. *Actual Lifetime Matches or Exceeds `'a`*: The actual lifetime of `self.items` must be at least as long as `'a`.
+        This is crucial because we the compiler that `items_ref` is valid for the lifetime `'a`.
+        If `self.items` does not live as long as `'a`, then `items_ref` could become a dangling reference, leading to undefined behavior.
+    2. *No Mutable Aliasing*: Since `items_ref` is an immutable reference, it must be ensured that no mutable references to `self.items` exist for the duration of `'a`,
+    as this could lead to data races in a multithreaded context.
+
+    Since `'a` is tied to the `DataWithQuery` struct itself, and the struct owns the `self.items`, this should be safe.
+    Additionally, `self.items` is a `Pin<Box<Vec<Item>>>`, so it's location in memory should never change. This may not be necessary.
+
+    *This would not be safe* if the `DataWithQuery` instance (and by extension `self.items`) is dropped while `items_ref` is still in use.
+    This could happen if `execute_query` is called, and then the `DataWithQuery` instance is dropped before the future returned by `execute_query` is polled to completion.
+    Rusts borrow checker _*should*_ prevent this from happening, i.e the following example is unsafe and would be very bad, except
+    the borrow checker will prevent it from compiling:
+    ```text
+    134 |     let data_with_query = DataWithQuery::new(vec![], insert_events_query);
+        |         --------------- binding `data_with_query` declared here
+    135 |     let future = data_with_query.execute_query(db_pool);
+        |                  --------------- borrow of `data_with_query` occurs here
+    ```
+
+    THIS WOULD BE UNSAFE, IF IT COMPILED:
+    ```rust
+    use processor::{utils::database, data_with_query::DataWithQuery, db_writer::DbExecutable};
+    use processor::processors::events_processor::insert_events_query;
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn unsafe_example() {
+        let db_pool = database::new_db_pool(&"postgres://...", 5)
+            .await
+            .expect("Failed to create connection pool");
+
+        let data_with_query = DataWithQuery::new(vec![], insert_events_query);
+        let future = data_with_query.execute_query(db_pool);
+
+        // Drop data_with_query immediately after calling execute_query
+        drop(data_with_query);
+
+        // If the future is polled after data_with_query is dropped, items_ref could be a dangling reference
+        let _ = future.await;
+    }
+    ```
+    */
+
+    async fn execute_query(&self, db_pool: PgDbPool) -> QueryResult<usize> {
+        let items_ref = unsafe { std::mem::transmute::<&[Item], &'a [Item]>(&self.items) };
         let query = (self.build_query_fn)(items_ref);
-        drop(query);
-        Ok(0)
+        execute_with_better_error(db_pool, query).await
     }
 }
