@@ -5,6 +5,7 @@
 */
 
 use crate::{
+    data_with_query::DataWithQuery,
     utils::{
         counters::{
             DB_EXECUTION_RETRIES_COUNT, DB_EXECUTOR_CHANNEL_CHUNK_INSERT_COUNT,
@@ -22,6 +23,7 @@ use diesel::{
     QueryResult,
 };
 use kanal::{AsyncReceiver, AsyncSender};
+use std::{borrow::Cow, future::Future, pin::Pin};
 use tokio::task::JoinHandle;
 use tracing::info;
 
@@ -35,7 +37,6 @@ where
         + serde::Serialize
         + for<'de> serde::Deserialize<'de>
         + Send
-        + Sync
         + Clone,
 {
     fn clean(&mut self) {
@@ -50,7 +51,7 @@ pub trait DbRowCountable {
 
 impl<Item> DbRowCountable for Vec<Item>
 where
-    Item: Send + Sync,
+    Item: Send,
 {
     fn len(&self) -> usize {
         self.len()
@@ -59,7 +60,7 @@ where
 
 #[async_trait::async_trait]
 /// The `DbExecutable` trait is for types that can be executed in the database
-pub trait DbExecutable: DbCleanable + DbRowCountable + Send + Sync {
+pub trait DbExecutable: DbCleanable + DbRowCountable + Send {
     async fn execute_query(&self, conn: PgDbPool) -> QueryResult<usize>;
 
     // TODO: make this config/constant?
@@ -188,13 +189,65 @@ impl DbWriter {
         get_config_table_chunk_size::<Item>(table_name, &self.per_table_chunk_sizes)
     }
 
+    pub async fn send_in_chunks_with_query<Item, F>(
+        &self,
+        table_name: &'static str,
+        items_to_insert: Vec<Item>,
+        query_fn: F,
+    ) where
+        Item: field_count::FieldCount
+            + serde::Serialize
+            + for<'de> serde::Deserialize<'de>
+            + Send
+            + Sync
+            + Clone
+            + 'static,
+        F: Fn(
+                Cow<'static, [Item]>,
+                PgDbPool,
+            ) -> Pin<Box<dyn Future<Output = QueryResult<usize>> + Send + 'static>>
+            + Send
+            + Sync
+            + Copy
+            + 'static,
+    {
+        // TODO: ideally this kind of skip is done much earlier in the process
+        if self.skip_tables.contains(table_name) {
+            return;
+        }
+
+        DB_EXECUTOR_CHANNEL_CHUNK_INSERT_COUNT
+            .with_label_values(&[self.processor_name, table_name])
+            .inc();
+
+        let chunk_size = self.chunk_size::<Item>(table_name);
+        let chunks = get_chunks(items_to_insert.len(), chunk_size);
+        for (start_ind, end_ind) in chunks {
+            let items = items_to_insert[start_ind..end_ind].to_vec();
+            // COW the items
+            let items = items.into();
+            let data_with_query = DataWithQuery::new(items, query_fn);
+
+            self.query_sender
+                .send(QueryGenerator {
+                    table_name,
+                    db_executable: Box::new(data_with_query),
+                })
+                .await
+                .expect("Error sending query generator to db writer task");
+        }
+
+        DB_EXECUTOR_CHANNEL_SIZE
+            .with_label_values(&[self.processor_name])
+            .set(self.query_sender.len() as i64);
+    }
+
     pub async fn send_in_chunks<Item>(&self, table_name: &'static str, items_to_insert: Vec<Item>)
     where
         Item: field_count::FieldCount
             + serde::Serialize
             + for<'de> serde::Deserialize<'de>
             + Send
-            + Sync
             + Clone
             + 'static,
         Vec<Item>: DbExecutable,

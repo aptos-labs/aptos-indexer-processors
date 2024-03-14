@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![feature(type_alias_impl_trait)]
 use anyhow::Result;
 use clap::Parser;
 use processor::IndexerGrpcProcessorConfig;

@@ -3,13 +3,17 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    diesel::ExpressionMethods, models::events_models::events::EventModel, schema,
+    diesel::ExpressionMethods,
+    models::events_models::events::EventModel,
+    schema,
+    schema::events::{event_index, indexed_type, inserted_at, transaction_version},
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::pg::upsert::excluded;
+use diesel::{pg::upsert::excluded, QueryResult};
+use std::{borrow::Cow, future::Future, pin::Pin};
 use tracing::error;
 
 pub struct EventsProcessor {
@@ -48,7 +52,9 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    db_writer.send_in_chunks("events", events).await;
+    db_writer
+        .send_in_chunks_with_query("events", events, insert_events_query)
+        .await;
     Ok(())
 }
 
@@ -56,12 +62,19 @@ async fn insert_to_db(
 impl crate::db_writer::DbExecutable for Vec<EventModel> {
     async fn execute_query(
         &self,
-        conn: crate::utils::database::PgDbPool,
+        _conn: crate::utils::database::PgDbPool,
     ) -> diesel::QueryResult<usize> {
-        use crate::schema::events::dsl::*;
+        unimplemented!("execute_query")
+    }
+}
 
+pub fn insert_events_query<'a>(
+    items_to_insert: Cow<'a, [EventModel]>,
+    conn: crate::utils::database::PgDbPool,
+) -> Pin<Box<dyn Future<Output = QueryResult<usize>> + Send + 'a>> {
+    Box::pin(async move {
         let query = diesel::insert_into(schema::events::table)
-            .values(self)
+            .values(items_to_insert.as_ref())
             .on_conflict((transaction_version, event_index))
             .do_update()
             .set((
@@ -69,7 +82,7 @@ impl crate::db_writer::DbExecutable for Vec<EventModel> {
                 indexed_type.eq(excluded(indexed_type)),
             ));
         crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    })
 }
 
 #[async_trait]
