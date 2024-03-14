@@ -74,6 +74,8 @@ impl crate::db_writer::DbExecutable for Vec<EventModel> {
 pub fn insert_events_query<'a>(
     items_to_insert: &'a [EventModel],
 ) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + 'a {
+    use schema::events::dsl::*;
+
     diesel::insert_into(schema::events::table)
         .values(items_to_insert)
         .on_conflict((transaction_version, event_index))
