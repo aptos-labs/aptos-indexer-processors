@@ -3,92 +3,52 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::events_models::events::EventModel,
-    schema,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-    },
+    diesel::ExpressionMethods, models::events_models::events::EventModel, schema,
+    utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
-use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
     query_builder::QueryFragment,
-    ExpressionMethods,
 };
-use std::fmt::Debug;
-use tracing::error;
 
 pub struct EventsProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for EventsProcessor {
+impl std::fmt::Debug for EventsProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "EventsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
-async fn insert_to_db(
-    conn: PgDbPool,
-    name: &'static str,
-    start_version: u64,
-    end_version: u64,
-    events: &[EventModel],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
-    tracing::trace!(
-        name = name,
-        start_version = start_version,
-        end_version = end_version,
-        "Inserting to db",
-    );
-    execute_in_chunks(
-        conn,
-        insert_events_query,
-        events,
-        get_config_table_chunk_size::<EventModel>("events", per_table_chunk_sizes),
-    )
-    .await?;
-    Ok(())
+impl EventsProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
 }
 
-fn insert_events_query(
-    items_to_insert: Vec<EventModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
+pub fn insert_events_query(
+    items_to_insert: &[EventModel],
+) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
     use schema::events::dsl::*;
-    (
-        diesel::insert_into(schema::events::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, event_index))
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                indexed_type.eq(excluded(indexed_type)),
-            )),
-        None,
-    )
+
+    diesel::insert_into(schema::events::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, event_index))
+        .do_update()
+        .set((
+            inserted_at.eq(excluded(inserted_at)),
+            indexed_type.eq(excluded(indexed_type)),
+        ))
 }
 
 #[async_trait]
@@ -139,39 +99,27 @@ impl ProcessorTrait for EventsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.get_pool(),
-            self.name(),
+        tracing::trace!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Finished parsing, sending to DB",
+        );
+        self.db_writer()
+            .send_in_chunks("events", events, insert_events_query)
+            .await;
+
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        Ok(ProcessingResult {
             start_version,
             end_version,
-            &events,
-            &self.per_table_chunk_sizes,
-        )
-        .await;
-
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

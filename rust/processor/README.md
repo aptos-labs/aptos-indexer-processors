@@ -13,7 +13,8 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 
 - A config YAML file
     - For exmaple, `config.yaml`
-    - ```yaml
+
+```yaml
   health_check_port: 8084
   server_config:
   processor_config:
@@ -26,16 +27,24 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
   auth_token: AUTH_TOKEN
   starting_version: 0 # optional
   ending_version: 0 # optional
+  # Filter out some transactions
   transaction_filter:
-  # Only allow transactions from these contract addresses
-  #focus_contract_addresses:
-  #- "0x0"
-  # Skip transactions from these sender addresses
-  skip_sender_addresses:
-  - "0x07"
-  # Skip all transactions that aren't user transactions
-  focus_user_transactions: false
-    ```
+    # Only allow transactions from these contract addresses
+    focus_contract_addresses:
+      - "0x0"
+    # Skip transactions from these sender addresses
+    skip_sender_addresses:
+      - "0x07"
+    # Skip all transactions that aren't user transactions
+    focus_user_transactions: false
+    # Skip writing to certain tables
+    skip_tables:
+      - "move_resources"
+      - "move_modules"
+      - "table_items"
+      - "write_set_changes"
+      - "block_metadata_transactions"
+```
 
 #### Config Explanation
 

@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    diesel::ExpressionMethods,
     models::{
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
@@ -20,212 +21,156 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool, PgPoolConnection},
+        database::PgPoolConnection,
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::filter_dsl::FilterDsl,
 };
-use std::fmt::Debug;
-use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 
 pub struct FungibleAssetProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl FungibleAssetProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for FungibleAssetProcessor {
+impl std::fmt::Debug for FungibleAssetProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "FungibleAssetTransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
+impl FungibleAssetProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
+}
+
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    fungible_asset_activities: &[FungibleAssetActivity],
-    fungible_asset_metadata: &[FungibleAssetMetadataModel],
-    fungible_asset_balances: &[FungibleAssetBalance],
-    current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
+    fungible_asset_activities: Vec<FungibleAssetActivity>,
+    fungible_asset_metadata: Vec<FungibleAssetMetadataModel>,
+    fungible_asset_balances: Vec<FungibleAssetBalance>,
+    current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance>,
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
-
-    let faa = execute_in_chunks(
-        conn.clone(),
-        insert_fungible_asset_activities_query,
+    let faa = db_writer.send_in_chunks(
+        "fungible_asset_activities",
         fungible_asset_activities,
-        get_config_table_chunk_size::<FungibleAssetActivity>(
-            "fungible_asset_activities",
-            per_table_chunk_sizes,
-        ),
+        insert_fungible_asset_activities_query,
     );
-    let fam = execute_in_chunks(
-        conn.clone(),
-        insert_fungible_asset_metadata_query,
+    let fam = db_writer.send_in_chunks(
+        "fungible_asset_metadata",
         fungible_asset_metadata,
-        get_config_table_chunk_size::<FungibleAssetMetadataModel>(
-            "fungible_asset_metadata",
-            per_table_chunk_sizes,
-        ),
+        insert_fungible_asset_metadatas_query,
     );
-    let fab = execute_in_chunks(
-        conn.clone(),
-        insert_fungible_asset_balances_query,
+    let fab = db_writer.send_in_chunks(
+        "fungible_asset_balances",
         fungible_asset_balances,
-        get_config_table_chunk_size::<FungibleAssetBalance>(
-            "fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
+        insert_fungible_asset_balances_query,
     );
-    let cfab = execute_in_chunks(
-        conn,
-        insert_current_fungible_asset_balances_query,
+    let cfab = db_writer.send_in_chunks(
+        "current_fungible_asset_balances",
         current_fungible_asset_balances,
-        get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
-            "current_fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
+        insert_current_fungible_asset_balances_query,
     );
-    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
-    for res in [faa_res, fam_res, fab_res, cfab_res] {
-        res?;
-    }
-
-    Ok(())
+    tokio::join!(faa, fam, fab, cfab);
 }
 
-fn insert_fungible_asset_activities_query(
-    items_to_insert: Vec<FungibleAssetActivity>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::fungible_asset_activities::dsl::*;
+pub fn insert_fungible_asset_activities_query(
+    items_to_insert: &[FungibleAssetActivity],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::fungible_asset_activities::dsl::*;
 
-    (
-        diesel::insert_into(schema::fungible_asset_activities::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, event_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::fungible_asset_activities::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, event_index))
+        .do_nothing()
 }
 
-fn insert_fungible_asset_metadata_query(
-    items_to_insert: Vec<FungibleAssetMetadataModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::fungible_asset_metadata::dsl::*;
+pub fn insert_fungible_asset_metadatas_query(
+    items_to_insert: &[FungibleAssetMetadataModel],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::fungible_asset_metadata::dsl::*;
 
-    (
-        diesel::insert_into(schema::fungible_asset_metadata::table)
-            .values(items_to_insert)
-            .on_conflict(asset_type)
-            .do_update()
-            .set(
-                (
-                    creator_address.eq(excluded(creator_address)),
-                    name.eq(excluded(name)),
-                    symbol.eq(excluded(symbol)),
-                    decimals.eq(excluded(decimals)),
-                    icon_uri.eq(excluded(icon_uri)),
-                    project_uri.eq(excluded(project_uri)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
-                    supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
-                    token_standard.eq(excluded(token_standard)),
-                    inserted_at.eq(excluded(inserted_at)),
-                    is_token_v2.eq(excluded(is_token_v2)),
-                )
-            ),
-        Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::fungible_asset_metadata::table)
+        .values(items_to_insert)
+        .on_conflict(asset_type)
+        .do_update()
+        .set((
+            creator_address.eq(excluded(creator_address)),
+            name.eq(excluded(name)),
+            symbol.eq(excluded(symbol)),
+            decimals.eq(excluded(decimals)),
+            icon_uri.eq(excluded(icon_uri)),
+            project_uri.eq(excluded(project_uri)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            supply_aggregator_table_handle_v1.eq(excluded(supply_aggregator_table_handle_v1)),
+            supply_aggregator_table_key_v1.eq(excluded(supply_aggregator_table_key_v1)),
+            token_standard.eq(excluded(token_standard)),
+            inserted_at.eq(excluded(inserted_at)),
+            is_token_v2.eq(excluded(is_token_v2)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-fn insert_fungible_asset_balances_query(
-    items_to_insert: Vec<FungibleAssetBalance>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::fungible_asset_balances::dsl::*;
+pub fn insert_fungible_asset_balances_query(
+    items_to_insert: &[FungibleAssetBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::fungible_asset_balances::dsl::*;
 
-    (
-        diesel::insert_into(schema::fungible_asset_balances::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set((
-                is_frozen.eq(excluded(is_frozen)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        None,
-    )
+    diesel::insert_into(schema::fungible_asset_balances::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_update()
+        .set((
+            is_frozen.eq(excluded(is_frozen)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
 }
 
-fn insert_current_fungible_asset_balances_query(
-    items_to_insert: Vec<CurrentFungibleAssetBalance>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_fungible_asset_balances::dsl::*;
+pub fn insert_current_fungible_asset_balances_query(
+    items_to_insert: &[CurrentFungibleAssetBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_fungible_asset_balances::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_fungible_asset_balances::table)
-            .values(items_to_insert)
-            .on_conflict(storage_id)
-            .do_update()
-            .set(
-                (
-                    owner_address.eq(excluded(owner_address)),
-                    asset_type.eq(excluded(asset_type)),
-                    is_primary.eq(excluded(is_primary)),
-                    is_frozen.eq(excluded(is_frozen)),
-                    amount.eq(excluded(amount)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    token_standard.eq(excluded(token_standard)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )
-            ),
-        Some(" WHERE current_fungible_asset_balances.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_fungible_asset_balances::table)
+        .values(items_to_insert)
+        .on_conflict(storage_id)
+        .do_update()
+        .set((
+            owner_address.eq(excluded(owner_address)),
+            asset_type.eq(excluded(asset_type)),
+            is_primary.eq(excluded(is_primary)),
+            is_frozen.eq(excluded(is_frozen)),
+            amount.eq(excluded(amount)),
+            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            token_standard.eq(excluded(token_standard)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
 #[async_trait]
@@ -255,42 +200,29 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.get_pool(),
+        insert_to_db(
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &fungible_asset_activities,
-            &fungible_asset_metadata,
-            &fungible_asset_balances,
-            &current_fungible_asset_balances,
-            &self.per_table_chunk_sizes,
+            fungible_asset_activities,
+            fungible_asset_metadata,
+            fungible_asset_balances,
+            current_fungible_asset_balances,
         )
         .await;
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(err) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    "[Parser] Error inserting transactions to db: {:?}",
-                    err
-                );
-                bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
-            },
-        }
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 

@@ -10,7 +10,7 @@ const RUNTIME_WORKER_MULTIPLIER: usize = 2;
 
 fn main() -> Result<()> {
     let num_cpus = num_cpus::get();
-    let worker_threads = (num_cpus * RUNTIME_WORKER_MULTIPLIER).max(16);
+    let worker_threads = num_cpus * RUNTIME_WORKER_MULTIPLIER;
     println!(
         "[Processor] Starting processor tokio runtime: num_cpus={}, worker_threads={}",
         num_cpus, worker_threads

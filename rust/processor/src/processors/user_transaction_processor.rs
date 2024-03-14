@@ -3,130 +3,93 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    diesel::ExpressionMethods,
     models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
-    schema,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-    },
+    utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
-use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
-};
-use std::fmt::Debug;
-use tracing::error;
+use diesel::{query_builder::QueryFragment, upsert::excluded};
 
 pub struct UserTransactionProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl UserTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for UserTransactionProcessor {
+impl std::fmt::Debug for UserTransactionProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "UserTransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
+impl UserTransactionProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
+}
+
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    user_transactions: &[UserTransactionModel],
-    signatures: &[Signature],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
+    user_transactions: Vec<UserTransactionModel>,
+    signatures: Vec<Signature>,
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
 
-    let ut = execute_in_chunks(
-        conn.clone(),
-        insert_user_transactions_query,
+    let ut = db_writer.send_in_chunks(
+        "user_transactions",
         user_transactions,
-        get_config_table_chunk_size::<UserTransactionModel>(
-            "user_transactions",
-            per_table_chunk_sizes,
-        ),
+        insert_user_transactions_query,
     );
-    let is = execute_in_chunks(
-        conn,
-        insert_signatures_query,
-        signatures,
-        get_config_table_chunk_size::<Signature>("signatures", per_table_chunk_sizes),
-    );
+    let is = db_writer.send_in_chunks("signatures", signatures, insert_signatures_query);
 
-    let (ut_res, is_res) = futures::join!(ut, is);
-    for res in [ut_res, is_res] {
-        res?;
-    }
-    Ok(())
+    tokio::join!(ut, is);
 }
 
-fn insert_user_transactions_query(
-    items_to_insert: Vec<UserTransactionModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::user_transactions::dsl::*;
-    (
-        diesel::insert_into(schema::user_transactions::table)
-            .values(items_to_insert)
-            .on_conflict(version)
-            .do_update()
-            .set((
-                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        None,
-    )
+pub fn insert_user_transactions_query(
+    items_to_insert: &[UserTransactionModel],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::user_transactions::dsl::*;
+
+    diesel::insert_into(crate::schema::user_transactions::table)
+        .values(items_to_insert)
+        .on_conflict(version)
+        .do_update()
+        .set((
+            expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
 }
 
-fn insert_signatures_query(
-    items_to_insert: Vec<Signature>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::signatures::dsl::*;
-    (
-        diesel::insert_into(schema::signatures::table)
-            .values(items_to_insert)
-            .on_conflict((
-                transaction_version,
-                multi_agent_index,
-                multi_sig_index,
-                is_sender_primary,
-            ))
-            .do_nothing(),
-        None,
-    )
+pub fn insert_signatures_query(
+    items_to_insert: &[Signature],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::signatures::dsl::*;
+
+    diesel::insert_into(crate::schema::signatures::table)
+        .values(items_to_insert)
+        .on_conflict((
+            transaction_version,
+            multi_agent_index,
+            multi_sig_index,
+            is_sender_primary,
+        ))
+        .do_nothing()
 }
 
 #[async_trait]
@@ -179,39 +142,26 @@ impl ProcessorTrait for UserTransactionProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.get_pool(),
+        insert_to_db(
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &user_transactions,
-            &signatures,
-            &self.per_table_chunk_sizes,
+            user_transactions,
+            signatures,
         )
         .await;
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

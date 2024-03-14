@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    diesel::ExpressionMethods,
     models::default_models::{
         block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
         move_modules::MoveModule,
@@ -12,290 +13,192 @@ use crate::{
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
+    query_builder::{QueryFragment, QueryId},
 };
-use std::fmt::Debug;
-use tokio::join;
-use tracing::error;
 
 pub struct DefaultProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for DefaultProcessor {
+impl std::fmt::Debug for DefaultProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "DefaultTransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
+impl DefaultProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
+}
+
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    txns: &[TransactionModel],
-    block_metadata_transactions: &[BlockMetadataTransactionModel],
-    wscs: &[WriteSetChangeModel],
+    txns: Vec<TransactionModel>,
+    block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
+    wscs: Vec<WriteSetChangeModel>,
     (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        &[MoveModule],
-        &[MoveResource],
-        &[TableItem],
-        &[CurrentTableItem],
-        &[TableMetadata],
+        Vec<MoveModule>,
+        Vec<MoveResource>,
+        Vec<TableItem>,
+        Vec<CurrentTableItem>,
+        Vec<TableMetadata>,
     ),
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
 
-    let txns_res = execute_in_chunks(
-        conn.clone(),
-        insert_transactions_query,
-        txns,
-        get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    );
-    let bmt_res = execute_in_chunks(
-        conn.clone(),
-        insert_block_metadata_transactions_query,
+    let txns_res = db_writer.send_in_chunks("transactions", txns, insert_tranasctions_query);
+    let bmt_res = db_writer.send_in_chunks(
+        "block_metadata_transactions",
         block_metadata_transactions,
-        get_config_table_chunk_size::<BlockMetadataTransactionModel>(
-            "block_metadata_transactions",
-            per_table_chunk_sizes,
-        ),
+        insert_block_metadata_transactions_query,
     );
-    let wst_res = execute_in_chunks(
-        conn.clone(),
-        insert_write_set_changes_query,
-        wscs,
-        get_config_table_chunk_size::<WriteSetChangeModel>(
-            "write_set_changes",
-            per_table_chunk_sizes,
-        ),
-    );
-    let mm_res = execute_in_chunks(
-        conn.clone(),
-        insert_move_modules_query,
-        move_modules,
-        get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
-    );
+    let wst_res =
+        db_writer.send_in_chunks("write_set_changes", wscs, insert_write_set_changes_query);
+    let mm_res = db_writer.send_in_chunks("move_modules", move_modules, insert_move_modules_query);
 
-    let mr_res = execute_in_chunks(
-        conn.clone(),
-        insert_move_resources_query,
+    let mr_res = db_writer.send_in_chunks(
+        "move_resources",
         move_resources,
-        get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
+        insert_move_resources_query,
     );
 
-    let ti_res = execute_in_chunks(
-        conn.clone(),
-        insert_table_items_query,
-        table_items,
-        get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
-    );
+    let ti_res = db_writer.send_in_chunks("table_items", table_items, insert_table_items_query);
 
-    let cti_res = execute_in_chunks(
-        conn.clone(),
-        insert_current_table_items_query,
+    let cti_res = db_writer.send_in_chunks(
+        "current_table_items",
         current_table_items,
-        get_config_table_chunk_size::<CurrentTableItem>(
-            "current_table_items",
-            per_table_chunk_sizes,
-        ),
+        insert_current_table_items_query,
     );
 
-    let tm_res = execute_in_chunks(
-        conn.clone(),
-        insert_table_metadata_query,
+    let tm_res = db_writer.send_in_chunks(
+        "table_metadatas",
         table_metadata,
-        get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
+        insert_table_metadata_query,
     );
 
-    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
-        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
-
-    for res in [
-        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-    ] {
-        res?;
-    }
-
-    Ok(())
+    tokio::join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
 }
 
-fn insert_transactions_query(
-    items_to_insert: Vec<TransactionModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::transactions::dsl::*;
+pub fn insert_tranasctions_query(
+    items_to_insert: &[TransactionModel],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::transactions::dsl::*;
 
-    (
-        diesel::insert_into(schema::transactions::table)
-            .values(items_to_insert)
-            .on_conflict(version)
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                payload_type.eq(excluded(payload_type)),
-            )),
-        None,
-    )
+    diesel::insert_into(schema::transactions::table)
+        .values(items_to_insert)
+        .on_conflict(version)
+        .do_update()
+        .set((
+            inserted_at.eq(excluded(inserted_at)),
+            payload_type.eq(excluded(payload_type)),
+        ))
 }
 
-fn insert_block_metadata_transactions_query(
-    items_to_insert: Vec<BlockMetadataTransactionModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::block_metadata_transactions::dsl::*;
+pub fn insert_block_metadata_transactions_query(
+    items_to_insert: &[BlockMetadataTransactionModel],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::block_metadata_transactions::dsl::*;
 
-    (
-        diesel::insert_into(schema::block_metadata_transactions::table)
-            .values(items_to_insert)
-            .on_conflict(version)
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::block_metadata_transactions::table)
+        .values(items_to_insert)
+        .on_conflict(version)
+        .do_nothing()
 }
 
-fn insert_write_set_changes_query(
-    items_to_insert: Vec<WriteSetChangeModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::write_set_changes::dsl::*;
-
-    (
-        diesel::insert_into(schema::write_set_changes::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, index))
-            .do_nothing(),
-        None,
-    )
+pub fn insert_write_set_changes_query(
+    items_to_insert: &[WriteSetChangeModel],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::write_set_changes::dsl::*;
+    diesel::insert_into(schema::write_set_changes::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, index))
+        .do_nothing()
 }
 
-fn insert_move_modules_query(
-    items_to_insert: Vec<MoveModule>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::move_modules::dsl::*;
+pub fn insert_move_modules_query(
+    items_to_insert: &[MoveModule],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::move_modules::dsl::*;
 
-    (
-        diesel::insert_into(schema::move_modules::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::move_modules::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-fn insert_move_resources_query(
-    items_to_insert: Vec<MoveResource>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::move_resources::dsl::*;
+pub fn insert_move_resources_query(
+    items_to_insert: &[MoveResource],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::move_resources::dsl::*;
 
-    (
-        diesel::insert_into(schema::move_resources::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::move_resources::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-fn insert_table_items_query(
-    items_to_insert: Vec<TableItem>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::table_items::dsl::*;
+pub fn insert_table_items_query(
+    items_to_insert: &[TableItem],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::table_items::dsl::*;
 
-    (
-        diesel::insert_into(schema::table_items::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::table_items::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-fn insert_current_table_items_query(
-    items_to_insert: Vec<CurrentTableItem>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_table_items::dsl::*;
+pub fn insert_current_table_items_query(
+    items_to_insert: &[CurrentTableItem],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::{diesel::query_dsl::methods::FilterDsl, schema::current_table_items::dsl::*};
 
-    (
-        diesel::insert_into(schema::current_table_items::table)
-            .values(items_to_insert)
-            .on_conflict((table_handle, key_hash))
-            .do_update()
-            .set((
-                key.eq(excluded(key)),
-                decoded_key.eq(excluded(decoded_key)),
-                decoded_value.eq(excluded(decoded_value)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_table_items::table)
+        .values(items_to_insert)
+        .on_conflict((table_handle, key_hash))
+        .do_update()
+        .set((
+            key.eq(excluded(key)),
+            decoded_key.eq(excluded(decoded_key)),
+            decoded_value.eq(excluded(decoded_value)),
+            is_deleted.eq(excluded(is_deleted)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-fn insert_table_metadata_query(
-    items_to_insert: Vec<TableMetadata>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::table_metadatas::dsl::*;
+pub fn insert_table_metadata_query(
+    items_to_insert: &[TableMetadata],
+) -> impl QueryFragment<Pg> + QueryId + Sync + Send + '_ {
+    use crate::schema::table_metadatas::dsl::*;
 
-    (
-        diesel::insert_into(schema::table_metadatas::table)
-            .values(items_to_insert)
-            .on_conflict(handle)
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::table_metadatas::table)
+        .values(items_to_insert)
+        .on_conflict(handle)
+        .do_nothing()
 }
 
 #[async_trait]
@@ -325,49 +228,36 @@ impl ProcessorTrait for DefaultProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.get_pool(),
+        insert_to_db(
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &txns,
-            &block_metadata_transactions,
-            &write_set_changes,
+            txns,
+            block_metadata_transactions,
+            write_set_changes,
             (
-                &move_modules,
-                &move_resources,
-                &table_items,
-                &current_table_items,
-                &table_metadata,
+                move_modules,
+                move_resources,
+                table_items,
+                current_table_items,
+                table_metadata,
             ),
-            &self.per_table_chunk_sizes,
         )
         .await;
 
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 

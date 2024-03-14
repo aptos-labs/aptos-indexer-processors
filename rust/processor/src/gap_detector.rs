@@ -10,8 +10,8 @@ use ahash::AHashMap;
 use kanal::AsyncReceiver;
 use tracing::{error, info};
 
-// Size of a gap (in txn version) before gap detected
-pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 500;
+// Number of batches processed before gap detected
+pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 100;
 // Number of seconds between each processor status update
 const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
@@ -155,7 +155,7 @@ mod test {
                 end_version: 199 + i * 100,
                 last_transaction_timestamp: None,
                 processing_duration_in_secs: 0.0,
-                db_insertion_duration_in_secs: 0.0,
+                db_channel_insertion_duration_in_secs: 0.0,
             };
             let gap_detector_result = gap_detector.process_versions(result).unwrap();
             assert_eq!(gap_detector_result.num_gaps, i + 1);
@@ -170,7 +170,7 @@ mod test {
                 end_version: 99,
                 last_transaction_timestamp: None,
                 processing_duration_in_secs: 0.0,
-                db_insertion_duration_in_secs: 0.0,
+                db_channel_insertion_duration_in_secs: 0.0,
             })
             .unwrap();
         assert_eq!(gap_detector_result.num_gaps, 0);

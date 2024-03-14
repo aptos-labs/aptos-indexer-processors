@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    diesel::ExpressionMethods,
     models::{
         coin_models::{
             coin_activities::CoinActivity,
@@ -13,216 +14,157 @@ use crate::{
         fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
     schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
 use ahash::AHashMap;
-use anyhow::{bail, Context};
+use anyhow::Context;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::filter_dsl::FilterDsl,
 };
-use std::fmt::Debug;
-use tracing::error;
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 
 pub struct CoinProcessor {
-    connection_pool: PgDbPool,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+    db_writer: crate::db_writer::DbWriter,
 }
 
-impl CoinProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-        }
-    }
-}
-
-impl Debug for CoinProcessor {
+impl std::fmt::Debug for CoinProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
+        let state = &self.connection_pool().state();
         write!(
             f,
-            "CoinTransactionProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
         )
     }
 }
 
+impl CoinProcessor {
+    pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
+        Self { db_writer }
+    }
+}
+
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    coin_activities: &[CoinActivity],
-    coin_infos: &[CoinInfo],
-    coin_balances: &[CoinBalance],
-    current_coin_balances: &[CurrentCoinBalance],
-    coin_supply: &[CoinSupply],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
+    coin_activities: Vec<CoinActivity>,
+    coin_infos: Vec<CoinInfo>,
+    coin_balances: Vec<CoinBalance>,
+    current_coin_balances: Vec<CurrentCoinBalance>,
+    coin_supply: Vec<CoinSupply>,
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
 
-    let ca = execute_in_chunks(
-        conn.clone(),
-        insert_coin_activities_query,
+    let ca = db_writer.send_in_chunks(
+        "coin_activities",
         coin_activities,
-        get_config_table_chunk_size::<CoinActivity>("coin_activities", per_table_chunk_sizes),
+        insert_coin_activities_query,
     );
-    let ci = execute_in_chunks(
-        conn.clone(),
-        insert_coin_infos_query,
-        coin_infos,
-        get_config_table_chunk_size::<CoinInfo>("coin_infos", per_table_chunk_sizes),
-    );
-    let cb = execute_in_chunks(
-        conn.clone(),
-        insert_coin_balances_query,
-        coin_balances,
-        get_config_table_chunk_size::<CoinBalance>("coin_balances", per_table_chunk_sizes),
-    );
-    let ccb = execute_in_chunks(
-        conn.clone(),
-        insert_current_coin_balances_query,
+    let ci = db_writer.send_in_chunks("coin_infos", coin_infos, insert_coin_infos_query);
+    let cb = db_writer.send_in_chunks("coin_balances", coin_balances, insert_coin_balances_query);
+    let ccb = db_writer.send_in_chunks(
+        "current_coin_balances",
         current_coin_balances,
-        get_config_table_chunk_size::<CurrentCoinBalance>(
-            "current_coin_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cs = execute_in_chunks(
-        conn,
-        inset_coin_supply_query,
-        coin_supply,
-        get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
+        insert_current_coin_balances_query,
     );
 
-    let (ca_res, ci_res, cb_res, ccb_res, cs_res) = tokio::join!(ca, ci, cb, ccb, cs);
-    for res in [ca_res, ci_res, cb_res, ccb_res, cs_res] {
-        res?;
-    }
-    Ok(())
+    let cs = db_writer.send_in_chunks("coin_supply", coin_supply, insert_coin_supplys_query);
+
+    tokio::join!(ca, ci, cb, ccb, cs);
 }
 
-fn insert_coin_activities_query(
-    items_to_insert: Vec<CoinActivity>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::coin_activities::dsl::*;
+pub fn insert_coin_activities_query(
+    items_to_insert: &[CoinActivity],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_activities::dsl::*;
 
-    (
-        diesel::insert_into(schema::coin_activities::table)
-            .values(items_to_insert)
-            .on_conflict((
-                transaction_version,
-                event_account_address,
-                event_creation_number,
-                event_sequence_number,
-            ))
-            .do_update()
-            .set((
-                entry_function_id_str.eq(excluded(entry_function_id_str)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        None,
-    )
+    diesel::insert_into(schema::coin_activities::table)
+        .values(items_to_insert)
+        .on_conflict((
+            transaction_version,
+            event_account_address,
+            event_creation_number,
+            event_sequence_number,
+        ))
+        .do_update()
+        .set((
+            entry_function_id_str.eq(excluded(entry_function_id_str)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
 }
 
-fn insert_coin_infos_query(
-    items_to_insert: Vec<CoinInfo>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::coin_infos::dsl::*;
+pub fn insert_coin_infos_query(
+    items_to_insert: &[CoinInfo],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_infos::dsl::*;
 
-    (
-        diesel::insert_into(schema::coin_infos::table)
-            .values(items_to_insert)
-            .on_conflict(coin_type_hash)
-            .do_update()
-            .set((
-                transaction_version_created.eq(excluded(transaction_version_created)),
-                creator_address.eq(excluded(creator_address)),
-                name.eq(excluded(name)),
-                symbol.eq(excluded(symbol)),
-                decimals.eq(excluded(decimals)),
-                transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
-                supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
-                supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE coin_infos.transaction_version_created >= EXCLUDED.transaction_version_created "),
-    )
+    diesel::insert_into(schema::coin_infos::table)
+        .values(items_to_insert)
+        .on_conflict(coin_type_hash)
+        .do_update()
+        .set((
+            transaction_version_created.eq(excluded(transaction_version_created)),
+            creator_address.eq(excluded(creator_address)),
+            name.eq(excluded(name)),
+            symbol.eq(excluded(symbol)),
+            decimals.eq(excluded(decimals)),
+            transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+            supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+            supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(transaction_version_created.ge(excluded(transaction_version_created)))
 }
 
-fn insert_coin_balances_query(
-    items_to_insert: Vec<CoinBalance>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::coin_balances::dsl::*;
+pub fn insert_coin_balances_query(
+    items_to_insert: &[CoinBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_balances::dsl::*;
 
-    (
-        diesel::insert_into(schema::coin_balances::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, owner_address, coin_type_hash))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::coin_balances::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, owner_address, coin_type_hash))
+        .do_nothing()
 }
 
-fn insert_current_coin_balances_query(
-    items_to_insert: Vec<CurrentCoinBalance>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_coin_balances::dsl::*;
+pub fn insert_current_coin_balances_query(
+    items_to_insert: &[CurrentCoinBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_coin_balances::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_coin_balances::table)
-            .values(items_to_insert)
-            .on_conflict((owner_address, coin_type_hash))
-            .do_update()
-            .set((
-                amount.eq(excluded(amount)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_coin_balances.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_coin_balances::table)
+        .values(items_to_insert)
+        .on_conflict((owner_address, coin_type_hash))
+        .do_update()
+        .set((
+            amount.eq(excluded(amount)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-fn inset_coin_supply_query(
-    items_to_insert: Vec<CoinSupply>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::coin_supply::dsl::*;
+pub fn insert_coin_supplys_query(
+    items_to_insert: &[CoinSupply],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_supply::dsl::*;
 
-    (
-        diesel::insert_into(schema::coin_supply::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, coin_type_hash))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::coin_supply::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, coin_type_hash))
+        .do_nothing()
 }
 
 #[async_trait]
@@ -297,44 +239,31 @@ impl ProcessorTrait for CoinProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.get_pool(),
+        insert_to_db(
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &all_coin_activities,
-            &all_coin_infos,
-            &all_coin_balances,
-            &all_current_coin_balances,
-            &all_coin_supply,
-            &self.per_table_chunk_sizes,
+            all_coin_activities,
+            all_coin_infos,
+            all_coin_balances,
+            all_current_coin_balances,
+            all_coin_supply,
         )
         .await;
 
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(err) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    "[Parser] Error inserting transactions to db: {:?}",
-                    err
-                );
-                bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }

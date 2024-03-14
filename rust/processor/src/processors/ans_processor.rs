@@ -11,25 +11,18 @@ use crate::{
         ans_utils::{RenewNameEvent, SubdomainExtV2},
     },
     schema,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-        util::standardize_address,
-    },
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
 use async_trait::async_trait;
 use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::methods::FilterDsl,
     ExpressionMethods,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -41,312 +34,214 @@ pub struct AnsProcessorConfig {
 }
 
 pub struct AnsProcessor {
-    connection_pool: PgDbPool,
+    db_writer: crate::db_writer::DbWriter,
     config: AnsProcessorConfig,
-    per_table_chunk_sizes: AHashMap<String, usize>,
+}
+
+impl std::fmt::Debug for AnsProcessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let state = &self.connection_pool().state();
+        write!(
+            f,
+            "{:} {{ connections: {:?}  idle_connections: {:?} }}",
+            self.name(),
+            state.connections,
+            state.idle_connections
+        )
+    }
 }
 
 impl AnsProcessor {
-    pub fn new(
-        connection_pool: PgDbPool,
-        per_table_chunk_sizes: AHashMap<String, usize>,
-        config: AnsProcessorConfig,
-    ) -> Self {
+    pub fn new(db_writer: crate::db_writer::DbWriter, config: AnsProcessorConfig) -> Self {
         tracing::info!(
             ans_v1_primary_names_table_handle = config.ans_v1_primary_names_table_handle,
             ans_v1_name_records_table_handle = config.ans_v1_name_records_table_handle,
             ans_v2_contract_address = config.ans_v2_contract_address,
             "init AnsProcessor"
         );
-        Self {
-            connection_pool,
-            per_table_chunk_sizes,
-            config,
-        }
-    }
-}
-
-impl Debug for AnsProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
-        write!(
-            f,
-            "AnsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
-        )
+        Self { db_writer, config }
     }
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    db_writer: &crate::db_writer::DbWriter,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_ans_lookups: &[CurrentAnsLookup],
-    ans_lookups: &[AnsLookup],
-    current_ans_primary_names: &[CurrentAnsPrimaryName],
-    ans_primary_names: &[AnsPrimaryName],
-    current_ans_lookups_v2: &[CurrentAnsLookupV2],
-    ans_lookups_v2: &[AnsLookupV2],
-    current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
-    ans_primary_names_v2: &[AnsPrimaryNameV2],
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
+    current_ans_lookups: Vec<CurrentAnsLookup>,
+    ans_lookups: Vec<AnsLookup>,
+    current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
+    ans_primary_names: Vec<AnsPrimaryName>,
+    current_ans_lookups_v2: Vec<CurrentAnsLookupV2>,
+    ans_lookups_v2: Vec<AnsLookupV2>,
+    current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2>,
+    ans_primary_names_v2: Vec<AnsPrimaryNameV2>,
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
-    let cal = execute_in_chunks(
-        conn.clone(),
-        insert_current_ans_lookups_query,
+    let cal = db_writer.send_in_chunks(
+        "current_ans_lookup",
         current_ans_lookups,
-        get_config_table_chunk_size::<CurrentAnsLookup>(
-            "current_ans_lookup",
-            per_table_chunk_sizes,
-        ),
+        insert_current_ans_lookups_query,
     );
-    let al = execute_in_chunks(
-        conn.clone(),
-        insert_ans_lookups_query,
-        ans_lookups,
-        get_config_table_chunk_size::<AnsLookup>("ans_lookup", per_table_chunk_sizes),
-    );
-    let capn = execute_in_chunks(
-        conn.clone(),
-        insert_current_ans_primary_names_query,
+    let al = db_writer.send_in_chunks("ans_lookup", ans_lookups, insert_ans_lookups_query);
+    let capn = db_writer.send_in_chunks(
+        "current_ans_primary_name",
         current_ans_primary_names,
-        get_config_table_chunk_size::<CurrentAnsPrimaryName>(
-            "current_ans_primary_name",
-            per_table_chunk_sizes,
-        ),
+        insert_current_ans_primary_names_query,
     );
-    let apn = execute_in_chunks(
-        conn.clone(),
-        insert_ans_primary_names_query,
+    let apn = db_writer.send_in_chunks(
+        "ans_primary_name",
         ans_primary_names,
-        get_config_table_chunk_size::<AnsPrimaryName>("ans_primary_name", per_table_chunk_sizes),
+        insert_ans_primary_names_query,
     );
-    let cal_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_ans_lookups_v2_query,
+    let cal_v2 = db_writer.send_in_chunks(
+        "current_ans_lookup_v2",
         current_ans_lookups_v2,
-        get_config_table_chunk_size::<CurrentAnsLookupV2>(
-            "current_ans_lookup_v2",
-            per_table_chunk_sizes,
-        ),
+        insert_current_ans_lookup_v2s_query,
     );
-    let al_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_ans_lookups_v2_query,
-        ans_lookups_v2,
-        get_config_table_chunk_size::<AnsLookupV2>("ans_lookup_v2", per_table_chunk_sizes),
-    );
-    let capn_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_ans_primary_names_v2_query,
+    let al_v2 =
+        db_writer.send_in_chunks("ans_lookup_v2", ans_lookups_v2, insert_ans_lookup_v2s_query);
+    let capn_v2 = db_writer.send_in_chunks(
+        "current_ans_primary_name_v2",
         current_ans_primary_names_v2,
-        get_config_table_chunk_size::<CurrentAnsPrimaryNameV2>(
-            "current_ans_primary_name_v2",
-            per_table_chunk_sizes,
-        ),
+        insert_current_ans_primary_name_v2s_query,
     );
-    let apn_v2 = execute_in_chunks(
-        conn,
-        insert_ans_primary_names_v2_query,
+    let apn_v2 = db_writer.send_in_chunks(
+        "ans_primary_name_v2",
         ans_primary_names_v2,
-        get_config_table_chunk_size::<AnsPrimaryNameV2>(
-            "ans_primary_name_v2",
-            per_table_chunk_sizes,
-        ),
+        insert_ans_primary_name_v2s_query,
     );
 
-    let (cal_res, al_res, capn_res, apn_res, cal_v2_res, al_v2_res, capn_v2_res, apn_v2_res) =
-        tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
-
-    for res in vec![
-        cal_res,
-        al_res,
-        capn_res,
-        apn_res,
-        cal_v2_res,
-        al_v2_res,
-        capn_v2_res,
-        apn_v2_res,
-    ] {
-        res?;
-    }
-
-    Ok(())
+    tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
 }
 
-fn insert_current_ans_lookups_query(
-    item_to_insert: Vec<CurrentAnsLookup>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_ans_lookup::dsl::*;
+pub fn insert_current_ans_lookups_query(
+    items_to_insert: &[CurrentAnsLookup],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_ans_lookup::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_ans_lookup::table)
-            .values(item_to_insert)
-            .on_conflict((domain, subdomain))
-            .do_update()
-            .set((
-                registered_address.eq(excluded(registered_address)),
-                expiration_timestamp.eq(excluded(expiration_timestamp)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_ans_lookup::table)
+        .values(items_to_insert)
+        .on_conflict((domain, subdomain))
+        .do_update()
+        .set((
+            registered_address.eq(excluded(registered_address)),
+            expiration_timestamp.eq(excluded(expiration_timestamp)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            token_name.eq(excluded(token_name)),
+            is_deleted.eq(excluded(is_deleted)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(excluded(last_transaction_version).ge(last_transaction_version))
 }
 
-fn insert_ans_lookups_query(
-    item_to_insert: Vec<AnsLookup>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::ans_lookup::dsl::*;
+pub fn insert_ans_lookups_query(
+    items_to_insert: &[AnsLookup],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::ans_lookup::dsl::*;
 
-    (
-        diesel::insert_into(schema::ans_lookup::table)
-            .values(item_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::ans_lookup::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-fn insert_current_ans_primary_names_query(
-    item_to_insert: Vec<CurrentAnsPrimaryName>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_ans_primary_name::dsl::*;
+pub fn insert_current_ans_primary_names_query(
+    items_to_insert: &[CurrentAnsPrimaryName],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_ans_primary_name::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_ans_primary_name::table)
-            .values(item_to_insert)
-            .on_conflict(registered_address)
-            .do_update()
-            .set((
-                domain.eq(excluded(domain)),
-                subdomain.eq(excluded(subdomain)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_ans_primary_name::table)
+        .values(items_to_insert)
+        .on_conflict(registered_address)
+        .do_update()
+        .set((
+            domain.eq(excluded(domain)),
+            subdomain.eq(excluded(subdomain)),
+            token_name.eq(excluded(token_name)),
+            is_deleted.eq(excluded(is_deleted)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(excluded(last_transaction_version).ge(last_transaction_version))
 }
 
-fn insert_ans_primary_names_query(
-    item_to_insert: Vec<AnsPrimaryName>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::ans_primary_name::dsl::*;
+pub fn insert_ans_primary_names_query(
+    items_to_insert: &[AnsPrimaryName],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::ans_primary_name::dsl::*;
 
-    (
-        diesel::insert_into(schema::ans_primary_name::table)
-            .values(item_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::ans_primary_name::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-fn insert_current_ans_lookups_v2_query(
-    item_to_insert: Vec<CurrentAnsLookupV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_ans_lookup_v2::dsl::*;
+pub fn insert_current_ans_lookup_v2s_query(
+    items_to_insert: &[CurrentAnsLookupV2],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_ans_lookup_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_ans_lookup_v2::table)
-            .values(item_to_insert)
-            .on_conflict((domain, subdomain, token_standard))
-            .do_update()
-            .set((
-                registered_address.eq(excluded(registered_address)),
-                expiration_timestamp.eq(excluded(expiration_timestamp)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_ans_lookup_v2::table)
+        .values(items_to_insert)
+        .on_conflict((domain, subdomain, token_standard))
+        .do_update()
+        .set((
+            registered_address.eq(excluded(registered_address)),
+            expiration_timestamp.eq(excluded(expiration_timestamp)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            token_name.eq(excluded(token_name)),
+            is_deleted.eq(excluded(is_deleted)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(excluded(last_transaction_version).ge(last_transaction_version))
 }
 
-fn insert_ans_lookups_v2_query(
-    item_to_insert: Vec<AnsLookupV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::ans_lookup_v2::dsl::*;
+pub fn insert_ans_lookup_v2s_query(
+    items_to_insert: &[AnsLookupV2],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::ans_lookup_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::ans_lookup_v2::table)
-            .values(item_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::ans_lookup_v2::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-fn insert_current_ans_primary_names_v2_query(
-    item_to_insert: Vec<CurrentAnsPrimaryNameV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_ans_primary_name_v2::dsl::*;
+pub fn insert_current_ans_primary_name_v2s_query(
+    items_to_insert: &[CurrentAnsPrimaryNameV2],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_ans_primary_name_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::current_ans_primary_name_v2::table)
-            .values(item_to_insert)
-            .on_conflict((registered_address, token_standard))
-            .do_update()
-            .set((
-                domain.eq(excluded(domain)),
-                subdomain.eq(excluded(subdomain)),
-                token_name.eq(excluded(token_name)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_ans_primary_name_v2.last_transaction_version <= excluded.last_transaction_version "),
-    )
+    diesel::insert_into(schema::current_ans_primary_name_v2::table)
+        .values(items_to_insert)
+        .on_conflict((registered_address, token_standard))
+        .do_update()
+        .set((
+            domain.eq(excluded(domain)),
+            subdomain.eq(excluded(subdomain)),
+            token_name.eq(excluded(token_name)),
+            is_deleted.eq(excluded(is_deleted)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(excluded(last_transaction_version).ge(last_transaction_version))
 }
 
-fn insert_ans_primary_names_v2_query(
-    items_to_insert: Vec<AnsPrimaryNameV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::ans_primary_name_v2::dsl::*;
+pub fn insert_ans_primary_name_v2s_query(
+    items_to_insert: &[AnsPrimaryNameV2],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::ans_primary_name_v2::dsl::*;
 
-    (
-        diesel::insert_into(schema::ans_primary_name_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
+    diesel::insert_into(schema::ans_primary_name_v2::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
 #[async_trait]
@@ -385,48 +280,35 @@ impl ProcessorTrait for AnsProcessor {
         let db_insertion_start = std::time::Instant::now();
 
         // Insert values to db
-        let tx_result = insert_to_db(
-            self.get_pool(),
+        insert_to_db(
+            self.db_writer(),
             self.name(),
             start_version,
             end_version,
-            &all_current_ans_lookups,
-            &all_ans_lookups,
-            &all_current_ans_primary_names,
-            &all_ans_primary_names,
-            &all_current_ans_lookups_v2,
-            &all_ans_lookups_v2,
-            &all_current_ans_primary_names_v2,
-            &all_ans_primary_names_v2,
-            &self.per_table_chunk_sizes,
+            all_current_ans_lookups,
+            all_ans_lookups,
+            all_current_ans_primary_names,
+            all_ans_primary_names,
+            all_current_ans_lookups_v2,
+            all_ans_lookups_v2,
+            all_current_ans_primary_names_v2,
+            all_ans_primary_names_v2,
         )
         .await;
 
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
-        &self.connection_pool
+    fn db_writer(&self) -> &crate::db_writer::DbWriter {
+        &self.db_writer
     }
 }
 
