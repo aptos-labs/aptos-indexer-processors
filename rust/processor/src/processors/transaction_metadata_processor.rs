@@ -9,10 +9,10 @@ use crate::{
     },
     schema,
 };
-use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use tracing::{error, warn};
+use diesel::query_builder::QueryFragment;
+use tracing::warn;
 
 pub struct TransactionMetadataProcessor {
     db_writer: crate::db_writer::DbWriter,
@@ -45,69 +45,64 @@ async fn insert_to_db(
     transaction_sizes: Vec<TransactionSize>,
     event_sizes: Vec<EventSize>,
     write_set_sizes: Vec<WriteSetSize>,
-) -> Result<(), diesel::result::Error> {
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
 
-    let tsi = db_writer.send_in_chunks("transaction_size_info", transaction_sizes);
-    let esi = db_writer.send_in_chunks("event_size_info", event_sizes);
-    let wssi = db_writer.send_in_chunks("write_set_size_info", write_set_sizes);
+    let tsi = db_writer.send_in_chunks(
+        "transaction_size_info",
+        transaction_sizes,
+        insert_transaction_size_infos_query,
+    );
+    let esi = db_writer.send_in_chunks(
+        "event_size_info",
+        event_sizes,
+        insert_event_size_infos_query,
+    );
+    let wssi = db_writer.send_in_chunks(
+        "write_set_size_info",
+        write_set_sizes,
+        insert_write_set_size_infos_query,
+    );
 
     tokio::join!(tsi, esi, wssi);
-
-    Ok(())
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TransactionSize> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use schema::transaction_size_info::dsl::*;
+pub fn insert_transaction_size_infos_query(
+    items_to_insert: &[TransactionSize],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::transaction_size_info::dsl::*;
 
-        let query = diesel::insert_into(schema::transaction_size_info::table)
-            .values(self)
-            .on_conflict(transaction_version)
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::transaction_size_info::table)
+        .values(items_to_insert)
+        .on_conflict(transaction_version)
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<EventSize> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use schema::event_size_info::dsl::*;
+pub fn insert_event_size_infos_query(
+    items_to_insert: &[EventSize],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::event_size_info::dsl::*;
 
-        let query = diesel::insert_into(schema::event_size_info::table)
-            .values(self)
-            .on_conflict((transaction_version, index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::event_size_info::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<WriteSetSize> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use schema::write_set_size_info::dsl::*;
+pub fn insert_write_set_size_infos_query(
+    items_to_insert: &[WriteSetSize],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::write_set_size_info::dsl::*;
 
-        let query = diesel::insert_into(schema::write_set_size_info::table)
-            .values(self)
-            .on_conflict((transaction_version, index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::write_set_size_info::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, index))
+        .do_nothing()
 }
 
 #[async_trait]
@@ -157,9 +152,9 @@ impl ProcessorTrait for TransactionMetadataProcessor {
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
-        let db_channel_insertion_duration_in_secs = std::time::Instant::now();
+        let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
+        insert_to_db(
             self.db_writer(),
             self.name(),
             start_version,
@@ -169,28 +164,15 @@ impl ProcessorTrait for TransactionMetadataProcessor {
             write_set_sizes,
         )
         .await;
-        let db_channel_insertion_duration_in_secs = db_channel_insertion_duration_in_secs
-            .elapsed()
-            .as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

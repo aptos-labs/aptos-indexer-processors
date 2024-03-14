@@ -21,11 +21,11 @@ use crate::{
     utils::util::{parse_timestamp, standardize_address},
 };
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
-use tracing::error;
+use diesel::{
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::filter_dsl::FilterDsl,
+};
 
 pub struct StakeProcessor {
     db_writer: crate::db_writer::DbWriter,
@@ -64,215 +64,199 @@ async fn insert_to_db(
     delegator_pool_balances: Vec<DelegatorPoolBalance>,
     current_delegator_pool_balances: Vec<CurrentDelegatorPoolBalance>,
     current_delegated_voter: Vec<CurrentDelegatedVoter>,
-) -> Result<(), diesel::result::Error> {
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
 
-    let cspv = db_writer.send_in_chunks("current_staking_pool_voter", current_stake_pool_voters);
-    let pv = db_writer.send_in_chunks("proposal_votes", proposal_votes);
-    let da = db_writer.send_in_chunks("delegated_staking_activities", delegator_actvities);
-    let db = db_writer.send_in_chunks("delegator_balances", delegator_balances);
-    let cdb = db_writer.send_in_chunks("current_delegator_balances", current_delegator_balances);
-    let dp = db_writer.send_in_chunks("delegated_staking_pools", delegator_pools);
-    let dpb = db_writer.send_in_chunks("delegated_staking_pool_balances", delegator_pool_balances);
+    let cspv = db_writer.send_in_chunks(
+        "current_staking_pool_voter",
+        current_stake_pool_voters,
+        insert_current_staking_pool_voters_query,
+    );
+    let pv = db_writer.send_in_chunks(
+        "proposal_votes",
+        proposal_votes,
+        insert_proposal_votes_query,
+    );
+    let da = db_writer.send_in_chunks(
+        "delegated_staking_activities",
+        delegator_actvities,
+        insert_delegated_staking_activities_query,
+    );
+    let db = db_writer.send_in_chunks(
+        "delegator_balances",
+        delegator_balances,
+        insert_delegator_balances_query,
+    );
+    let cdb = db_writer.send_in_chunks(
+        "current_delegator_balances",
+        current_delegator_balances,
+        insert_current_delegator_balances_query,
+    );
+    let dp = db_writer.send_in_chunks(
+        "delegated_staking_pools",
+        delegator_pools,
+        insert_delegated_staking_pools_query,
+    );
+    let dpb = db_writer.send_in_chunks(
+        "delegated_staking_pool_balances",
+        delegator_pool_balances,
+        insert_delegated_staking_pool_balances_query,
+    );
     let cdpb = db_writer.send_in_chunks(
         "current_delegated_staking_pool_balances",
         current_delegator_pool_balances,
+        insert_current_delegated_staking_pool_balances_query,
     );
-    let cdv = db_writer.send_in_chunks("current_delegated_voter", current_delegated_voter);
+    let cdv = db_writer.send_in_chunks(
+        "current_delegated_voter",
+        current_delegated_voter,
+        insert_current_delegated_voters_query,
+    );
 
     tokio::join!(cspv, pv, da, db, cdb, dp, dpb, cdpb, cdv);
-
-    Ok(())
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentStakingPoolVoter> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_staking_pool_voter::dsl::*;
+pub fn insert_current_staking_pool_voters_query(
+    items_to_insert: &[CurrentStakingPoolVoter],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_staking_pool_voter::dsl::*;
 
-        let query = diesel::insert_into(schema::current_staking_pool_voter::table)
-            .values(self)
-            .on_conflict(staking_pool_address)
-            .do_update()
-            .set((
-                staking_pool_address.eq(excluded(staking_pool_address)),
-                voter_address.eq(excluded(voter_address)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-                operator_address.eq(excluded(operator_address)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_staking_pool_voter::table)
+        .values(items_to_insert)
+        .on_conflict(staking_pool_address)
+        .do_update()
+        .set((
+            staking_pool_address.eq(excluded(staking_pool_address)),
+            voter_address.eq(excluded(voter_address)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+            operator_address.eq(excluded(operator_address)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<ProposalVote> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::proposal_votes::dsl::*;
+pub fn insert_proposal_votes_query(
+    items_to_insert: &[ProposalVote],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::proposal_votes::dsl::*;
 
-        let query = diesel::insert_into(schema::proposal_votes::table)
-            .values(self)
-            .on_conflict((transaction_version, proposal_id, voter_address))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::proposal_votes::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, proposal_id, voter_address))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<DelegatedStakingActivity> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::delegated_staking_activities::dsl::*;
+pub fn insert_delegated_staking_activities_query(
+    items_to_insert: &[DelegatedStakingActivity],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::delegated_staking_activities::dsl::*;
 
-        let query = diesel::insert_into(schema::delegated_staking_activities::table)
-            .values(self)
-            .on_conflict((transaction_version, event_index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::delegated_staking_activities::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, event_index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<DelegatorBalance> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::delegator_balances::dsl::*;
+pub fn insert_delegator_balances_query(
+    items_to_insert: &[DelegatorBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::delegator_balances::dsl::*;
 
-        let query = diesel::insert_into(schema::delegator_balances::table)
-            .values(self)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::delegator_balances::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorBalance> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_delegator_balances::dsl::*;
+pub fn insert_current_delegator_balances_query(
+    items_to_insert: &[CurrentDelegatorBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_delegator_balances::dsl::*;
 
-        let query = diesel::insert_into(schema::current_delegator_balances::table)
-            .values(self)
-            .on_conflict((delegator_address, pool_address, pool_type, table_handle))
-            .do_update()
-            .set((
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-                shares.eq(excluded(shares)),
-                parent_table_handle.eq(excluded(parent_table_handle)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_delegator_balances::table)
+        .values(items_to_insert)
+        .on_conflict((delegator_address, pool_address, pool_type, table_handle))
+        .do_update()
+        .set((
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+            shares.eq(excluded(shares)),
+            parent_table_handle.eq(excluded(parent_table_handle)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<DelegatorPool> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::delegated_staking_pools::dsl::*;
+pub fn insert_delegated_staking_pools_query(
+    items_to_insert: &[DelegatorPool],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::delegated_staking_pools::dsl::*;
 
-        let query = diesel::insert_into(schema::delegated_staking_pools::table)
-            .values(self)
-            .on_conflict(staking_pool_address)
-            .do_update()
-            .set((
-                first_transaction_version.eq(excluded(first_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(first_transaction_version.ge(excluded(first_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::delegated_staking_pools::table)
+        .values(items_to_insert)
+        .on_conflict(staking_pool_address)
+        .do_update()
+        .set((
+            first_transaction_version.eq(excluded(first_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(first_transaction_version.ge(excluded(first_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<DelegatorPoolBalance> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::delegated_staking_pool_balances::dsl::*;
+pub fn insert_delegated_staking_pool_balances_query(
+    items_to_insert: &[DelegatorPoolBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::delegated_staking_pool_balances::dsl::*;
 
-        let query = diesel::insert_into(schema::delegated_staking_pool_balances::table)
-            .values(self)
-            .on_conflict((transaction_version, staking_pool_address))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::delegated_staking_pool_balances::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, staking_pool_address))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentDelegatorPoolBalance> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::{
-            diesel::ExpressionMethods, schema::current_delegated_staking_pool_balances::dsl::*,
-        };
+pub fn insert_current_delegated_staking_pool_balances_query(
+    items_to_insert: &[CurrentDelegatorPoolBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_delegated_staking_pool_balances::dsl::*;
 
-        let query = diesel::insert_into(schema::current_delegated_staking_pool_balances::table)
-            .values(self)
-            .on_conflict(staking_pool_address)
-            .do_update()
-            .set((
-                total_coins.eq(excluded(total_coins)),
-                total_shares.eq(excluded(total_shares)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-                operator_commission_percentage.eq(excluded(operator_commission_percentage)),
-                inactive_table_handle.eq(excluded(inactive_table_handle)),
-                active_table_handle.eq(excluded(active_table_handle)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_delegated_staking_pool_balances::table)
+        .values(items_to_insert)
+        .on_conflict(staking_pool_address)
+        .do_update()
+        .set((
+            total_coins.eq(excluded(total_coins)),
+            total_shares.eq(excluded(total_shares)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+            operator_commission_percentage.eq(excluded(operator_commission_percentage)),
+            inactive_table_handle.eq(excluded(inactive_table_handle)),
+            active_table_handle.eq(excluded(active_table_handle)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentDelegatedVoter> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_delegated_voter::dsl::*;
+pub fn insert_current_delegated_voters_query(
+    items_to_insert: &[CurrentDelegatedVoter],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_delegated_voter::dsl::*;
 
-        let query = diesel::insert_into(schema::current_delegated_voter::table)
-            .values(self)
-            .on_conflict((delegation_pool_address, delegator_address))
-            .do_update()
-            .set((
-                voter.eq(excluded(voter)),
-                pending_voter.eq(excluded(pending_voter)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                table_handle.eq(excluded(table_handle)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_delegated_voter::table)
+        .values(items_to_insert)
+        .on_conflict((delegation_pool_address, delegator_address))
+        .do_update()
+        .set((
+            voter.eq(excluded(voter)),
+            pending_voter.eq(excluded(pending_voter)),
+            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            table_handle.eq(excluded(table_handle)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
 #[async_trait]
@@ -445,7 +429,7 @@ impl ProcessorTrait for StakeProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
+        insert_to_db(
             self.db_writer(),
             self.name(),
             start_version,
@@ -462,25 +446,13 @@ impl ProcessorTrait for StakeProcessor {
         )
         .await;
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                start_version = start_version,
-                end_version = end_version,
-                processor_name = self.name(),
-                error = ? e,
-                "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

@@ -16,11 +16,12 @@ use crate::{
     schema,
 };
 use ahash::AHashMap;
-use anyhow::{bail, Context};
+use anyhow::Context;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
-use tracing::error;
+use diesel::{
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::filter_dsl::FilterDsl,
+};
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 
@@ -57,132 +58,113 @@ async fn insert_to_db(
     coin_balances: Vec<CoinBalance>,
     current_coin_balances: Vec<CurrentCoinBalance>,
     coin_supply: Vec<CoinSupply>,
-) -> Result<(), diesel::result::Error> {
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
 
-    let ca = db_writer.send_in_chunks("coin_activities", coin_activities);
-    let ci = db_writer.send_in_chunks("coin_infos", coin_infos);
-    let cb = db_writer.send_in_chunks("coin_balances", coin_balances);
-    let ccb = db_writer.send_in_chunks("current_coin_balances", current_coin_balances);
+    let ca = db_writer.send_in_chunks(
+        "coin_activities",
+        coin_activities,
+        insert_coin_activities_query,
+    );
+    let ci = db_writer.send_in_chunks("coin_infos", coin_infos, insert_coin_infos_query);
+    let cb = db_writer.send_in_chunks("coin_balances", coin_balances, insert_coin_balances_query);
+    let ccb = db_writer.send_in_chunks(
+        "current_coin_balances",
+        current_coin_balances,
+        insert_current_coin_balances_query,
+    );
 
-    let cs = db_writer.send_in_chunks("coin_supply", coin_supply);
+    let cs = db_writer.send_in_chunks("coin_supply", coin_supply, insert_coin_supplys_query);
 
     tokio::join!(ca, ci, cb, ccb, cs);
-
-    Ok(())
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CoinActivity> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::coin_activities::dsl::*;
+pub fn insert_coin_activities_query(
+    items_to_insert: &[CoinActivity],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_activities::dsl::*;
 
-        let query = diesel::insert_into(schema::coin_activities::table)
-            .values(self)
-            .on_conflict((
-                transaction_version,
-                event_account_address,
-                event_creation_number,
-                event_sequence_number,
-            ))
-            .do_update()
-            .set((
-                entry_function_id_str.eq(excluded(entry_function_id_str)),
-                inserted_at.eq(excluded(inserted_at)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::coin_activities::table)
+        .values(items_to_insert)
+        .on_conflict((
+            transaction_version,
+            event_account_address,
+            event_creation_number,
+            event_sequence_number,
+        ))
+        .do_update()
+        .set((
+            entry_function_id_str.eq(excluded(entry_function_id_str)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CoinInfo> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::coin_infos::dsl::*;
+pub fn insert_coin_infos_query(
+    items_to_insert: &[CoinInfo],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_infos::dsl::*;
 
-        let query = diesel::insert_into(schema::coin_infos::table)
-            .values(self)
-            .on_conflict(coin_type_hash)
-            .do_update()
-            .set((
-                transaction_version_created.eq(excluded(transaction_version_created)),
-                creator_address.eq(excluded(creator_address)),
-                name.eq(excluded(name)),
-                symbol.eq(excluded(symbol)),
-                decimals.eq(excluded(decimals)),
-                transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
-                supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
-                supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(transaction_version_created.ge(excluded(transaction_version_created)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::coin_infos::table)
+        .values(items_to_insert)
+        .on_conflict(coin_type_hash)
+        .do_update()
+        .set((
+            transaction_version_created.eq(excluded(transaction_version_created)),
+            creator_address.eq(excluded(creator_address)),
+            name.eq(excluded(name)),
+            symbol.eq(excluded(symbol)),
+            decimals.eq(excluded(decimals)),
+            transaction_created_timestamp.eq(excluded(transaction_created_timestamp)),
+            supply_aggregator_table_handle.eq(excluded(supply_aggregator_table_handle)),
+            supply_aggregator_table_key.eq(excluded(supply_aggregator_table_key)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(transaction_version_created.ge(excluded(transaction_version_created)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CoinBalance> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::coin_balances::dsl::*;
+pub fn insert_coin_balances_query(
+    items_to_insert: &[CoinBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_balances::dsl::*;
 
-        let query = diesel::insert_into(schema::coin_balances::table)
-            .values(self)
-            .on_conflict((transaction_version, owner_address, coin_type_hash))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::coin_balances::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, owner_address, coin_type_hash))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentCoinBalance> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_coin_balances::dsl::*;
+pub fn insert_current_coin_balances_query(
+    items_to_insert: &[CurrentCoinBalance],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_coin_balances::dsl::*;
 
-        let query = diesel::insert_into(schema::current_coin_balances::table)
-            .values(self)
-            .on_conflict((owner_address, coin_type_hash))
-            .do_update()
-            .set((
-                amount.eq(excluded(amount)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_coin_balances::table)
+        .values(items_to_insert)
+        .on_conflict((owner_address, coin_type_hash))
+        .do_update()
+        .set((
+            amount.eq(excluded(amount)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CoinSupply> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::coin_supply::dsl::*;
+pub fn insert_coin_supplys_query(
+    items_to_insert: &[CoinSupply],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::coin_supply::dsl::*;
 
-        let query = diesel::insert_into(schema::coin_supply::table)
-            .values(self)
-            .on_conflict((transaction_version, coin_type_hash))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::coin_supply::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, coin_type_hash))
+        .do_nothing()
 }
 
 #[async_trait]
@@ -257,7 +239,7 @@ impl ProcessorTrait for CoinProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
+        insert_to_db(
             self.db_writer(),
             self.name(),
             start_version,
@@ -272,25 +254,13 @@ impl ProcessorTrait for CoinProcessor {
 
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(err) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    "[Parser] Error inserting transactions to db: {:?}",
-                    err
-                );
-                bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

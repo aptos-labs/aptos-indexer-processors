@@ -4,10 +4,9 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{models::account_transaction_models::account_transactions::AccountTransaction, schema};
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use tracing::error;
+use diesel::query_builder::QueryFragment;
 
 pub struct AccountTransactionsProcessor {
     db_writer: crate::db_writer::DbWriter,
@@ -32,39 +31,15 @@ impl AccountTransactionsProcessor {
     }
 }
 
-async fn insert_to_db(
-    db_writer: &crate::db_writer::DbWriter,
-    name: &'static str,
-    start_version: u64,
-    end_version: u64,
-    account_transactions: Vec<AccountTransaction>,
-) -> Result<(), diesel::result::Error> {
-    tracing::trace!(
-        name = name,
-        start_version = start_version,
-        end_version = end_version,
-        "Inserting to db",
-    );
-    db_writer
-        .send_in_chunks("account_transactions", account_transactions)
-        .await;
-    Ok(())
-}
+pub fn insert_account_transactions_query(
+    items_to_insert: &[AccountTransaction],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::account_transactions::dsl::*;
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<AccountTransaction> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::account_transactions::dsl::*;
-
-        let query = diesel::insert_into(schema::account_transactions::table)
-            .values(self)
-            .on_conflict((transaction_version, account_address))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::account_transactions::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, account_address))
+        .do_nothing()
 }
 
 #[async_trait]
@@ -99,36 +74,30 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         });
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
+
         let db_insertion_start = std::time::Instant::now();
-        let tx_result = insert_to_db(
-            self.db_writer(),
-            self.name(),
-            start_version,
-            end_version,
-            account_transactions,
-        )
-        .await;
+        tracing::trace!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Finished parsing, sending to DB",
+        );
+        self.db_writer()
+            .send_in_chunks(
+                "account_transactions",
+                account_transactions,
+                insert_account_transactions_query,
+            )
+            .await;
 
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(err) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    "[Parser] Error inserting transactions to db: {:?}",
-                    err
-                );
-                bail!(format!("Error inserting transactions to db. Processor {}. Start {}. End {}. Error {:?}", self.name(), start_version, end_version, err))
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

@@ -12,11 +12,11 @@ use crate::{
     utils::util::standardize_address,
 };
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
-use tracing::error;
+use diesel::{
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::filter_dsl::FilterDsl,
+};
 
 pub struct ObjectsProcessor {
     db_writer: crate::db_writer::DbWriter,
@@ -41,68 +41,37 @@ impl ObjectsProcessor {
     }
 }
 
-async fn insert_to_db(
-    db_writer: &crate::db_writer::DbWriter,
-    name: &'static str,
-    start_version: u64,
-    end_version: u64,
-    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
-) -> Result<(), diesel::result::Error> {
-    tracing::trace!(
-        name = name,
-        start_version = start_version,
-        end_version = end_version,
-        "Inserting to db",
-    );
+pub fn insert_objects_query(
+    items_to_insert: &[Object],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::objects::dsl::*;
 
-    let io = db_writer.send_in_chunks("objects", objects);
-    let co = db_writer.send_in_chunks("current_objects", current_objects);
-    tokio::join!(io, co);
-
-    Ok(())
+    diesel::insert_into(schema::objects::table)
+        .values(items_to_insert)
+        .on_conflict((transaction_version, write_set_change_index))
+        .do_update()
+        .set(inserted_at.eq(excluded(inserted_at)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<Object> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::objects::dsl::*;
+pub fn insert_current_objects_query(
+    items_to_insert: &[CurrentObject],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_objects::dsl::*;
 
-        let query = diesel::insert_into(schema::objects::table)
-            .values(self)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set(inserted_at.eq(excluded(inserted_at)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentObject> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_objects::dsl::*;
-
-        let query = diesel::insert_into(schema::current_objects::table)
-            .values(self)
-            .on_conflict(object_address)
-            .do_update()
-            .set((
-                owner_address.eq(excluded(owner_address)),
-                state_key_hash.eq(excluded(state_key_hash)),
-                allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
-                last_guid_creation_num.eq(excluded(last_guid_creation_num)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                is_deleted.eq(excluded(is_deleted)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_objects::table)
+        .values(items_to_insert)
+        .on_conflict(object_address)
+        .do_update()
+        .set((
+            owner_address.eq(excluded(owner_address)),
+            state_key_hash.eq(excluded(state_key_hash)),
+            allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
+            last_guid_creation_num.eq(excluded(last_guid_creation_num)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            is_deleted.eq(excluded(is_deleted)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
 #[async_trait]
@@ -219,35 +188,31 @@ impl ProcessorTrait for ObjectsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.db_writer(),
-            self.name(),
-            start_version,
-            end_version,
-            (all_objects, all_current_objects),
-        )
-        .await;
+        tracing::trace!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Finished parsing, sending to DB",
+        );
+
+        let db_writer = self.db_writer();
+        let io = db_writer.send_in_chunks("objects", all_objects, insert_objects_query);
+        let co = db_writer.send_in_chunks(
+            "current_objects",
+            all_current_objects,
+            insert_current_objects_query,
+        );
+        tokio::join!(io, co);
+
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

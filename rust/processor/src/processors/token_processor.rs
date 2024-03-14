@@ -19,12 +19,12 @@ use crate::{
     schema,
 };
 use ahash::AHashMap;
-use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, query_dsl::filter_dsl::FilterDsl};
+use diesel::{
+    pg::upsert::excluded, query_builder::QueryFragment, query_dsl::filter_dsl::FilterDsl,
+};
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -75,265 +75,241 @@ async fn insert_to_db(
     token_activities: Vec<TokenActivity>,
     current_token_claims: Vec<CurrentTokenPendingClaim>,
     nft_points: Vec<NftPoints>,
-) -> Result<(), diesel::result::Error> {
+) {
     tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Finished parsing, sending to DB",
     );
-    let t = db_writer.send_in_chunks("tokens", tokens);
-    let to = db_writer.send_in_chunks("token_ownerships", token_ownerships);
-    let td = db_writer.send_in_chunks("token_datas", token_datas);
-    let cd = db_writer.send_in_chunks("collection_datas", collection_datas);
-    let cto = db_writer.send_in_chunks("current_token_ownerships", current_token_ownerships);
-    let ctd = db_writer.send_in_chunks("current_token_datas", current_token_datas);
-    let ccd = db_writer.send_in_chunks("current_collection_datas", current_collection_datas);
-    let ta = db_writer.send_in_chunks("token_activities", token_activities);
-    let ctc = db_writer.send_in_chunks("current_token_pending_claims", current_token_claims);
-    let np = db_writer.send_in_chunks("nft_points", nft_points);
+    let t = db_writer.send_in_chunks("tokens", tokens, insert_tokens_query);
+    let to = db_writer.send_in_chunks(
+        "token_ownerships",
+        token_ownerships,
+        insert_token_ownerships_query,
+    );
+    let td = db_writer.send_in_chunks("token_datas", token_datas, insert_token_datas_query);
+    let cd = db_writer.send_in_chunks(
+        "collection_datas",
+        collection_datas,
+        insert_collection_datas_query,
+    );
+    let cto = db_writer.send_in_chunks(
+        "current_token_ownerships",
+        current_token_ownerships,
+        insert_current_token_ownerships_query,
+    );
+    let ctd = db_writer.send_in_chunks(
+        "current_token_datas",
+        current_token_datas,
+        insert_current_token_datas_query,
+    );
+    let ccd = db_writer.send_in_chunks(
+        "current_collection_datas",
+        current_collection_datas,
+        insert_current_collection_datas_query,
+    );
+    let ta = db_writer.send_in_chunks(
+        "token_activities",
+        token_activities,
+        insert_token_activities_query,
+    );
+    let ctc = db_writer.send_in_chunks(
+        "current_token_pending_claims",
+        current_token_claims,
+        insert_current_token_pending_claims_query,
+    );
+    let np = db_writer.send_in_chunks("nft_points", nft_points, insert_nft_points_query);
 
     tokio::join!(t, to, td, cd, cto, ctd, ccd, ta, ctc, np);
-
-    Ok(())
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<Token> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::tokens::dsl::*;
+pub fn insert_tokens_query(
+    items_to_insert: &[Token],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::tokens::dsl::*;
 
-        let query = diesel::insert_into(schema::tokens::table)
-            .values(self)
-            .on_conflict((token_data_id_hash, property_version, transaction_version))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::tokens::table)
+        .values(items_to_insert)
+        .on_conflict((token_data_id_hash, property_version, transaction_version))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TokenOwnership> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::token_ownerships::dsl::*;
+pub fn insert_token_ownerships_query(
+    items_to_insert: &[TokenOwnership],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::token_ownerships::dsl::*;
 
-        let query = diesel::insert_into(schema::token_ownerships::table)
-            .values(self)
-            .on_conflict((
-                token_data_id_hash,
-                property_version,
-                transaction_version,
-                table_handle,
-            ))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::token_ownerships::table)
+        .values(items_to_insert)
+        .on_conflict((
+            token_data_id_hash,
+            property_version,
+            transaction_version,
+            table_handle,
+        ))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TokenData> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::token_datas::dsl::*;
+pub fn insert_token_datas_query(
+    items_to_insert: &[TokenData],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::token_datas::dsl::*;
 
-        let query = diesel::insert_into(schema::token_datas::table)
-            .values(self)
-            .on_conflict((token_data_id_hash, transaction_version))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::token_datas::table)
+        .values(items_to_insert)
+        .on_conflict((token_data_id_hash, transaction_version))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CollectionData> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::collection_datas::dsl::*;
+pub fn insert_collection_datas_query(
+    items_to_insert: &[CollectionData],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::collection_datas::dsl::*;
 
-        let query = diesel::insert_into(schema::collection_datas::table)
-            .values(self)
-            .on_conflict((collection_data_id_hash, transaction_version))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::collection_datas::table)
+        .values(items_to_insert)
+        .on_conflict((collection_data_id_hash, transaction_version))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentTokenOwnership> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_token_ownerships::dsl::*;
+pub fn insert_current_token_ownerships_query(
+    items_to_insert: &[CurrentTokenOwnership],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_token_ownerships::dsl::*;
 
-        let query = diesel::insert_into(schema::current_token_ownerships::table)
-            .values(self)
-            .on_conflict((token_data_id_hash, property_version, owner_address))
-            .do_update()
-            .set((
-                creator_address.eq(excluded(creator_address)),
-                collection_name.eq(excluded(collection_name)),
-                name.eq(excluded(name)),
-                amount.eq(excluded(amount)),
-                token_properties.eq(excluded(token_properties)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                table_type.eq(excluded(table_type)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_token_ownerships::table)
+        .values(items_to_insert)
+        .on_conflict((token_data_id_hash, property_version, owner_address))
+        .do_update()
+        .set((
+            creator_address.eq(excluded(creator_address)),
+            collection_name.eq(excluded(collection_name)),
+            name.eq(excluded(name)),
+            amount.eq(excluded(amount)),
+            token_properties.eq(excluded(token_properties)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+            table_type.eq(excluded(table_type)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentTokenData> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_token_datas::dsl::*;
+pub fn insert_current_token_datas_query(
+    items_to_insert: &[CurrentTokenData],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_token_datas::dsl::*;
 
-        let query = diesel::insert_into(schema::current_token_datas::table)
-            .values(self)
-            .on_conflict(token_data_id_hash)
-            .do_update()
-            .set((
-                creator_address.eq(excluded(creator_address)),
-                collection_name.eq(excluded(collection_name)),
-                name.eq(excluded(name)),
-                maximum.eq(excluded(maximum)),
-                supply.eq(excluded(supply)),
-                largest_property_version.eq(excluded(largest_property_version)),
-                metadata_uri.eq(excluded(metadata_uri)),
-                payee_address.eq(excluded(payee_address)),
-                royalty_points_numerator.eq(excluded(royalty_points_numerator)),
-                royalty_points_denominator.eq(excluded(royalty_points_denominator)),
-                maximum_mutable.eq(excluded(maximum_mutable)),
-                uri_mutable.eq(excluded(uri_mutable)),
-                description_mutable.eq(excluded(description_mutable)),
-                properties_mutable.eq(excluded(properties_mutable)),
-                royalty_mutable.eq(excluded(royalty_mutable)),
-                default_properties.eq(excluded(default_properties)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                description.eq(excluded(description)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_token_datas::table)
+        .values(items_to_insert)
+        .on_conflict(token_data_id_hash)
+        .do_update()
+        .set((
+            creator_address.eq(excluded(creator_address)),
+            collection_name.eq(excluded(collection_name)),
+            name.eq(excluded(name)),
+            maximum.eq(excluded(maximum)),
+            supply.eq(excluded(supply)),
+            largest_property_version.eq(excluded(largest_property_version)),
+            metadata_uri.eq(excluded(metadata_uri)),
+            payee_address.eq(excluded(payee_address)),
+            royalty_points_numerator.eq(excluded(royalty_points_numerator)),
+            royalty_points_denominator.eq(excluded(royalty_points_denominator)),
+            maximum_mutable.eq(excluded(maximum_mutable)),
+            uri_mutable.eq(excluded(uri_mutable)),
+            description_mutable.eq(excluded(description_mutable)),
+            properties_mutable.eq(excluded(properties_mutable)),
+            royalty_mutable.eq(excluded(royalty_mutable)),
+            default_properties.eq(excluded(default_properties)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+            description.eq(excluded(description)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentCollectionData> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_collection_datas::dsl::*;
+pub fn insert_current_collection_datas_query(
+    items_to_insert: &[CurrentCollectionData],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_collection_datas::dsl::*;
 
-        let query = diesel::insert_into(schema::current_collection_datas::table)
-            .values(self)
-            .on_conflict(collection_data_id_hash)
-            .do_update()
-            .set((
-                creator_address.eq(excluded(creator_address)),
-                collection_name.eq(excluded(collection_name)),
-                description.eq(excluded(description)),
-                metadata_uri.eq(excluded(metadata_uri)),
-                supply.eq(excluded(supply)),
-                maximum.eq(excluded(maximum)),
-                maximum_mutable.eq(excluded(maximum_mutable)),
-                uri_mutable.eq(excluded(uri_mutable)),
-                description_mutable.eq(excluded(description_mutable)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                table_handle.eq(excluded(table_handle)),
-                inserted_at.eq(excluded(inserted_at)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_collection_datas::table)
+        .values(items_to_insert)
+        .on_conflict(collection_data_id_hash)
+        .do_update()
+        .set((
+            creator_address.eq(excluded(creator_address)),
+            collection_name.eq(excluded(collection_name)),
+            description.eq(excluded(description)),
+            metadata_uri.eq(excluded(metadata_uri)),
+            supply.eq(excluded(supply)),
+            maximum.eq(excluded(maximum)),
+            maximum_mutable.eq(excluded(maximum_mutable)),
+            uri_mutable.eq(excluded(uri_mutable)),
+            description_mutable.eq(excluded(description_mutable)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            table_handle.eq(excluded(table_handle)),
+            inserted_at.eq(excluded(inserted_at)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<TokenActivity> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::token_activities::dsl::*;
+pub fn insert_token_activities_query(
+    items_to_insert: &[TokenActivity],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::token_activities::dsl::*;
 
-        let query = diesel::insert_into(schema::token_activities::table)
-            .values(self)
-            .on_conflict((
-                transaction_version,
-                event_account_address,
-                event_creation_number,
-                event_sequence_number,
-            ))
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::token_activities::table)
+        .values(items_to_insert)
+        .on_conflict((
+            transaction_version,
+            event_account_address,
+            event_creation_number,
+            event_sequence_number,
+        ))
+        .do_nothing()
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<CurrentTokenPendingClaim> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::current_token_pending_claims::dsl::*;
+pub fn insert_current_token_pending_claims_query(
+    items_to_insert: &[CurrentTokenPendingClaim],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::current_token_pending_claims::dsl::*;
 
-        let query = diesel::insert_into(schema::current_token_pending_claims::table)
-            .values(self)
-            .on_conflict((
-                token_data_id_hash,
-                property_version,
-                from_address,
-                to_address,
-            ))
-            .do_update()
-            .set((
-                collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                creator_address.eq(excluded(creator_address)),
-                collection_name.eq(excluded(collection_name)),
-                name.eq(excluded(name)),
-                amount.eq(excluded(amount)),
-                table_handle.eq(excluded(table_handle)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-                token_data_id.eq(excluded(token_data_id)),
-                collection_id.eq(excluded(collection_id)),
-            ))
-            .filter(last_transaction_version.le(excluded(last_transaction_version)));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::current_token_pending_claims::table)
+        .values(items_to_insert)
+        .on_conflict((
+            token_data_id_hash,
+            property_version,
+            from_address,
+            to_address,
+        ))
+        .do_update()
+        .set((
+            collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+            creator_address.eq(excluded(creator_address)),
+            collection_name.eq(excluded(collection_name)),
+            name.eq(excluded(name)),
+            amount.eq(excluded(amount)),
+            table_handle.eq(excluded(table_handle)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
+            inserted_at.eq(excluded(inserted_at)),
+            token_data_id.eq(excluded(token_data_id)),
+            collection_id.eq(excluded(collection_id)),
+        ))
+        .filter(last_transaction_version.le(excluded(last_transaction_version)))
 }
 
-#[async_trait::async_trait]
-impl crate::db_writer::DbExecutable for Vec<NftPoints> {
-    async fn execute_query(
-        &'_ self,
-        conn: crate::utils::database::PgDbPool,
-    ) -> diesel::QueryResult<usize> {
-        use crate::schema::nft_points::dsl::*;
+pub fn insert_nft_points_query(
+    items_to_insert: &[NftPoints],
+) -> impl QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    use crate::schema::nft_points::dsl::*;
 
-        let query = diesel::insert_into(schema::nft_points::table)
-            .values(self)
-            .on_conflict(transaction_version)
-            .do_nothing();
-        crate::db_writer::execute_with_better_error(conn, query).await
-    }
+    diesel::insert_into(schema::nft_points::table)
+        .values(items_to_insert)
+        .on_conflict(transaction_version)
+        .do_nothing()
 }
 
 #[async_trait]
@@ -461,7 +437,7 @@ impl ProcessorTrait for TokenProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
+        insert_to_db(
             self.db_writer(),
             self.name(),
             start_version,
@@ -484,25 +460,13 @@ impl ProcessorTrait for TokenProcessor {
         .await;
 
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

@@ -6,14 +6,12 @@ use crate::{
     diesel::ExpressionMethods, models::events_models::events::EventModel, schema,
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
-use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
     query_builder::QueryFragment,
 };
-use tracing::error;
 
 pub struct EventsProcessor {
     db_writer: crate::db_writer::DbWriter,
@@ -36,25 +34,6 @@ impl EventsProcessor {
     pub fn new(db_writer: crate::db_writer::DbWriter) -> Self {
         Self { db_writer }
     }
-}
-
-async fn insert_to_db(
-    db_writer: &crate::db_writer::DbWriter,
-    name: &'static str,
-    start_version: u64,
-    end_version: u64,
-    events: Vec<EventModel>,
-) -> Result<(), diesel::result::Error> {
-    tracing::trace!(
-        name = name,
-        start_version = start_version,
-        end_version = end_version,
-        "Inserting to db",
-    );
-    db_writer
-        .send_in_chunks_with_query("events", events, insert_events_query)
-        .await;
-    Ok(())
 }
 
 pub fn insert_events_query(
@@ -120,35 +99,24 @@ impl ProcessorTrait for EventsProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let tx_result = insert_to_db(
-            self.db_writer(),
-            self.name(),
-            start_version,
-            end_version,
-            events,
-        )
-        .await;
+        tracing::trace!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Finished parsing, sending to DB",
+        );
+        self.db_writer()
+            .send_in_chunks("events", events, insert_events_query)
+            .await;
 
         let db_channel_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_channel_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            db_channel_insertion_duration_in_secs,
+            last_transaction_timestamp,
+        })
     }
 
     fn db_writer(&self) -> &crate::db_writer::DbWriter {

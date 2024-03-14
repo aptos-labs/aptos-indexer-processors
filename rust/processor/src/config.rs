@@ -31,7 +31,7 @@ pub struct IndexerGrpcProcessorConfig {
     // Version to end indexing at
     pub ending_version: Option<u64>,
     // Number of tasks waiting to pull transaction batches from the channel and process them
-    // TODO: ADD A DEFAULT HERE!
+    #[serde(default = "IndexerGrpcProcessorConfig::number_concurrent_processing_tasks")]
     pub number_concurrent_processing_tasks: usize,
     // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
     #[serde(default = "IndexerGrpcProcessorConfig::default_db_pool_size")]
@@ -82,6 +82,11 @@ impl IndexerGrpcProcessorConfig {
     // TODO: ideally the default is a multiple of pool_size and/or number_concurrent_processing_tasks
     pub const fn default_number_concurrent_db_writer_tasks() -> usize {
         50
+    }
+
+    // TODO: ideally the default is based on the number of cores
+    pub const fn number_concurrent_processing_tasks() -> usize {
+        10
     }
 
     /// Make the default very large on purpose so that by default it's not chunked

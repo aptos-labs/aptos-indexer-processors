@@ -80,47 +80,6 @@ pub struct CurrentTokenOwnershipV2 {
     pub non_transferrable_by_owner: Option<bool>,
 }
 
-impl From<CurrentTokenOwnershipV2> for CurrentDeletedTokenOwnershipV2 {
-    fn from(val: CurrentTokenOwnershipV2) -> Self {
-        CurrentDeletedTokenOwnershipV2 {
-            token_data_id: val.token_data_id,
-            property_version_v1: val.property_version_v1,
-            owner_address: val.owner_address,
-            storage_id: val.storage_id,
-            amount: val.amount,
-            table_type_v1: val.table_type_v1,
-            token_properties_mutated_v1: val.token_properties_mutated_v1,
-            is_soulbound_v2: val.is_soulbound_v2,
-            token_standard: val.token_standard,
-            is_fungible_v2: val.is_fungible_v2,
-            last_transaction_version: val.last_transaction_version,
-            last_transaction_timestamp: val.last_transaction_timestamp,
-            non_transferrable_by_owner: val.non_transferrable_by_owner,
-        }
-    }
-}
-
-// because we have the impl on Vec<T> we need to create a wrapper struct to implement the trait if
-// we want to use the same underlying type between different queries
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
-#[diesel(table_name = current_token_ownerships_v2)]
-pub struct CurrentDeletedTokenOwnershipV2 {
-    pub token_data_id: String,
-    pub property_version_v1: BigDecimal,
-    pub owner_address: String,
-    pub storage_id: String,
-    pub amount: BigDecimal,
-    pub table_type_v1: Option<String>,
-    pub token_properties_mutated_v1: Option<serde_json::Value>,
-    pub is_soulbound_v2: Option<bool>,
-    pub token_standard: String,
-    pub is_fungible_v2: Option<bool>,
-    pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub non_transferrable_by_owner: Option<bool>,
-}
-
 // Facilitate tracking when a token is burned
 #[derive(Clone, Debug)]
 pub struct NFTOwnershipV2 {
