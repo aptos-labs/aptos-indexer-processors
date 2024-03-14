@@ -14,7 +14,8 @@ use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
+    query_builder::{QueryFragment, SqlQuery},
+    QueryDsl, Table,
 };
 use tracing::error;
 
@@ -70,11 +71,11 @@ impl crate::db_writer::DbExecutable for Vec<EventModel> {
     }
 }
 
-pub fn insert_events_query(
-    items_to_insert: &[EventModel],
-) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+pub fn insert_events_query<'a>(
+    items_to_insert: &'a [EventModel],
+) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + 'a {
     diesel::insert_into(schema::events::table)
-        .values(items_to_insert.as_ref())
+        .values(items_to_insert)
         .on_conflict((transaction_version, event_index))
         .do_update()
         .set((

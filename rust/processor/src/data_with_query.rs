@@ -97,11 +97,7 @@ where
 
 impl<Item, F, Query> DbRowCountable for DataWithQuery<Item, F, Query>
 where
-    Query: for<'a> QueryFragment<diesel::pg::Pg>
-        + diesel::query_builder::QueryId
-        + Send
-        + Sync
-        + 'static,
+    Query: for<'a> QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync,
     F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
     Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
