@@ -12,8 +12,10 @@ use crate::{
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, QueryResult};
-use std::{borrow::Cow, future::Future, pin::Pin};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+};
 use tracing::error;
 
 pub struct EventsProcessor {
@@ -68,21 +70,17 @@ impl crate::db_writer::DbExecutable for Vec<EventModel> {
     }
 }
 
-pub fn insert_events_query<'a>(
-    items_to_insert: &'a [EventModel],
-    conn: crate::utils::database::PgDbPool,
-) -> Pin<Box<dyn Future<Output = QueryResult<usize>> + Send + 'a>> {
-    Box::pin(async move {
-        let query = diesel::insert_into(schema::events::table)
-            .values(items_to_insert.as_ref())
-            .on_conflict((transaction_version, event_index))
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                indexed_type.eq(excluded(indexed_type)),
-            ));
-        crate::db_writer::execute_with_better_error(conn, query).await
-    })
+pub fn insert_events_query(
+    items_to_insert: &[EventModel],
+) -> impl QueryFragment<Pg> + diesel::query_builder::QueryId + Sync + Send + '_ {
+    diesel::insert_into(schema::events::table)
+        .values(items_to_insert.as_ref())
+        .on_conflict((transaction_version, event_index))
+        .do_update()
+        .set((
+            inserted_at.eq(excluded(inserted_at)),
+            indexed_type.eq(excluded(indexed_type)),
+        ))
 }
 
 #[async_trait]

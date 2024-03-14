@@ -24,7 +24,6 @@ use diesel::{
     QueryResult,
 };
 use kanal::{AsyncReceiver, AsyncSender};
-use std::{borrow::Cow, future::Future, pin::Pin};
 use tokio::task::JoinHandle;
 use tracing::info;
 
@@ -190,11 +189,11 @@ impl DbWriter {
         get_config_table_chunk_size::<Item>(table_name, &self.per_table_chunk_sizes)
     }
 
-    pub async fn send_in_chunks_with_query<Item, Query>(
+    pub async fn send_in_chunks_with_query<Item, F, Query>(
         &self,
         table_name: &'static str,
         items_to_insert: Vec<Item>,
-        query_fn: fn(&[Item]) -> Query,
+        query_fn: F,
     ) where
         Item: field_count::FieldCount
             + serde::Serialize
@@ -203,6 +202,7 @@ impl DbWriter {
             + Sync
             + Clone
             + 'static,
+        F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
         Query:
             QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
     {

@@ -9,33 +9,56 @@ use crate::{
     utils::{database::PgDbPool, util::remove_null_bytes},
 };
 use diesel::{query_builder::QueryFragment, QueryResult};
-use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, future::Future, pin::Pin};
+use std::pin::Pin;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TestModel {}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TestDb {}
-
-pub struct DataWithQuery<'a, Query, Item>
+/*
+pub trait GenQueryFun<Item, F, Query>: Copy
 where
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
+    Query: for<'a> QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
-    pub build_query_fn: fn(&'a [Item]) -> Query,
-    pub items: Vec<Item>,
+    fn generate_query(&self, items: &[Item]) -> Query;
 }
 
-impl<'a, Query, Item> DataWithQuery<'a, Query, Item>
+impl<Item, F, Query> GenQueryFun<Item, F, Query> for F
 where
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
+    Query: for<'a> QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'static,
+    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
-    pub fn new(items: Vec<Item>, build_query_fn: fn(&'a [Item]) -> Query) -> Self {
+    fn generate_query(&self, items: &[Item]) -> Query {
+        (self)(items)
+    }
+}*/
+
+pub struct DataWithQuery<Item, F, Query>
+where
+    Query: for<'a> QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
+        + Send
+        + Sync
+        + 'static,
+    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+{
+    pub build_query_fn: F,
+    pub items: Pin<Box<Vec<Item>>>,
+}
+
+impl<Item, F, Query> DataWithQuery<Item, F, Query>
+where
+    Query: for<'a> QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
+        + Send
+        + Sync
+        + 'static,
+    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
+{
+    pub fn new(items: Vec<Item>, build_query_fn: F) -> Self {
         Self {
             build_query_fn,
-            items,
+            items: Box::pin(items),
         }
     }
 
@@ -56,20 +79,31 @@ where
      */
 }
 
-impl<'a, Query, Item> DbCleanable for DataWithQuery<'a, Query, Item>
+impl<Item, F, Query> DbCleanable for DataWithQuery<Item, F, Query>
 where
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
+    Query: for<'a> QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
+        + Send
+        + Sync
+        + 'static,
+    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     fn clean(&mut self) {
-        self.items = self.items.iter().map(remove_null_bytes).collect()
+        let items = self.items.as_mut().iter().map(remove_null_bytes).collect();
+        self.items = Box::pin(items);
     }
 }
 
-impl<'a, Query, Item> DbRowCountable for DataWithQuery<'a, Query, Item>
+impl<Item, F, Query> DbRowCountable for DataWithQuery<Item, F, Query>
 where
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
+    Query: for<'a> QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
+        + Send
+        + Sync
+        + 'static,
+    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     fn len(&self) -> usize {
         self.items.len()
@@ -81,14 +115,18 @@ unsafe fn extend_lifetime<'a, T: ?Sized>(r: &'a T) -> &'static T {
 }
 
 #[async_trait::async_trait]
-impl<'a, Query, Item> DbExecutable for DataWithQuery<'a, Query, Item>
+impl<Item, F, Query> DbExecutable for DataWithQuery<Item, F, Query>
 where
-    Query: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + Sync + 'a,
-    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone,
+    Query: for<'a> QueryFragment<diesel::pg::Pg>
+        + diesel::query_builder::QueryId
+        + Send
+        + Sync
+        + 'static,
+    F: Fn(&[Item]) -> Query + Send + Sync + Copy + 'static,
+    Item: serde::Serialize + for<'de> serde::Deserialize<'de> + Send + Sync + Clone + 'static,
 {
     async fn execute_query(&self, conn: PgDbPool) -> QueryResult<usize> {
-        //let items_ref: &'a [Item] = &items;
-        let items_ref = unsafe { extend_lifetime(&self.items) };
+        let items_ref = unsafe { std::mem::transmute::<&[Item], &'static [Item]>(&self.items) };
         let query = (self.build_query_fn)(items_ref);
         drop(query);
         Ok(0)
