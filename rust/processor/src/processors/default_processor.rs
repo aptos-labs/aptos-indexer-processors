@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::default_models::{
         block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
         move_modules::MoveModule,
@@ -50,6 +51,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     txns: Vec<TransactionModel>,
     block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
     wscs: Vec<WriteSetChangeModel>,
@@ -67,35 +69,63 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
 
-    let txns_res = db_writer.send_in_chunks("transactions", txns, insert_tranasctions_query);
+    let txns_res = db_writer.send_in_chunks(
+        "transactions",
+        txns,
+        insert_tranasctions_query,
+        version_tracker_item.clone(),
+    );
     let bmt_res = db_writer.send_in_chunks(
         "block_metadata_transactions",
         block_metadata_transactions,
         insert_block_metadata_transactions_query,
+        version_tracker_item.clone(),
     );
-    let wst_res =
-        db_writer.send_in_chunks("write_set_changes", wscs, insert_write_set_changes_query);
-    let mm_res = db_writer.send_in_chunks("move_modules", move_modules, insert_move_modules_query);
+    let wst_res = db_writer.send_in_chunks(
+        "write_set_changes",
+        wscs,
+        insert_write_set_changes_query,
+        version_tracker_item.clone(),
+    );
+    let mm_res = db_writer.send_in_chunks(
+        "move_modules",
+        move_modules,
+        insert_move_modules_query,
+        version_tracker_item.clone(),
+    );
 
     let mr_res = db_writer.send_in_chunks(
         "move_resources",
         move_resources,
         insert_move_resources_query,
+        version_tracker_item.clone(),
     );
 
-    let ti_res = db_writer.send_in_chunks("table_items", table_items, insert_table_items_query);
+    let ti_res = db_writer.send_in_chunks(
+        "table_items",
+        table_items,
+        insert_table_items_query,
+        version_tracker_item.clone(),
+    );
 
     let cti_res = db_writer.send_in_chunks(
         "current_table_items",
         current_table_items,
         insert_current_table_items_query,
+        version_tracker_item.clone(),
     );
 
     let tm_res = db_writer.send_in_chunks(
         "table_metadatas",
         table_metadata,
         insert_table_metadata_query,
+        version_tracker_item,
     );
 
     tokio::join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
@@ -233,6 +263,7 @@ impl ProcessorTrait for DefaultProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             txns,
             block_metadata_transactions,
             write_set_changes,

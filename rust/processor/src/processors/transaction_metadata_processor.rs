@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::transaction_metadata_model::{
         event_size_info::EventSize, transaction_size_info::TransactionSize,
         write_set_size_info::WriteSetSize,
@@ -42,6 +43,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     transaction_sizes: Vec<TransactionSize>,
     event_sizes: Vec<EventSize>,
     write_set_sizes: Vec<WriteSetSize>,
@@ -52,21 +54,28 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
-
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
     let tsi = db_writer.send_in_chunks(
         "transaction_size_info",
         transaction_sizes,
         insert_transaction_size_infos_query,
+        version_tracker_item.clone(),
     );
     let esi = db_writer.send_in_chunks(
         "event_size_info",
         event_sizes,
         insert_event_size_infos_query,
+        version_tracker_item.clone(),
     );
     let wssi = db_writer.send_in_chunks(
         "write_set_size_info",
         write_set_sizes,
         insert_write_set_size_infos_query,
+        version_tracker_item,
     );
 
     tokio::join!(tsi, esi, wssi);
@@ -122,6 +131,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
         let mut transaction_sizes = vec![];
         let mut event_sizes = vec![];
         let mut write_set_sizes = vec![];
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let size_info = match txn.size_info.as_ref() {
@@ -159,6 +169,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             transaction_sizes,
             event_sizes,
             write_set_sizes,

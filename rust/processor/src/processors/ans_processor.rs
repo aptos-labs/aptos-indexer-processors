@@ -3,6 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
         ans_lookup_v2::{
@@ -68,6 +69,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     current_ans_lookups: Vec<CurrentAnsLookup>,
     ans_lookups: Vec<AnsLookup>,
     current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
@@ -83,38 +85,58 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
     let cal = db_writer.send_in_chunks(
         "current_ans_lookup",
         current_ans_lookups,
         insert_current_ans_lookups_query,
+        version_tracker_item.clone(),
     );
-    let al = db_writer.send_in_chunks("ans_lookup", ans_lookups, insert_ans_lookups_query);
+    let al = db_writer.send_in_chunks(
+        "ans_lookup",
+        ans_lookups,
+        insert_ans_lookups_query,
+        version_tracker_item.clone(),
+    );
     let capn = db_writer.send_in_chunks(
         "current_ans_primary_name",
         current_ans_primary_names,
         insert_current_ans_primary_names_query,
+        version_tracker_item.clone(),
     );
     let apn = db_writer.send_in_chunks(
         "ans_primary_name",
         ans_primary_names,
         insert_ans_primary_names_query,
+        version_tracker_item.clone(),
     );
     let cal_v2 = db_writer.send_in_chunks(
         "current_ans_lookup_v2",
         current_ans_lookups_v2,
         insert_current_ans_lookup_v2s_query,
+        version_tracker_item.clone(),
     );
-    let al_v2 =
-        db_writer.send_in_chunks("ans_lookup_v2", ans_lookups_v2, insert_ans_lookup_v2s_query);
+    let al_v2 = db_writer.send_in_chunks(
+        "ans_lookup_v2",
+        ans_lookups_v2,
+        insert_ans_lookup_v2s_query,
+        version_tracker_item.clone(),
+    );
     let capn_v2 = db_writer.send_in_chunks(
         "current_ans_primary_name_v2",
         current_ans_primary_names_v2,
         insert_current_ans_primary_name_v2s_query,
+        version_tracker_item.clone(),
     );
     let apn_v2 = db_writer.send_in_chunks(
         "ans_primary_name_v2",
         ans_primary_names_v2,
         insert_ans_primary_name_v2s_query,
+        version_tracker_item,
     );
 
     tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
@@ -285,6 +307,7 @@ impl ProcessorTrait for AnsProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             all_current_ans_lookups,
             all_ans_lookups,
             all_current_ans_primary_names,

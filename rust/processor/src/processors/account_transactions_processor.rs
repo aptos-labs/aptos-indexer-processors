@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
-use crate::{models::account_transaction_models::account_transactions::AccountTransaction, schema};
+use crate::{
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
+    models::account_transaction_models::account_transactions::AccountTransaction,
+    schema,
+};
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
@@ -82,11 +86,17 @@ impl ProcessorTrait for AccountTransactionsProcessor {
             end_version = end_version,
             "Finished parsing, sending to DB",
         );
+        let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+            start_version,
+            end_version,
+            last_transaction_timestamp: last_transaction_timestamp.clone(),
+        });
         self.db_writer()
             .send_in_chunks(
                 "account_transactions",
                 account_transactions,
                 insert_account_transactions_query,
+                version_tracker_item,
             )
             .await;
 

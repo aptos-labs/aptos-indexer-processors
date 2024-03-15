@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::{
         fungible_asset_models::v2_fungible_asset_utils::{
             FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
@@ -70,6 +71,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     collections_v2: Vec<CollectionV2>,
     token_datas_v2: Vec<TokenDataV2>,
     token_ownerships_v2: Vec<TokenOwnershipV2>,
@@ -86,51 +88,65 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
 
     let coll_v2 = db_writer.send_in_chunks(
         "collections_v2",
         collections_v2,
         insert_collections_v2s_query,
+        version_tracker_item.clone(),
     );
     let td_v2 = db_writer.send_in_chunks(
         "token_datas_v2",
         token_datas_v2,
         insert_token_datas_v2s_query,
+        version_tracker_item.clone(),
     );
     let to_v2 = db_writer.send_in_chunks(
         "token_ownerships_v2",
         token_ownerships_v2,
         insert_token_ownerships_v2s_query,
+        version_tracker_item.clone(),
     );
     let cc_v2 = db_writer.send_in_chunks(
         "current_collections_v2",
         current_collections_v2,
         insert_current_collections_v2s_query,
+        version_tracker_item.clone(),
     );
     let ctd_v2 = db_writer.send_in_chunks(
         "current_token_datas_v2",
         current_token_datas_v2,
         insert_current_token_datas_v2s_query,
+        version_tracker_item.clone(),
     );
     let cto_v2 = db_writer.send_in_chunks(
         "current_token_ownerships_v2",
         current_token_ownerships_v2,
         insert_current_token_ownerships_v2s_query,
+        version_tracker_item.clone(),
     );
     let cbto_v2 = db_writer.send_in_chunks(
         "current_token_ownerships_v2",
         current_burned_token_ownerships_v2,
         insert_current_burned_token_ownerships_v2s_query,
+        version_tracker_item.clone(),
     );
     let ta_v2 = db_writer.send_in_chunks(
         "token_activities_v2",
         token_activities_v2,
         insert_token_activities_v2s_query,
+        version_tracker_item.clone(),
     );
     let ct_v2 = db_writer.send_in_chunks(
         "current_token_v2_metadata",
         current_token_v2_metadata,
         insert_current_token_v2_metadatas_query,
+        version_tracker_item,
     );
 
     tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, cbto_v2, ta_v2, ct_v2,);
@@ -354,6 +370,7 @@ impl ProcessorTrait for TokenV2Processor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             collections_v2,
             token_datas_v2,
             token_ownerships_v2,

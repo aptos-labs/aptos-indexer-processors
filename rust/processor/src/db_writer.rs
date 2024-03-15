@@ -6,6 +6,7 @@
 
 use crate::{
     data_with_query::DataWithQuery,
+    latest_version_tracker::VersionTrackerItem,
     utils::{
         counters::{
             DB_EXECUTION_RETRIES_COUNT, DB_EXECUTOR_CHANNEL_CHUNK_INSERT_COUNT,
@@ -202,6 +203,7 @@ impl DbWriter {
         table_name: &'static str,
         items_to_insert: Vec<Item>,
         query_fn: fn(&'a [Item]) -> Query,
+        version_tracker_item: VersionTrackerItem,
     ) where
         Item: field_count::FieldCount
             + serde::Serialize
@@ -232,6 +234,7 @@ impl DbWriter {
                 .send(QueryGenerator {
                     table_name,
                     db_executable: Box::new(data_with_query),
+                    version_tracker_item: version_tracker_item.clone(),
                 })
                 .await
                 .expect("Error sending query generator to db writer task");
@@ -245,6 +248,7 @@ impl DbWriter {
 
 pub async fn launch_db_writer_tasks(
     query_receiver: AsyncReceiver<QueryGenerator>,
+    version_tracker_sender: AsyncSender<VersionTrackerItem>,
     processor_name: &'static str,
     num_tasks: usize,
     db_pool: PgDbPool,
@@ -255,7 +259,14 @@ pub async fn launch_db_writer_tasks(
         "[Parser] Starting db writer tasks",
     );
     let tasks = (0..num_tasks)
-        .map(|_| launch_db_writer_task(query_receiver.clone(), processor_name, db_pool.clone()))
+        .map(|_| {
+            launch_db_writer_task(
+                query_receiver.clone(),
+                version_tracker_sender.clone(),
+                processor_name,
+                db_pool.clone(),
+            )
+        })
         .collect::<Vec<_>>();
     futures::future::try_join_all(tasks)
         .await
@@ -266,10 +277,12 @@ pub async fn launch_db_writer_tasks(
 pub struct QueryGenerator {
     pub table_name: &'static str,
     pub db_executable: Box<dyn DbExecutable>,
+    pub version_tracker_item: VersionTrackerItem,
 }
 
 pub fn launch_db_writer_task(
     query_receiver: AsyncReceiver<QueryGenerator>,
+    version_tracker_sender: AsyncSender<VersionTrackerItem>,
     processor_name: &'static str,
     db_pool: PgDbPool,
 ) -> JoinHandle<()> {
@@ -286,6 +299,10 @@ pub fn launch_db_writer_task(
                         )
                         .await;
                     query_res.expect("Error executing query");
+                    version_tracker_sender
+                        .send(query_generator.version_tracker_item.clone())
+                        .await
+                        .expect("Error sending version tracker item");
                     drop(query_generator);
                 },
                 Err(e) => info!(

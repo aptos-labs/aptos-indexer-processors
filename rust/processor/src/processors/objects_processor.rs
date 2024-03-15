@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::object_models::{
         v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
         v2_objects::{CurrentObject, Object},
@@ -195,12 +196,24 @@ impl ProcessorTrait for ObjectsProcessor {
             "Finished parsing, sending to DB",
         );
 
+        let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+            start_version,
+            end_version,
+            last_transaction_timestamp: last_transaction_timestamp.clone(),
+        });
+
         let db_writer = self.db_writer();
-        let io = db_writer.send_in_chunks("objects", all_objects, insert_objects_query);
+        let io = db_writer.send_in_chunks(
+            "objects",
+            all_objects,
+            insert_objects_query,
+            version_tracker_item.clone(),
+        );
         let co = db_writer.send_in_chunks(
             "current_objects",
             all_current_objects,
             insert_current_objects_query,
+            version_tracker_item,
         );
         tokio::join!(io, co);
 

@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     diesel::ExpressionMethods,
+    latest_version_tracker::{PartialBatch, VersionTrackerItem},
     models::{
         coin_models::{
             coin_activities::CoinActivity,
@@ -53,6 +54,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
+    last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     coin_activities: Vec<CoinActivity>,
     coin_infos: Vec<CoinInfo>,
     coin_balances: Vec<CoinBalance>,
@@ -65,21 +67,43 @@ async fn insert_to_db(
         end_version = end_version,
         "Finished parsing, sending to DB",
     );
+    let version_tracker_item = VersionTrackerItem::PartialBatch(PartialBatch {
+        start_version,
+        end_version,
+        last_transaction_timestamp,
+    });
 
     let ca = db_writer.send_in_chunks(
         "coin_activities",
         coin_activities,
         insert_coin_activities_query,
+        version_tracker_item.clone(),
     );
-    let ci = db_writer.send_in_chunks("coin_infos", coin_infos, insert_coin_infos_query);
-    let cb = db_writer.send_in_chunks("coin_balances", coin_balances, insert_coin_balances_query);
+    let ci = db_writer.send_in_chunks(
+        "coin_infos",
+        coin_infos,
+        insert_coin_infos_query,
+        version_tracker_item.clone(),
+    );
+    let cb = db_writer.send_in_chunks(
+        "coin_balances",
+        coin_balances,
+        insert_coin_balances_query,
+        version_tracker_item.clone(),
+    );
     let ccb = db_writer.send_in_chunks(
         "current_coin_balances",
         current_coin_balances,
         insert_current_coin_balances_query,
+        version_tracker_item.clone(),
     );
 
-    let cs = db_writer.send_in_chunks("coin_supply", coin_supply, insert_coin_supplys_query);
+    let cs = db_writer.send_in_chunks(
+        "coin_supply",
+        coin_supply,
+        insert_coin_supplys_query,
+        version_tracker_item,
+    );
 
     tokio::join!(ca, ci, cb, ccb, cs);
 }
@@ -244,6 +268,7 @@ impl ProcessorTrait for CoinProcessor {
             self.name(),
             start_version,
             end_version,
+            last_transaction_timestamp.clone(),
             all_coin_activities,
             all_coin_infos,
             all_coin_balances,
