@@ -474,10 +474,10 @@ impl Signature {
         transaction_version: i64,
     ) -> Option<Vec<u8>> {
         match signature_variant {
-            Some(SignatureVariant::Ed25519(sig)) => sig.signature.clone(),
-            Some(SignatureVariant::Keyless(sig)) => sig.signature.clone(),
-            Some(SignatureVariant::Webauthn(sig)) => sig.signature.clone(),
-            Some(SignatureVariant::Secp256k1Ecdsa(sig)) => sig.signature.clone(),
+            Some(SignatureVariant::Ed25519(sig)) => Some(sig.signature.clone()),
+            Some(SignatureVariant::Keyless(sig)) => Some(sig.signature.clone()),
+            Some(SignatureVariant::Webauthn(sig)) => Some(sig.signature.clone()),
+            Some(SignatureVariant::Secp256k1Ecdsa(sig)) => Some(sig.signature.clone()),
             None => {
                 PROCESSOR_UNKNOWN_TYPE_COUNT
                     .with_label_values(&["SignatureVariant"])
@@ -502,9 +502,9 @@ impl Signature {
             "multi_key"
         };
         match signature_variant {
-            Some(SignatureVariant::Ed25519(_)) => format!("{}_ed25519_signature", prefix),
-            Some(SignatureVariant::Keyless(_)) => format!("{}_keyless_signature", prefix),
-            Some(SignatureVariant::Webauthn(_)) => format!("{}_webauthn_signature", prefix),
+            Some(SignatureVariant::Ed25519(_)) => Some(format!("{}_ed25519_signature", prefix)),
+            Some(SignatureVariant::Keyless(_)) => Some(format!("{}_keyless_signature", prefix)),
+            Some(SignatureVariant::Webauthn(_)) => Some(format!("{}_webauthn_signature", prefix)),
             Some(SignatureVariant::Secp256k1Ecdsa(_)) => {
                 Some(format!("{}_secp256k1_ecdsa_signature", prefix))
             },
