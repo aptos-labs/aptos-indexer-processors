@@ -356,6 +356,7 @@ impl Signature {
                 },
                 wildcard => {
                     tracing::warn!(
+                        transaction_version = transaction_version,
                         "Unspecified signature type or un-recognized type is not supported: {:?}",
                         wildcard
                     );
@@ -433,6 +434,7 @@ impl Signature {
                     },
                     wildcard => {
                         tracing::warn!(
+                            transaction_version = transaction_version,
                             "Unspecified signature type or un-recognized type is not supported: {:?}",
                             wildcard
                         );
