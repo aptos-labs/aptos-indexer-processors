@@ -102,7 +102,7 @@ async fn insert_to_db(
     );
     let cs = execute_in_chunks(
         conn,
-        inset_coin_supply_query,
+        insert_coin_supply_query,
         coin_supply,
         get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
     );
@@ -208,7 +208,7 @@ fn insert_current_coin_balances_query(
     )
 }
 
-fn inset_coin_supply_query(
+fn insert_coin_supply_query(
     items_to_insert: Vec<CoinSupply>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
