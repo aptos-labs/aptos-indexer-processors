@@ -44,7 +44,6 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
@@ -65,7 +64,11 @@ pub struct TokenV2Processor {
 }
 
 impl TokenV2Processor {
-    pub fn new(connection_pool: PgDbPool, config: TokenV2ProcessorConfig, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: PgDbPool,
+        config: TokenV2ProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
             connection_pool,
             config,

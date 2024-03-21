@@ -32,7 +32,6 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;

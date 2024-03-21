@@ -23,7 +23,6 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
@@ -43,7 +42,11 @@ pub struct ObjectsProcessor {
 }
 
 impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool, config: ObjectsProcessorConfig, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: PgDbPool,
+        config: ObjectsProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
             connection_pool,
             config,
