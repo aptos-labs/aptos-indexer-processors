@@ -59,3 +59,10 @@ url = { workspace = true }
 native-tls = { workspace = true }
 postgres-native-tls = { workspace = true }
 tokio-postgres = { workspace = true }
+
+[features]
+libpq = ["diesel/postgres"]
+# When using the default features we enable the diesel/postgres feature. We configure
+# it in a feature so the CLI can opt out, since it cannot tolerate the libpq dep.
+# Recall that features should always be additive.
+default = ["libpq"]

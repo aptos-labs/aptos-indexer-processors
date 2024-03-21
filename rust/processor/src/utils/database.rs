@@ -275,7 +275,7 @@ where
     Ok(())
 }
 
-pub async fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
+pub fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
     conn.run_pending_migrations(MIGRATIONS)
         .expect("[Parser] Migrations failed!");
 }

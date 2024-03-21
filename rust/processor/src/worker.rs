@@ -35,7 +35,6 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
-use diesel::Connection;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
@@ -495,13 +494,44 @@ impl Worker {
         })
     }
 
+    // For the normal processor build we just use standard Diesel with the postgres
+    // feature enabled (which uses libpq under the hood, hence why we named the feature
+    // this way).
+    #[cfg(feature = "libpq")]
     async fn run_migrations(&self) {
+        use crate::diesel::Connection;
         use diesel::pg::PgConnection;
 
-        println!("Running migrations: {:?}", self.postgres_connection_string);
+        info!("Running migrations: {:?}", self.postgres_connection_string);
         let mut conn =
             PgConnection::establish(&self.postgres_connection_string).expect("migrations failed!");
-        run_pending_migrations(&mut conn).await;
+        run_pending_migrations(&mut conn);
+    }
+
+    // If the libpq feature isn't enabled, we use diesel async instead. This is used by
+    // the CLI for the local testnet, where we cannot tolerate the libpq dependency.
+    #[cfg(not(feature = "libpq"))]
+    async fn run_migrations(&self) {
+        use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
+
+        info!("Running migrations: {:?}", self.postgres_connection_string);
+        let conn = self
+            .db_pool
+            // We need to use this since AsyncConnectionWrapper doesn't know how to
+            // work with a pooled connection.
+            .dedicated_connection()
+            .await
+            .expect("[Parser] Failed to get connection");
+        // We use spawn_blocking since run_pending_migrations is a blocking function.
+        tokio::task::spawn_blocking(move || {
+            // This lets us use the connection like a normal diesel connection. See more:
+            // https://docs.rs/diesel-async/latest/diesel_async/async_connection_wrapper/type.AsyncConnectionWrapper.html
+            let mut conn: AsyncConnectionWrapper<diesel_async::AsyncPgConnection> =
+                AsyncConnectionWrapper::from(conn);
+            run_pending_migrations(&mut conn);
+        })
+        .await
+        .expect("[Parser] Failed to run migrations");
     }
 
     /// Gets the start version for the processor. If not found, start from 0.

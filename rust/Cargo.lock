@@ -546,6 +546,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acada1517534c92d3f382217b485db8a8638f111b0e3f2a2a8e26165050f77be"
 dependencies = [
  "async-trait",
+ "diesel",
+ "futures-util",
+ "scoped-futures",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
+name = "diesel-async"
+version = "0.4.1"
+source = "git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2#d02798c67065d763154d7272dd0c09b39757d0f2"
+dependencies = [
+ "async-trait",
  "bb8",
  "diesel",
  "futures-util",
@@ -560,7 +573,7 @@ version = "0.11.0"
 source = "git+https://github.com/niroco/diesel_async_migrations?rev=11f331b73c5cfcc894380074f748d8fda710ac12#11f331b73c5cfcc894380074f748d8fda710ac12"
 dependencies = [
  "diesel",
- "diesel-async",
+ "diesel-async 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "macros",
  "scoped-futures",
  "tracing",
@@ -1927,7 +1940,7 @@ dependencies = [
  "chrono",
  "clap",
  "diesel",
- "diesel-async",
+ "diesel-async 0.4.1 (git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2)",
  "diesel_async_migrations",
  "diesel_migrations",
  "enum_dispatch",

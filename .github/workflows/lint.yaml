@@ -38,3 +38,8 @@ jobs:
           rustup component add rustfmt --toolchain nightly
           scripts/rust_lint.sh --check
         working-directory: rust
+      - run: bash scripts/check_banned_deps.sh
+        working-directory: rust
+      - name: Ensure the --no-default-features build passes too
+        run: cargo build --no-default-features
+        working-directory: rust
