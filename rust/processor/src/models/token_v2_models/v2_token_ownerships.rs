@@ -226,12 +226,16 @@ impl TokenOwnershipV2 {
     }
 
     /// This handles the case where token is burned but objectCore is still there
-    pub fn get_burned_nft_v2_from_write_resource(
+    pub async fn get_burned_nft_v2_from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
+        prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
+        conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let token_data_id = standardize_address(&write_resource.address.to_string());
         if tokens_burned
@@ -279,6 +283,19 @@ impl TokenOwnershipV2 {
                         non_transferrable_by_owner: Some(is_soulbound),
                     },
                 )));
+            } else {
+                return Self::get_burned_nft_v2_helper(
+                    &token_data_id,
+                    txn_version,
+                    write_set_change_index,
+                    txn_timestamp,
+                    prior_nft_ownership,
+                    tokens_burned,
+                    conn,
+                    query_retries,
+                    query_retry_delay_ms,
+                )
+                .await;
             }
         }
         Ok(None)
@@ -286,7 +303,7 @@ impl TokenOwnershipV2 {
 
     /// This handles the case where token is burned and objectCore is deleted
     pub async fn get_burned_nft_v2_from_delete_resource(
-        write_resource: &DeleteResource,
+        delete_resource: &DeleteResource,
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
@@ -296,7 +313,33 @@ impl TokenOwnershipV2 {
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
-        let token_address = standardize_address(&write_resource.address.to_string());
+        let token_address = standardize_address(&delete_resource.address.to_string());
+        Self::get_burned_nft_v2_helper(
+            &token_address,
+            txn_version,
+            write_set_change_index,
+            txn_timestamp,
+            prior_nft_ownership,
+            tokens_burned,
+            conn,
+            query_retries,
+            query_retry_delay_ms,
+        )
+        .await
+    }
+
+    async fn get_burned_nft_v2_helper(
+        token_address: &str,
+        txn_version: i64,
+        write_set_change_index: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
+        tokens_burned: &TokenV2Burned,
+        conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
+    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
+        let token_address = standardize_address(token_address);
         if let Some(burn_event) = tokens_burned.get(&token_address) {
             // 1. Try to lookup token address in burn event mapping
             let previous_owner = if let Some(burn_event) = burn_event {

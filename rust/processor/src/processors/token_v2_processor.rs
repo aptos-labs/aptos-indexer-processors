@@ -925,8 +925,13 @@ async fn parse_v2_token(
                                 txn_version,
                                 wsc_index,
                                 txn_timestamp,
+                                &prior_nft_ownership,
                                 &tokens_burned,
+                                conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
+                            .await
                             .unwrap()
                         {
                             token_ownerships_v2.push(nft_ownership);
