@@ -17,6 +17,7 @@ use crate::{
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -35,6 +36,10 @@ use tracing::error;
 #[serde(deny_unknown_fields)]
 pub struct TokenProcessorConfig {
     pub nft_points_contract: Option<String>,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
 }
 
 pub struct TokenProcessor {
@@ -46,8 +51,8 @@ pub struct TokenProcessor {
 impl TokenProcessor {
     pub fn new(
         connection_pool: PgDbPool,
-        per_table_chunk_sizes: AHashMap<String, usize>,
         config: TokenProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
     ) -> Self {
         Self {
             connection_pool,
@@ -434,6 +439,8 @@ impl ProcessorTrait for TokenProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -474,7 +481,14 @@ impl ProcessorTrait for TokenProcessor {
                 current_token_datas,
                 current_collection_datas,
                 current_token_claims,
-            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn).await;
+            ) = Token::from_transaction(
+                txn,
+                &table_handle_to_owner,
+                &mut conn,
+                query_retries,
+                query_retry_delay_ms,
+            )
+            .await;
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);

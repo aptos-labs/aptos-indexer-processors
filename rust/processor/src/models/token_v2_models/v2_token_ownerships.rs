@@ -14,11 +14,7 @@ use crate::{
         default_models::move_resources::MoveResource,
         fungible_asset_models::v2_fungible_asset_utils::V2FungibleAssetResource,
         object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
-        token_models::{
-            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-            token_utils::TokenWriteSet,
-            tokens::TableHandleToOwner,
-        },
+        token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
         token_v2_models::v2_token_utils::DEFAULT_OWNER_ADDRESS,
     },
     schema::{current_token_ownerships_v2, token_ownerships_v2},
@@ -297,6 +293,8 @@ impl TokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let token_address = standardize_address(&write_resource.address.to_string());
         if let Some(burn_event) = tokens_burned.get(&token_address) {
@@ -312,6 +310,8 @@ impl TokenOwnershipV2 {
                         match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                             conn,
                             &token_address,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         {
@@ -400,7 +400,7 @@ impl TokenOwnershipV2 {
                 let object_core = &object_data.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(
+                if !TokenDataV2::is_address_token(
                     conn,
                     &token_data_id,
                     object_metadatas,
@@ -616,10 +616,12 @@ impl CurrentTokenOwnershipV2Query {
     pub async fn get_latest_owned_nft_by_token_data_id(
         conn: &mut PgPoolConnection<'_>,
         token_data_id: &str,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<NFTOwnershipV2> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match Self::get_latest_owned_nft_by_token_data_id_impl(conn, token_data_id).await {
                 Ok(inner) => {
                     return Ok(NFTOwnershipV2 {
@@ -629,8 +631,10 @@ impl CurrentTokenOwnershipV2Query {
                     });
                 },
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

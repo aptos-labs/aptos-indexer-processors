@@ -9,10 +9,7 @@ use super::v2_token_utils::{TokenStandard, TokenV2};
 use crate::{
     models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::{
-            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-            token_utils::TokenWriteSet,
-        },
+        token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
@@ -259,94 +256,45 @@ impl TokenDataV2 {
     /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
     /// 1. If metadata is present with a token object, then is a token
     /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_fungible_token(
+    pub async fn is_address_token(
         conn: &mut PgPoolConnection<'_>,
         token_data_id: &str,
         object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
         txn_version: i64,
     ) -> bool {
-        // 1. If metadata is present, the object is a token iff token struct is also present in the object
         if let Some(object_data) = object_aggregated_data_mapping.get(token_data_id) {
-            if object_data.fungible_asset_metadata.is_some() {
-                return object_data.token.is_some();
-            }
+            return object_data.token.is_some();
         }
-        // 2. If metadata is not present, we will do a lookup in the db.
-        match CurrentTokenDataV2::get_current_token_data_v2(conn, txn_version, token_data_id).await
-        {
-            Ok(token_data) => {
-                if let Some(is_fungible_v2) = token_data.is_fungible_v2 {
-                    return is_fungible_v2;
-                }
-                // If is_fungible_v2 is null, that's likely because it's a v1 token, which are not fungible
-                false
-            },
-            Err(_) => {
-                tracing::error!(
-                    transaction_version = txn_version,
-                    lookup_key = token_data_id,
-                    "Missing current_token_data_v2 for token_data_id: {}. You probably should backfill db.",
-                    token_data_id,
-                );
-                // Default
-                false
+        match CurrentTokenDataV2Query::get_exists(conn, token_data_id).await {
+            Ok(is_token) => is_token,
+            Err(e) => {
+                // TODO: Standardize this error handling
+                panic!("Version: {}, error {:?}", txn_version, e)
             },
         }
-    }
-}
-
-impl CurrentTokenDataV2 {
-    pub async fn get_current_token_data_v2(
-        conn: &mut PgPoolConnection<'_>,
-        txn_version: i64,
-        token_data_id: &str,
-    ) -> anyhow::Result<Self> {
-        let mut retries = 0;
-        while retries < QUERY_RETRIES {
-            retries += 1;
-            match CurrentTokenDataV2Query::get_by_token_data_id(conn, token_data_id).await {
-                Ok(res) => {
-                    return Ok(CurrentTokenDataV2 {
-                        token_data_id: res.token_data_id,
-                        collection_id: res.collection_id,
-                        token_name: res.token_name,
-                        maximum: res.maximum,
-                        supply: res.supply,
-                        largest_property_version_v1: res.largest_property_version_v1,
-                        token_uri: res.token_uri,
-                        token_properties: res.token_properties,
-                        description: res.description,
-                        token_standard: res.token_standard,
-                        is_fungible_v2: res.is_fungible_v2,
-                        last_transaction_version: res.last_transaction_version,
-                        last_transaction_timestamp: res.last_transaction_timestamp,
-                        decimals: res.decimals,
-                    });
-                },
-                Err(_) => {
-                    tracing::error!(
-                        transaction_version = txn_version,
-                        lookup_key = token_data_id,
-                        "Missing current_token_data_v2 for token_data_id: {}. You probably should backfill db.",
-                        token_data_id,
-                    );
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
-                },
-            }
-        }
-        Err(anyhow::anyhow!("Failed to get token data"))
     }
 }
 
 impl CurrentTokenDataV2Query {
-    pub async fn get_by_token_data_id(
+    /// TODO: change this to diesel exists. Also this only checks once so may miss some data if coming from another thread
+    pub async fn get_exists(
         conn: &mut PgPoolConnection<'_>,
         token_data_id: &str,
-    ) -> diesel::QueryResult<Self> {
-        current_token_datas_v2::table
+    ) -> anyhow::Result<bool> {
+        match current_token_datas_v2::table
             .filter(current_token_datas_v2::token_data_id.eq(token_data_id))
             .first::<Self>(conn)
             .await
+            .optional()
+        {
+            Ok(result) => {
+                if result.is_some() {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            },
+            Err(e) => anyhow::bail!("Error checking if token_data_id exists: {:?}", e),
+        }
     }
 }

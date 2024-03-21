@@ -12,6 +12,7 @@ use crate::{
         database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
         util::standardize_address,
     },
+    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -22,18 +23,33 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectsProcessorConfig {
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
+}
 pub struct ObjectsProcessor {
     connection_pool: PgDbPool,
+    config: ObjectsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: PgDbPool,
+        config: ObjectsProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
             connection_pool,
+            config,
             per_table_chunk_sizes,
         }
     }
@@ -146,6 +162,8 @@ impl ProcessorTrait for ObjectsProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         // Moving object handling here because we need a single object
         // map through transactions for lookups
@@ -220,6 +238,8 @@ impl ProcessorTrait for ObjectsProcessor {
                             index,
                             &all_current_objects,
                             &mut conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()

@@ -73,6 +73,8 @@ impl Token {
         transaction: &Transaction,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> (
         Vec<Self>,
         Vec<TokenOwnership>,
@@ -156,6 +158,8 @@ impl Token {
                                 txn_timestamp,
                                 table_handle_to_owner,
                                 conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
                             .await
                             .unwrap(),
