@@ -339,19 +339,20 @@ impl TokenOwnershipV2 {
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
-        if let Some(burn_event) = tokens_burned.get(token_address) {
+        let token_address = standardize_address(token_address);
+        if let Some(burn_event) = tokens_burned.get(&token_address) {
             // 1. Try to lookup token address in burn event mapping
             let previous_owner = if let Some(burn_event) = burn_event {
                 burn_event.get_previous_owner_address()
             } else {
                 // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
                 // Do a lookup to get previous owner. This is necessary because preivous owner is part of current token ownerships primary key.
-                match prior_nft_ownership.get(token_address) {
+                match prior_nft_ownership.get(&token_address) {
                     Some(inner) => inner.owner_address.clone(),
                     None => {
                         match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                             conn,
-                            token_address,
+                            &token_address,
                             query_retries,
                             query_retry_delay_ms,
                         )
@@ -361,7 +362,7 @@ impl TokenOwnershipV2 {
                             Err(_) => {
                                 tracing::error!(
                                     transaction_version = txn_version,
-                                    lookup_key = token_address,
+                                    lookup_key = &token_address,
                                     "Failed to find current_token_ownership_v2 for burned token. You probably should backfill db."
                                 );
                                 DEFAULT_OWNER_ADDRESS.to_string()
@@ -371,7 +372,7 @@ impl TokenOwnershipV2 {
                 }
             };
 
-            let token_data_id = token_address.to_string();
+            let token_data_id = token_address.clone();
             let storage_id = token_data_id.clone();
 
             return Ok(Some((
