@@ -351,7 +351,7 @@ impl TokenOwnershipV2 {
                     None => {
                         match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
                             conn,
-                            &token_address,
+                            token_address,
                             query_retries,
                             query_retry_delay_ms,
                         )
