@@ -928,6 +928,8 @@ async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
                             .await
                             .unwrap()

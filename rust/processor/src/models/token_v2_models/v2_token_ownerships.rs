@@ -234,6 +234,8 @@ impl TokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let token_data_id = standardize_address(&write_resource.address.to_string());
         if tokens_burned
@@ -290,6 +292,8 @@ impl TokenOwnershipV2 {
                     prior_nft_ownership,
                     tokens_burned,
                     conn,
+                    query_retries,
+                    query_retry_delay_ms,
                 )
                 .await;
             }
@@ -318,6 +322,8 @@ impl TokenOwnershipV2 {
             prior_nft_ownership,
             tokens_burned,
             conn,
+            query_retries,
+            query_retry_delay_ms,
         )
         .await
     }
@@ -330,6 +336,8 @@ impl TokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         if let Some(burn_event) = tokens_burned.get(token_address) {
             // 1. Try to lookup token address in burn event mapping
