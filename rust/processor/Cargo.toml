@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
+aptos-in-memory-cache = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
@@ -23,6 +24,7 @@ bcs = { workspace = true }
 bigdecimal = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+dashmap = { workspace = true }
 diesel = { workspace = true }
 diesel-async = { workspace = true }
 diesel_async_migrations = { workspace = true }
@@ -54,6 +56,7 @@ tonic = { workspace = true }
 tracing = { workspace = true }
 unescape = { workspace = true }
 url = { workspace = true }
+warp = { workspace = true }
 
 # Postgres SSL support
 native-tls = { workspace = true }
