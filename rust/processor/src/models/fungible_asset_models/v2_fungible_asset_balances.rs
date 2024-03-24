@@ -125,6 +125,7 @@ impl FungibleAssetBalance {
     }
 
     /// Getting coin balances from resources for v1
+    /// If the fully qualified coin type is too long (currently 1000 length), we exclude from indexing
     pub fn get_v1_from_write_resource(
         write_resource: &WriteResource,
         write_set_change_index: i64,

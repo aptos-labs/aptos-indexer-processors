@@ -146,15 +146,18 @@ impl FungibleAssetActivity {
                 addr: standardize_address(event_key.account_address.as_str()),
                 creation_num: event_key.creation_number as i64,
             };
-            let coin_type =
-                event_to_coin_type
-                    .get(&event_move_guid)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                            txn_version, event_move_guid, event_to_coin_type
-                        )
-                    }).clone();
+            // Given this mapping only contains coin type < 1000 length, we should not assume that the mapping exists.
+            // If it doesn't exist, skip.
+            let coin_type = match event_to_coin_type.get(&event_move_guid) {
+                Some(coin_type) => coin_type.clone(),
+                None => {
+                    tracing::warn!(
+                        "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                        txn_version, event_move_guid, event_to_coin_type
+                    );
+                    return Ok(None);
+                },
+            };
             let storage_id =
                 CoinInfoType::get_storage_id(coin_type.as_str(), event_move_guid.addr.as_str());
             Ok(Some(Self {
