@@ -55,6 +55,7 @@ pub struct Worker {
     pub grpc_http2_config: IndexerGrpcHttp2Config,
     pub auth_token: String,
     pub starting_version: Option<u64>,
+    pub override_starting_version: Option<bool>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub gap_detection_batch_size: u64,
@@ -73,6 +74,7 @@ impl Worker {
         grpc_http2_config: IndexerGrpcHttp2Config,
         auth_token: String,
         starting_version: Option<u64>,
+        override_starting_version: Option<bool>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
@@ -107,6 +109,7 @@ impl Worker {
             indexer_grpc_data_service_address,
             grpc_http2_config,
             starting_version,
+            override_starting_version,
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
@@ -154,7 +157,13 @@ impl Worker {
                 0
             });
 
-        let starting_version = self.starting_version.unwrap_or(starting_version_from_db);
+        let mut starting_version = self.starting_version.unwrap_or(starting_version_from_db);
+
+        if let Some(override_starting_version) = self.override_starting_version {
+            if override_starting_version && self.starting_version.is_some() {
+                starting_version = self.starting_version.unwrap();
+            }
+        }
 
         info!(
             processor_name = processor_name,
@@ -162,6 +171,7 @@ impl Worker {
             stream_address = self.indexer_grpc_data_service_address.to_string(),
             final_start_version = starting_version,
             start_version_from_config = self.starting_version,
+            override_starting_version = self.override_starting_version,
             start_version_from_db = starting_version_from_db,
             "[Parser] Building processor",
         );
