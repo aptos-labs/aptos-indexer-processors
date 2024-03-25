@@ -25,10 +25,9 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
         indexer_grpc_http2_ping_timeout_in_secs: 10
         number_concurrent_processing_tasks: 10
         auth_token: AUTH_TOKEN
-        version: 
-          starting: 0
-          ending: 0 # optional
-          override_starting: false
+        starting_version: 0 # optional
+        override_starting_version: false # optional
+        ending_version: 0 # optional
         transaction_filter:
           # Only allow transactions from these contract addresses
           # focus_contract_addresses:
