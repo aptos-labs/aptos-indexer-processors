@@ -1953,6 +1953,7 @@ dependencies = [
  "hex",
  "itertools 0.12.1",
  "kanal",
+ "lazy_static",
  "native-tls",
  "num_cpus",
  "once_cell",

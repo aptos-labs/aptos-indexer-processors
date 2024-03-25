@@ -59,6 +59,7 @@ url = { workspace = true }
 native-tls = { workspace = true }
 postgres-native-tls = { workspace = true }
 tokio-postgres = { workspace = true }
+lazy_static = "1.4.0"
 
 [features]
 libpq = ["diesel/postgres"]
