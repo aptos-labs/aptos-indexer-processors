@@ -37,6 +37,7 @@ google-cloud-pubsub = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 kanal = { workspace = true }
+lazy_static = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
@@ -59,6 +60,7 @@ url = { workspace = true }
 native-tls = { workspace = true }
 postgres-native-tls = { workspace = true }
 tokio-postgres = { workspace = true }
+
 
 [features]
 libpq = ["diesel/postgres"]
