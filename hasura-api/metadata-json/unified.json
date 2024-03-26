@@ -1,5 +1,5 @@
 {
-  "resource_version": 385,
+  "resource_version": 307,
   "metadata": {
     "version": 3,
     "sources": [
@@ -1400,9 +1400,11 @@
                     }
                   }
                 }
-              },
+              }
+            ],
+            "array_relationships": [
               {
-                "name": "current_token_ownership",
+                "name": "current_token_ownerships",
                 "using": {
                   "manual_configuration": {
                     "column_mapping": {
@@ -1423,6 +1425,7 @@
                 "permission": {
                   "columns": [
                     "collection_id",
+                    "decimals",
                     "description",
                     "is_fungible_v2",
                     "largest_property_version_v1",
@@ -1568,6 +1571,7 @@
                     "is_soulbound_v2",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "non_transferrable_by_owner",
                     "owner_address",
                     "property_version_v1",
                     "storage_id",
@@ -2070,6 +2074,35 @@
                   "limit": 100,
                   "allow_aggregations": true
                 }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "signatures",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "is_sender_primary",
+                    "multi_agent_index",
+                    "multi_sig_index",
+                    "public_key",
+                    "public_key_indices",
+                    "signature",
+                    "signer",
+                    "threshold",
+                    "transaction_block_height",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
               }
             ]
           },
