@@ -42,7 +42,7 @@ CREATE TABLE coin_infos (
   creator_address VARCHAR(66) NOT NULL,
   name VARCHAR(32) NOT NULL,
   symbol VARCHAR(10) NOT NULL,
-  decimals INT NOT NULL,
+  decimals INT4 NOT NULL,
   transaction_created_timestamp TIMESTAMP NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
