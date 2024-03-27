@@ -23,6 +23,7 @@ use diesel::{
 };
 use std::fmt::Debug;
 use tracing::error;
+use google_cloud_storage::{client::Client as Client};
 
 pub struct UserTransactionProcessor {
     connection_pool: PgDbPool,
@@ -141,6 +142,7 @@ impl ProcessorTrait for UserTransactionProcessor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();

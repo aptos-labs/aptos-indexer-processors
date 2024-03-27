@@ -31,6 +31,7 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
+use google_cloud_storage::{client::Client};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -366,6 +367,7 @@ impl ProcessorTrait for AnsProcessor {
         start_version: u64,
         end_version: u64,
         _db_chain_id: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();

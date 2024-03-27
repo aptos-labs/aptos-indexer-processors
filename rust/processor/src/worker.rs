@@ -6,15 +6,7 @@ use crate::{
     grpc_stream::TransactionsPBResponse,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
-        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
-        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
-        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        transaction_metadata_processor::TransactionMetadataProcessor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor, coin_processor::CoinProcessor, default_processor::DefaultProcessor, events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor, monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor, parquet_processor::ParquetProcessor, stake_processor::StakeProcessor, token_processor::TokenProcessor, token_v2_processor::TokenV2Processor, transaction_metadata_processor::TransactionMetadataProcessor, user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor, ProcessorConfig, ProcessorTrait
     },
     schema::ledger_infos,
     transaction_filter::TransactionFilter,
@@ -30,14 +22,16 @@ use crate::{
         },
         database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
-    },
+    }, IndexerGrpcProcessorConfig,
 };
+use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
+use std::sync::Arc;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
@@ -63,6 +57,7 @@ pub struct Worker {
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
     pub transaction_filter: TransactionFilter,
+    pub gcs_client: Arc<GCSClient>,
 }
 
 impl Worker {
@@ -82,6 +77,7 @@ impl Worker {
         per_table_chunk_sizes: AHashMap<String, usize>,
         enable_verbose_logging: Option<bool>,
         transaction_filter: TransactionFilter,
+        gcs_client: Arc<GCSClient>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -116,6 +112,7 @@ impl Worker {
             per_table_chunk_sizes,
             enable_verbose_logging,
             transaction_filter,
+            gcs_client,
         })
     }
 
@@ -302,6 +299,8 @@ impl Worker {
             .grpc_chain_id
             .expect("GRPC chain ID has not been fetched yet!");
 
+        let gcs_client = self.gcs_client.clone();
+
         tokio::spawn(async move {
             let task_index_str = task_index.to_string();
             let step = ProcessorStep::ProcessedBatch.get_step();
@@ -394,6 +393,7 @@ impl Worker {
                     processor_name,
                     &auth_token,
                     false, // enable_verbose_logging
+                    &gcs_client
                 )
                 .await;
 
@@ -628,6 +628,7 @@ pub async fn do_processor(
     processor_name: &str,
     auth_token: &str,
     enable_verbose_logging: bool,
+    gcs_client: &GCSClient,
 ) -> Result<ProcessingResult> {
     // We use the value passed from the `transactions_pb` as it may have been filtered
     let start_version = transactions_pb.start_version;
@@ -672,6 +673,7 @@ pub async fn do_processor(
             start_version,
             end_version,
             Some(db_chain_id),
+            &gcs_client,
         )
         .await;
 
@@ -745,5 +747,12 @@ pub fn build_processor(
         ProcessorConfig::UserTransactionProcessor => Processor::from(
             UserTransactionProcessor::new(db_pool, per_table_chunk_sizes),
         ),
+        ProcessorConfig::ParquetProcessor(config) => {
+            Processor::from(ParquetProcessor::new(
+                db_pool,
+                per_table_chunk_sizes,
+                config.clone(),
+            ))
+        },
     }
 }

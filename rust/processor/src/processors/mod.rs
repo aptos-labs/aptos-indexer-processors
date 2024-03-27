@@ -21,6 +21,7 @@ pub mod token_processor;
 pub mod token_v2_processor;
 pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
+pub mod parquet_processor;
 
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
@@ -37,6 +38,7 @@ use self::{
     token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
     transaction_metadata_processor::TransactionMetadataProcessor,
     user_transaction_processor::UserTransactionProcessor,
+    parquet_processor::{ParquetProcessor, ParquetProcessorConfig},
 };
 use crate::{
     models::processor_status::ProcessorStatus,
@@ -53,6 +55,7 @@ use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use google_cloud_storage::{client::Client};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProcessingResult {
@@ -76,6 +79,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         start_version: u64,
         end_version: u64,
         db_chain_id: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult>;
 
     /// Gets a reference to the connection pool
@@ -193,6 +197,7 @@ pub enum ProcessorConfig {
     TokenV2Processor(TokenV2ProcessorConfig),
     TransactionMetadataProcessor,
     UserTransactionProcessor,
+    ParquetProcessor(ParquetProcessorConfig)
 }
 
 impl ProcessorConfig {
@@ -235,6 +240,7 @@ pub enum Processor {
     TokenV2Processor,
     TransactionMetadataProcessor,
     UserTransactionProcessor,
+    ParquetProcessor
 }
 
 #[cfg(test)]

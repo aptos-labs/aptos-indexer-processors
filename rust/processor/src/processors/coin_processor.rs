@@ -26,6 +26,7 @@ use diesel::{
 };
 use std::fmt::Debug;
 use tracing::error;
+use google_cloud_storage::{client::Client};
 
 pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 
@@ -237,6 +238,7 @@ impl ProcessorTrait for CoinProcessor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();

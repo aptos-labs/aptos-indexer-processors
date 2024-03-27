@@ -9,8 +9,10 @@ use ahash::AHashMap;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use url::Url;
+use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
+use tracing::{error, info, warn};
 
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;
 pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;
@@ -70,6 +72,21 @@ impl IndexerGrpcProcessorConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
     async fn run(&self) -> Result<()> {
+
+        // Establish GCS client
+        let gcs_config = GCSClientConfig::default()
+            .with_auth()
+            .await
+            .unwrap_or_else(|e| {
+                error!(
+                    error = ?e,
+                    "Failed to create gRPC client config"
+                );
+                panic!();
+            });
+            
+        let gcs_client = Arc::new(GCSClient::new(gcs_config));
+
         let mut worker = Worker::new(
             self.processor_config.clone(),
             self.postgres_connection_string.clone(),
@@ -85,6 +102,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.per_table_chunk_sizes.clone(),
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
+            gcs_client,
         )
         .await
         .context("Failed to build worker")?;

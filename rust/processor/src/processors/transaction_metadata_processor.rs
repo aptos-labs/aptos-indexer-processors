@@ -17,6 +17,7 @@ use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
 use std::fmt::Debug;
 use tracing::{error, warn};
+use google_cloud_storage::{client::Client as Client};
 
 pub struct TransactionMetadataProcessor {
     connection_pool: PgDbPool,
@@ -148,6 +149,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut transaction_sizes = vec![];

@@ -35,6 +35,7 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
+use google_cloud_storage::{client::Client as Client};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -393,6 +394,7 @@ impl ProcessorTrait for StakeProcessor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
