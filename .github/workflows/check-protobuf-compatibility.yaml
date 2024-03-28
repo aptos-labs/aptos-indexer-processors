@@ -1,9 +1,8 @@
 name: "Check Protobuf Compatibility"
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       upstream_commit_version:
-        type: string
         description: 'The commit version to check compatibility against'
         required: false
         default: 'main'
