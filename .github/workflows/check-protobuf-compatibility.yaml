@@ -1,0 +1,24 @@
+name: "Check Protobuf Compatibility"
+on:
+  workflow_dispatch:
+  pull_request:
+
+    # cancel redundant builds
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  CheckProtobufCompatibilityAgainstCurrentPR:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/protobuf-compatibility-check/
+        with:
+          # Either current PR or the latest commit on the branch
+          upstream_commit_version: ${{ env.GIT_SHA }}

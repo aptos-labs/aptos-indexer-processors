@@ -1,0 +1,39 @@
+name: "Nightly Check Protobuf Compatibility"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * *"
+
+# cancel redundant builds
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  CheckProtobufCompatibilityAgainstTestnet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get current version
+        id: get_upstream_commit_version
+        run: |
+          echo "::set-output name=upstream_commit_version::$(curl -s https://api.testnet.aptoslabs.com/v1 | jq -r .git_hash)"
+
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/protobuf-compatibility-check/
+        with:
+          upstream_commit_version: ${{ steps.get_upstream_commit_version.outputs.upstream_commit_version }}
+
+  CheckProtobufCompatibilityAgainstMainnet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get current version
+        id: get_upstream_commit_version
+        run: |
+          echo "::set-output name=upstream_commit_version::$(curl -s https://api.mainnet.aptoslabs.com/v1 | jq -r .git_hash)"
+  
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/protobuf-compatibility-check/
+        with:
+          upstream_commit_version: ${{ steps.get_upstream_commit_version.outputs.upstream_commit_version }}
