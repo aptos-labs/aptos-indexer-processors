@@ -1,6 +1,11 @@
 name: "Check Protobuf Compatibility"
 on:
   workflow_dispatch:
+    inputs:
+      upstream_commit_version:
+        description: 'The commit version to check compatibility against'
+        required: false
+        default: 'main'
   pull_request:
 
     # cancel redundant builds
@@ -10,8 +15,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
   cancel-in-progress: true
 
-env:
-  GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   CheckProtobufCompatibilityAgainstCurrentPR:
@@ -21,4 +24,4 @@ jobs:
       - uses: ./.github/actions/protobuf-compatibility-check/
         with:
           # Either current PR or the latest commit on the branch
-          upstream_commit_version: ${{ env.GIT_SHA }}
+          upstream_commit_version: ${{ github.event.inputs.upstream_commit_version || 'main'}}
