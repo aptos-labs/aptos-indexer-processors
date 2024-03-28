@@ -23,6 +23,8 @@ runs:
     # Checkout current repo with current commit
     - name: Checkout current repo
       uses: actions/checkout@v4
+      with:
+        path: "aptos-indexer-processors"
 
     - name: Parse the toml in this repo
       id: get_tag_output
