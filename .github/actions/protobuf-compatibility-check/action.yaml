@@ -33,7 +33,7 @@ runs:
         set -ex
         curl -sSLf "$(curl -sSLf https://api.github.com/repos/tomwright/dasel/releases/latest | grep browser_download_url | grep linux_amd64 | grep -v .gz | cut -d\" -f 4)" -L -o dasel && chmod +x dasel
         mv ./dasel /usr/local/bin/dasel
-        cd aptos-indexer-processors/rust
+        cd aptos-indexer-processors
         tag_output=$(dasel -f rust/Cargo.toml 'workspace.dependencies.aptos-protos.tag')
         echo "::set-output name=tag_output::$tag_output"
 
