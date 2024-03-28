@@ -173,6 +173,9 @@ impl ProcessorTrait for DefaultProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+
+        tracing::debug!("process_transactions - begin: start_version={:?} end_version={:?} transaction_length={:?}", start_version, end_version, transactions.len());
+        
         let mut conn = self.get_conn().await;
         let (txns, block_metadata_txns, _, wsc_details) =
             TransactionModel::from_transactions(&transactions);
@@ -451,7 +454,7 @@ impl ProcessorTrait for DefaultProcessor {
             Ok(_) => (),
             Err(e) => fail(start_version, end_version, "Error on processing tokens v1", e),
         };*/
-        
+        tracing::debug!("process_transactions - end: start_version={:?} end_version={:?} transaction_length={:?}", start_version, end_version, transactions.len());
         Ok(ProcessingResult {
             start_version,
             end_version,
