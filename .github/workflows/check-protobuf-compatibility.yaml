@@ -1,14 +1,15 @@
 name: "Check Protobuf Compatibility"
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       upstream_commit_version:
+        type: string
         description: 'The commit version to check compatibility against'
         required: false
         default: 'main'
   pull_request:
 
-    # cancel redundant builds
+# cancel redundant builds
 concurrency:
   # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
   # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
