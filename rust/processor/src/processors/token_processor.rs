@@ -17,7 +17,7 @@ use crate::{
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-    IndexerGrpcProcessorConfig,
+    IndexerGrpcProcessorConfigV2,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -36,9 +36,9 @@ use tracing::error;
 #[serde(deny_unknown_fields)]
 pub struct TokenProcessorConfig {
     pub nft_points_contract: Option<String>,
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    #[serde(default = "IndexerGrpcProcessorConfigV2::default_query_retries")]
     pub query_retries: u32,
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    #[serde(default = "IndexerGrpcProcessorConfigV2::default_query_retry_delay_ms")]
     pub query_retry_delay_ms: u64,
 }
 

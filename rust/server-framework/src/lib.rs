@@ -24,11 +24,19 @@ impl ServerArgs {
     where
         C: RunnableConfig,
     {
+        self.pre_run();
+        let config = self.load_generic_config::<C>()?;
+        run_server_with_config(config, handle).await
+    }
+
+    pub fn pre_run(&self) {
         // Set up the server.
         setup_logging();
         setup_panic_handler();
-        let config = load::<GenericConfig<C>>(&self.config_path)?;
-        run_server_with_config(config, handle).await
+    }
+
+    pub fn load_generic_config<C: for<'de> Deserialize<'de>>(&self) -> Result<GenericConfig<C>> {
+        load::<GenericConfig<C>>(&self.config_path)
     }
 }
 
