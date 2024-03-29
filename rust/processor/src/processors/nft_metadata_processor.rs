@@ -17,7 +17,7 @@ use crate::{
         database::{ArcDbPool, DbPoolConnection},
         util::{parse_timestamp, remove_null_bytes, standardize_address},
     },
-    IndexerGrpcProcessorConfig,
+    IndexerGrpcProcessorConfigV2,
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
@@ -39,9 +39,9 @@ pub const CHUNK_SIZE: usize = 1000;
 pub struct NftMetadataProcessorConfig {
     pub pubsub_topic_name: String,
     pub google_application_credentials: Option<String>,
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    #[serde(default = "IndexerGrpcProcessorConfigV2::default_query_retries")]
     pub query_retries: u32,
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    #[serde(default = "IndexerGrpcProcessorConfigV2::default_query_retry_delay_ms")]
     pub query_retry_delay_ms: u64,
 }
 

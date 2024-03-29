@@ -12,7 +12,7 @@ use crate::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::standardize_address,
     },
-    IndexerGrpcProcessorConfig,
+    IndexerGrpcProcessorConfigV2,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -30,9 +30,9 @@ use tracing::error;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ObjectsProcessorConfig {
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    #[serde(default = "IndexerGrpcProcessorConfigV2::default_query_retries")]
     pub query_retries: u32,
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    #[serde(default = "IndexerGrpcProcessorConfigV2::default_query_retry_delay_ms")]
     pub query_retry_delay_ms: u64,
 }
 pub struct ObjectsProcessor {

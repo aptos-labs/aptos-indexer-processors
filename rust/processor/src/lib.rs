@@ -11,7 +11,7 @@
 #[macro_use]
 extern crate diesel;
 
-pub use config::IndexerGrpcProcessorConfig;
+pub use config::{from_v1_config, IndexerGrpcProcessorConfig, IndexerGrpcProcessorConfigV2};
 
 mod config;
 mod db;
