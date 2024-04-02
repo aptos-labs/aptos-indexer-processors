@@ -68,6 +68,7 @@ arrow ={ workspace = true }
 num = { workspace = true }
 google-cloud-storage = { workspace = true }
 hyper = { workspace = true }
+lazy_static = { workspace = true }
 
 [features]
 libpq = ["diesel/postgres"]

@@ -114,3 +114,4 @@ parquet = "51.0.0"
 num = "0.4.0"
 google-cloud-storage = "0.13.0"
 hyper = { version = "0.14.18", features = ["full"] }
+lazy_static = "1.4.0"

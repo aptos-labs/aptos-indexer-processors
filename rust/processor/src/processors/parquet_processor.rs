@@ -13,6 +13,7 @@ use crate::{
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+    schemas::default_schemas::transactions::TRANSACTION_SCHEMA,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -24,7 +25,7 @@ use diesel::{
     ExpressionMethods,
 };
 use std::{fmt::Debug, fs::File, sync::Arc};
-use tracing::error;
+use tracing::{error, info};
 
 use arrow::{datatypes::{DataType, Field, Schema}};
 use arrow::array::{Int64Array, StringArray, BooleanArray, Float64Array, ArrayRef, ListArray, StringBuilder};
@@ -33,11 +34,11 @@ use arrow::record_batch::RecordBatch;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use google_cloud_storage::{
     client::Client,
-    http::objects::upload::{Media, UploadObjectRequest, UploadType},
+    http::{buckets::list::ListBucketsRequest, objects::upload::{Media, UploadObjectRequest, UploadType}},
 };
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, anyhow};
-use tokio::io::AsyncReadExt;
+use tokio::{io::AsyncReadExt, join};
 use hyper::Body;
 use std::path::PathBuf;
 use tokio::fs::File as TokioFile;
@@ -48,6 +49,7 @@ use tokio::fs::File as TokioFile;
 #[serde(deny_unknown_fields)]
 pub struct ParquetProcessorConfig {
     pub bucket: String,
+    pub google_application_credentials: Option<String>,
 }
 
 pub struct ParquetProcessor {
@@ -58,6 +60,14 @@ pub struct ParquetProcessor {
 
 impl ParquetProcessor {
     pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>, config: ParquetProcessorConfig) -> Self {
+
+        tracing::info!("init ParquetProcessor");
+
+
+        if let Some(credentials) = config.google_application_credentials.clone() {
+            std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+        }
+
         Self {
             connection_pool,
             per_table_chunk_sizes,
@@ -93,6 +103,8 @@ impl ProcessorTrait for ParquetProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
+        // we can modify this to only process the transactions that we need 
         let (
             txns,
             block_metadata_transactions,
@@ -110,44 +122,45 @@ impl ProcessorTrait for ParquetProcessor {
             self.name(),
             start_version,
             end_version,
-            &txns,
-            &block_metadata_transactions,
-            &write_set_changes,
             (
-                &move_modules,
-                &move_resources,
                 &table_items,
                 &current_table_items,
-                &table_metadata,
             ),
             &self.per_table_chunk_sizes,
         )
         .await;
 
-        // transaction schema for the parquet file 
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("version", DataType::Int64, false),
-            Field::new("block_height", DataType::Int64, false),
-            Field::new("hash", DataType::Utf8, false),
-            Field::new("type_", DataType::Utf8, false),
-            // Representing `serde_json::Value` as a string. Adjust based on your actual serialization needs.
-            // Utf8 (json text), binary (serialized json), or  nested structure (expensive)
-            Field::new("payload", DataType::Utf8, true),
-            Field::new("state_change_hash", DataType::Utf8, false),
-            Field::new("event_root_hash", DataType::Utf8, false),
-            // Option<String> represented as nullable UTF8
-            Field::new("state_checkpoint_hash", DataType::Utf8, true),
-            // BigDecimal as String due to lack of direct support in Arrow. Consider Float64 if applicable.
-            Field::new("gas_used", DataType::Utf8, false),
-            Field::new("success", DataType::Boolean, false),
-            Field::new("vm_status", DataType::Utf8, false),
-            Field::new("accumulator_root_hash", DataType::Utf8, false),
-            Field::new("num_events", DataType::Int64, false),
-            Field::new("num_write_set_changes", DataType::Int64, false),
-            Field::new("epoch", DataType::Int64, false),
-            // Option<String> represented as nullable UTF8
-            Field::new("payload_type", DataType::Utf8, true),
-        ]));
+        info!(
+            start_version = start_version,
+            end_version = end_version,
+            processor_name = self.name(),
+            db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64(),
+            "converting transactions to record batch and writing to parquet file",
+        );
+        // // transaction schema for the parquet file 
+        // let schema = Arc::new(Schema::new(vec![
+        //     Field::new("version", DataType::Int64, false),
+        //     Field::new("block_height", DataType::Int64, false),
+        //     Field::new("hash", DataType::Utf8, false),
+        //     Field::new("type_", DataType::Utf8, false),
+        //     // Representing `serde_json::Value` as a string. Adjust based on your actual serialization needs.
+        //     // Utf8 (json text), binary (serialized json), or  nested structure (expensive)
+        //     Field::new("payload", DataType::Utf8, true),
+        //     Field::new("state_change_hash", DataType::Utf8, false),
+        //     Field::new("event_root_hash", DataType::Utf8, false),
+        //     // Option<String> represented as nullable UTF8
+        //     Field::new("state_checkpoint_hash", DataType::Utf8, true),
+        //     // BigDecimal as String due to lack of direct support in Arrow. Consider Float64 if applicable.
+        //     Field::new("gas_used", DataType::Utf8, false),
+        //     Field::new("success", DataType::Boolean, false),
+        //     Field::new("vm_status", DataType::Utf8, false),
+        //     Field::new("accumulator_root_hash", DataType::Utf8, false),
+        //     Field::new("num_events", DataType::Int64, false),
+        //     Field::new("num_write_set_changes", DataType::Int64, false),
+        //     Field::new("epoch", DataType::Int64, false),
+        //     // Option<String> represented as nullable UTF8
+        //     Field::new("payload_type", DataType::Utf8, true),
+        // ]));
 
         // convert a vec Transaction into a RecordBatch
         let mut version = Int64Array::from(txns.iter().map(|x| x.version).collect::<Vec<i64>>());
@@ -188,14 +201,7 @@ impl ProcessorTrait for ParquetProcessor {
 
         let mut event_root_hash = StringArray::from(txns.iter().map(|x| x.event_root_hash.clone()).collect::<Vec<String>>());
         
-        let gas_used = Int64Array::from(
-            txns.iter()
-                .map(|x|
-                    // Directly attempt to convert BigDecimal to i64
-                    x.gas_used.to_i64().unwrap_or_default()
-                )
-                .collect::<Vec<i64>>()
-        );
+        let gas_used = StringArray::from(txns.iter().map(|x| x.gas_used.to_string()).collect::<Vec<String>>());
         
         let success = BooleanArray::from(txns.iter().map(|x| x.success).collect::<Vec<bool>>());
         let mut vm_status = StringArray::from(txns.iter().map(|x| x.vm_status.clone()).collect::<Vec<String>>());
@@ -203,14 +209,21 @@ impl ProcessorTrait for ParquetProcessor {
         let mut num_events = Int64Array::from(txns.iter().map(|x| x.num_events).collect::<Vec<i64>>());
         let mut num_write_set_changes = Int64Array::from(txns.iter().map(|x| x.num_write_set_changes).collect::<Vec<i64>>());
         let mut epoch = Int64Array::from(txns.iter().map(|x| x.epoch).collect::<Vec<i64>>());
-        let payload_type = StringArray::from(
-            txns.iter()
-                .filter_map(|x| x.payload_type.clone()) 
-                .collect::<Vec<String>>() 
-        );
+
+        let mut payload_type_builder = StringBuilder::new();
+        for payload_type in txns.iter().map(|x| &x.payload_type) {
+            match payload_type {
+                Some(value) => {
+                    let serialized = serde_json::to_string(value).unwrap(); // Handle errors as needed
+                    payload_type_builder.append_value(&serialized)
+                },
+                None => payload_type_builder.append_null(),
+            }
+        }
+        let payload_type = payload_type_builder.finish();
         
-        let record_batch = RecordBatch::try_new(schema, vec![
-            Arc::new(version) as ArrayRef,
+        let record_batch = RecordBatch::try_new(Arc::new((&*TRANSACTION_SCHEMA).clone()), vec![
+            Arc::new(version),
             Arc::new(block_height),
             Arc::new(hash),
             Arc::new(type_),
@@ -228,6 +241,14 @@ impl ProcessorTrait for ParquetProcessor {
             Arc::new(payload_type),
         ]).unwrap();
 
+        info!(record_batch = ?record_batch, "Record batch created");
+        let result = client.list_buckets(&ListBucketsRequest{
+            project: "aptos-yuun-playground".to_string(),
+            ..Default::default()
+        }).await;
+        // log the result
+        info!(result = ?result, "List buckets result");
+        
         // write the record_batch into parquet file
         let file_path = PathBuf::from("some_proper_name_goes_here");
         let file = File::create(&file_path).unwrap(); 
@@ -348,15 +369,9 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    txns: &[TransactionModel],
-    block_metadata_transactions: &[BlockMetadataTransactionModel],
-    wscs: &[WriteSetChangeModel],
-    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        &[MoveModule],
-        &[MoveResource],
+    (table_items, current_table_items): (
         &[TableItem],
         &[CurrentTableItem],
-        &[TableMetadata],
     ),
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
@@ -366,44 +381,6 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-
-    // let txns_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_transactions_query,
-    //     txns,
-    //     get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    // );
-    // let bmt_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_block_metadata_transactions_query,
-    //     block_metadata_transactions,
-    //     get_config_table_chunk_size::<BlockMetadataTransactionModel>(
-    //         "block_metadata_transactions",
-    //         per_table_chunk_sizes,
-    //     ),
-    // );
-    // let wst_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_write_set_changes_query,
-    //     wscs,
-    //     get_config_table_chunk_size::<WriteSetChangeModel>(
-    //         "write_set_changes",
-    //         per_table_chunk_sizes,
-    //     ),
-    // );
-    // let mm_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_move_modules_query,
-    //     move_modules,
-    //     get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
-    // );
-
-    // let mr_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_move_resources_query,
-    //     move_resources,
-    //     get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
-    // );
 
     let ti_res = execute_in_chunks(
         conn.clone(),
@@ -422,21 +399,14 @@ async fn insert_to_db(
         ),
     );
 
-    // let tm_res = execute_in_chunks(
-    //     conn.clone(),
-    //     insert_table_metadata_query,
-    //     table_metadata,
-    //     get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
-    // );
+    let (ti_res, cti_res) =
+        join!(ti_res, cti_res);
 
-    // let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
-    //     join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
-
-    // for res in [
-    //     txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-    // ] {
-    //     res?;
-    // }
+    for res in [
+        ti_res, cti_res,
+    ] {
+        res?;
+    }
 
     Ok(())
 }
