@@ -1,0 +1,59 @@
+name: "Protobuf compatibility check"
+description: |
+  "Runs a compatibility check for protobuf files."
+inputs:
+  upstream_commit_version:
+    description: "Commit version of aptos-core that upstream is using"
+    required: true
+    default: "main"
+
+runs:
+  using: composite
+  steps:
+    - name: Install the buf CLI
+      shell: bash
+      run: |
+        BIN="/usr/local/bin" && \
+        VERSION="1.30.0" && \
+        curl -sSL \
+        "https://github.com/bufbuild/buf/releases/download/v${VERSION}/buf-$(uname -s)-$(uname -m)" \
+        -o "${BIN}/buf" && \
+        chmod +x "${BIN}/buf"
+
+    # Checkout current repo with current commit
+    - name: Checkout current repo
+      uses: actions/checkout@v4
+      with:
+        path: "aptos-indexer-processors"
+
+    - name: Parse the toml in this repo
+      id: get_tag_output
+      shell: bash
+      run: |
+        set -ex
+        curl -sSLf "$(curl -sSLf https://api.github.com/repos/tomwright/dasel/releases/latest | grep browser_download_url | grep linux_amd64 | grep -v .gz | cut -d\" -f 4)" -L -o dasel && chmod +x dasel
+        mv ./dasel /usr/local/bin/dasel
+        cd aptos-indexer-processors
+        tag_output=$(dasel -r toml  -f rust/Cargo.toml workspace.dependencies.aptos-protos.tag -w - )
+        echo "::set-output name=tag_output::$tag_output"
+
+    - name: Checkout aptos-core
+      uses: actions/checkout@v4
+      with:
+        repository: "aptos-labs/aptos-core"
+        path: "aptos-core"
+        ref: ${{ steps.get_tag_output.outputs.tag_output }}
+    
+    - name: Check compatibility
+      shell: bash
+      run: |
+        set -ex
+        cd aptos-core/protos/proto 
+        repo_url="https://github.com/aptos-labs/aptos-core.git#tag=${{  inputs.upstream_commit_version }},subdir=protos/proto"
+        if buf breaking --against "$repo_url" --verbose; then
+          echo "No breaking changes found"
+        else
+          echo "Breaking changes found"
+          echo "Did new oneof/enum fields get added?"
+          exit 1
+        fi
