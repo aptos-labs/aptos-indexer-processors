@@ -1,4 +1,7 @@
-use super::{events_processor::EventsProcessor, user_transaction_processor::UserTransactionProcessor, ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{
+    events_processor::EventsProcessor, user_transaction_processor::UserTransactionProcessor,
+    ProcessingResult, ProcessorName, ProcessorTrait,
+};
 use crate::{
     models::default_models::transactions::TransactionModel,
     schema,
@@ -32,8 +35,14 @@ impl MercatoProcessor {
         Self {
             connection_pool,
             per_table_chunk_sizes,
-            events_processor: EventsProcessor::new(events_processor_connection_pool, events_processor_per_table_chunk_sizes),
-            user_transaction_processor: UserTransactionProcessor::new(user_transaction_processor_connection_pool, user_transaction_processor_per_table_chunk_sizes),
+            events_processor: EventsProcessor::new(
+                events_processor_connection_pool,
+                events_processor_per_table_chunk_sizes,
+            ),
+            user_transaction_processor: UserTransactionProcessor::new(
+                user_transaction_processor_connection_pool,
+                user_transaction_processor_per_table_chunk_sizes,
+            ),
         }
     }
 }
@@ -69,9 +78,10 @@ async fn insert_to_db(
         insert_transactions_query,
         txns,
         get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    ).await;
+    )
+    .await;
 
-     match txns_res {
+    match txns_res {
         Ok(_) => Ok(()),
         Err(e) => {
             error!(
@@ -84,7 +94,6 @@ async fn insert_to_db(
             Ok(())
         },
     }
-
 }
 
 fn insert_transactions_query(
@@ -108,7 +117,6 @@ fn insert_transactions_query(
     )
 }
 
-
 #[async_trait]
 impl ProcessorTrait for MercatoProcessor {
     fn name(&self) -> &'static str {
@@ -130,12 +138,7 @@ impl ProcessorTrait for MercatoProcessor {
         );
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-        let (
-            txns,
-            _,
-            _,
-            _
-        ) = TransactionModel::from_transactions(&transactions);
+        let (txns, _, _, _) = TransactionModel::from_transactions(&transactions);
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -175,15 +178,19 @@ impl ProcessorTrait for MercatoProcessor {
             end_version = end_version,
             "Processing events",
         );
-        self.events_processor.process_transactions(transactions.clone(), start_version, end_version, None).await?;
-        
+        self.events_processor
+            .process_transactions(transactions.clone(), start_version, end_version, None)
+            .await?;
+
         tracing::trace!(
             name = self.name(),
             start_version = start_version,
             end_version = end_version,
             "Processing user transactions",
         );
-        self.user_transaction_processor.process_transactions(transactions, start_version, end_version, None).await?;
+        self.user_transaction_processor
+            .process_transactions(transactions, start_version, end_version, None)
+            .await?;
         tracing::info!(
             name = self.name(),
             start_version = start_version,
@@ -197,4 +204,3 @@ impl ProcessorTrait for MercatoProcessor {
         &self.connection_pool
     }
 }
-
