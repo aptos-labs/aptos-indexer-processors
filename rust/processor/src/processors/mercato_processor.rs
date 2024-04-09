@@ -61,17 +61,29 @@ async fn insert_to_db(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to db",
+        "Inserting to \"transactions\"",
     );
 
-    let _txns_res = execute_in_chunks(
+    let txns_res = execute_in_chunks(
         conn.clone(),
         insert_transactions_query,
         txns,
         get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    );
+    ).await;
 
-    Ok(())
+     match txns_res {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!(
+                start_version = start_version,
+                end_version = end_version,
+                processor_name = name,
+                error = ?e,
+                "[Parser] Error inserting transactions into \"transactions\"",
+            );
+            Ok(())
+        },
+    }
 
 }
 
@@ -151,8 +163,20 @@ impl ProcessorTrait for MercatoProcessor {
                 bail!(e)
             },
         };
-
+        tracing::trace!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Processing events",
+        );
         self.events_processor.process_transactions(transactions.clone(), start_version, end_version, None).await?;
+        
+        tracing::trace!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Processing user transactions",
+        );
         self.user_transaction_processor.process_transactions(transactions, start_version, end_version, None).await?;
         result
     }
