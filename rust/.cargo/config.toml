@@ -12,3 +12,6 @@ xclippy = [
   "-Aclippy::mutable-key-type",
   "-Wclippy::needless-borrow",
 ]
+
+[build]
+rustflags = ["--cfg", "tokio_unstable"]

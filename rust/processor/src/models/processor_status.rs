@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
+
 use crate::{schema::processor_status, utils::database::PgPoolConnection};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::RunQueryDsl;
@@ -12,6 +13,7 @@ use diesel_async::RunQueryDsl;
 pub struct ProcessorStatus {
     pub processor: String,
     pub last_success_version: i64,
+    pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(AsChangeset, Debug, Queryable)]
@@ -21,6 +23,7 @@ pub struct ProcessorStatusQuery {
     pub processor: String,
     pub last_success_version: i64,
     pub last_updated: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,
 }
 
 impl ProcessorStatusQuery {

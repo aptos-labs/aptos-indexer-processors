@@ -690,6 +690,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    event_size_info (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
+        type_tag_bytes -> Int8,
+        total_bytes -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     events (transaction_version, event_index) {
         sequence_number -> Int8,
         creation_number -> Int8,
@@ -779,6 +789,7 @@ diesel::table! {
         #[max_length = 10]
         token_standard -> Varchar,
         inserted_at -> Timestamp,
+        is_token_v2 -> Nullable<Bool>,
     }
 }
 
@@ -870,6 +881,7 @@ diesel::table! {
         processor -> Varchar,
         last_success_version -> Int8,
         last_updated -> Timestamp,
+        last_transaction_timestamp -> Nullable<Timestamp>,
     }
 }
 
@@ -901,8 +913,7 @@ diesel::table! {
         type_ -> Varchar,
         #[max_length = 136]
         public_key -> Varchar,
-        #[max_length = 200]
-        signature -> Varchar,
+        signature -> Text,
         threshold -> Int8,
         public_key_indices -> Jsonb,
         inserted_at -> Timestamp,
@@ -1135,6 +1146,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    transaction_size_info (transaction_version) {
+        transaction_version -> Int8,
+        size_bytes -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -1158,6 +1177,8 @@ diesel::table! {
         num_write_set_changes -> Int8,
         inserted_at -> Timestamp,
         epoch -> Int8,
+        #[max_length = 50]
+        payload_type -> Nullable<Varchar>,
     }
 }
 
@@ -1196,7 +1217,15 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(block_metadata_transactions -> transactions (version));
+diesel::table! {
+    write_set_size_info (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
+        key_bytes -> Int8,
+        value_bytes -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
@@ -1235,6 +1264,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     delegated_staking_pool_balances,
     delegated_staking_pools,
     delegator_balances,
+    event_size_info,
     events,
     fungible_asset_activities,
     fungible_asset_balances,
@@ -1258,7 +1288,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships,
     token_ownerships_v2,
     tokens,
+    transaction_size_info,
     transactions,
     user_transactions,
     write_set_changes,
+    write_set_size_info,
 );

@@ -13,6 +13,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
@@ -34,6 +35,9 @@ gcloud-sdk = { workspace = true }
 google-cloud-googleapis = { workspace = true }
 google-cloud-pubsub = { workspace = true }
 hex = { workspace = true }
+itertools = { workspace = true }
+kanal = { workspace = true }
+num_cpus = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }
@@ -50,3 +54,15 @@ tonic = { workspace = true }
 tracing = { workspace = true }
 unescape = { workspace = true }
 url = { workspace = true }
+
+# Postgres SSL support
+native-tls = { workspace = true }
+postgres-native-tls = { workspace = true }
+tokio-postgres = { workspace = true }
+
+[features]
+libpq = ["diesel/postgres"]
+# When using the default features we enable the diesel/postgres feature. We configure
+# it in a feature so the CLI can opt out, since it cannot tolerate the libpq dep.
+# Recall that features should always be additive.
+default = ["libpq"]

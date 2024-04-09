@@ -3,22 +3,24 @@
 
 //! Database-related functions
 #![allow(clippy::extra_unused_lifetimes)]
+
 use crate::utils::util::remove_null_bytes;
+use ahash::AHashMap;
 use diesel::{
-    pg::Pg,
+    backend::Backend,
     query_builder::{AstPass, Query, QueryFragment},
-    QueryResult,
+    ConnectionResult, QueryResult,
 };
 use diesel_async::{
     pg::AsyncPgConnection,
     pooled_connection::{
         bb8::{Pool, PooledConnection},
-        AsyncDieselConnectionManager, PoolError,
+        AsyncDieselConnectionManager, ManagerConfig, PoolError,
     },
     RunQueryDsl,
 };
-use diesel_async_migrations::{embed_migrations, EmbeddedMigrations};
-use once_cell::sync::Lazy;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use futures_util::{future::BoxFuture, FutureExt};
 use std::{cmp::min, sync::Arc};
 
 pub type MyDbConnection = AsyncPgConnection;
@@ -26,7 +28,9 @@ pub type PgPool = Pool<MyDbConnection>;
 pub type PgDbPool = Arc<PgPool>;
 pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
-pub static MIGRATIONS: Lazy<EmbeddedMigrations> = Lazy::new(|| embed_migrations!());
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
 
 #[derive(QueryId)]
 /// Using this will append a where clause at the end of the string upsert function, e.g.
@@ -38,19 +42,16 @@ pub struct UpsertFilterLatestTransactionQuery<T> {
 }
 
 // the max is actually u16::MAX but we see that when the size is too big we get an overflow error so reducing it a bit
-pub const MAX_DIESEL_PARAM_SIZE: u16 = u16::MAX / 2;
+pub const MAX_DIESEL_PARAM_SIZE: usize = (u16::MAX / 2) as usize;
 
-/// Given diesel has a limit of how many parameters can be inserted in a single operation (u16::MAX)
-/// we may need to chunk an array of items based on how many columns are in the table.
 /// This function returns boundaries of chunks in the form of (start_index, end_index)
-pub fn get_chunks(num_items_to_insert: usize, column_count: usize) -> Vec<(usize, usize)> {
-    let max_item_size = MAX_DIESEL_PARAM_SIZE as usize / column_count;
-    let mut chunk: (usize, usize) = (0, min(num_items_to_insert, max_item_size));
+pub fn get_chunks(num_items_to_insert: usize, chunk_size: usize) -> Vec<(usize, usize)> {
+    let mut chunk: (usize, usize) = (0, min(num_items_to_insert, chunk_size));
     let mut chunks = vec![chunk];
     while chunk.1 != num_items_to_insert {
         chunk = (
-            chunk.0 + max_item_size,
-            min(num_items_to_insert, chunk.1 + max_item_size),
+            chunk.0 + chunk_size,
+            min(num_items_to_insert, chunk.1 + chunk_size),
         );
         chunks.push(chunk);
     }
@@ -70,25 +71,161 @@ pub fn clean_data_for_db<T: serde::Serialize + for<'de> serde::Deserialize<'de>>
     }
 }
 
-pub async fn new_db_pool(database_url: &str) -> Result<PgDbPool, PoolError> {
-    let config = AsyncDieselConnectionManager::<MyDbConnection>::new(database_url);
-    Ok(Arc::new(Pool::builder().max_size(64).build(config).await?))
+fn establish_connection(database_url: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+    use native_tls::{Certificate, TlsConnector};
+    use postgres_native_tls::MakeTlsConnector;
+
+    (async move {
+        let (url, cert_path) = parse_and_clean_db_url(database_url);
+        let cert = std::fs::read(cert_path.unwrap()).expect("Could not read certificate");
+
+        let cert = Certificate::from_pem(&cert).expect("Could not parse certificate");
+        let connector = TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .add_root_certificate(cert)
+            .build()
+            .expect("Could not build TLS connector");
+        let connector = MakeTlsConnector::new(connector);
+
+        let (client, connection) = tokio_postgres::connect(&url, connector)
+            .await
+            .expect("Could not connect to database");
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+        AsyncPgConnection::try_from(client).await
+    })
+    .boxed()
 }
 
-/*
-pub async fn get_connection(pool: &PgPool) -> Result<AsyncConnectionWrapper<AsyncPgConnection>, PoolError> {
-    let connection = pool.get().await.unwrap();
-    Ok(AsyncConnectionWrapper::from(connection))
+fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
+    let mut db_url = url::Url::parse(url).expect("Could not parse database url");
+    let mut cert_path = None;
+
+    let mut query = "".to_string();
+    db_url.query_pairs().for_each(|(k, v)| {
+        if k == "sslrootcert" {
+            cert_path = Some(v.parse().unwrap());
+        } else {
+            query.push_str(&format!("{}={}&", k, v));
+        }
+    });
+    db_url.set_query(Some(&query));
+
+    (db_url.to_string(), cert_path)
 }
-*/
+
+pub async fn new_db_pool(
+    database_url: &str,
+    max_pool_size: Option<u32>,
+) -> Result<PgDbPool, PoolError> {
+    let (_url, cert_path) = parse_and_clean_db_url(database_url);
+
+    let config = if cert_path.is_some() {
+        let mut config = ManagerConfig::<AsyncPgConnection>::default();
+        config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
+        AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config)
+    } else {
+        AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
+    };
+    let pool = Pool::builder()
+        .max_size(max_pool_size.unwrap_or(DEFAULT_MAX_POOL_SIZE))
+        .build(config)
+        .await?;
+    Ok(Arc::new(pool))
+}
+
+pub async fn execute_in_chunks<U, T>(
+    conn: PgDbPool,
+    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    items_to_insert: &[T],
+    chunk_size: usize,
+) -> Result<(), diesel::result::Error>
+where
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + 'static,
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone + Send + 'static,
+{
+    let chunks = get_chunks(items_to_insert.len(), chunk_size);
+
+    let tasks = chunks
+        .into_iter()
+        .map(|(start_ind, end_ind)| {
+            let items = items_to_insert[start_ind..end_ind].to_vec();
+            let conn = conn.clone();
+            tokio::spawn(async move {
+                let (query, additional_where_clause) = build_query(items.clone());
+                execute_or_retry_cleaned(conn, build_query, items, query, additional_where_clause)
+                    .await
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let results = futures_util::future::try_join_all(tasks)
+        .await
+        .expect("Task panicked executing in chunks");
+    for res in results {
+        res?
+    }
+
+    Ok(())
+}
 
 pub async fn execute_with_better_error<U>(
+    pool: PgDbPool,
+    query: U,
+    mut additional_where_clause: Option<&'static str>,
+) -> QueryResult<usize>
+where
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+{
+    let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    // This is needed because if we don't insert any row, then diesel makes a call like this
+    // SELECT 1 FROM TABLE WHERE 1=0
+    if original_query.to_lowercase().contains("where") {
+        additional_where_clause = None;
+    }
+    let final_query = UpsertFilterLatestTransactionQuery {
+        query,
+        where_clause: additional_where_clause,
+    };
+    let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    tracing::debug!("Executing query: {:?}", debug_string);
+    let conn = &mut pool.get().await.map_err(|e| {
+        tracing::warn!("Error getting connection from pool: {:?}", e);
+        diesel::result::Error::DatabaseError(
+            diesel::result::DatabaseErrorKind::UnableToSendCommand,
+            Box::new(e.to_string()),
+        )
+    })?;
+    let res = final_query.execute(conn).await;
+    if let Err(ref e) = res {
+        tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
+    }
+    res
+}
+
+/// Returns the entry for the config hashmap, or the default field count for the insert
+/// Given diesel has a limit of how many parameters can be inserted in a single operation (u16::MAX),
+/// we default to chunk an array of items based on how many columns are in the table.
+pub fn get_config_table_chunk_size<T: field_count::FieldCount>(
+    table_name: &str,
+    per_table_chunk_sizes: &AHashMap<String, usize>,
+) -> usize {
+    per_table_chunk_sizes
+        .get(table_name)
+        .copied()
+        .unwrap_or_else(|| MAX_DIESEL_PARAM_SIZE / T::field_count())
+}
+
+pub async fn execute_with_better_error_conn<U>(
     conn: &mut MyDbConnection,
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
 where
-    U: QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
 {
     let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
@@ -109,10 +246,37 @@ where
     res
 }
 
-pub async fn run_pending_migrations(conn: &mut MyDbConnection) {
-    MIGRATIONS
-        .run_pending_migrations(conn)
-        .await
+async fn execute_or_retry_cleaned<U, T>(
+    conn: PgDbPool,
+    build_query: fn(Vec<T>) -> (U, Option<&'static str>),
+    items: Vec<T>,
+    query: U,
+    additional_where_clause: Option<&'static str>,
+) -> Result<(), diesel::result::Error>
+where
+    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+    T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
+{
+    match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
+        Ok(_) => {},
+        Err(_) => {
+            let cleaned_items = clean_data_for_db(items, true);
+            let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
+            match execute_with_better_error(conn.clone(), cleaned_query, additional_where_clause)
+                .await
+            {
+                Ok(_) => {},
+                Err(e) => {
+                    return Err(e);
+                },
+            }
+        },
+    }
+    Ok(())
+}
+
+pub fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
+    conn.run_pending_migrations(MIGRATIONS)
         .expect("[Parser] Migrations failed!");
 }
 
@@ -123,11 +287,11 @@ impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
 
 //impl<T> RunQueryDsl<MyDbConnection> for UpsertFilterLatestTransactionQuery<T> {}
 
-impl<T> QueryFragment<Pg> for UpsertFilterLatestTransactionQuery<T>
+impl<T> QueryFragment<diesel::pg::Pg> for UpsertFilterLatestTransactionQuery<T>
 where
-    T: QueryFragment<Pg>,
+    T: QueryFragment<diesel::pg::Pg>,
 {
-    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Pg>) -> QueryResult<()> {
+    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, diesel::pg::Pg>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;
         if let Some(w) = self.where_clause {
             out.push_sql(w);
@@ -146,7 +310,7 @@ mod test {
         assert_eq!(get_chunks(65535, 1), vec![
             (0, 32767),
             (32767, 65534),
-            (65534, 65535)
+            (65534, 65535),
         ]);
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
         assert_eq!(get_chunks(10000, 20), vec![
@@ -156,14 +320,14 @@ mod test {
             (4914, 6552),
             (6552, 8190),
             (8190, 9828),
-            (9828, 10000)
+            (9828, 10000),
         ]);
         assert_eq!(get_chunks(65535, 2), vec![
             (0, 16383),
             (16383, 32766),
             (32766, 49149),
             (49149, 65532),
-            (65532, 65535)
+            (65532, 65535),
         ]);
     }
 }

@@ -1,0 +1,46 @@
+name: "Lint"
+on:
+  # Allow us to run this specific workflow without a PR
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# cancel redundant builds
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: python
+      - run: poetry run poe lint
+        working-directory: python
+
+  Rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install deps and run linter
+        run: |
+          cargo install cargo-sort
+          rustup update
+          rustup toolchain install nightly
+          rustup component add clippy --toolchain nightly
+          rustup component add rustfmt --toolchain nightly
+          scripts/rust_lint.sh --check
+        working-directory: rust
+      - run: bash scripts/check_banned_deps.sh
+        working-directory: rust
+      - name: Ensure the --no-default-features build passes too
+        run: cargo build --no-default-features
+        working-directory: rust
+

@@ -1,39 +1,42 @@
-use super::{ProcessingResult, ProcessorName, ProcessorTrait/*, token_v2_processor::parse_v2_token*/};
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{default_models::{
-        block_metadata_transactions::BlockMetadataTransactionModel,
+    models::default_models::{
+        block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
+        move_modules::MoveModule,
+        move_resources::MoveResource,
+        move_tables::{CurrentTableItem, TableItem, TableMetadata},
         transactions::TransactionModel,
-        write_set_changes::{WriteSetChangeDetail},
-    }, events_models::events::EventModel, user_transactions_models::user_transactions::UserTransactionModel},
+        write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
+    },
     schema,
-    utils::database::{
-        clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-        PgPoolConnection,
-    }, processors::{events_processor::insert_events_to_db, /*token_processor::insert_tokens_to_db, token_v2_processor::insert_token_v2_to_db,*/ user_transaction_processor::insert_user_transactions_to_db},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
-use aptos_protos::transaction::v1::{Transaction, transaction::TxnData};
+use ahash::AHashMap;
+use anyhow::bail;
+use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{result::Error};
-use field_count::FieldCount;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
+use std::fmt::Debug;
+use tokio::join;
 use tracing::error;
-
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct DefaultProcessorConfig {
-    pub nft_points_contract: Option<String>,
-}
 
 pub struct DefaultProcessor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             connection_pool,
+            per_table_chunk_sizes,
         }
     }
 }
@@ -49,33 +52,22 @@ impl Debug for DefaultProcessor {
     }
 }
 
-fn fail(start_version: u64, end_version: u64, additional_message: &str, e: Error) {
-    error!(
-        start_version = start_version,
-        end_version = end_version,
-        processor_name = "default_processor",
-        error = ?e,
-        additional_message,
-    );
-}
-
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
-    txns: &[TransactionModel],
-    block_metadata_transactions: &[BlockMetadataTransactionModel],
-) -> Result<(), diesel::result::Error> {
-    insert_transactions(conn, txns).await?;
-    insert_block_metadata_transactions(conn, block_metadata_transactions).await?;
-    Ok(())
-}
-
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    txns: Vec<TransactionModel>,
-    block_metadata_transactions: Vec<BlockMetadataTransactionModel>,
+    txns: &[TransactionModel],
+    block_metadata_transactions: &[BlockMetadataTransactionModel],
+    wscs: &[WriteSetChangeModel],
+    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
+        &[MoveModule],
+        &[MoveResource],
+        &[TableItem],
+        &[CurrentTableItem],
+        &[TableMetadata],
+    ),
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -83,81 +75,227 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                &txns,
-                &block_metadata_transactions,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async move {
-                        let txns = clean_data_for_db(txns, true);
-                        let block_metadata_transactions =
-                            clean_data_for_db(block_metadata_transactions, true);
-                        insert_to_db_impl(
-                            pg_conn,
-                            &txns,
-                            &block_metadata_transactions,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
-    }
-}
 
-async fn insert_transactions(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[TransactionModel],
-) -> Result<(), diesel::result::Error> {
-    use schema::transactions::dsl::*;
-    let chunks = get_chunks(items_to_insert.len(), TransactionModel::field_count());
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::transactions::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(version)
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_block_metadata_transactions(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[BlockMetadataTransactionModel],
-) -> Result<(), diesel::result::Error> {
-    use schema::block_metadata_transactions::dsl::*;
-    let chunks = get_chunks(
-        items_to_insert.len(),
-        BlockMetadataTransactionModel::field_count(),
+    let txns_res = execute_in_chunks(
+        conn.clone(),
+        insert_transactions_query,
+        txns,
+        get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
     );
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::block_metadata_transactions::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(version)
-                .do_nothing(),
-            None,
-        )
-        .await?;
+    let bmt_res = execute_in_chunks(
+        conn.clone(),
+        insert_block_metadata_transactions_query,
+        block_metadata_transactions,
+        get_config_table_chunk_size::<BlockMetadataTransactionModel>(
+            "block_metadata_transactions",
+            per_table_chunk_sizes,
+        ),
+    );
+    let wst_res = execute_in_chunks(
+        conn.clone(),
+        insert_write_set_changes_query,
+        wscs,
+        get_config_table_chunk_size::<WriteSetChangeModel>(
+            "write_set_changes",
+            per_table_chunk_sizes,
+        ),
+    );
+    let mm_res = execute_in_chunks(
+        conn.clone(),
+        insert_move_modules_query,
+        move_modules,
+        get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
+    );
+
+    let mr_res = execute_in_chunks(
+        conn.clone(),
+        insert_move_resources_query,
+        move_resources,
+        get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
+    );
+
+    let ti_res = execute_in_chunks(
+        conn.clone(),
+        insert_table_items_query,
+        table_items,
+        get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
+    );
+
+    let cti_res = execute_in_chunks(
+        conn.clone(),
+        insert_current_table_items_query,
+        current_table_items,
+        get_config_table_chunk_size::<CurrentTableItem>(
+            "current_table_items",
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let tm_res = execute_in_chunks(
+        conn.clone(),
+        insert_table_metadata_query,
+        table_metadata,
+        get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
+    );
+
+    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
+        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
+
+    for res in [
+        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
+    ] {
+        res?;
     }
+
     Ok(())
+}
+
+fn insert_transactions_query(
+    items_to_insert: Vec<TransactionModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::transactions::dsl::*;
+
+    (
+        diesel::insert_into(schema::transactions::table)
+            .values(items_to_insert)
+            .on_conflict(version)
+            .do_update()
+            .set((
+                inserted_at.eq(excluded(inserted_at)),
+                payload_type.eq(excluded(payload_type)),
+            )),
+        None,
+    )
+}
+
+fn insert_block_metadata_transactions_query(
+    items_to_insert: Vec<BlockMetadataTransactionModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::block_metadata_transactions::dsl::*;
+
+    (
+        diesel::insert_into(schema::block_metadata_transactions::table)
+            .values(items_to_insert)
+            .on_conflict(version)
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_write_set_changes_query(
+    items_to_insert: Vec<WriteSetChangeModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::write_set_changes::dsl::*;
+
+    (
+        diesel::insert_into(schema::write_set_changes::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_move_modules_query(
+    items_to_insert: Vec<MoveModule>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::move_modules::dsl::*;
+
+    (
+        diesel::insert_into(schema::move_modules::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_move_resources_query(
+    items_to_insert: Vec<MoveResource>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::move_resources::dsl::*;
+
+    (
+        diesel::insert_into(schema::move_resources::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_table_items_query(
+    items_to_insert: Vec<TableItem>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::table_items::dsl::*;
+
+    (
+        diesel::insert_into(schema::table_items::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_current_table_items_query(
+    items_to_insert: Vec<CurrentTableItem>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_table_items::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_table_items::table)
+            .values(items_to_insert)
+            .on_conflict((table_handle, key_hash))
+            .do_update()
+            .set((
+                key.eq(excluded(key)),
+                decoded_key.eq(excluded(decoded_key)),
+                decoded_value.eq(excluded(decoded_value)),
+                is_deleted.eq(excluded(is_deleted)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_table_metadata_query(
+    items_to_insert: Vec<TableMetadata>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::table_metadatas::dsl::*;
+
+    (
+        diesel::insert_into(schema::table_metadatas::table)
+            .values(items_to_insert)
+            .on_conflict(handle)
+            .do_nothing(),
+        None,
+    )
 }
 
 #[async_trait]
@@ -173,296 +311,131 @@ impl ProcessorTrait for DefaultProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-
-        tracing::debug!("process_transactions - begin: start_version={:?} end_version={:?} transaction_length={:?}", start_version, end_version, transactions.len());
-        
-        let mut conn = self.get_conn().await;
-        let (txns, block_metadata_txns, _, wsc_details) =
-            TransactionModel::from_transactions(&transactions);
-
-        let mut block_metadata_transactions = vec![];
-        for block_metadata_txn in block_metadata_txns {
-            block_metadata_transactions.push(block_metadata_txn.clone());
-        }
-        let mut move_modules = vec![];
-        let mut move_resources = vec![];
-        let mut table_items = vec![];
-        let mut current_table_items = HashMap::new();
-        let mut table_metadata = HashMap::new();
-        for detail in wsc_details {
-            match detail {
-                WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
-                WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
-                WriteSetChangeDetail::Table(item, current_item, metadata) => {
-                    table_items.push(item.clone());
-                    current_table_items.insert(
-                        (
-                            current_item.table_handle.clone(),
-                            current_item.key_hash.clone(),
-                        ),
-                        current_item.clone(),
-                    );
-                    if let Some(meta) = metadata {
-                        table_metadata.insert(meta.handle.clone(), meta.clone());
-                    }
-                },
-            }
-        }
-
-        //let mut all_objects = vec![];
-        //let mut all_current_objects = HashMap::new();
-        let mut events = vec![];
-        /*let mut all_tokens = vec![];
-        let mut all_token_ownerships = vec![];
-        let mut all_token_datas = vec![];
-        let mut all_collection_datas = vec![];
-        let mut all_token_activities = vec![];
-
-        let mut all_current_token_ownerships: HashMap<
-            CurrentTokenOwnershipPK,
-            CurrentTokenOwnership,
-        > = HashMap::new();
-        let mut all_current_token_datas: HashMap<TokenDataIdHash, CurrentTokenData> =
-            HashMap::new();
-        let mut all_current_collection_datas: HashMap<TokenDataIdHash, CurrentCollectionData> =
-            HashMap::new();
-        let mut all_current_token_claims: HashMap<
-            CurrentTokenPendingClaimPK,
-            CurrentTokenPendingClaim,
-        > = HashMap::new();
-        let mut all_nft_points = vec![]; */
-
-        let mut signatures = vec![];
-        let mut user_transactions = vec![];
-
-        //let table_handle_to_owner = TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
-        
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let block_height = txn.block_height as i64;
-           /* let changes = &txn
-                .info
-                .as_ref()
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Transaction info doesn't exist! Transaction {}",
-                        txn_version
-                    )
-                })
-                .changes;
-            for (index, wsc) in changes.iter().enumerate() {
-                let index: i64 = index as i64;
-                match wsc.change.as_ref().unwrap() {
-                    Change::WriteResource(inner) => {
-                        if let Some((object, current_object)) =
-                            &Object::from_write_resource(inner, txn_version, index).unwrap()
-                        {
-                            all_objects.push(object.clone());
-                            all_current_objects
-                                .insert(object.object_address.clone(), current_object.clone());
-                        }
-                    },
-                    Change::DeleteResource(inner) => {
-                        // Passing all_current_objects into the function so that we can get the owner of the deleted
-                        // resource if it was handled in the same batch
-                        if let Some((object, current_object)) = Object::from_delete_resource(
-                            inner,
-                            txn_version,
-                            index,
-                            &all_current_objects,
-                            &mut conn,
-                        )
-                        .await
-                        .unwrap()
-                        {
-                            all_objects.push(object.clone());
-                            all_current_objects
-                                .insert(object.object_address.clone(), current_object.clone());
-                        }
-                    },
-                    _ => {},
-                };
-            }*/
-            let txn_data = txn.txn_data.as_ref().expect("Txn Data doesn't exit!");
-            let default = vec![];
-            let raw_events = match txn_data {
-                TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-                TxnData::Genesis(tx_inner) => &tx_inner.events,
-                TxnData::User(tx_inner) => &tx_inner.events,
-                _ => &default,
-            };
-
-            let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-            events.extend(txn_events);
-
-            /*let (
-                mut tokens,
-                mut token_ownerships,
-                mut token_datas,
-                mut collection_datas,
-                current_token_ownerships,
-                current_token_datas,
-                current_collection_datas,
-                current_token_claims,
-            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn).await;
-            all_tokens.append(&mut tokens);
-            all_token_ownerships.append(&mut token_ownerships);
-            all_token_datas.append(&mut token_datas);
-            all_collection_datas.append(&mut collection_datas);
-            // Given versions will always be increasing here (within a single batch), we can just override current values
-            all_current_token_ownerships.extend(current_token_ownerships);
-            all_current_token_datas.extend(current_token_datas);
-            all_current_collection_datas.extend(current_collection_datas);*/
-
-            // Track token activities
-            //let mut activities = TokenActivity::from_transaction(txn);
-            //all_token_activities.append(&mut activities);
-
-            // claims
-            //all_current_token_claims.extend(current_token_claims);
-
-            // NFT points
-            /*let nft_points_txn =
-                NftPoints::from_transaction(txn, self.config.nft_points_contract.clone());
-            if let Some(nft_points) = nft_points_txn {
-                all_nft_points.push(nft_points);
-            }*/
-
-            if let TxnData::User(inner) = txn_data {
-                let (user_transaction, sigs) = UserTransactionModel::from_transaction(
-                    inner,
-                    &txn.timestamp.as_ref().unwrap(),
-                    block_height,
-                    txn.epoch as i64,
-                    txn_version,
-                );
-                signatures.extend(sigs);
-                user_transactions.push(user_transaction);
-            }
-        }
-        // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
-        /*let mut current_table_items = current_table_items
-            .into_values()
-            .collect::<Vec<CurrentTableItem>>();
-        let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
-        // Sort by PK
-        let mut all_current_objects = all_current_objects
-            .into_values()
-            .collect::<Vec<CurrentObject>>();
-        current_table_items
-            .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
-        table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
-        all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
-        */
-
-        /*let all_current_token_ownerships = all_current_token_ownerships
-            .into_values()
-            .collect::<Vec<CurrentTokenOwnership>>();
-        let all_current_token_datas = all_current_token_datas
-            .into_values()
-            .collect::<Vec<CurrentTokenData>>();
-        let all_current_collection_datas = all_current_collection_datas
-            .into_values()
-            .collect::<Vec<CurrentCollectionData>>();
-        let all_current_token_claims = all_current_token_claims
-            .into_values()
-            .collect::<Vec<CurrentTokenPendingClaim>>();
-        
+        let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         let (
-            collections_v2,
-            token_datas_v2,
-            token_ownerships_v2,
-            current_collections_v2,
-            current_token_ownerships_v2,
-            current_token_datas_v2,
-            token_activities_v2,
-            current_token_v2_metadata,
-        ) = parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await; */
-
-        // Transaction metadata 
-        match insert_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
             txns,
             block_metadata_transactions,
-        ).await {
-            Ok(_) => (),
-            Err(e) => fail(start_version, end_version, "Error on processing transaction metadata", e),
-        };
+            write_set_changes,
+            (move_modules, move_resources, table_items, current_table_items, table_metadata),
+        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+            .await
+            .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
-        // Events 
-        match insert_events_to_db(&mut conn, self.name(), start_version, end_version, events).await {
-            Ok(_) => (),
-            Err(e) => fail(start_version, end_version, "Error on processing events", e),
-        };
+        let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
+        let db_insertion_start = std::time::Instant::now();
 
-        // User transactions
-        match insert_user_transactions_to_db(
-            &mut conn,
+        let tx_result = insert_to_db(
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            user_transactions,
-            signatures,
-        ).await {
-            Ok(_) => (),
-            Err(e) => fail(start_version, end_version, "Error on processing user transactions", e),
-        };
-
-        // Tokens v2
-        /*match insert_token_v2_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
-            collections_v2,
-            token_datas_v2,
-            token_ownerships_v2,
-            current_collections_v2,
-            current_token_ownerships_v2,
-            current_token_datas_v2,
-            token_activities_v2,
-            current_token_v2_metadata,
-        ).await {
-            Ok(_) => (),
-            Err(e) => fail(start_version, end_version, "Error on processing tokens v2", e),
-        };
-        
-        // Tokens
-        match insert_tokens_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
+            &txns,
+            &block_metadata_transactions,
+            &write_set_changes,
             (
-                all_tokens,
-                all_token_ownerships,
-                all_token_datas,
-                all_collection_datas,
+                &move_modules,
+                &move_resources,
+                &table_items,
+                &current_table_items,
+                &table_metadata,
             ),
-            (
-                all_current_token_ownerships,
-                all_current_token_datas,
-                all_current_collection_datas,
-            ),
-            all_token_activities,
-            all_current_token_claims,
-            all_nft_points,
-        ).await {
-            Ok(_) => (),
-            Err(e) => fail(start_version, end_version, "Error on processing tokens v1", e),
-        };*/
-        tracing::debug!("process_transactions - end: start_version={:?} end_version={:?} transaction_length={:?}", start_version, end_version, transactions.len());
-        Ok(ProcessingResult {
-            start_version,
-            end_version,
-        })
+            &self.per_table_chunk_sizes,
+        )
+        .await;
+
+        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+        match tx_result {
+            Ok(_) => Ok(ProcessingResult {
+                start_version,
+                end_version,
+                processing_duration_in_secs,
+                db_insertion_duration_in_secs,
+                last_transaction_timestamp,
+            }),
+            Err(e) => {
+                error!(
+                    start_version = start_version,
+                    end_version = end_version,
+                    processor_name = self.name(),
+                    error = ?e,
+                    "[Parser] Error inserting transactions to db",
+                );
+                bail!(e)
+            },
+        }
     }
-
 
     fn connection_pool(&self) -> &PgDbPool {
         &self.connection_pool
     }
+}
+
+fn process_transactions(
+    transactions: Vec<Transaction>,
+) -> (
+    Vec<crate::models::default_models::transactions::Transaction>,
+    Vec<BlockMetadataTransaction>,
+    Vec<WriteSetChangeModel>,
+    (
+        Vec<MoveModule>,
+        Vec<MoveResource>,
+        Vec<TableItem>,
+        Vec<CurrentTableItem>,
+        Vec<TableMetadata>,
+    ),
+) {
+    let (txns, block_metadata_txns, write_set_changes, wsc_details) =
+        TransactionModel::from_transactions(&transactions);
+    let mut block_metadata_transactions = vec![];
+    for block_metadata_txn in block_metadata_txns {
+        block_metadata_transactions.push(block_metadata_txn.clone());
+    }
+    let mut move_modules = vec![];
+    let mut move_resources = vec![];
+    let mut table_items = vec![];
+    let mut current_table_items = AHashMap::new();
+    let mut table_metadata = AHashMap::new();
+    for detail in wsc_details {
+        match detail {
+            WriteSetChangeDetail::Module(module) => move_modules.push(module.clone()),
+            WriteSetChangeDetail::Resource(resource) => move_resources.push(resource.clone()),
+            WriteSetChangeDetail::Table(item, current_item, metadata) => {
+                table_items.push(item.clone());
+                current_table_items.insert(
+                    (
+                        current_item.table_handle.clone(),
+                        current_item.key_hash.clone(),
+                    ),
+                    current_item.clone(),
+                );
+                if let Some(meta) = metadata {
+                    table_metadata.insert(meta.handle.clone(), meta.clone());
+                }
+            },
+        }
+    }
+
+    // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
+    let mut current_table_items = current_table_items
+        .into_values()
+        .collect::<Vec<CurrentTableItem>>();
+    let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+    // Sort by PK
+    current_table_items
+        .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
+    table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
+    (
+        txns,
+        block_metadata_transactions,
+        write_set_changes,
+        (
+            move_modules,
+            move_resources,
+            table_items,
+            current_table_items,
+            table_metadata,
+        ),
+    )
 }

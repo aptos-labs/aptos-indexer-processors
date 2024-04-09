@@ -12,22 +12,24 @@ use crate::{
     },
     schema,
     utils::{
-        database::{
-            clean_data_for_db, execute_with_better_error, get_chunks, MyDbConnection, PgDbPool,
-            PgPoolConnection,
-        },
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
         util::standardize_address,
     },
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChange, Transaction,
 };
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods};
-use field_count::FieldCount;
+use diesel::{
+    pg::{upsert::excluded, Pg},
+    query_builder::QueryFragment,
+    ExpressionMethods,
+};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -41,10 +43,15 @@ pub struct AnsProcessorConfig {
 pub struct AnsProcessor {
     connection_pool: PgDbPool,
     config: AnsProcessorConfig,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AnsProcessor {
-    pub fn new(connection_pool: PgDbPool, config: AnsProcessorConfig) -> Self {
+    pub fn new(
+        connection_pool: PgDbPool,
+        config: AnsProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         tracing::info!(
             ans_v1_primary_names_table_handle = config.ans_v1_primary_names_table_handle,
             ans_v1_name_records_table_handle = config.ans_v1_name_records_table_handle,
@@ -54,6 +61,7 @@ impl AnsProcessor {
         Self {
             connection_pool,
             config,
+            per_table_chunk_sizes,
         }
     }
 }
@@ -70,82 +78,10 @@ impl Debug for AnsProcessor {
 }
 
 async fn insert_to_db(
-    conn: &mut PgPoolConnection<'_>,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_ans_lookups: Vec<CurrentAnsLookup>,
-    ans_lookups: Vec<AnsLookup>,
-    current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
-    ans_primary_names: Vec<AnsPrimaryName>,
-    current_ans_lookups_v2: Vec<CurrentAnsLookupV2>,
-    ans_lookups_v2: Vec<AnsLookupV2>,
-    current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2>,
-    ans_primary_names_v2: Vec<AnsPrimaryNameV2>,
-) -> Result<(), diesel::result::Error> {
-    tracing::trace!(
-        name = name,
-        start_version = start_version,
-        end_version = end_version,
-        "Inserting to db",
-    );
-    match conn
-        .build_transaction()
-        .read_write()
-        .run::<_, Error, _>(|pg_conn| {
-            Box::pin(insert_to_db_impl(
-                pg_conn,
-                &current_ans_lookups,
-                &ans_lookups,
-                &current_ans_primary_names,
-                &ans_primary_names,
-                &current_ans_lookups_v2,
-                &ans_lookups_v2,
-                &current_ans_primary_names_v2,
-                &ans_primary_names_v2,
-            ))
-        })
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            conn.build_transaction()
-                .read_write()
-                .run::<_, Error, _>(|pg_conn| {
-                    Box::pin(async {
-                        let current_ans_lookups = clean_data_for_db(current_ans_lookups, true);
-                        let ans_lookups = clean_data_for_db(ans_lookups, true);
-                        let current_ans_primary_names =
-                            clean_data_for_db(current_ans_primary_names, true);
-                        let ans_primary_names = clean_data_for_db(ans_primary_names, true);
-                        let current_ans_lookups_v2 =
-                            clean_data_for_db(current_ans_lookups_v2, true);
-                        let ans_lookups_v2 = clean_data_for_db(ans_lookups_v2, true);
-                        let current_ans_primary_names_v2 =
-                            clean_data_for_db(current_ans_primary_names_v2, true);
-                        let ans_primary_names_v2 = clean_data_for_db(ans_primary_names_v2, true);
-
-                        insert_to_db_impl(
-                            pg_conn,
-                            &current_ans_lookups,
-                            &ans_lookups,
-                            &current_ans_primary_names,
-                            &ans_primary_names,
-                            &current_ans_lookups_v2,
-                            &ans_lookups_v2,
-                            &current_ans_primary_names_v2,
-                            &ans_primary_names_v2,
-                        )
-                        .await
-                    })
-                })
-                .await
-        },
-    }
-}
-
-async fn insert_to_db_impl(
-    conn: &mut MyDbConnection,
     current_ans_lookups: &[CurrentAnsLookup],
     ans_lookups: &[AnsLookup],
     current_ans_primary_names: &[CurrentAnsPrimaryName],
@@ -154,238 +90,263 @@ async fn insert_to_db_impl(
     ans_lookups_v2: &[AnsLookupV2],
     current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
     ans_primary_names_v2: &[AnsPrimaryNameV2],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
-    /*
-    // Execute the futures concurrently. The engine will pipeline the queries.
-    futures::try_join!(
-        insert_current_ans_lookups(conn, current_ans_lookups),
-        insert_ans_lookups(conn, ans_lookups),
-        insert_current_ans_primary_names(conn, current_ans_primary_names),
-        insert_ans_primary_names(conn, ans_primary_names),
-        insert_current_ans_lookups_v2(conn, current_ans_lookups_v2),
-        insert_ans_lookups_v2(conn, ans_lookups_v2),
-        insert_current_ans_primary_names_v2(conn, current_ans_primary_names_v2),
-        insert_ans_primary_names_v2(conn, ans_primary_names_v2),
-    )?;
-    */
-
-    insert_current_ans_lookups(conn, current_ans_lookups).await?;
-    insert_ans_lookups(conn, ans_lookups).await?;
-    insert_current_ans_primary_names(conn, current_ans_primary_names).await?;
-    insert_ans_primary_names(conn, ans_primary_names).await?;
-    insert_current_ans_lookups_v2(conn, current_ans_lookups_v2).await?;
-    insert_ans_lookups_v2(conn, ans_lookups_v2).await?;
-    insert_current_ans_primary_names_v2(conn, current_ans_primary_names_v2).await?;
-    insert_ans_primary_names_v2(conn, ans_primary_names_v2).await?;
-
-    Ok(())
-}
-
-async fn insert_current_ans_lookups(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentAnsLookup],
-) -> Result<(), diesel::result::Error> {
-    use schema::current_ans_lookup::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), CurrentAnsLookup::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-                conn,
-                diesel::insert_into(schema::current_ans_lookup::table)
-                    .values(&items_to_insert[start_ind..end_ind])
-                    .on_conflict((domain, subdomain))
-                    .do_update()
-                    .set((
-                        registered_address.eq(excluded(registered_address)),
-                        expiration_timestamp.eq(excluded(expiration_timestamp)),
-                        last_transaction_version.eq(excluded(last_transaction_version)),
-                        token_name.eq(excluded(token_name)),
-                        is_deleted.eq(excluded(is_deleted)),
-                        inserted_at.eq(excluded(inserted_at)),
-                    )),
-                    Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
-                ).await?;
-    }
-    Ok(())
-}
-
-async fn insert_ans_lookups(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[AnsLookup],
-) -> Result<(), diesel::result::Error> {
-    use schema::ans_lookup::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), AnsLookup::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::ans_lookup::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_current_ans_primary_names(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentAnsPrimaryName],
-) -> Result<(), diesel::result::Error> {
-    use schema::current_ans_primary_name::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), CurrentAnsPrimaryName::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_ans_primary_name::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict(registered_address)
-                .do_update()
-                .set((
-                    domain.eq(excluded(domain)),
-                    subdomain.eq(excluded(subdomain)),
-                    token_name.eq(excluded(token_name)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
-    }
-    Ok(())
-}
-
-async fn insert_ans_primary_names(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[AnsPrimaryName],
-) -> Result<(), diesel::result::Error> {
-    use schema::ans_primary_name::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), AnsPrimaryName::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::ans_primary_name::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_current_ans_lookups_v2(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentAnsLookupV2],
-) -> Result<(), diesel::result::Error> {
-    use schema::current_ans_lookup_v2::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), CurrentAnsLookupV2::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-                conn,
-                diesel::insert_into(schema::current_ans_lookup_v2::table)
-                    .values(&items_to_insert[start_ind..end_ind])
-                    .on_conflict((domain, subdomain, token_standard))
-                    .do_update()
-                    .set((
-                        registered_address.eq(excluded(registered_address)),
-                        expiration_timestamp.eq(excluded(expiration_timestamp)),
-                        last_transaction_version.eq(excluded(last_transaction_version)),
-                        token_name.eq(excluded(token_name)),
-                        is_deleted.eq(excluded(is_deleted)),
-                        inserted_at.eq(excluded(inserted_at)),
-                    )),
-                    Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
-                ).await?;
-    }
-    Ok(())
-}
-
-async fn insert_ans_lookups_v2(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[AnsLookupV2],
-) -> Result<(), diesel::result::Error> {
-    use schema::ans_lookup_v2::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), AnsLookupV2::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::ans_lookup_v2::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn insert_current_ans_primary_names_v2(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[CurrentAnsPrimaryNameV2],
-) -> Result<(), diesel::result::Error> {
-    use schema::current_ans_primary_name_v2::dsl::*;
-
-    let chunks = get_chunks(
-        items_to_insert.len(),
-        CurrentAnsPrimaryNameV2::field_count(),
+    tracing::trace!(
+        name = name,
+        start_version = start_version,
+        end_version = end_version,
+        "Inserting to db",
+    );
+    let cal = execute_in_chunks(
+        conn.clone(),
+        insert_current_ans_lookups_query,
+        current_ans_lookups,
+        get_config_table_chunk_size::<CurrentAnsLookup>(
+            "current_ans_lookup",
+            per_table_chunk_sizes,
+        ),
+    );
+    let al = execute_in_chunks(
+        conn.clone(),
+        insert_ans_lookups_query,
+        ans_lookups,
+        get_config_table_chunk_size::<AnsLookup>("ans_lookup", per_table_chunk_sizes),
+    );
+    let capn = execute_in_chunks(
+        conn.clone(),
+        insert_current_ans_primary_names_query,
+        current_ans_primary_names,
+        get_config_table_chunk_size::<CurrentAnsPrimaryName>(
+            "current_ans_primary_name",
+            per_table_chunk_sizes,
+        ),
+    );
+    let apn = execute_in_chunks(
+        conn.clone(),
+        insert_ans_primary_names_query,
+        ans_primary_names,
+        get_config_table_chunk_size::<AnsPrimaryName>("ans_primary_name", per_table_chunk_sizes),
+    );
+    let cal_v2 = execute_in_chunks(
+        conn.clone(),
+        insert_current_ans_lookups_v2_query,
+        current_ans_lookups_v2,
+        get_config_table_chunk_size::<CurrentAnsLookupV2>(
+            "current_ans_lookup_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let al_v2 = execute_in_chunks(
+        conn.clone(),
+        insert_ans_lookups_v2_query,
+        ans_lookups_v2,
+        get_config_table_chunk_size::<AnsLookupV2>("ans_lookup_v2", per_table_chunk_sizes),
+    );
+    let capn_v2 = execute_in_chunks(
+        conn.clone(),
+        insert_current_ans_primary_names_v2_query,
+        current_ans_primary_names_v2,
+        get_config_table_chunk_size::<CurrentAnsPrimaryNameV2>(
+            "current_ans_primary_name_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let apn_v2 = execute_in_chunks(
+        conn,
+        insert_ans_primary_names_v2_query,
+        ans_primary_names_v2,
+        get_config_table_chunk_size::<AnsPrimaryNameV2>(
+            "ans_primary_name_v2",
+            per_table_chunk_sizes,
+        ),
     );
 
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::current_ans_primary_name_v2::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((registered_address, token_standard))
-                .do_update()
-                .set((
-                    domain.eq(excluded(domain)),
-                    subdomain.eq(excluded(subdomain)),
-                    token_name.eq(excluded(token_name)),
-                    is_deleted.eq(excluded(is_deleted)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
-            Some(" WHERE current_ans_primary_name_v2.last_transaction_version <= excluded.last_transaction_version "),
-        ).await?;
+    let (cal_res, al_res, capn_res, apn_res, cal_v2_res, al_v2_res, capn_v2_res, apn_v2_res) =
+        tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
+
+    for res in vec![
+        cal_res,
+        al_res,
+        capn_res,
+        apn_res,
+        cal_v2_res,
+        al_v2_res,
+        capn_v2_res,
+        apn_v2_res,
+    ] {
+        res?;
     }
+
     Ok(())
 }
 
-async fn insert_ans_primary_names_v2(
-    conn: &mut MyDbConnection,
-    items_to_insert: &[AnsPrimaryNameV2],
-) -> Result<(), diesel::result::Error> {
+fn insert_current_ans_lookups_query(
+    item_to_insert: Vec<CurrentAnsLookup>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_ans_lookup::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_ans_lookup::table)
+            .values(item_to_insert)
+            .on_conflict((domain, subdomain))
+            .do_update()
+            .set((
+                registered_address.eq(excluded(registered_address)),
+                expiration_timestamp.eq(excluded(expiration_timestamp)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                token_name.eq(excluded(token_name)),
+                is_deleted.eq(excluded(is_deleted)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_ans_lookup.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_ans_lookups_query(
+    item_to_insert: Vec<AnsLookup>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::ans_lookup::dsl::*;
+
+    (
+        diesel::insert_into(schema::ans_lookup::table)
+            .values(item_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_current_ans_primary_names_query(
+    item_to_insert: Vec<CurrentAnsPrimaryName>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_ans_primary_name::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_ans_primary_name::table)
+            .values(item_to_insert)
+            .on_conflict(registered_address)
+            .do_update()
+            .set((
+                domain.eq(excluded(domain)),
+                subdomain.eq(excluded(subdomain)),
+                token_name.eq(excluded(token_name)),
+                is_deleted.eq(excluded(is_deleted)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_ans_primary_name.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_ans_primary_names_query(
+    item_to_insert: Vec<AnsPrimaryName>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::ans_primary_name::dsl::*;
+
+    (
+        diesel::insert_into(schema::ans_primary_name::table)
+            .values(item_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_current_ans_lookups_v2_query(
+    item_to_insert: Vec<CurrentAnsLookupV2>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_ans_lookup_v2::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_ans_lookup_v2::table)
+            .values(item_to_insert)
+            .on_conflict((domain, subdomain, token_standard))
+            .do_update()
+            .set((
+                registered_address.eq(excluded(registered_address)),
+                expiration_timestamp.eq(excluded(expiration_timestamp)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                token_name.eq(excluded(token_name)),
+                is_deleted.eq(excluded(is_deleted)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_ans_lookups_v2_query(
+    item_to_insert: Vec<AnsLookupV2>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::ans_lookup_v2::dsl::*;
+
+    (
+        diesel::insert_into(schema::ans_lookup_v2::table)
+            .values(item_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_current_ans_primary_names_v2_query(
+    item_to_insert: Vec<CurrentAnsPrimaryNameV2>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_ans_primary_name_v2::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_ans_primary_name_v2::table)
+            .values(item_to_insert)
+            .on_conflict((registered_address, token_standard))
+            .do_update()
+            .set((
+                domain.eq(excluded(domain)),
+                subdomain.eq(excluded(subdomain)),
+                token_name.eq(excluded(token_name)),
+                is_deleted.eq(excluded(is_deleted)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_ans_primary_name_v2.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_ans_primary_names_v2_query(
+    items_to_insert: Vec<AnsPrimaryNameV2>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
     use schema::ans_primary_name_v2::dsl::*;
 
-    let chunks = get_chunks(items_to_insert.len(), AnsPrimaryNameV2::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::ans_primary_name_v2::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
-            None,
-        )
-        .await?;
-    }
-    Ok(())
+    (
+        diesel::insert_into(schema::ans_primary_name_v2::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
+    )
 }
 
 #[async_trait]
@@ -401,7 +362,8 @@ impl ProcessorTrait for AnsProcessor {
         end_version: u64,
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let mut conn = self.get_conn().await;
+        let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let (
             all_current_ans_lookups,
@@ -419,29 +381,36 @@ impl ProcessorTrait for AnsProcessor {
             self.config.ans_v2_contract_address.clone(),
         );
 
+        let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
+        let db_insertion_start = std::time::Instant::now();
 
         // Insert values to db
         let tx_result = insert_to_db(
-            &mut conn,
+            self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            all_current_ans_lookups,
-            all_ans_lookups,
-            all_current_ans_primary_names,
-            all_ans_primary_names,
-            all_current_ans_lookups_v2,
-            all_ans_lookups_v2,
-            all_current_ans_primary_names_v2,
-            all_ans_primary_names_v2,
+            &all_current_ans_lookups,
+            &all_ans_lookups,
+            &all_current_ans_primary_names,
+            &all_ans_primary_names,
+            &all_current_ans_lookups_v2,
+            &all_ans_lookups_v2,
+            &all_current_ans_primary_names_v2,
+            &all_ans_primary_names_v2,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
+        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         match tx_result {
             Ok(_) => Ok(ProcessingResult {
                 start_version,
                 end_version,
+                processing_duration_in_secs,
+                db_insertion_duration_in_secs,
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(
@@ -476,21 +445,30 @@ fn parse_ans(
     Vec<CurrentAnsPrimaryNameV2>,
     Vec<AnsPrimaryNameV2>,
 ) {
-    let mut all_current_ans_lookups = HashMap::new();
+    let mut all_current_ans_lookups = AHashMap::new();
     let mut all_ans_lookups = vec![];
-    let mut all_current_ans_primary_names = HashMap::new();
+    let mut all_current_ans_primary_names = AHashMap::new();
     let mut all_ans_primary_names = vec![];
-    let mut all_current_ans_lookups_v2 = HashMap::new();
+    let mut all_current_ans_lookups_v2 = AHashMap::new();
     let mut all_ans_lookups_v2 = vec![];
-    let mut all_current_ans_primary_names_v2 = HashMap::new();
+    let mut all_current_ans_primary_names_v2 = AHashMap::new();
     let mut all_ans_primary_names_v2 = vec![];
 
     for transaction in transactions {
         let txn_version = transaction.version as i64;
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .expect("Txn Data doesn't exit!");
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["AnsProcessor"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist",
+                );
+                continue;
+            },
+        };
         let transaction_info = transaction
             .info
             .as_ref()
@@ -501,7 +479,7 @@ fn parse_ans(
         if let TxnData::User(user_txn) = txn_data {
             // TODO: Use the v2_renew_name_events to preserve metadata once we switch to a single ANS table to store everything
             let mut v2_renew_name_events = vec![];
-            let mut v2_address_to_subdomain_ext = HashMap::new();
+            let mut v2_address_to_subdomain_ext = AHashMap::new();
 
             // Parse V2 ANS Events. We only care about the following events:
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
@@ -581,31 +559,31 @@ fn parse_ans(
                             all_ans_lookups_v2.push(ans_lookup_v2);
                         }
                         if let Some((current_primary_name, primary_name)) =
-                        CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
-                            table_item,
-                            &ans_v1_primary_names_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
+                            CurrentAnsPrimaryName::parse_primary_name_record_from_write_table_item_v1(
+                                table_item,
+                                &ans_v1_primary_names_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                                .unwrap_or_else(|e| {
+                                    error!(
                                 error = ?e,
                                 "Error parsing ANS v1 primary name from write table item"
                             );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_primary_name.pk(), current_primary_name.clone());
-                        all_ans_primary_names.push(primary_name.clone());
+                                    panic!();
+                                })
+                        {
+                            all_current_ans_primary_names
+                                .insert(current_primary_name.pk(), current_primary_name.clone());
+                            all_ans_primary_names.push(primary_name.clone());
 
-                        // Include all v1 primary names in v2 data
-                        let (current_primary_name_v2, primary_name_v2) =
-                            CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
-                        all_current_ans_primary_names_v2
-                            .insert(current_primary_name_v2.pk(), current_primary_name_v2);
-                        all_ans_primary_names_v2.push(primary_name_v2);
-                    }
+                            // Include all v1 primary names in v2 data
+                            let (current_primary_name_v2, primary_name_v2) =
+                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
+                            all_current_ans_primary_names_v2
+                                .insert(current_primary_name_v2.pk(), current_primary_name_v2);
+                            all_ans_primary_names_v2.push(primary_name_v2);
+                        }
                     },
                     WriteSetChange::DeleteTableItem(table_item) => {
                         if let Some((current_ans_lookup, ans_lookup)) =
@@ -635,31 +613,31 @@ fn parse_ans(
                             all_ans_lookups_v2.push(ans_lookup_v2);
                         }
                         if let Some((current_primary_name, primary_name)) =
-                        CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
-                            table_item,
-                            &ans_v1_primary_names_table_handle,
-                            txn_version,
-                            wsc_index as i64,
-                        )
-                        .unwrap_or_else(|e| {
-                            error!(
+                            CurrentAnsPrimaryName::parse_primary_name_record_from_delete_table_item_v1(
+                                table_item,
+                                &ans_v1_primary_names_table_handle,
+                                txn_version,
+                                wsc_index as i64,
+                            )
+                                .unwrap_or_else(|e| {
+                                    error!(
                                 error = ?e,
                                 "Error parsing ANS v1 primary name from delete table item"
                             );
-                            panic!();
-                        })
-                    {
-                        all_current_ans_primary_names
-                            .insert(current_primary_name.pk(), current_primary_name.clone());
-                        all_ans_primary_names.push(primary_name.clone());
+                                    panic!();
+                                })
+                        {
+                            all_current_ans_primary_names
+                                .insert(current_primary_name.pk(), current_primary_name.clone());
+                            all_ans_primary_names.push(primary_name.clone());
 
-                        // Include all v1 primary names in v2 data
-                        let (current_primary_name_v2, primary_name_v2) =
-                            CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
-                        all_current_ans_primary_names_v2
-                            .insert(current_primary_name_v2.pk(), current_primary_name_v2);
-                        all_ans_primary_names_v2.push(primary_name_v2);
-                    }
+                            // Include all v1 primary names in v2 data
+                            let (current_primary_name_v2, primary_name_v2) =
+                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
+                            all_current_ans_primary_names_v2
+                                .insert(current_primary_name_v2.pk(), current_primary_name_v2);
+                            all_ans_primary_names_v2.push(primary_name_v2);
+                        }
                     },
                     WriteSetChange::WriteResource(write_resource) => {
                         if let Some((current_ans_lookup_v2, ans_lookup_v2)) =

@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::models::property_map::{PropertyMap, TokenObjectPropertyMap};
+use crate::{
+    models::property_map::{PropertyMap, TokenObjectPropertyMap},
+    utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+};
 use aptos_protos::{
     transaction::v1::{
         multisig_transaction_payload::Payload as MultisigPayloadType,
@@ -106,10 +109,24 @@ pub fn get_entry_function_from_user_request(
     ))
 }
 
+pub fn get_payload_type(payload: &TransactionPayload) -> String {
+    payload.r#type().as_str_name().to_string()
+}
+
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
 /// This function converts the string into json recursively and lets the diesel ORM handles
 /// the escaping.
 pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<Value> {
+    if payload.payload.as_ref().is_none() {
+        PROCESSOR_UNKNOWN_TYPE_COUNT
+            .with_label_values(&["TransactionPayload"])
+            .inc();
+        tracing::warn!(
+            transaction_version = version,
+            "Transaction payload doesn't exist",
+        );
+        return None;
+    }
     match payload.payload.as_ref().unwrap() {
         PayloadType::EntryFunctionPayload(inner) => {
             let clean = get_clean_entry_function_payload(inner, version);
@@ -121,12 +138,6 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
         PayloadType::ScriptPayload(inner) => {
             let clean = get_clean_script_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                tracing::error!(version = version, "Unable to serialize payload into value");
-                panic!()
-            }))
-        },
-        PayloadType::ModuleBundlePayload(inner) => {
-            Some(serde_json::to_value(inner).unwrap_or_else(|_| {
                 tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
@@ -422,6 +433,26 @@ pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
 pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
     let t: Vec<&str> = move_type.split("::").collect();
     t.last().unwrap()
+}
+
+/* COMMON STRUCTS */
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AggregatorU64 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub value: BigDecimal,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub max_value: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AggregatorSnapshotU64 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub value: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DerivedStringSnapshot {
+    pub value: String,
 }
 
 #[cfg(test)]

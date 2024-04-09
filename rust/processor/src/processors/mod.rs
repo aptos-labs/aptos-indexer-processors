@@ -11,25 +11,33 @@ pub mod account_transactions_processor;
 pub mod ans_processor;
 pub mod coin_processor;
 pub mod default_processor;
+pub mod mercato_processor;
 pub mod events_processor;
 pub mod fungible_asset_processor;
+pub mod monitoring_processor;
 pub mod nft_metadata_processor;
+pub mod objects_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
+pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
 
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
     ans_processor::{AnsProcessor, AnsProcessorConfig},
     coin_processor::CoinProcessor,
-    default_processor::{DefaultProcessor},
+    default_processor::DefaultProcessor,
+    mercato_processor::MercatoProcessor,
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
+    monitoring_processor::MonitoringProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
-    stake_processor::StakeProcessor,
+    objects_processor::{ObjectsProcessor, ObjectsProcessorConfig},
+    stake_processor::{StakeProcessor, StakeProcessorConfig},
     token_processor::{TokenProcessor, TokenProcessorConfig},
-    token_v2_processor::TokenV2Processor,
+    token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
+    transaction_metadata_processor::TransactionMetadataProcessor,
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
@@ -38,21 +46,23 @@ use crate::{
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+        util::parse_timestamp,
     },
 };
 use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
-use diesel::{pg::upsert::excluded, prelude::*};
+use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-type StartVersion = u64;
-type EndVersion = u64;
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProcessingResult {
-    pub start_version: StartVersion,
-    pub end_version: EndVersion,
+    pub start_version: u64,
+    pub end_version: u64,
+    pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
+    pub processing_duration_in_secs: f64,
+    pub db_insertion_duration_in_secs: f64,
 }
 
 /// Base trait for all processors
@@ -75,6 +85,12 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     fn connection_pool(&self) -> &PgDbPool;
 
     //* Below are helper methods that don't need to be implemented *//
+
+    /// Gets an instance of the connection pool
+    fn get_pool(&self) -> PgDbPool {
+        let pool = self.connection_pool();
+        pool.clone()
+    }
 
     /// Gets the connection.
     /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
@@ -102,14 +118,19 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 
     /// Store last processed version from database. We can assume that all previously processed
     /// versions are successful because any gap would cause the processor to panic
-    async fn update_last_processed_version(&self, version: u64) -> anyhow::Result<()> {
-        let mut conn = self.get_conn().await;
+    async fn update_last_processed_version(
+        &self,
+        version: u64,
+        last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
+    ) -> anyhow::Result<()> {
+        let timestamp = last_transaction_timestamp.map(|t| parse_timestamp(&t, version as i64));
         let status = ProcessorStatus {
             processor: self.name().to_string(),
             last_success_version: version as i64,
+            last_transaction_timestamp: timestamp,
         };
         execute_with_better_error(
-            &mut conn,
+            self.get_pool(),
             diesel::insert_into(processor_status::table)
                 .values(&status)
                 .on_conflict(processor_status::processor)
@@ -118,6 +139,8 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                     processor_status::last_success_version
                         .eq(excluded(processor_status::last_success_version)),
                     processor_status::last_updated.eq(excluded(processor_status::last_updated)),
+                    processor_status::last_transaction_timestamp
+                        .eq(excluded(processor_status::last_transaction_timestamp)),
                 )),
             Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
         )
@@ -162,12 +185,16 @@ pub enum ProcessorConfig {
     AnsProcessor(AnsProcessorConfig),
     CoinProcessor,
     DefaultProcessor,
+    MercatoProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
+    MonitoringProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
-    StakeProcessor,
+    ObjectsProcessor(ObjectsProcessorConfig),
+    StakeProcessor(StakeProcessorConfig),
     TokenProcessor(TokenProcessorConfig),
-    TokenV2Processor,
+    TokenV2Processor(TokenV2ProcessorConfig),
+    TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
 
@@ -201,12 +228,16 @@ pub enum Processor {
     AnsProcessor,
     CoinProcessor,
     DefaultProcessor,
+    MercatoProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
+    MonitoringProcessor,
     NftMetadataProcessor,
+    ObjectsProcessor,
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,
+    TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
 

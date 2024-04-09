@@ -5,11 +5,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenV2AggregatedDataMapping, TOKEN_V2_ADDR};
+use super::v2_token_utils::TOKEN_V2_ADDR;
 use crate::{
     models::{
         coin_models::coin_utils::COIN_ADDR,
         default_models::move_resources::MoveResource,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::token_utils::{NAME_LENGTH, TOKEN_ADDR},
     },
     schema::current_token_v2_metadata,
@@ -24,7 +25,7 @@ use serde_json::Value;
 // PK of current_objects, i.e. object_address, resource_type
 pub type CurrentTokenV2MetadataPK = (String, String);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(object_address, resource_type))]
 #[diesel(table_name = current_token_v2_metadata)]
 pub struct CurrentTokenV2Metadata {
@@ -40,12 +41,12 @@ impl CurrentTokenV2Metadata {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
         let object_address = standardize_address(&write_resource.address.to_string());
-        if let Some(metadata) = token_v2_metadata.get(&object_address) {
+        if let Some(object_data) = object_metadatas.get(&object_address) {
             // checking if token_v2
-            if metadata.token.is_some() {
+            if object_data.token.is_some() {
                 let move_tag =
                     MoveResource::convert_move_struct_tag(write_resource.r#type.as_ref().unwrap());
                 let resource_type_addr = move_tag.get_address();
@@ -58,7 +59,7 @@ impl CurrentTokenV2Metadata {
 
                 let resource = MoveResource::from_write_resource(write_resource, 0, txn_version, 0);
 
-                let state_key_hash = metadata.object.get_state_key_hash();
+                let state_key_hash = object_data.object.get_state_key_hash();
                 if state_key_hash != resource.state_key_hash {
                     return Ok(None);
                 }

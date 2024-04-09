@@ -7,11 +7,12 @@
 
 use super::{
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
+    v2_token_utils::{TokenStandard, V2TokenEvent},
 };
 use crate::{
     models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetEvent,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::token_utils::{TokenDataIdType, TokenEvent},
     },
     schema::token_activities_v2,
@@ -22,7 +23,7 @@ use bigdecimal::{BigDecimal, One, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = token_activities_v2)]
 pub struct TokenActivityV2 {
@@ -59,6 +60,7 @@ struct TokenActivityHelperV2 {
     pub token_amount: BigDecimal,
     pub before_value: Option<String>,
     pub after_value: Option<String>,
+    pub event_type: String,
 }
 
 impl TokenActivityV2 {
@@ -74,7 +76,7 @@ impl TokenActivityV2 {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
@@ -86,13 +88,18 @@ impl TokenActivityV2 {
 
             // The event account address will also help us find fungible store which tells us where to find
             // the metadata
-            if let Some(metadata) = token_v2_metadata.get(&event_account_address) {
-                let object_core = &metadata.object.object_core;
-                let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
+            if let Some(object_data) = object_metadatas.get(&event_account_address) {
+                let object_core = &object_data.object.object_core;
+                let fungible_asset = object_data.fungible_asset_store.as_ref().unwrap();
                 let token_data_id = fungible_asset.metadata.get_reference_address();
                 // Exit early if it's not a token
-                if !TokenDataV2::is_address_fungible_token(conn, &token_data_id, token_v2_metadata)
-                    .await
+                if !TokenDataV2::is_address_token(
+                    conn,
+                    &token_data_id,
+                    object_metadatas,
+                    txn_version,
+                )
+                .await
                 {
                     return Ok(None);
                 }
@@ -104,6 +111,7 @@ impl TokenActivityV2 {
                         token_amount: inner.amount.clone(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
                     },
                     FungibleAssetEvent::DepositEvent(inner) => TokenActivityHelperV2 {
                         from_address: None,
@@ -111,6 +119,7 @@ impl TokenActivityV2 {
                         token_amount: inner.amount.clone(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
                     },
                     _ => return Ok(None),
                 };
@@ -121,7 +130,7 @@ impl TokenActivityV2 {
                     event_account_address,
                     token_data_id: token_data_id.clone(),
                     property_version_v1: BigDecimal::zero(),
-                    type_: event_type.to_string(),
+                    type_: token_activity_helper.event_type,
                     from_address: token_activity_helper.from_address,
                     to_address: token_activity_helper.to_address,
                     token_amount: token_activity_helper.token_amount,
@@ -137,13 +146,13 @@ impl TokenActivityV2 {
         Ok(None)
     }
 
-    pub fn get_nft_v2_from_parsed_event(
+    pub async fn get_nft_v2_from_parsed_event(
         event: &Event,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_v2_metadata: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) =
@@ -154,7 +163,9 @@ impl TokenActivityV2 {
             // burn and mint events are attached to the collection. The rest should be attached to the token
             let token_data_id = match token_event {
                 V2TokenEvent::MintEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::Mint(inner) => inner.get_token_address(),
                 V2TokenEvent::BurnEvent(inner) => inner.get_token_address(),
+                V2TokenEvent::Burn(inner) => inner.get_token_address(),
                 V2TokenEvent::TransferEvent(inner) => inner.get_object_address(),
                 _ => event_account_address.clone(),
             };
@@ -168,6 +179,15 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::one(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
+                    },
+                    V2TokenEvent::Mint(_) => TokenActivityHelperV2 {
+                        from_address: Some(object_core.get_owner_address()),
+                        to_address: None,
+                        token_amount: BigDecimal::one(),
+                        before_value: None,
+                        after_value: None,
+                        event_type: "0x4::collection::MintEvent".to_string(),
                     },
                     V2TokenEvent::TokenMutationEvent(inner) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
@@ -175,6 +195,7 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::zero(),
                         before_value: Some(inner.old_value.clone()),
                         after_value: Some(inner.new_value.clone()),
+                        event_type: event_type.clone(),
                     },
                     V2TokenEvent::BurnEvent(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),
@@ -182,6 +203,15 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::one(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
+                    },
+                    V2TokenEvent::Burn(_) => TokenActivityHelperV2 {
+                        from_address: Some(object_core.get_owner_address()),
+                        to_address: None,
+                        token_amount: BigDecimal::one(),
+                        before_value: None,
+                        after_value: None,
+                        event_type: "0x4::collection::BurnEvent".to_string(),
                     },
                     V2TokenEvent::TransferEvent(inner) => TokenActivityHelperV2 {
                         from_address: Some(inner.get_from_address()),
@@ -189,6 +219,7 @@ impl TokenActivityV2 {
                         token_amount: BigDecimal::one(),
                         before_value: None,
                         after_value: None,
+                        event_type: event_type.clone(),
                     },
                 };
                 return Ok(Some(Self {
@@ -197,12 +228,40 @@ impl TokenActivityV2 {
                     event_account_address,
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
-                    type_: event_type,
+                    type_: token_activity_helper.event_type,
                     from_address: token_activity_helper.from_address,
                     to_address: token_activity_helper.to_address,
                     token_amount: token_activity_helper.token_amount,
                     before_value: token_activity_helper.before_value,
                     after_value: token_activity_helper.after_value,
+                    entry_function_id_str: entry_function_id_str.clone(),
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: Some(false),
+                    transaction_timestamp: txn_timestamp,
+                }));
+            } else {
+                // If the object metadata isn't found in the transaction, then the token was burnt.
+
+                // the new burn event has owner address now!
+                let owner_address = if let V2TokenEvent::Burn(inner) = token_event {
+                    Some(inner.get_previous_owner_address())
+                } else {
+                    // To handle a case with the old burn events, when a token is minted and burnt in the same transaction
+                    None
+                };
+
+                return Ok(Some(Self {
+                    transaction_version: txn_version,
+                    event_index,
+                    event_account_address,
+                    token_data_id,
+                    property_version_v1: BigDecimal::zero(),
+                    type_: event_type,
+                    from_address: owner_address.clone(),
+                    to_address: None,
+                    token_amount: BigDecimal::one(),
+                    before_value: None,
+                    after_value: None,
                     entry_function_id_str: entry_function_id_str.clone(),
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2: Some(false),

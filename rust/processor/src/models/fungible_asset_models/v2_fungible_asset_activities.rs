@@ -6,9 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    v2_fungible_asset_utils::{
-        FeeStatement, FungibleAssetAggregatedDataMapping, FungibleAssetEvent,
-    },
+    v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
@@ -17,17 +15,18 @@ use crate::{
             coin_activities::CoinActivity,
             coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
         },
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_activities,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
@@ -38,9 +37,9 @@ pub type OwnerAddress = String;
 pub type CoinType = String;
 // Primary key of the current_coin_balances table, i.e. (owner_address, coin_type)
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
-pub type EventToCoinType = HashMap<EventGuidResource, CoinType>;
+pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = fungible_asset_activities)]
 pub struct FungibleAssetActivity {
@@ -70,7 +69,7 @@ impl FungibleAssetActivity {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
-        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
@@ -81,15 +80,16 @@ impl FungibleAssetActivity {
 
             // The event account address will also help us find fungible store which tells us where to find
             // the metadata
-            if let Some(metadata) = fungible_asset_metadata.get(&storage_id) {
-                let object_core = &metadata.object.object_core;
-                let fungible_asset = metadata.fungible_asset_store.as_ref().unwrap();
+            if let Some(object_metadata) = object_aggregated_data_mapping.get(&storage_id) {
+                let object_core = &object_metadata.object.object_core;
+                let fungible_asset = object_metadata.fungible_asset_store.as_ref().unwrap();
                 let asset_type = fungible_asset.metadata.get_reference_address();
                 // If it's a fungible token, return early
                 if !FungibleAssetMetadataModel::is_address_fungible_asset(
                     conn,
                     &asset_type,
-                    fungible_asset_metadata,
+                    object_aggregated_data_mapping,
+                    txn_version,
                 )
                 .await
                 {
@@ -146,15 +146,18 @@ impl FungibleAssetActivity {
                 addr: standardize_address(event_key.account_address.as_str()),
                 creation_num: event_key.creation_number as i64,
             };
-            let coin_type =
-                    event_to_coin_type
-                        .get(&event_move_guid)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                                txn_version, event_move_guid, event_to_coin_type
-                            )
-                        }).clone();
+            // Given this mapping only contains coin type < 1000 length, we should not assume that the mapping exists.
+            // If it doesn't exist, skip.
+            let coin_type = match event_to_coin_type.get(&event_move_guid) {
+                Some(coin_type) => coin_type.clone(),
+                None => {
+                    tracing::warn!(
+                        "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                        txn_version, event_move_guid, event_to_coin_type
+                    );
+                    return Ok(None);
+                },
+            };
             let storage_id =
                 CoinInfoType::get_storage_id(coin_type.as_str(), event_move_guid.addr.as_str());
             Ok(Some(Self {

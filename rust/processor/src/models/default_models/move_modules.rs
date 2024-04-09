@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
+
 use super::transactions::Transaction;
 use crate::{schema::move_modules, utils::util::standardize_address};
 use aptos_protos::transaction::v1::{
@@ -29,6 +30,7 @@ pub struct MoveModule {
     pub is_deleted: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MoveModuleByteCodeParsed {
     pub address: String,
     pub name: String,
@@ -50,15 +52,17 @@ impl MoveModule {
             transaction_version,
             transaction_block_height,
             write_set_change_index,
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             name: parsed_data
-                .as_ref()
+                .clone()
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
             address: standardize_address(&write_module.address.to_string()),
-            bytecode: parsed_data.as_ref().map(|d| d.bytecode.clone()),
-            exposed_functions: parsed_data.as_ref().map(|d| d.exposed_functions.clone()),
-            friends: parsed_data.as_ref().map(|d| d.friends.clone()),
-            structs: parsed_data.as_ref().map(|d| d.structs.clone()),
+            bytecode: parsed_data.clone().map(|d| d.bytecode.clone()),
+            exposed_functions: parsed_data.clone().map(|d| d.exposed_functions.clone()),
+            friends: parsed_data.clone().map(|d| d.friends.clone()),
+            structs: parsed_data.map(|d| d.structs.clone()),
             is_deleted: false,
         }
     }
@@ -73,9 +77,11 @@ impl MoveModule {
             transaction_version,
             transaction_block_height,
             write_set_change_index,
+            // TODO: remove the useless_asref lint when new clippy nighly is released.
+            #[allow(clippy::useless_asref)]
             name: delete_module
                 .module
-                .as_ref()
+                .clone()
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
             address: standardize_address(&delete_module.address.to_string()),

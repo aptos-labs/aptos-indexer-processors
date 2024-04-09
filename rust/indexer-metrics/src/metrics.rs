@@ -35,6 +35,24 @@ pub static HASURA_API_LATEST_VERSION_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static HASURA_API_LATEST_TRANSACTION_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_metrics_hasura_latest_transaction_timestamp_secs",
+        "Latest transaction timestamp (unix timestamp), i.e., block timestamp.",
+        &["processor_name", "chain_name"],
+    )
+    .unwrap()
+});
+
+pub static HASURA_API_LATEST_TRANSACTION_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_metrics_hasura_latest_transaction_latency_secs",
+        "Latest transaction e2e latency, from block timestamp to insertion time of db.",
+        &["processor_name", "chain_name"],
+    )
+    .unwrap()
+});
+
 pub static PFN_LEDGER_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "indexer_metrics_pfn_ledger_version",

@@ -11,7 +11,13 @@ use super::{
 };
 use crate::{
     schema::transactions,
-    utils::util::{get_clean_payload, get_clean_writeset, standardize_address, u64_to_bigdecimal},
+    utils::{
+        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
+        util::{
+            get_clean_payload, get_clean_writeset, get_payload_type, standardize_address,
+            u64_to_bigdecimal,
+        },
+    },
 };
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
@@ -21,7 +27,7 @@ use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = transactions)]
 pub struct Transaction {
@@ -40,12 +46,69 @@ pub struct Transaction {
     pub num_events: i64,
     pub num_write_set_changes: i64,
     pub epoch: i64,
+    pub payload_type: Option<String>,
+}
+
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            block_height: 0,
+            hash: "".to_string(),
+            type_: "".to_string(),
+            payload: None,
+            state_change_hash: "".to_string(),
+            event_root_hash: "".to_string(),
+            state_checkpoint_hash: None,
+            gas_used: BigDecimal::from(0),
+            success: true,
+            vm_status: "".to_string(),
+            accumulator_root_hash: "".to_string(),
+            num_events: 0,
+            num_write_set_changes: 0,
+            epoch: 0,
+            payload_type: None,
+        }
+    }
 }
 
 impl Transaction {
     fn from_transaction_info(
         info: &TransactionInfo,
+        version: i64,
+        epoch: i64,
+        block_height: i64,
+    ) -> Self {
+        Self {
+            version,
+            block_height,
+            hash: standardize_address(hex::encode(info.hash.as_slice()).as_str()),
+            state_change_hash: standardize_address(
+                hex::encode(info.state_change_hash.as_slice()).as_str(),
+            ),
+            event_root_hash: standardize_address(
+                hex::encode(info.event_root_hash.as_slice()).as_str(),
+            ),
+            state_checkpoint_hash: info
+                .state_checkpoint_hash
+                .as_ref()
+                .map(|hash| standardize_address(hex::encode(hash).as_str())),
+            gas_used: u64_to_bigdecimal(info.gas_used),
+            success: info.success,
+            vm_status: info.vm_status.clone(),
+            accumulator_root_hash: standardize_address(
+                hex::encode(info.accumulator_root_hash.as_slice()).as_str(),
+            ),
+            num_write_set_changes: info.changes.len() as i64,
+            epoch,
+            ..Default::default()
+        }
+    }
+
+    fn from_transaction_info_with_data(
+        info: &TransactionInfo,
         payload: Option<serde_json::Value>,
+        payload_type: Option<String>,
         version: i64,
         type_: String,
         num_events: i64,
@@ -77,6 +140,7 @@ impl Transaction {
             num_events,
             num_write_set_changes: info.changes.len() as i64,
             epoch,
+            payload_type,
         }
     }
 
@@ -90,19 +154,34 @@ impl Transaction {
     ) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
-        let txn_data = transaction
-            .txn_data
+        let transaction_info = transaction
+            .info
             .as_ref()
-            .expect("Txn Data doesn't exit!");
+            .expect("Transaction info doesn't exist!");
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(txn_data) => txn_data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["Transaction"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                let transaction_out = Self::from_transaction_info(
+                    transaction_info,
+                    transaction.version as i64,
+                    epoch,
+                    block_height,
+                );
+                return (transaction_out, None, Vec::new(), Vec::new());
+            },
+        };
         let version = transaction.version as i64;
         let transaction_type = TransactionType::try_from(transaction.r#type)
             .expect("Transaction type doesn't exist!")
             .as_str_name()
             .to_string();
-        let transaction_info = transaction
-            .info
-            .as_ref()
-            .expect("Transaction info doesn't exist!");
         let timestamp = transaction
             .timestamp
             .as_ref()
@@ -122,11 +201,13 @@ impl Transaction {
                     .as_ref()
                     .expect("Getting payload failed.");
                 let payload_cleaned = get_clean_payload(payload, version);
+                let payload_type = get_payload_type(payload);
 
                 (
-                    Self::from_transaction_info(
+                    Self::from_transaction_info_with_data(
                         transaction_info,
                         payload_cleaned,
+                        Some(payload_type),
                         version,
                         transaction_type,
                         user_txn.events.len() as i64,
@@ -146,10 +227,13 @@ impl Transaction {
                 );
                 let payload = genesis_txn.payload.as_ref().unwrap();
                 let payload_cleaned = get_clean_writeset(payload, version);
+                // It's genesis so no big deal
+                let payload_type = None;
                 (
-                    Self::from_transaction_info(
+                    Self::from_transaction_info_with_data(
                         transaction_info,
                         payload_cleaned,
+                        payload_type,
                         version,
                         transaction_type,
                         genesis_txn.events.len() as i64,
@@ -168,8 +252,9 @@ impl Transaction {
                     block_height,
                 );
                 (
-                    Self::from_transaction_info(
+                    Self::from_transaction_info_with_data(
                         transaction_info,
+                        None,
                         None,
                         version,
                         transaction_type,
@@ -188,9 +273,25 @@ impl Transaction {
                     wsc_detail,
                 )
             },
-            TxnData::StateCheckpoint(_state_checkpoint_txn) => (
-                Self::from_transaction_info(
+            TxnData::StateCheckpoint(_) => (
+                Self::from_transaction_info_with_data(
                     transaction_info,
+                    None,
+                    None,
+                    version,
+                    transaction_type,
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+            ),
+            TxnData::Validator(_) => (
+                Self::from_transaction_info_with_data(
+                    transaction_info,
+                    None,
                     None,
                     version,
                     transaction_type,

@@ -11,11 +11,14 @@
 #[macro_use]
 extern crate diesel;
 
+pub use config::IndexerGrpcProcessorConfig;
+
 mod config;
+pub mod gap_detector;
+pub mod grpc_stream;
 pub mod models;
 pub mod processors;
 pub mod schema;
+pub mod transaction_filter;
 pub mod utils;
 pub mod worker;
-
-pub use config::IndexerGrpcProcessorConfig;

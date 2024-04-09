@@ -4,20 +4,22 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
+        object_models::v2_object_utils::{
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        },
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
             v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
-            v2_token_utils::{
-                ObjectWithMetadata, TokenV2AggregatedData, TokenV2AggregatedDataMapping,
-            },
         },
     },
     utils::{
         database::{PgDbPool, PgPoolConnection},
-        util::{parse_timestamp, standardize_address},
+        util::{parse_timestamp, remove_null_bytes, standardize_address},
     },
+    IndexerGrpcProcessorConfig,
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use futures_util::future::try_join_all;
@@ -25,11 +27,10 @@ use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::client::{Client, ClientConfig};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     fmt::Debug,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tracing::info;
+use tracing::{error, info};
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -38,6 +39,10 @@ pub const CHUNK_SIZE: usize = 1000;
 pub struct NftMetadataProcessorConfig {
     pub pubsub_topic_name: String,
     pub google_application_credentials: Option<String>,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
 }
 
 pub struct NftMetadataProcessor {
@@ -92,7 +97,17 @@ impl ProcessorTrait for NftMetadataProcessor {
         end_version: u64,
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
+
+        let db_chain_id = db_chain_id.unwrap_or_else(|| {
+            error!("[NFT Metadata Crawler] db_chain_id must not be null");
+            panic!();
+        });
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -107,23 +122,21 @@ impl ProcessorTrait for NftMetadataProcessor {
         let ordering_key = get_current_timestamp();
 
         // Publish CurrentTokenDataV2 and CurrentCollectionV2 from transactions
-        let (token_datas, collections) =
-            parse_v2_token(&transactions, &table_handle_to_owner, &mut conn).await;
+        let (token_datas, collections) = parse_v2_token(
+            &transactions,
+            &table_handle_to_owner,
+            &mut conn,
+            query_retries,
+            query_retry_delay_ms,
+        )
+        .await;
         let mut pubsub_messages: Vec<PubsubMessage> =
             Vec::with_capacity(token_datas.len() + collections.len());
 
         // Publish all parsed token and collection data to Pubsub
         for token_data in token_datas {
             pubsub_messages.push(PubsubMessage {
-                data: format!(
-                    "{},{},{},{},{},false",
-                    token_data.token_data_id,
-                    token_data.token_uri,
-                    token_data.last_transaction_version,
-                    token_data.last_transaction_timestamp,
-                    db_chain_id.expect("db_chain_id must not be null"),
-                )
-                .into(),
+                data: clean_token_pubsub_message(token_data, db_chain_id).into(),
                 ordering_key: ordering_key.clone(),
                 ..Default::default()
             })
@@ -131,20 +144,14 @@ impl ProcessorTrait for NftMetadataProcessor {
 
         for collection in collections {
             pubsub_messages.push(PubsubMessage {
-                data: format!(
-                    "{},{},{},{},{},false",
-                    collection.collection_id,
-                    collection.uri,
-                    collection.last_transaction_version,
-                    collection.last_transaction_timestamp,
-                    db_chain_id.expect("db_chain_id must not be null"),
-                )
-                .into(),
+                data: clean_collection_pubsub_message(collection, db_chain_id).into(),
                 ordering_key: ordering_key.clone(),
                 ..Default::default()
             })
         }
 
+        let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
+        let db_insertion_start = std::time::Instant::now();
 
         info!(
             start_version = start_version,
@@ -168,9 +175,14 @@ impl ProcessorTrait for NftMetadataProcessor {
             .await?;
         }
 
+        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
+
         Ok(ProcessingResult {
             start_version,
             end_version,
+            processing_duration_in_secs,
+            db_insertion_duration_in_secs,
+            last_transaction_timestamp,
         })
     }
 
@@ -179,23 +191,47 @@ impl ProcessorTrait for NftMetadataProcessor {
     }
 }
 
+fn clean_token_pubsub_message(ctd: CurrentTokenDataV2, db_chain_id: u64) -> String {
+    remove_null_bytes(&format!(
+        "{},{},{},{},{},false",
+        ctd.token_data_id,
+        ctd.token_uri,
+        ctd.last_transaction_version,
+        ctd.last_transaction_timestamp,
+        db_chain_id,
+    ))
+}
+
+fn clean_collection_pubsub_message(cc: CurrentCollectionV2, db_chain_id: u64) -> String {
+    remove_null_bytes(&format!(
+        "{},{},{},{},{},false",
+        cc.collection_id,
+        cc.uri,
+        cc.last_transaction_version,
+        cc.last_transaction_timestamp,
+        db_chain_id,
+    ))
+}
+
 /// Copied from token_processor;
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut PgPoolConnection<'_>,
+    query_retries: u32,
+    query_retry_delay_ms: u64,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
-    let mut current_token_datas_v2: HashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
-        HashMap::new();
-    let mut current_collections_v2: HashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
-        HashMap::new();
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+        AHashMap::new();
+    let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
+        AHashMap::new();
 
     for txn in transactions {
         let txn_version = txn.version as i64;
         let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
         let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
 
-        let mut token_v2_metadata_helper: TokenV2AggregatedDataMapping = HashMap::new();
+        let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
         for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                 if let Some(object) =
@@ -203,17 +239,19 @@ async fn parse_v2_token(
                 {
                     token_v2_metadata_helper.insert(
                         standardize_address(&wr.address.to_string()),
-                        TokenV2AggregatedData {
+                        ObjectAggregatedData {
                             aptos_collection: None,
                             fixed_supply: None,
                             object,
+                            concurrent_supply: None,
                             unlimited_supply: None,
                             property_map: None,
-                            transfer_event: None,
+                            transfer_events: vec![],
                             token: None,
                             fungible_asset_metadata: None,
                             fungible_asset_supply: None,
                             fungible_asset_store: None,
+                            token_identifier: None,
                         },
                     );
                 }
@@ -244,6 +282,8 @@ async fn parse_v2_token(
                             txn_timestamp,
                             table_handle_to_owner,
                             conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()

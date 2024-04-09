@@ -6,18 +6,19 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    v2_fungible_asset_activities::EventToCoinType,
-    v2_fungible_asset_utils::{FungibleAssetAggregatedDataMapping, FungibleAssetStore},
+    v2_fungible_asset_activities::EventToCoinType, v2_fungible_asset_utils::FungibleAssetStore,
     v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::{current_fungible_asset_balances, fungible_asset_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -25,14 +26,13 @@ use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use sha3::Sha3_256;
-use std::collections::HashMap;
 
 // Storage id
 pub type CurrentFungibleAssetBalancePK = String;
 pub type CurrentFungibleAssetMapping =
-    HashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
+    AHashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = fungible_asset_balances)]
 pub struct FungibleAssetBalance {
@@ -70,22 +70,23 @@ impl FungibleAssetBalance {
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        fungible_asset_metadata: &FungibleAssetAggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
         conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
         {
             let storage_id = standardize_address(write_resource.address.as_str());
             // Need to get the object of the store
-            if let Some(store_metadata) = fungible_asset_metadata.get(&storage_id) {
-                let object = &store_metadata.object.object_core;
+            if let Some(object_data) = object_metadatas.get(&storage_id) {
+                let object = &object_data.object.object_core;
                 let owner_address = object.get_owner_address();
                 let asset_type = inner.metadata.get_reference_address();
                 // If it's a fungible token, return early
                 if !FungibleAssetMetadataModel::is_address_fungible_asset(
                     conn,
                     &asset_type,
-                    fungible_asset_metadata,
+                    object_metadatas,
+                    txn_version,
                 )
                 .await
                 {
@@ -124,6 +125,7 @@ impl FungibleAssetBalance {
     }
 
     /// Getting coin balances from resources for v1
+    /// If the fully qualified coin type is too long (currently 1000 length), we exclude from indexing
     pub fn get_v1_from_write_resource(
         write_resource: &WriteResource,
         write_set_change_index: i64,
@@ -165,7 +167,7 @@ impl FungibleAssetBalance {
                     last_transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };
-                let event_to_coin_mapping: EventToCoinType = HashMap::from([
+                let event_to_coin_mapping: EventToCoinType = AHashMap::from([
                     (
                         inner.withdraw_events.guid.id.get_standardized(),
                         coin_type.clone(),
@@ -217,7 +219,7 @@ mod tests {
         assert!(FungibleAssetBalance::is_primary(
             owner_address,
             metadata_address,
-            fungible_store_address
+            fungible_store_address,
         ));
     }
 
@@ -230,7 +232,7 @@ mod tests {
         assert!(!FungibleAssetBalance::is_primary(
             owner_address,
             metadata_address,
-            fungible_store_address
+            fungible_store_address,
         ));
     }
 
@@ -244,7 +246,7 @@ mod tests {
         assert!(FungibleAssetBalance::is_primary(
             owner_address,
             metadata_address,
-            fungible_store_address
+            fungible_store_address,
         ));
     }
 }

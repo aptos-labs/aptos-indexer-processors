@@ -5,22 +5,18 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping};
+use super::v2_token_utils::{TokenStandard, TokenV2};
 use crate::{
     models::{
-        fungible_asset_models::v2_fungible_metadata::FungibleAssetMetadataModel,
-        token_models::{
-            collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-            token_utils::TokenWriteSet,
-        },
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use anyhow::Context;
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
-use diesel::{prelude::*, sql_query, sql_types::Text};
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -28,7 +24,7 @@ use serde::{Deserialize, Serialize};
 // PK of current_token_datas_v2, i.e. token_data_id
 pub type CurrentTokenDataV2PK = String;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = token_datas_v2)]
 pub struct TokenDataV2 {
@@ -49,7 +45,7 @@ pub struct TokenDataV2 {
     pub decimals: i64,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_data_id))]
 #[diesel(table_name = current_token_datas_v2)]
 pub struct CurrentTokenDataV2 {
@@ -69,30 +65,48 @@ pub struct CurrentTokenDataV2 {
     pub decimals: i64,
 }
 
-#[derive(Debug, QueryableByName)]
-pub struct TokenDataIdFromTable {
-    #[diesel(sql_type = Text)]
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(primary_key(token_data_id))]
+#[diesel(table_name = current_token_datas_v2)]
+pub struct CurrentTokenDataV2Query {
     pub token_data_id: String,
+    pub collection_id: String,
+    pub token_name: String,
+    pub maximum: Option<BigDecimal>,
+    pub supply: BigDecimal,
+    pub largest_property_version_v1: Option<BigDecimal>,
+    pub token_uri: String,
+    pub description: String,
+    pub token_properties: serde_json::Value,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub inserted_at: chrono::NaiveDateTime,
+    pub decimals: i64,
 }
 
 impl TokenDataV2 {
+    // TODO: remove the useless_asref lint when new clippy nighly is released.
+    #[allow(clippy::useless_asref)]
     pub fn get_v2_from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentTokenDataV2)>> {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
+            let mut token_name = inner.get_name_trunc();
             // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
             let (mut maximum, mut supply, mut decimals, mut is_fungible_v2) =
                 (None, BigDecimal::zero(), 0, Some(false));
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
-            if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
-                let fungible_asset_metadata = metadata.fungible_asset_metadata.as_ref();
-                let fungible_asset_supply = metadata.fungible_asset_supply.as_ref();
+            if let Some(object_metadata) = object_metadatas.get(&token_data_id) {
+                let fungible_asset_metadata = object_metadata.fungible_asset_metadata.as_ref();
+                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
                 if let Some(metadata) = fungible_asset_metadata {
                     if let Some(fa_supply) = fungible_asset_supply {
                         maximum = fa_supply.get_maximum();
@@ -101,18 +115,21 @@ impl TokenDataV2 {
                         is_fungible_v2 = Some(true);
                     }
                 }
-                token_properties = metadata
+                token_properties = object_metadata
                     .property_map
                     .as_ref()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
+                // In aggregator V2 name is now derived from a separate struct
+                if let Some(token_identifier) = object_metadata.token_identifier.as_ref() {
+                    token_name = token_identifier.get_name_trunc();
+                }
             } else {
                 // ObjectCore should not be missing, returning from entire function early
                 return Ok(None);
             }
 
             let collection_id = inner.get_collection_address();
-            let token_name = inner.get_name_trunc();
             let token_uri = inner.get_uri_trunc();
 
             Ok(Some((
@@ -239,58 +256,45 @@ impl TokenDataV2 {
     /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
     /// 1. If metadata is present with a token object, then is a token
     /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_fungible_token(
+    pub async fn is_address_token(
         conn: &mut PgPoolConnection<'_>,
-        address: &str,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        token_data_id: &str,
+        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
+        txn_version: i64,
     ) -> bool {
-        if let Some(metadata) = token_v2_metadata.get(address) {
-            metadata.token.is_some()
-        } else {
-            // Look up in the db
-            Self::query_is_address_token(conn, address).await
+        if let Some(object_data) = object_aggregated_data_mapping.get(token_data_id) {
+            return object_data.token.is_some();
+        }
+        match CurrentTokenDataV2Query::get_exists(conn, token_data_id).await {
+            Ok(is_token) => is_token,
+            Err(e) => {
+                // TODO: Standardize this error handling
+                panic!("Version: {}, error {:?}", txn_version, e)
+            },
         }
     }
+}
 
-    /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
-    /// and if we can't find after N times, we'll assume that it's not a token.
-    /// TODO: An improvement is to combine this with is_address_coin. To do this well we need
-    /// a k-v store
-    async fn query_is_address_token(conn: &mut PgPoolConnection<'_>, address: &str) -> bool {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
-            match Self::get_by_token_data_id(conn, address).await {
-                Ok(_) => return true,
-                Err(_) => {
-                    // TODO: this'll unblock very short term but we should clean this up
-                    if FungibleAssetMetadataModel::get_by_asset_type(conn, address)
-                        .await
-                        .is_ok()
-                    {
-                        return false;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
-                },
-            }
-        }
-        false
-    }
-
-    /// TODO: Change this to a KV store
-    async fn get_by_token_data_id(
+impl CurrentTokenDataV2Query {
+    /// TODO: change this to diesel exists. Also this only checks once so may miss some data if coming from another thread
+    pub async fn get_exists(
         conn: &mut PgPoolConnection<'_>,
-        address: &str,
-    ) -> anyhow::Result<String> {
-        let mut res: Vec<Option<TokenDataIdFromTable>> =
-            sql_query("SELECT token_data_id FROM current_token_datas_v2 WHERE token_data_id = $1")
-                .bind::<Text, _>(address)
-                .get_results(conn)
-                .await?;
-        Ok(res
-            .pop()
-            .context("token data result empty")?
-            .context("token data result null")?
-            .token_data_id)
+        token_data_id: &str,
+    ) -> anyhow::Result<bool> {
+        match current_token_datas_v2::table
+            .filter(current_token_datas_v2::token_data_id.eq(token_data_id))
+            .first::<Self>(conn)
+            .await
+            .optional()
+        {
+            Ok(result) => {
+                if result.is_some() {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            },
+            Err(e) => anyhow::bail!("Error checking if token_data_id exists: {:?}", e),
+        }
     }
 }

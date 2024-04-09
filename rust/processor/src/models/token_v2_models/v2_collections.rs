@@ -5,12 +5,13 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource};
+use super::v2_token_utils::{TokenStandard, V2TokenResource};
 use crate::{
     models::{
         default_models::move_resources::MoveResource,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::{
-            collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            collection_datas::CollectionData,
             token_utils::{CollectionDataIdType, TokenWriteSet},
             tokens::TableHandleToOwner,
         },
@@ -29,7 +30,7 @@ use serde::{Deserialize, Serialize};
 // PK of current_collections_v2, i.e. collection_id
 pub type CurrentCollectionV2PK = String;
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = collections_v2)]
 pub struct CollectionV2 {
@@ -50,7 +51,7 @@ pub struct CollectionV2 {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_id))]
 #[diesel(table_name = current_collections_v2)]
 pub struct CurrentCollectionV2 {
@@ -82,7 +83,7 @@ impl CollectionV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
+        object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let type_str = MoveResource::get_outer_type_from_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
@@ -103,10 +104,10 @@ impl CollectionV2 {
             let (mut current_supply, mut max_supply, mut total_minted_v2) =
                 (BigDecimal::zero(), None, None);
             let (mut mutable_description, mut mutable_uri) = (None, None);
-            if let Some(metadata) = token_v2_metadata.get(&resource.address) {
+            if let Some(object_data) = object_metadatas.get(&resource.address) {
                 // Getting supply data (prefer fixed supply over unlimited supply although they should never appear at the same time anyway)
-                let fixed_supply = metadata.fixed_supply.as_ref();
-                let unlimited_supply = metadata.unlimited_supply.as_ref();
+                let fixed_supply = object_data.fixed_supply.as_ref();
+                let unlimited_supply = object_data.unlimited_supply.as_ref();
                 if let Some(supply) = unlimited_supply {
                     (current_supply, max_supply, total_minted_v2) = (
                         supply.current_supply.clone(),
@@ -122,8 +123,22 @@ impl CollectionV2 {
                     );
                 }
 
+                // Aggregator V2 enables a separate struct for supply
+                let concurrent_supply = object_data.concurrent_supply.as_ref();
+                if let Some(supply) = concurrent_supply {
+                    (current_supply, max_supply, total_minted_v2) = (
+                        supply.current_supply.value.clone(),
+                        if supply.current_supply.max_value == u64::MAX.into() {
+                            None
+                        } else {
+                            Some(supply.current_supply.max_value.clone())
+                        },
+                        Some(supply.total_minted.value.clone()),
+                    );
+                }
+
                 // Getting collection mutability config from AptosCollection
-                let collection = metadata.aptos_collection.as_ref();
+                let collection = object_data.aptos_collection.as_ref();
                 if let Some(collection) = collection {
                     mutable_description = Some(collection.mutable_description);
                     mutable_uri = Some(collection.mutable_uri);
@@ -186,6 +201,8 @@ impl CollectionV2 {
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -205,16 +222,27 @@ impl CollectionV2 {
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
                 None => {
-                    match Self::get_collection_creator_for_v1(conn, &table_handle)
-                        .await
-                        .context(format!(
-                            "Failed to get collection creator for table handle {}, txn version {}",
-                            table_handle, txn_version
-                        )) {
+                    match Self::get_collection_creator_for_v1(
+                        conn,
+                        &table_handle,
+                        query_retries,
+                        query_retry_delay_ms,
+                    )
+                    .await
+                    .context(format!(
+                        "Failed to get collection creator for table handle {}, txn version {}",
+                        table_handle, txn_version
+                    )) {
                         Ok(ca) => ca,
                         Err(_) => {
                             // Try our best by getting from the older collection data
-                            match CollectionData::get_collection_creator(conn, &table_handle).await
+                            match CollectionData::get_collection_creator(
+                                conn,
+                                &table_handle,
+                                query_retries,
+                                query_retry_delay_ms,
+                            )
+                            .await
                             {
                                 Ok(creator) => creator,
                                 Err(_) => {
@@ -283,14 +311,19 @@ impl CollectionV2 {
     async fn get_collection_creator_for_v1(
         conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match Self::get_by_table_handle(conn, table_handle).await {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

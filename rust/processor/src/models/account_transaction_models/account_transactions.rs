@@ -7,23 +7,23 @@
 
 use crate::{
     models::{
-        token_v2_models::v2_token_utils::ObjectWithMetadata,
+        object_models::v2_object_utils::ObjectWithMetadata,
         user_transactions_models::user_transactions::UserTransaction,
     },
     schema::account_transactions,
-    utils::util::standardize_address,
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change, DeleteResource, Event, Transaction,
     WriteResource,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub type AccountTransactionPK = (String, i64);
 
-#[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(account_address, transaction_version))]
 #[diesel(table_name = account_transactions)]
 pub struct AccountTransaction {
@@ -39,12 +39,21 @@ impl AccountTransaction {
     /// We will also consider transactions that the account signed or is part of a multi sig / multi agent.
     /// TODO: recursively find the parent account of an object
     /// TODO: include table items in the detection path
-    pub fn from_transaction(transaction: &Transaction) -> HashMap<AccountTransactionPK, Self> {
+    pub fn from_transaction(transaction: &Transaction) -> AHashMap<AccountTransactionPK, Self> {
         let txn_version = transaction.version as i64;
-        let txn_data = transaction
-            .txn_data
-            .as_ref()
-            .unwrap_or_else(|| panic!("Txn Data doesn't exit for version {}", txn_version));
+        let txn_data = match transaction.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["AccountTransaction"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = transaction.version,
+                    "Transaction data doesn't exist",
+                );
+                return AHashMap::new();
+            },
+        };
         let transaction_info = transaction.info.as_ref().unwrap_or_else(|| {
             panic!("Transaction info doesn't exist for version {}", txn_version)
         });
@@ -63,10 +72,10 @@ impl AccountTransaction {
             TxnData::Genesis(inner) => (&inner.events, vec![]),
             TxnData::BlockMetadata(inner) => (&inner.events, vec![]),
             _ => {
-                return HashMap::new();
+                return AHashMap::new();
             },
         };
-        let mut account_transactions = HashMap::new();
+        let mut account_transactions = AHashMap::new();
         for sig in &signatures {
             account_transactions.insert((sig.signer.clone(), txn_version), Self {
                 transaction_version: txn_version,
@@ -94,10 +103,10 @@ impl AccountTransaction {
 
     /// Base case, record event account address. We don't really have to worry about
     /// objects here because it'll be taken care of in the resource section
-    fn from_event(event: &Event, txn_version: i64) -> HashMap<AccountTransactionPK, Self> {
+    fn from_event(event: &Event, txn_version: i64) -> AHashMap<AccountTransactionPK, Self> {
         let account_address =
             standardize_address(event.key.as_ref().unwrap().account_address.as_str());
-        HashMap::from([((account_address.clone(), txn_version), Self {
+        AHashMap::from([((account_address.clone(), txn_version), Self {
             transaction_version: txn_version,
             account_address,
         })])
@@ -108,8 +117,8 @@ impl AccountTransaction {
     fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-    ) -> anyhow::Result<HashMap<AccountTransactionPK, Self>> {
-        let mut result = HashMap::new();
+    ) -> anyhow::Result<AHashMap<AccountTransactionPK, Self>> {
+        let mut result = AHashMap::new();
         let account_address = standardize_address(write_resource.address.as_str());
         result.insert((account_address.clone(), txn_version), Self {
             transaction_version: txn_version,
@@ -132,8 +141,8 @@ impl AccountTransaction {
     fn from_delete_resource(
         delete_resource: &DeleteResource,
         txn_version: i64,
-    ) -> anyhow::Result<HashMap<AccountTransactionPK, Self>> {
-        let mut result = HashMap::new();
+    ) -> anyhow::Result<AHashMap<AccountTransactionPK, Self>> {
+        let mut result = AHashMap::new();
         let account_address = standardize_address(delete_resource.address.as_str());
         result.insert((account_address.clone(), txn_version), Self {
             transaction_version: txn_version,

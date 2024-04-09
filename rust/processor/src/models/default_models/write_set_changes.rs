@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
+
 use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
@@ -16,7 +17,9 @@ use aptos_protos::transaction::v1::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Associations, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
+)]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, index))]
 #[diesel(table_name = write_set_changes)]
