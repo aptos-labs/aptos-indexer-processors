@@ -184,6 +184,12 @@ impl ProcessorTrait for MercatoProcessor {
             "Processing user transactions",
         );
         self.user_transaction_processor.process_transactions(transactions, start_version, end_version, None).await?;
+        tracing::info!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Finished processing new transactions",
+        );
         result
     }
 
