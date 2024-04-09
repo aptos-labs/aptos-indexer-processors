@@ -192,21 +192,24 @@ impl ProcessorTrait for ObjectsProcessor {
                         ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
                     {
                         // Object core is the first struct that we need to get
-                        object_metadata_helper.insert(address.clone(), ObjectAggregatedData {
-                            object: object_with_metadata,
-                            token: None,
-                            fungible_asset_store: None,
-                            // The following structs are unused in this processor
-                            fungible_asset_metadata: None,
-                            aptos_collection: None,
-                            fixed_supply: None,
-                            unlimited_supply: None,
-                            concurrent_supply: None,
-                            property_map: None,
-                            transfer_events: vec![],
-                            fungible_asset_supply: None,
-                            token_identifier: None,
-                        });
+                        object_metadata_helper.insert(
+                            address.clone(),
+                            ObjectAggregatedData {
+                                object: object_with_metadata,
+                                token: None,
+                                fungible_asset_store: None,
+                                // The following structs are unused in this processor
+                                fungible_asset_metadata: None,
+                                aptos_collection: None,
+                                fixed_supply: None,
+                                unlimited_supply: None,
+                                concurrent_supply: None,
+                                property_map: None,
+                                transfer_events: vec![],
+                                fungible_asset_supply: None,
+                                token_identifier: None,
+                            },
+                        );
                     }
                 }
             }
