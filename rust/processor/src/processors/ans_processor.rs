@@ -285,6 +285,7 @@ fn insert_current_ans_lookups_v2_query(
                 token_name.eq(excluded(token_name)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
+                subdomain_expiration_policy.eq(excluded(subdomain_expiration_policy)),
             )),
         Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
@@ -302,7 +303,11 @@ fn insert_ans_lookups_v2_query(
         diesel::insert_into(schema::ans_lookup_v2::table)
             .values(item_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .do_update()
+            .set((
+                inserted_at.eq(excluded(inserted_at)),
+                subdomain_expiration_policy.eq(excluded(subdomain_expiration_policy)),
+            )),
         None,
     )
 }

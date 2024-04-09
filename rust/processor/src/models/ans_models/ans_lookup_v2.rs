@@ -55,6 +55,7 @@ pub struct CurrentAnsLookupV2 {
     pub expiration_timestamp: chrono::NaiveDateTime,
     pub token_name: String,
     pub is_deleted: bool,
+    pub subdomain_expiration_policy: Option<i64>,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -71,6 +72,7 @@ pub struct AnsLookupV2 {
     pub expiration_timestamp: chrono::NaiveDateTime,
     pub token_name: String,
     pub is_deleted: bool,
+    pub subdomain_expiration_policy: Option<i64>,
 }
 
 #[derive(
@@ -150,6 +152,7 @@ impl CurrentAnsLookupV2 {
                 expiration_timestamp: v1_current_ans_lookup.expiration_timestamp,
                 token_name: v1_current_ans_lookup.token_name,
                 is_deleted: v1_current_ans_lookup.is_deleted,
+                subdomain_expiration_policy: None,
             },
             AnsLookupV2 {
                 transaction_version: v1_ans_lookup.transaction_version,
@@ -161,6 +164,7 @@ impl CurrentAnsLookupV2 {
                 expiration_timestamp: v1_ans_lookup.expiration_timestamp,
                 token_name: v1_ans_lookup.token_name,
                 is_deleted: v1_ans_lookup.is_deleted,
+                subdomain_expiration_policy: None,
             },
         )
     }
@@ -177,12 +181,11 @@ impl CurrentAnsLookupV2 {
                 .unwrap()
         {
             // If this resource account has a SubdomainExt, then it's a subdomain
-            let maybe_subdomain_name = address_to_subdomain_ext
+            let (subdomain_name, subdomain_expiration_policy) = match address_to_subdomain_ext
                 .get(&standardize_address(write_resource.address.as_str()))
-                .map(|subdomain_ext| subdomain_ext.get_subdomain_trunc());
-            let subdomain_name = match maybe_subdomain_name.clone() {
-                Some(subdomain) => subdomain,
-                None => "".to_string(),
+            {
+                Some(s) => (s.get_subdomain_trunc(), Some(s.subdomain_expiration_policy)),
+                None => ("".to_string(), None),
             };
 
             let token_name = get_token_name(
@@ -200,6 +203,7 @@ impl CurrentAnsLookupV2 {
                     token_name: token_name.clone(),
                     last_transaction_version: txn_version,
                     is_deleted: false,
+                    subdomain_expiration_policy,
                 },
                 AnsLookupV2 {
                     transaction_version: txn_version,
@@ -211,6 +215,7 @@ impl CurrentAnsLookupV2 {
                     expiration_timestamp: inner.get_expiration_time(),
                     token_name,
                     is_deleted: false,
+                    subdomain_expiration_policy,
                 },
             )));
         }

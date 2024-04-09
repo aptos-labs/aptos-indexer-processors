@@ -181,7 +181,7 @@ impl NameRecordV2 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubdomainExtV2 {
-    subdomain_expiration_policy: BigDecimal,
+    pub subdomain_expiration_policy: i64,
     subdomain_name: String,
 }
 
