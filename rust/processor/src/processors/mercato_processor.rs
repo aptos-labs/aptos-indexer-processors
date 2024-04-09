@@ -61,7 +61,7 @@ async fn insert_to_db(
         name = name,
         start_version = start_version,
         end_version = end_version,
-        "Inserting to \"transactions\"",
+        "Inserting into \"transactions\"",
     );
 
     let txns_res = execute_in_chunks(
