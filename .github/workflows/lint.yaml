@@ -43,4 +43,3 @@ jobs:
       - name: Ensure the --no-default-features build passes too
         run: cargo build --no-default-features
         working-directory: rust
-
