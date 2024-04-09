@@ -122,6 +122,12 @@ impl ProcessorTrait for MercatoProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        tracing::info!(
+            name = self.name(),
+            start_version = start_version,
+            end_version = end_version,
+            "Processing new transactions",
+        );
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         let (
