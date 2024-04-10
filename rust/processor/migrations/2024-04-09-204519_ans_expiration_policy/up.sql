@@ -43,5 +43,5 @@ WHERE cal.is_deleted IS false
     -- Mainnet ANS v1 domain collection
     '0x63d26a4e3a8aeececf9b878e46bad78997fb38e50936efeabb2c4453f4d7f746',
     -- Mainnet ANS v2 domain collection
-    '0x63d26a4e3a8aeececf9b878e46bad78997fb38e50936efeabb2c4453f4d7f746' -- Mainnet ANS v2 subdomain collection
+    '0x30fbc956f0f38db2d314bd9c018d34be3e047a804a71e30a4e5d43d8b7c539eb' -- Mainnet ANS v2 subdomain collection
   );
