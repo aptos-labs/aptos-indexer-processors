@@ -38,7 +38,7 @@ for example in $EXAMPLES_TO_BUILD; do
         -v $(pwd)/$example:/workspace \
         gcr.io/kaniko-project/executor:latest \
         --dockerfile /workspace/Dockerfile \
-        --destination "$TARGET_REGISTRY/$example:$GIT_SHA" \
+        --destination "$TARGET_REGISTRY/$example:$GIT_SHA,aptos-indexer-processors" \
         --context dir:///workspace/ \
         --cache=true
 done
