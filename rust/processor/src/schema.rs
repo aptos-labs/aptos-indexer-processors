@@ -44,6 +44,7 @@ diesel::table! {
         token_name -> Varchar,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        subdomain_expiration_policy -> Nullable<Int8>,
     }
 }
 
@@ -263,6 +264,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        subdomain_expiration_policy -> Nullable<Int8>,
     }
 }
 

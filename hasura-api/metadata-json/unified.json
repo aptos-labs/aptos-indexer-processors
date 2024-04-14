@@ -1,5 +1,5 @@
 {
-  "resource_version": 307,
+  "resource_version": 313,
   "metadata": {
     "version": 3,
     "sources": [
@@ -879,17 +879,19 @@
                 "role": "anonymous",
                 "permission": {
                   "columns": [
-                    "last_transaction_version",
+                    "domain",
+                    "domain_expiration_timestamp",
+                    "domain_with_suffix",
+                    "expiration_timestamp",
                     "is_active",
                     "is_primary",
-                    "domain",
+                    "last_transaction_version",
                     "owner_address",
                     "registered_address",
                     "subdomain",
+                    "subdomain_expiration_policy",
                     "token_name",
-                    "token_standard",
-                    "domain_with_suffix",
-                    "expiration_timestamp"
+                    "token_standard"
                   ],
                   "filter": {},
                   "limit": 100,
