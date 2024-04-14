@@ -3,7 +3,7 @@ use super::{
     ProcessingResult, ProcessorName, ProcessorTrait,
 };
 use crate::{
-    models::default_models::transactions::TransactionModel,
+    models::default_models::{block_metadata_transactions::BlockMetadataTransactionModel, transactions::TransactionModel},
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
@@ -18,6 +18,7 @@ use diesel::{
 };
 use std::fmt::Debug;
 use tracing::error;
+use tokio::join;
 
 pub struct MercatoProcessor {
     connection_pool: PgDbPool,
@@ -64,6 +65,7 @@ async fn insert_to_db(
     start_version: u64,
     end_version: u64,
     txns: &[TransactionModel],
+    block_metadata_transactions: &[BlockMetadataTransactionModel],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -78,22 +80,28 @@ async fn insert_to_db(
         insert_transactions_query,
         txns,
         get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    )
-    .await;
+    );
 
-    match txns_res {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!(
-                start_version = start_version,
-                end_version = end_version,
-                processor_name = name,
-                error = ?e,
-                "[Parser] Error inserting transactions into \"transactions\"",
-            );
-            Ok(())
-        },
+    let bmt_res = execute_in_chunks(
+        conn.clone(),
+        insert_block_metadata_transactions_query,
+        block_metadata_transactions,
+        get_config_table_chunk_size::<BlockMetadataTransactionModel>(
+            "block_metadata_transactions",
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let (txns_res, bmt_res) =
+        join!(txns_res, bmt_res);
+
+    for res in [
+        txns_res, bmt_res,
+    ] {
+        res?;
     }
+
+    Ok(())
 }
 
 fn insert_transactions_query(
@@ -113,6 +121,23 @@ fn insert_transactions_query(
                 inserted_at.eq(excluded(inserted_at)),
                 payload_type.eq(excluded(payload_type)),
             )),
+        None,
+    )
+}
+
+fn insert_block_metadata_transactions_query(
+    items_to_insert: Vec<BlockMetadataTransactionModel>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::block_metadata_transactions::dsl::*;
+
+    (
+        diesel::insert_into(schema::block_metadata_transactions::table)
+            .values(items_to_insert)
+            .on_conflict(version)
+            .do_nothing(),
         None,
     )
 }
@@ -138,9 +163,14 @@ impl ProcessorTrait for MercatoProcessor {
         );
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-        let (txns, _, _, _) = TransactionModel::from_transactions(&transactions);
+        let (txns, block_metadata_txns, _, _) = TransactionModel::from_transactions(&transactions);
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
+
+        let mut block_metadata_transactions = vec![];
+        for block_metadata_txn in block_metadata_txns {
+            block_metadata_transactions.push(block_metadata_txn.clone());
+        }
 
         let tx_result = insert_to_db(
             self.get_pool(),
@@ -148,6 +178,7 @@ impl ProcessorTrait for MercatoProcessor {
             start_version,
             end_version,
             &txns,
+            &block_metadata_transactions,
             &self.per_table_chunk_sizes,
         )
         .await;
