@@ -7,11 +7,11 @@ name: Build docker image
 
 on:
   push:
-    branches: [ "develop", "master" ]
+    branches: [ "develop", "master", "main" ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [ "develop", "master" ]
+    branches: [ "develop", "master", "main" ]
 
 env:
   # Use docker.io for Docker Hub if empty
