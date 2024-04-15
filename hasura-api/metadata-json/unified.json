@@ -1,5 +1,5 @@
 {
-  "resource_version": 313,
+  "resource_version": 316,
   "metadata": {
     "version": 3,
     "sources": [
@@ -295,6 +295,23 @@
               "name": "account_transactions",
               "schema": "public"
             },
+            "object_relationships": [
+              {
+                "name": "user_transaction",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "user_transactions",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
             "array_relationships": [
               {
                 "name": "coin_activities",
@@ -2485,7 +2502,7 @@
           "GET"
         ],
         "name": "Latest Processor Status",
-        "url": "get_lastest_processor_status"
+        "url": "get_latest_processor_status"
       }
     ],
     "api_limits": {
