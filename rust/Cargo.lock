@@ -1840,26 +1840,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
-name = "post-processor"
-version = "1.0.0"
-dependencies = [
- "ahash",
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "futures",
- "once_cell",
- "prometheus",
- "reqwest",
- "serde",
- "serde_json",
- "server-framework",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "postgres-native-tls"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
