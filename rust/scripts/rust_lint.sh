@@ -5,7 +5,7 @@
 #
 # The best way to do this however is to run scripts/dev_setup.sh
 #
-# If you want to run this from anywhere in aptos-core, try adding this wrapepr
+# If you want to run this from anywhere in aptos-core, try adding this wrapper
 # script to your path:
 # https://gist.github.com/banool/e6a2b85e2fff067d3a215cbfaf808032
 
