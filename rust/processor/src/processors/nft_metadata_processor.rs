@@ -3,7 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
+    db::common::models::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
@@ -14,7 +14,7 @@ use crate::{
         },
     },
     utils::{
-        database::{PgDbPool, PgPoolConnection},
+        database::{ArcDbPool, DbPoolConnection},
         util::{parse_timestamp, remove_null_bytes, standardize_address},
     },
     IndexerGrpcProcessorConfig,
@@ -46,13 +46,13 @@ pub struct NftMetadataProcessorConfig {
 }
 
 pub struct NftMetadataProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     chain_id: u8,
     config: NftMetadataProcessorConfig,
 }
 
 impl NftMetadataProcessor {
-    pub fn new(connection_pool: PgDbPool, config: NftMetadataProcessorConfig) -> Self {
+    pub fn new(connection_pool: ArcDbPool, config: NftMetadataProcessorConfig) -> Self {
         tracing::info!("init NftMetadataProcessor");
 
         // Crate reads from authentication from file specified in
@@ -186,7 +186,7 @@ impl ProcessorTrait for NftMetadataProcessor {
         })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }
@@ -217,7 +217,7 @@ fn clean_collection_pubsub_message(cc: CurrentCollectionV2, db_chain_id: u64) ->
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut PgPoolConnection<'_>,
+    conn: &mut DbPoolConnection<'_>,
     query_retries: u32,
     query_retry_delay_ms: u64,
 ) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {

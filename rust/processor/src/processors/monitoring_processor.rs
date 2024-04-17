@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
-use crate::utils::database::PgDbPool;
+use crate::utils::database::ArcDbPool;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
 pub struct MonitoringProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
 }
 
 impl MonitoringProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
+    pub fn new(connection_pool: ArcDbPool) -> Self {
         Self { connection_pool }
     }
 }
@@ -50,7 +50,7 @@ impl ProcessorTrait for MonitoringProcessor {
         })
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

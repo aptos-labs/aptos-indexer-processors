@@ -3,13 +3,13 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::object_models::{
+    db::common::models::object_models::{
         v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
         v2_objects::{CurrentObject, Object},
     },
     schema,
     utils::{
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::standardize_address,
     },
     IndexerGrpcProcessorConfig,
@@ -36,14 +36,14 @@ pub struct ObjectsProcessorConfig {
     pub query_retry_delay_ms: u64,
 }
 pub struct ObjectsProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     config: ObjectsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl ObjectsProcessor {
     pub fn new(
-        connection_pool: PgDbPool,
+        connection_pool: ArcDbPool,
         config: ObjectsProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
     ) -> Self {
@@ -67,7 +67,7 @@ impl Debug for ObjectsProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -295,7 +295,7 @@ impl ProcessorTrait for ObjectsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

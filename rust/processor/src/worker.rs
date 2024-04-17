@@ -3,8 +3,8 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
+    db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     grpc_stream::TransactionsPBResponse,
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
@@ -28,7 +28,9 @@ use crate::{
             SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS, SINGLE_BATCH_PARSING_TIME_IN_SECS,
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
-        database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
+        database::{
+            execute_with_better_error_conn, new_db_pool, run_pending_migrations, ArcDbPool,
+        },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -48,7 +50,7 @@ pub const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 pub struct Worker {
-    pub db_pool: PgDbPool,
+    pub db_pool: ArcDbPool,
     pub processor_config: ProcessorConfig,
     pub postgres_connection_string: String,
     pub indexer_grpc_data_service_address: Url,
@@ -692,7 +694,7 @@ pub async fn do_processor(
 pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
-    db_pool: PgDbPool,
+    db_pool: ArcDbPool,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(

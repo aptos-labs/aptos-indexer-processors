@@ -7,28 +7,28 @@
 use crate::utils::util::remove_null_bytes;
 use ahash::AHashMap;
 use diesel::{
-    backend::Backend,
     query_builder::{AstPass, Query, QueryFragment},
     ConnectionResult, QueryResult,
 };
 use diesel_async::{
-    pg::AsyncPgConnection,
     pooled_connection::{
         bb8::{Pool, PooledConnection},
         AsyncDieselConnectionManager, ManagerConfig, PoolError,
     },
-    RunQueryDsl,
+    AsyncPgConnection, RunQueryDsl,
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures_util::{future::BoxFuture, FutureExt};
 use std::{cmp::min, sync::Arc};
 
-pub type MyDbConnection = AsyncPgConnection;
-pub type PgPool = Pool<MyDbConnection>;
-pub type PgDbPool = Arc<PgPool>;
-pub type PgPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
+pub type Backend = diesel::pg::Pg;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+pub type MyDbConnection = AsyncPgConnection;
+pub type DbPool = Pool<MyDbConnection>;
+pub type ArcDbPool = Arc<DbPool>;
+pub type DbPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/postgres/migrations");
 
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
 
@@ -120,13 +120,13 @@ fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
 pub async fn new_db_pool(
     database_url: &str,
     max_pool_size: Option<u32>,
-) -> Result<PgDbPool, PoolError> {
+) -> Result<ArcDbPool, PoolError> {
     let (_url, cert_path) = parse_and_clean_db_url(database_url);
 
     let config = if cert_path.is_some() {
-        let mut config = ManagerConfig::<AsyncPgConnection>::default();
+        let mut config = ManagerConfig::<MyDbConnection>::default();
         config.custom_setup = Box::new(|conn| Box::pin(establish_connection(conn)));
-        AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(database_url, config)
+        AsyncDieselConnectionManager::<MyDbConnection>::new_with_config(database_url, config)
     } else {
         AsyncDieselConnectionManager::<MyDbConnection>::new(database_url)
     };
@@ -138,13 +138,13 @@ pub async fn new_db_pool(
 }
 
 pub async fn execute_in_chunks<U, T>(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     build_query: fn(Vec<T>) -> (U, Option<&'static str>),
     items_to_insert: &[T],
     chunk_size: usize,
 ) -> Result<(), diesel::result::Error>
 where
-    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send + 'static,
+    U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send + 'static,
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone + Send + 'static,
 {
     let chunks = get_chunks(items_to_insert.len(), chunk_size);
@@ -173,14 +173,14 @@ where
 }
 
 pub async fn execute_with_better_error<U>(
-    pool: PgDbPool,
+    pool: ArcDbPool,
     query: U,
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
 where
-    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+    U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send,
 {
-    let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    let original_query = diesel::debug_query::<Backend, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
     // SELECT 1 FROM TABLE WHERE 1=0
     if original_query.to_lowercase().contains("where") {
@@ -190,7 +190,7 @@ where
         query,
         where_clause: additional_where_clause,
     };
-    let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    let debug_string = diesel::debug_query::<Backend, _>(&final_query).to_string();
     tracing::debug!("Executing query: {:?}", debug_string);
     let conn = &mut pool.get().await.map_err(|e| {
         tracing::warn!("Error getting connection from pool: {:?}", e);
@@ -225,9 +225,9 @@ pub async fn execute_with_better_error_conn<U>(
     mut additional_where_clause: Option<&'static str>,
 ) -> QueryResult<usize>
 where
-    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+    U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send,
 {
-    let original_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
+    let original_query = diesel::debug_query::<Backend, _>(&query).to_string();
     // This is needed because if we don't insert any row, then diesel makes a call like this
     // SELECT 1 FROM TABLE WHERE 1=0
     if original_query.to_lowercase().contains("where") {
@@ -237,7 +237,7 @@ where
         query,
         where_clause: additional_where_clause,
     };
-    let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    let debug_string = diesel::debug_query::<Backend, _>(&final_query).to_string();
     tracing::debug!("Executing query: {:?}", debug_string);
     let res = final_query.execute(conn).await;
     if let Err(ref e) = res {
@@ -247,14 +247,14 @@ where
 }
 
 async fn execute_or_retry_cleaned<U, T>(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     build_query: fn(Vec<T>) -> (U, Option<&'static str>),
     items: Vec<T>,
     query: U,
     additional_where_clause: Option<&'static str>,
 ) -> Result<(), diesel::result::Error>
 where
-    U: QueryFragment<diesel::pg::Pg> + diesel::query_builder::QueryId + Send,
+    U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send,
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
 {
     match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
@@ -275,7 +275,7 @@ where
     Ok(())
 }
 
-pub fn run_pending_migrations<DB: Backend>(conn: &mut impl MigrationHarness<DB>) {
+pub fn run_pending_migrations<DB: diesel::backend::Backend>(conn: &mut impl MigrationHarness<DB>) {
     conn.run_pending_migrations(MIGRATIONS)
         .expect("[Parser] Migrations failed!");
 }
@@ -287,11 +287,11 @@ impl<T: Query> Query for UpsertFilterLatestTransactionQuery<T> {
 
 //impl<T> RunQueryDsl<MyDbConnection> for UpsertFilterLatestTransactionQuery<T> {}
 
-impl<T> QueryFragment<diesel::pg::Pg> for UpsertFilterLatestTransactionQuery<T>
+impl<T> QueryFragment<Backend> for UpsertFilterLatestTransactionQuery<T>
 where
-    T: QueryFragment<diesel::pg::Pg>,
+    T: QueryFragment<Backend>,
 {
-    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, diesel::pg::Pg>) -> QueryResult<()> {
+    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, Backend>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;
         if let Some(w) = self.where_clause {
             out.push_sql(w);
