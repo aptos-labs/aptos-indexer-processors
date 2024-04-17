@@ -150,7 +150,8 @@ pub async fn get_stream(
     let mut rpc_client = match connect_res {
         Ok(client) => client
             .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
-            .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+            .accept_compressed(tonic::codec::CompressionEncoding::Zstd)
+            .send_compressed(tonic::codec::CompressionEncoding::Zstd)
             .max_decoding_message_size(MAX_RESPONSE_SIZE)
             .max_encoding_message_size(MAX_RESPONSE_SIZE),
         Err(e) => {

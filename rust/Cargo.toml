@@ -20,7 +20,7 @@ aptos-moving-average = { path = "moving-average" }
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.62"
 async-trait = "0.1.53"
-aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", tag = "aptos-node-v1.10.0" }
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", tag = "aptos-node-v1.11.0" }
 backtrace = "0.3.58"
 base64 = "0.13.0"
 bb8 = "0.8.1"
@@ -84,13 +84,14 @@ tempfile = "3.3.0"
 toml = "0.7.4"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 tokio = { version = "1.35.1", features = ["full"] }
-tonic = { version = "0.10.2", features = [
+tonic = { version = "0.11.0", features = [
     "tls",
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
+    "zstd",
 ] }
 tracing = "0.1.34"
 unescape = "0.1.0"
