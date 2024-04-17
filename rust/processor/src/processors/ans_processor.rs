@@ -3,7 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::ans_models::{
+    db::common::models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
         ans_lookup_v2::{
             AnsLookupV2, AnsPrimaryNameV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2,
@@ -13,7 +13,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::standardize_address,
     },
 };
@@ -41,14 +41,14 @@ pub struct AnsProcessorConfig {
 }
 
 pub struct AnsProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     config: AnsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AnsProcessor {
     pub fn new(
-        connection_pool: PgDbPool,
+        connection_pool: ArcDbPool,
         config: AnsProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
     ) -> Self {
@@ -78,7 +78,7 @@ impl Debug for AnsProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -430,7 +430,7 @@ impl ProcessorTrait for AnsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

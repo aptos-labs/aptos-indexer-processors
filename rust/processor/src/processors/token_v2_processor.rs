@@ -3,7 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
+    db::common::models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
@@ -29,7 +29,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool, DbPoolConnection},
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
     IndexerGrpcProcessorConfig,
@@ -57,14 +57,14 @@ pub struct TokenV2ProcessorConfig {
 }
 
 pub struct TokenV2Processor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     config: TokenV2ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl TokenV2Processor {
     pub fn new(
-        connection_pool: PgDbPool,
+        connection_pool: ArcDbPool,
         config: TokenV2ProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
     ) -> Self {
@@ -88,7 +88,7 @@ impl Debug for TokenV2Processor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -611,7 +611,7 @@ impl ProcessorTrait for TokenV2Processor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }
@@ -619,7 +619,7 @@ impl ProcessorTrait for TokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut PgPoolConnection<'_>,
+    conn: &mut DbPoolConnection<'_>,
     query_retries: u32,
     query_retry_delay_ms: u64,
 ) -> (

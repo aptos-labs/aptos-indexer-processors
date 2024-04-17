@@ -4,9 +4,6 @@
 // Note: For enum_dispatch to work nicely, it is easiest to have the trait and the enum
 // in the same file (ProcessorTrait and Processor).
 
-// Note: For enum_dispatch to work nicely, it is easiest to have the trait and the enum
-// in the same file (ProcessorTrait and Processor).
-
 pub mod account_transactions_processor;
 pub mod ans_processor;
 pub mod coin_processor;
@@ -39,11 +36,11 @@ use self::{
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
-    models::processor_status::ProcessorStatus,
+    db::common::models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
-        database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+        database::{execute_with_better_error, ArcDbPool, DbPoolConnection},
         util::parse_timestamp,
     },
 };
@@ -80,19 +77,19 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below
-    fn connection_pool(&self) -> &PgDbPool;
+    fn connection_pool(&self) -> &ArcDbPool;
 
     //* Below are helper methods that don't need to be implemented *//
 
     /// Gets an instance of the connection pool
-    fn get_pool(&self) -> PgDbPool {
+    fn get_pool(&self) -> ArcDbPool {
         let pool = self.connection_pool();
         pool.clone()
     }
 
     /// Gets the connection.
     /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
-    async fn get_conn(&self) -> PgPoolConnection {
+    async fn get_conn(&self) -> DbPoolConnection {
         let pool = self.connection_pool();
         loop {
             match pool.get().await {

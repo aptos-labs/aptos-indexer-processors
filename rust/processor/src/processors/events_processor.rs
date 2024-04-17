@@ -3,11 +3,11 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::events_models::events::EventModel,
+    db::common::models::events_models::events::EventModel,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
     },
 };
 use ahash::AHashMap;
@@ -23,12 +23,12 @@ use std::fmt::Debug;
 use tracing::error;
 
 pub struct EventsProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
@@ -48,7 +48,7 @@ impl Debug for EventsProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -171,7 +171,7 @@ impl ProcessorTrait for EventsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }
