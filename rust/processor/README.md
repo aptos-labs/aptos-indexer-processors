@@ -26,7 +26,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
         number_concurrent_processing_tasks: 10
         auth_token: AUTH_TOKEN
         starting_version: 0 # optional
-        override_starting_version: false # optional
+        override_starting_version: false # optional, defaults to true
         ending_version: 0 # optional
         transaction_filter:
           # Only allow transactions from these contract addresses

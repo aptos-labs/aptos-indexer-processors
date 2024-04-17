@@ -158,11 +158,10 @@ impl Worker {
             });
 
         let mut starting_version = self.starting_version.unwrap_or(starting_version_from_db);
+        let override_starting_version = self.override_starting_version.unwrap_or(true);
 
-        if let Some(override_starting_version) = self.override_starting_version {
-            if override_starting_version && self.starting_version.is_some() {
-                starting_version = self.starting_version.unwrap();
-            }
+        if override_starting_version && self.starting_version.is_some() {
+            starting_version = self.starting_version.unwrap();
         }
 
         info!(
@@ -186,7 +185,7 @@ impl Worker {
             self.auth_token.clone(),
             processor_name.to_string(),
         )
-        .await;
+            .await;
         self.check_or_update_chain_id(chain_id as i64)
             .await
             .unwrap();
@@ -229,7 +228,7 @@ impl Worker {
                 transaction_filter,
                 pb_channel_txn_chunk_size,
             )
-            .await
+                .await
         });
 
         // Create a gap detector task that will panic if there is a gap in the processing
@@ -248,7 +247,7 @@ impl Worker {
                 starting_version,
                 gap_detection_batch_size,
             )
-            .await;
+                .await;
         });
 
         // This is the consumer side of the channel. These are the major states:
@@ -327,7 +326,7 @@ impl Worker {
                     receiver_clone.clone(),
                     task_index,
                 )
-                .await;
+                    .await;
 
                 let size_in_bytes = transactions_pb.size_in_bytes as f64;
                 let first_txn_version = transactions_pb
@@ -405,7 +404,7 @@ impl Worker {
                     &auth_token,
                     false, // enable_verbose_logging
                 )
-                .await;
+                    .await;
 
                 let processing_result = match res {
                     Ok(versions) => {
@@ -540,8 +539,8 @@ impl Worker {
                 AsyncConnectionWrapper::from(conn);
             run_pending_migrations(&mut conn);
         })
-        .await
-        .expect("[Parser] Failed to run migrations");
+            .await
+            .expect("[Parser] Failed to run migrations");
     }
 
     /// Gets the start version for the processor. If not found, start from 0.
@@ -592,9 +591,9 @@ impl Worker {
                         .on_conflict_do_nothing(),
                     None,
                 )
-                .await
-                .context("[Parser] Error updating chain_id!")
-                .map(|_| grpc_chain_id as u64)
+                    .await
+                    .context("[Parser] Error updating chain_id!")
+                    .map(|_| grpc_chain_id as u64)
             },
         }
     }
