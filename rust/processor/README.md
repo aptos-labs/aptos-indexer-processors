@@ -26,7 +26,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
         number_concurrent_processing_tasks: 10
         auth_token: AUTH_TOKEN
         starting_version: 0 # optional
-        override_starting_version: false # optional, defaults to true
+        starting_version_if_nothing_in_db: 0 # optional
         ending_version: 0 # optional
         transaction_filter:
           # Only allow transactions from these contract addresses
@@ -47,8 +47,8 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 - `indexer_grpc_http2_ping_interval_in_secs`: client-side grpc HTTP2 ping interval.
 - `indexer_grpc_http2_ping_timeout_in_secs`: client-side grpc HTTP2 ping timeout.
 - `auth_token`: Auth token used for connection.
-- `starting_version`: start processor at starting_version.
-- `override_starting_version`: indicates whether to enforce the starting version from the configuration, disregarding any existing database values.
+- `starting_version`: start processor at starting_version regardless of the database version.
+- `starting_version_if_nothing_in_db`: start processor at the starting_version if nothing is set in the database.
 - `ending_version`: stop processor after ending_version.
 - `number_concurrent_processing_tasks`: number of tasks to parse and insert; 1 means sequential processing, otherwise,
   transactions are splitted into tasks and inserted with random order.

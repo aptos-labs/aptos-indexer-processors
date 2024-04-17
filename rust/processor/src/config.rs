@@ -27,8 +27,8 @@ pub struct IndexerGrpcProcessorConfig {
     pub auth_token: String,
     // Version to start indexing from
     pub starting_version: Option<u64>,
-    // Indicates whether to enforce the starting version from the configuration, disregarding any existing database values
-    pub override_starting_version: Option<bool>,
+    // Version to start indexing from if nothing in db
+    pub starting_version_if_nothing_in_db: Option<u64>,
     // Version to end indexing at
     pub ending_version: Option<u64>,
     // Number of tasks waiting to pull transaction batches from the channel and process them
@@ -79,7 +79,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.grpc_http2_config.clone(),
             self.auth_token.clone(),
             self.starting_version,
-            self.override_starting_version,
+            self.starting_version_if_nothing_in_db,
             self.ending_version,
             self.number_concurrent_processing_tasks,
             self.db_pool_size,

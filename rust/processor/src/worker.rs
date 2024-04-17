@@ -55,7 +55,7 @@ pub struct Worker {
     pub grpc_http2_config: IndexerGrpcHttp2Config,
     pub auth_token: String,
     pub starting_version: Option<u64>,
-    pub override_starting_version: Option<bool>,
+    pub starting_version_if_nothing_in_db: Option<u64>,
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub gap_detection_batch_size: u64,
@@ -74,7 +74,7 @@ impl Worker {
         grpc_http2_config: IndexerGrpcHttp2Config,
         auth_token: String,
         starting_version: Option<u64>,
-        override_starting_version: Option<bool>,
+        starting_version_if_nothing_in_db: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
@@ -109,7 +109,7 @@ impl Worker {
             indexer_grpc_data_service_address,
             grpc_http2_config,
             starting_version,
-            override_starting_version,
+            starting_version_if_nothing_in_db,
             ending_version,
             auth_token,
             number_concurrent_processing_tasks,
@@ -144,25 +144,25 @@ impl Worker {
             "[Parser] Finished migrations"
         );
 
-        let starting_version_from_db = self
+        let mut starting_version_from_db = None;
+
+        let starting_version = match self
             .get_start_version()
             .await
-            .expect("[Parser] Database error when getting starting version")
-            .unwrap_or_else(|| {
+            .expect("[Parser] Database error when getting starting version") {
+            None => {
                 info!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     "[Parser] No starting version from db so starting from version 0"
                 );
-                0
-            });
-
-        let mut starting_version = self.starting_version.unwrap_or(starting_version_from_db);
-        let override_starting_version = self.override_starting_version.unwrap_or(true);
-
-        if override_starting_version && self.starting_version.is_some() {
-            starting_version = self.starting_version.unwrap();
-        }
+                self.starting_version_if_nothing_in_db.unwrap_or(0)
+            }
+            Some(version) => {
+                starting_version_from_db = Some(version);
+                version
+            }
+        };
 
         info!(
             processor_name = processor_name,
@@ -170,7 +170,7 @@ impl Worker {
             stream_address = self.indexer_grpc_data_service_address.to_string(),
             final_start_version = starting_version,
             start_version_from_config = self.starting_version,
-            override_starting_version = self.override_starting_version,
+            starting_version_if_nothing_in_db = self.starting_version_if_nothing_in_db,
             start_version_from_db = starting_version_from_db,
             "[Parser] Building processor",
         );
