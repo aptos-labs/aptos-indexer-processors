@@ -9,6 +9,7 @@ WORKDIR /app
 COPY --link . /app
 
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev lld
+ENV CARGO_NET_GIT_FETCH_WITH_CLI true
 RUN cargo build --locked --release -p processor
 RUN cp target/release/processor /usr/local/bin
 RUN cargo build --locked --release -p indexer-metrics
