@@ -146,7 +146,7 @@ impl Worker {
 
         let mut starting_version_from_db = None;
 
-        let starting_version = match self
+        let mut starting_version = match self
             .get_start_version()
             .await
             .expect("[Parser] Database error when getting starting version") {
@@ -163,6 +163,10 @@ impl Worker {
                 version
             }
         };
+
+        if let Some(force_start_version) = self.starting_version {
+            starting_version = force_start_version
+        }
 
         info!(
             processor_name = processor_name,
