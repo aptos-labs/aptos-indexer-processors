@@ -10,7 +10,7 @@ git fetch upstream
 git merge upstream/main
 
 cd rust
-cargo build --locked --release -p processor
+#cargo build --locked --release -p processor
 
 # Check if the build was successful
 if [ $? -eq 0 ]; then
@@ -21,7 +21,7 @@ if [ $? -eq 0 ]; then
     git config --global user.name "Bot"
     git push origin "$current_date"
     
-    gh pr create --title "Autoupdate" --body "The upstream/main was merged and built successfully."
+    gh pr create --head --title "Autoupdate" --body "The upstream/main was merged and built successfully."
 else
     echo "Build failed"
     exit 1
