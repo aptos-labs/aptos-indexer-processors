@@ -1,4 +1,4 @@
-name: "Lint"
+name: "Auto update to fresh upstream"
 on:
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
@@ -16,4 +16,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: bash scripts/auto-update-upstream.sh
-        working-directory: rust
+        
