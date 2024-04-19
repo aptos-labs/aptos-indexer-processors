@@ -4,9 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
-        fungible_asset_models::v2_fungible_asset_utils::{
-            FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
-        },
+        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
@@ -604,18 +602,8 @@ async fn parse_v2_token(
                         token_v2_metadata_helper.insert(
                             standardize_address(&wr.address.to_string()),
                             ObjectAggregatedData {
-                                aptos_collection: None,
-                                fixed_supply: None,
                                 object,
-                                unlimited_supply: None,
-                                concurrent_supply: None,
-                                property_map: None,
-                                transfer_events: vec![],
-                                token: None,
-                                fungible_asset_metadata: None,
-                                fungible_asset_supply: None,
-                                fungible_asset_store: None,
-                                token_identifier: None,
+                                ..ObjectAggregatedData::default()
                             },
                         );
                     }
@@ -660,16 +648,6 @@ async fn parse_v2_token(
                             FungibleAssetMetadata::from_write_resource(wr, txn_version).unwrap()
                         {
                             aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
-                        }
-                        if let Some(fungible_asset_supply) =
-                            FungibleAssetSupply::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.fungible_asset_supply = Some(fungible_asset_supply);
-                        }
-                        if let Some(fungible_asset_store) =
-                            FungibleAssetStore::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.fungible_asset_store = Some(fungible_asset_store);
                         }
                         if let Some(token_identifier) =
                             TokenIdentifiers::from_write_resource(wr, txn_version).unwrap()
@@ -731,21 +709,6 @@ async fn parse_v2_token(
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
-                )
-                .await
-                .unwrap()
-                {
-                    token_activities_v2.push(event);
-                }
-                // handling all the token v2 events
-                if let Some(event) = TokenActivityV2::get_ft_v2_from_parsed_event(
-                    event,
-                    txn_version,
-                    txn_timestamp,
-                    index as i64,
-                    &entry_function_id_str,
-                    &token_v2_metadata_helper,
-                    conn,
                 )
                 .await
                 .unwrap()
@@ -951,31 +914,6 @@ async fn parse_v2_token(
                                     current_nft_ownership.storage_id.clone(),
                                 ),
                                 current_nft_ownership,
-                            );
-                        }
-
-                        // Add fungible token handling
-                        if let Some((ft_ownership, current_ft_ownership)) =
-                            TokenOwnershipV2::get_ft_v2_from_write_resource(
-                                resource,
-                                txn_version,
-                                wsc_index,
-                                txn_timestamp,
-                                &token_v2_metadata_helper,
-                                conn,
-                            )
-                            .await
-                            .unwrap()
-                        {
-                            token_ownerships_v2.push(ft_ownership);
-                            current_token_ownerships_v2.insert(
-                                (
-                                    current_ft_ownership.token_data_id.clone(),
-                                    current_ft_ownership.property_version_v1.clone(),
-                                    current_ft_ownership.owner_address.clone(),
-                                    current_ft_ownership.storage_id.clone(),
-                                ),
-                                current_ft_ownership,
                             );
                         }
 

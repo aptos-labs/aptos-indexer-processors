@@ -7,7 +7,6 @@
 
 use super::{
     v2_fungible_asset_activities::EventToCoinType, v2_fungible_asset_utils::FungibleAssetStore,
-    v2_fungible_metadata::FungibleAssetMetadataModel,
 };
 use crate::{
     models::{
@@ -16,7 +15,7 @@ use crate::{
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::{current_fungible_asset_balances, fungible_asset_balances},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::util::standardize_address,
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
@@ -71,7 +70,6 @@ impl FungibleAssetBalance {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
         {
@@ -81,17 +79,6 @@ impl FungibleAssetBalance {
                 let object = &object_data.object.object_core;
                 let owner_address = object.get_owner_address();
                 let asset_type = inner.metadata.get_reference_address();
-                // If it's a fungible token, return early
-                if !FungibleAssetMetadataModel::is_address_fungible_asset(
-                    conn,
-                    &asset_type,
-                    object_metadatas,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);
 
                 let coin_balance = Self {

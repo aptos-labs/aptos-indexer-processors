@@ -99,21 +99,13 @@ impl TokenDataV2 {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             let mut token_name = inner.get_name_trunc();
-            // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
-            let (mut maximum, mut supply, mut decimals, mut is_fungible_v2) =
-                (None, BigDecimal::zero(), 0, Some(false));
+            let mut is_fungible_v2 = Some(false);
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
             if let Some(object_metadata) = object_metadatas.get(&token_data_id) {
                 let fungible_asset_metadata = object_metadata.fungible_asset_metadata.as_ref();
-                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
-                if let Some(metadata) = fungible_asset_metadata {
-                    if let Some(fa_supply) = fungible_asset_supply {
-                        maximum = fa_supply.get_maximum();
-                        supply = fa_supply.current.clone();
-                        decimals = metadata.decimals as i64;
-                        is_fungible_v2 = Some(true);
-                    }
+                if fungible_asset_metadata.is_some() {
+                    is_fungible_v2 = Some(true);
                 }
                 token_properties = object_metadata
                     .property_map
@@ -139,8 +131,8 @@ impl TokenDataV2 {
                     token_data_id: token_data_id.clone(),
                     collection_id: collection_id.clone(),
                     token_name: token_name.clone(),
-                    maximum: maximum.clone(),
-                    supply: supply.clone(),
+                    maximum: None,
+                    supply: BigDecimal::zero(),
                     largest_property_version_v1: None,
                     token_uri: token_uri.clone(),
                     token_properties: token_properties.clone(),
@@ -148,14 +140,14 @@ impl TokenDataV2 {
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2,
                     transaction_timestamp: txn_timestamp,
-                    decimals,
+                    decimals: 0,
                 },
                 CurrentTokenDataV2 {
                     token_data_id,
                     collection_id,
                     token_name,
-                    maximum,
-                    supply,
+                    maximum: None,
+                    supply: BigDecimal::zero(),
                     largest_property_version_v1: None,
                     token_uri,
                     token_properties,
@@ -164,7 +156,7 @@ impl TokenDataV2 {
                     is_fungible_v2,
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
-                    decimals,
+                    decimals: 0,
                 },
             )))
         } else {

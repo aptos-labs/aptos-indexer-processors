@@ -9,18 +9,19 @@ use crate::{
             v2_fungible_asset_balances::{
                 CurrentFungibleAssetBalance, CurrentFungibleAssetMapping, FungibleAssetBalance,
             },
-            v2_fungible_asset_utils::{FeeStatement, FungibleAssetMetadata, FungibleAssetStore},
+            v2_fungible_asset_utils::{
+                FeeStatement, FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+            },
             v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
         },
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
-        token_v2_models::v2_token_utils::TokenV2,
     },
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool, PgPoolConnection},
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
@@ -244,13 +245,12 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let mut conn = self.get_conn().await;
         let (
             fungible_asset_activities,
             fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
-        ) = parse_v2_coin(&transactions, &mut conn).await;
+        ) = parse_v2_coin(&transactions).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -297,7 +297,6 @@ impl ProcessorTrait for FungibleAssetProcessor {
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
 async fn parse_v2_coin(
     transactions: &[Transaction],
-    conn: &mut PgPoolConnection<'_>,
 ) -> (
     Vec<FungibleAssetActivity>,
     Vec<FungibleAssetMetadataModel>,
@@ -367,18 +366,7 @@ async fn parse_v2_coin(
                         standardize_address(&wr.address.to_string()),
                         ObjectAggregatedData {
                             object,
-                            fungible_asset_metadata: None,
-                            fungible_asset_store: None,
-                            token: None,
-                            // The following structs are unused in this processor
-                            aptos_collection: None,
-                            fixed_supply: None,
-                            unlimited_supply: None,
-                            concurrent_supply: None,
-                            property_map: None,
-                            transfer_events: vec![],
-                            fungible_asset_supply: None,
-                            token_identifier: None,
+                            ..ObjectAggregatedData::default()
                         },
                     );
                 }
@@ -417,10 +405,11 @@ async fn parse_v2_coin(
                     {
                         aggregated_data.fungible_asset_store = Some(fungible_asset_store);
                     }
-                    if let Some(token) =
-                        TokenV2::from_write_resource(write_resource, txn_version).unwrap()
+                    if let Some(fungible_asset_supply) =
+                        FungibleAssetSupply::from_write_resource(write_resource, txn_version)
+                            .unwrap()
                     {
-                        aggregated_data.token = Some(token);
+                        aggregated_data.fungible_asset_supply = Some(fungible_asset_supply);
                     }
                 }
             }
@@ -473,7 +462,6 @@ async fn parse_v2_coin(
                 index as i64,
                 &entry_function_id_str,
                 &fungible_asset_object_helper,
-                conn,
             )
             .await
             .unwrap_or_else(|e| {
@@ -529,7 +517,6 @@ async fn parse_v2_coin(
                         txn_version,
                         txn_timestamp,
                         &fungible_asset_object_helper,
-                        conn,
                     )
                     .await
                     .unwrap_or_else(|e| {

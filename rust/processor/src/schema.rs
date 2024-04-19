@@ -792,6 +792,8 @@ diesel::table! {
         token_standard -> Varchar,
         inserted_at -> Timestamp,
         is_token_v2 -> Nullable<Bool>,
+        supply_v2 -> Nullable<Numeric>,
+        maximum_v2 -> Nullable<Numeric>,
     }
 }
 
