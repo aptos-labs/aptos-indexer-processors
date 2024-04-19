@@ -124,12 +124,12 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
                 panic!()
             }))
         },
-        PayloadType::ModuleBundlePayload(inner) => {
-            Some(serde_json::to_value(inner).unwrap_or_else(|_| {
-                tracing::error!(version = version, "Unable to serialize payload into value");
-                panic!()
-            }))
-        },
+        // PayloadType::ModuleBundlePayload(inner) => {
+        //     Some(serde_json::to_value(inner).unwrap_or_else(|_| {
+        //         tracing::error!(version = version, "Unable to serialize payload into value");
+        //         panic!()
+        //     }))
+        // },
         PayloadType::WriteSetPayload(inner) => {
             if let Some(writeset) = inner.write_set.as_ref() {
                 get_clean_writeset(writeset, version)
