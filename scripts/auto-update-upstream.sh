@@ -2,8 +2,7 @@
 git config --global user.email "bot@indexer.xyz"
 git config --global user.name "Bot"
 
-current_date=$(date +'%Y-%m-%d')
-git checkout -b "$current_date"
+git checkout -b automerge
 
 # Add new remote named 'upstream'
 git remote add upstream "https://github.com/aptos-labs/aptos-indexer-processors.git"
@@ -19,10 +18,10 @@ cd rust
 if [ $? -eq 0 ]; then
     cd ..
     git add .
-    git commit -m "Auto-merge $current_date"
-    git push -f  origin "$current_date"
+    git commit -m "Auto-merge"
+    git push -f  origin automerge
     
-    gh pr create --title "Autoupdate" --body "The upstream/main was merged and built successfully."
+    gh pr create --title "Autoupdate" --body "The upstream/main was merged and built successfully." --head automerge
 else
     echo "Build failed"
     exit 1
