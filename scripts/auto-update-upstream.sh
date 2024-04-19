@@ -12,6 +12,8 @@ git merge upstream/main
 cd rust
 #cargo build --locked --release -p processor
 
+gh_pr_up() { gh pr create $* || gh pr edit $* }
+
 # Check if the build was successful
 if [ $? -eq 0 ]; then
     echo "Can be merged"
@@ -21,6 +23,8 @@ if [ $? -eq 0 ]; then
     git config --global user.email "bot@indexer.xyz"
     git config --global user.name "Bot"
     git push origin "$current_date"
+    
+    gh_pr_up --title "Autoupdate can me merged" --body "The upstream/main was merged and built successfully."
 else
     echo "Build failed"
 fi
