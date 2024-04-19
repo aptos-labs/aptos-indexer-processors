@@ -10,7 +10,7 @@ git fetch upstream
 git merge upstream/main
 
 cd rust
-cargo build --locked --release -p processor
+#cargo build --locked --release -p processor
 
 # Check if the build was successful
 if [ $? -eq 0 ]; then
@@ -19,7 +19,7 @@ if [ $? -eq 0 ]; then
     git add .
     git commit -m "Auto-merge $current_date"
     git config --global user.email "bot@indexer.xyz"
-    git config --global user.name "Botß"
+    git config --global user.name "Bot"
     git push origin "$current_date"
 else
     echo "Build failed"
