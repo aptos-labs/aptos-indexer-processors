@@ -1,0 +1,19 @@
+name: "Lint"
+on:
+  # Allow us to run this specific workflow without a PR
+  workflow_dispatch:
+
+# cancel redundant builds
+concurrency:
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: bash scripts/auto-update-upstream.sh
+        working-directory: rust
