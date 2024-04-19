@@ -18,6 +18,9 @@ if [ $? -eq 0 ]; then
     cd ..
     git add .
     git commit -m "Auto-merge $current_date"
+    git config --global user.email "bot@indexer.xyz"
+    git config --global user.name "Botß"
+    git push origin "$current_date"
 else
     echo "Build failed"
 fi
