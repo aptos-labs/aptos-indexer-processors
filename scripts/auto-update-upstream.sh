@@ -22,7 +22,7 @@ if [ $? -eq 0 ]; then
     git commit -m "Auto-merge $current_date"
     git push -f  origin "$current_date"
     
-    gh pr create --title "Autoupdate" --body "The upstream/main was merged and built successfully." --head "$current_date"
+    gh pr create --title "Autoupdate" --body "The upstream/main was merged and built successfully."
 else
     echo "Build failed"
     exit 1
