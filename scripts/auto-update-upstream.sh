@@ -21,7 +21,7 @@ if [ $? -eq 0 ]; then
     git config --global user.name "Bot"
     git push origin "$current_date"
     
-    gh pr create --head --title "Autoupdate" --body "The upstream/main was merged and built successfully."
+    gh pr create --title "Autoupdate" --body "The upstream/main was merged and built successfully." --head "$current_date"
 else
     echo "Build failed"
     exit 1
