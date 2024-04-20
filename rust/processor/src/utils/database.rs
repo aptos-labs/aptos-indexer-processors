@@ -19,13 +19,14 @@ use diesel_async::{
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures_util::{future::BoxFuture, FutureExt};
-use std::{cmp::min, sync::Arc};
+use rand::RngCore;
+use std::{cmp::min, ops::Deref, sync::Arc};
 
 pub type Backend = diesel::pg::Pg;
 
 pub type MyDbConnection = AsyncPgConnection;
 pub type DbPool = Pool<MyDbConnection>;
-pub type ArcDbPool = Arc<DbPool>;
+pub type ArcDbPool = Arc<DbPoolManager>;
 pub type DbPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/postgres/migrations");
@@ -117,10 +118,36 @@ fn parse_and_clean_db_url(url: &str) -> (String, Option<String>) {
     (db_url.to_string(), cert_path)
 }
 
+pub struct DbPoolManager {
+    pools: Vec<DbPool>,
+}
+
+impl DbPoolManager {
+    pub async fn new(
+        db_connection_urls: &[String],
+        pool_size_per_url: Option<u32>,
+    ) -> Result<Self, PoolError> {
+        let mut pools = vec![];
+        for db_connection_url in db_connection_urls {
+            let pool = new_db_pool(&db_connection_url, pool_size_per_url).await?;
+            pools.push(pool);
+        }
+
+        Ok(Self { pools })
+    }
+}
+
+impl Deref for DbPoolManager {
+    type Target = DbPool;
+    fn deref(&self) -> &Self::Target {
+        &self.pools[(rand::thread_rng().next_u32() % (self.pools.len() as u32)) as usize]
+    }
+}
+
 pub async fn new_db_pool(
     database_url: &str,
     max_pool_size: Option<u32>,
-) -> Result<ArcDbPool, PoolError> {
+) -> Result<DbPool, PoolError> {
     let (_url, cert_path) = parse_and_clean_db_url(database_url);
 
     let config = if cert_path.is_some() {
@@ -134,7 +161,7 @@ pub async fn new_db_pool(
         .max_size(max_pool_size.unwrap_or(DEFAULT_MAX_POOL_SIZE))
         .build(config)
         .await?;
-    Ok(Arc::new(pool))
+    Ok(pool)
 }
 
 pub async fn execute_in_chunks<U, T>(
@@ -307,27 +334,32 @@ mod test {
     #[tokio::test]
     async fn test_get_chunks_logic() {
         assert_eq!(get_chunks(10, 5), vec![(0, 10)]);
-        assert_eq!(get_chunks(65535, 1), vec![
-            (0, 32767),
-            (32767, 65534),
-            (65534, 65535),
-        ]);
+        assert_eq!(
+            get_chunks(65535, 1),
+            vec![(0, 32767), (32767, 65534), (65534, 65535),]
+        );
         // 200,000 total items will take 6 buckets. Each bucket can only be 3276 size.
-        assert_eq!(get_chunks(10000, 20), vec![
-            (0, 1638),
-            (1638, 3276),
-            (3276, 4914),
-            (4914, 6552),
-            (6552, 8190),
-            (8190, 9828),
-            (9828, 10000),
-        ]);
-        assert_eq!(get_chunks(65535, 2), vec![
-            (0, 16383),
-            (16383, 32766),
-            (32766, 49149),
-            (49149, 65532),
-            (65532, 65535),
-        ]);
+        assert_eq!(
+            get_chunks(10000, 20),
+            vec![
+                (0, 1638),
+                (1638, 3276),
+                (3276, 4914),
+                (4914, 6552),
+                (6552, 8190),
+                (8190, 9828),
+                (9828, 10000),
+            ]
+        );
+        assert_eq!(
+            get_chunks(65535, 2),
+            vec![
+                (0, 16383),
+                (16383, 32766),
+                (32766, 49149),
+                (49149, 65532),
+                (65532, 65535),
+            ]
+        );
     }
 }

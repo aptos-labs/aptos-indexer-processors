@@ -29,7 +29,7 @@ use crate::{
             SINGLE_BATCH_PROCESSING_TIME_IN_SECS, TRANSACTION_UNIX_TIMESTAMP,
         },
         database::{
-            execute_with_better_error_conn, new_db_pool, run_pending_migrations, ArcDbPool,
+            execute_with_better_error_conn, run_pending_migrations, ArcDbPool, DbPoolManager,
         },
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
@@ -37,6 +37,7 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
@@ -52,7 +53,7 @@ pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 pub struct Worker {
     pub db_pool: ArcDbPool,
     pub processor_config: ProcessorConfig,
-    pub postgres_connection_string: String,
+    pub db_connection_urls: Vec<String>,
     pub indexer_grpc_data_service_address: Url,
     pub grpc_http2_config: IndexerGrpcHttp2Config,
     pub auth_token: String,
@@ -70,14 +71,14 @@ pub struct Worker {
 impl Worker {
     pub async fn new(
         processor_config: ProcessorConfig,
-        postgres_connection_string: String,
+        db_connection_urls: Vec<String>,
         indexer_grpc_data_service_address: Url,
         grpc_http2_config: IndexerGrpcHttp2Config,
         auth_token: String,
         starting_version: Option<u64>,
         ending_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
-        db_pool_size: Option<u32>,
+        db_pool_size_per_url: Option<u32>,
         gap_detection_batch_size: u64,
         // The number of transactions per protobuf batch
         pb_channel_txn_chunk_size: usize,
@@ -93,7 +94,7 @@ impl Worker {
             service_type = PROCESSOR_SERVICE_TYPE,
             "[Parser] Creating connection pool"
         );
-        let conn_pool = new_db_pool(&postgres_connection_string, db_pool_size)
+        let conn_pool = DbPoolManager::new(&db_connection_urls, db_pool_size_per_url)
             .await
             .context("Failed to create connection pool")?;
         info!(
@@ -103,9 +104,9 @@ impl Worker {
         );
         let number_concurrent_processing_tasks = number_concurrent_processing_tasks.unwrap_or(10);
         Ok(Self {
-            db_pool: conn_pool,
+            db_pool: Arc::new(conn_pool),
             processor_config,
-            postgres_connection_string,
+            db_connection_urls,
             indexer_grpc_data_service_address,
             grpc_http2_config,
             starting_version,
@@ -504,9 +505,9 @@ impl Worker {
         use crate::diesel::Connection;
         use diesel::pg::PgConnection;
 
-        info!("Running migrations: {:?}", self.postgres_connection_string);
+        info!("Running migrations: {:?}", self.db_connection_urls[0]);
         let mut conn =
-            PgConnection::establish(&self.postgres_connection_string).expect("migrations failed!");
+            PgConnection::establish(&self.db_connection_urls[0]).expect("migrations failed!");
         run_pending_migrations(&mut conn);
     }
 

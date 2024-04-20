@@ -83,12 +83,9 @@ impl RunnableConfig for IndexerGrpcProcessorConfigV2 {
         if self.processors.len() != 1 {
             unimplemented!("Only support 1 processor now.");
         }
-        if self.db_connection.db_connection_urls.len() != 1 {
-            unimplemented!("Only support 1 db connection URL now.");
-        }
         let mut worker = Worker::new(
             self.processors[0].processor.clone(),
-            self.db_connection.db_connection_urls[0].clone(),
+            self.db_connection.db_connection_urls.clone(),
             self.indexer_grpc.data_service_address.clone(),
             self.indexer_grpc.http2_config.clone(),
             self.indexer_grpc.auth_token.clone(),
