@@ -8,7 +8,7 @@ git checkout -b automerge
 git remote add upstream "https://github.com/aptos-labs/aptos-indexer-processors.git"
 
 # Merge upstream/main with the current branch
-git fetch upstream/main
+git fetch upstream || :
 git merge upstream/main
 
 cd rust
