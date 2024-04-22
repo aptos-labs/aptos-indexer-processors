@@ -24,3 +24,6 @@ This guide will get you started with creating an Aptos indexer with custom parsi
 
 ## [Aptos Indexer GRPC Release Notes](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/indexer-grpc/release_notes.md)
 
+
+> [!WARNING]  
+> The typescript implementation is known to get stuck when there are lots of data to process. The issue is with the GRPC client and we haven't had a chance to optimize. Please proceed with caution.
