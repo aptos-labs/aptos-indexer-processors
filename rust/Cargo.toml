@@ -19,8 +19,9 @@ aptos-moving-average = { path = "moving-average" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.62"
-async-trait = "0.1.53"
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", tag = "aptos-node-v1.11.0" }
+aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
+async-trait = "0.1.53"
 backtrace = "0.3.58"
 base64 = "0.13.0"
 bb8 = "0.8.1"
