@@ -346,7 +346,7 @@ impl TokenOwnershipV2 {
                 burn_event.get_previous_owner_address()
             } else {
                 // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
-                // Do a lookup to get previous owner. This is necessary because preivous owner is part of current token ownerships primary key.
+                // Do a lookup to get previous owner. This is necessary because previous owner is part of current token ownerships primary key.
                 match prior_nft_ownership.get(&token_address) {
                     Some(inner) => inner.owner_address.clone(),
                     None => {

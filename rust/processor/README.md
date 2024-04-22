@@ -12,7 +12,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
   found [here](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#postgres)
 
 - A config YAML file
-    - For exmaple, `config.yaml`
+    - For example, `config.yaml`
 
       ```yaml
       health_check_port: 8084
