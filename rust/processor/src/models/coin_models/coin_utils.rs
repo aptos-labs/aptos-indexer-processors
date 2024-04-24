@@ -163,9 +163,7 @@ pub struct CoinInfoType {
     creator_address: String,
 }
 
-static RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(<(.*)>)").unwrap()
-});
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(<(.*)>)").unwrap());
 
 static COIN_RESOURCES: Lazy<[String; 2]> = Lazy::new(|| {
     [
