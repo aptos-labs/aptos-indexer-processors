@@ -42,7 +42,7 @@ use crate::{
     models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
-        counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
+        counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT, PROCESSOR_GAS_PROCESSED_COUNT},
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
         util::parse_timestamp,
     },
@@ -77,6 +77,28 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         end_version: u64,
         db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult>;
+
+    /// Process all transactions with monitoring.
+    async fn process_transactions_with_monitoring(
+        &self,
+        transactions: Vec<ProtoTransaction>,
+        start_version: u64,
+        end_version: u64,
+        db_chain_id: Option<u64>,
+    ) -> anyhow::Result<ProcessingResult> {
+        let gas_sum = transactions.iter().map(|t| match t.info.as_ref(){
+            Some(info) => info.gas_used,
+            None => 0,
+        }).sum::<u64>();
+        let result = self.process_transactions(
+            transactions, start_version, end_version, db_chain_id).await;
+        if result.is_ok() {
+            PROCESSOR_GAS_PROCESSED_COUNT
+            .with_label_values(&[self.name()])
+            .inc_by(gas_sum);
+        }
+        result
+    }
 
     /// Gets a reference to the connection pool
     /// This is used by the `get_conn()` helper below
