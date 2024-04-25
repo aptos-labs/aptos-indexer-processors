@@ -137,7 +137,7 @@ impl TokenOwnershipV2 {
             token_properties_mutated_v1: None,
             is_soulbound_v2: Some(is_soulbound),
             token_standard: TokenStandard::V2.to_string(),
-            is_fungible_v2: token_data.is_fungible_v2,
+            is_fungible_v2: None,
             transaction_timestamp: token_data.transaction_timestamp,
             non_transferrable_by_owner: Some(is_soulbound),
         });
@@ -158,7 +158,7 @@ impl TokenOwnershipV2 {
                 token_properties_mutated_v1: None,
                 is_soulbound_v2: Some(is_soulbound),
                 token_standard: TokenStandard::V2.to_string(),
-                is_fungible_v2: token_data.is_fungible_v2,
+                is_fungible_v2: None,
                 last_transaction_version: token_data.transaction_version,
                 last_transaction_timestamp: token_data.transaction_timestamp,
                 non_transferrable_by_owner: Some(is_soulbound),
@@ -186,7 +186,7 @@ impl TokenOwnershipV2 {
                 token_properties_mutated_v1: None,
                 is_soulbound_v2: Some(is_soulbound),
                 token_standard: TokenStandard::V2.to_string(),
-                is_fungible_v2: token_data.is_fungible_v2,
+                is_fungible_v2: None,
                 transaction_timestamp: token_data.transaction_timestamp,
                 non_transferrable_by_owner: Some(is_soulbound),
             });

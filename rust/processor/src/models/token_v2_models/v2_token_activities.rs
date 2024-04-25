@@ -150,7 +150,7 @@ impl TokenActivityV2 {
                     after_value: token_activity_helper.after_value,
                     entry_function_id_str: entry_function_id_str.clone(),
                     token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: Some(false),
+                    is_fungible_v2: None,
                     transaction_timestamp: txn_timestamp,
                 }));
             } else {
@@ -178,7 +178,7 @@ impl TokenActivityV2 {
                     after_value: None,
                     entry_function_id_str: entry_function_id_str.clone(),
                     token_standard: TokenStandard::V2.to_string(),
-                    is_fungible_v2: Some(false),
+                    is_fungible_v2: None,
                     transaction_timestamp: txn_timestamp,
                 }));
             }
