@@ -152,6 +152,10 @@ impl ProcessorTrait for EventsProcessor {
                 "0x163df34fccbf003ce219d3f1d9e70d140b60622cb9dd47599c25fb2f797ba6e",
                 "0x4bf51972879e3b95c4781a5cdcb9e1ee24ef483e7d22f2d903626f126df62bd1",
                 "0x3c1d4a86594d681ff7e5d5a233965daeabdc6a15fe5672ceeda5260038857183",
+                "0xc6bc659f1649553c1a3fa05d9727433dc03843baac29473c817d06d39e7621ba",
+                "0x167f411fc5a678fb40d86e0af646fa8f62458b686ad8996215248447037af40c",
+                "0x3c1d4a86594d681ff7e5d5a233965daeabdc6a15fe5672ceeda5260038857183",
+                "0x31a6675cbe84365bf2b0cbce617ece6c47023ef70826533bde5203d32171dc3c"
             ];
             for txn_event in txn_events {
                 if filter_addresses.iter().any(|address| txn_event.type_.contains(address)) {
