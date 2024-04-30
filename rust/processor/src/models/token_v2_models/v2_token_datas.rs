@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, TokenV2};
+use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2Burned};
 use crate::{
     models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
@@ -14,8 +14,8 @@ use crate::{
     schema::{current_token_datas_v2, token_datas_v2},
     utils::util::standardize_address,
 };
-use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
-use bigdecimal::BigDecimal;
+use aptos_protos::transaction::v1::{DeleteResource, WriteResource, WriteTableItem};
+use bigdecimal::{BigDecimal, Zero};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,40 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub decimals: i64,
+    pub is_deleted_v2: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(token_data_id))]
+#[diesel(table_name = current_token_datas_v2)]
+pub struct CurrentDeletedTokenDataV2 {
+    pub token_data_id: String,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub is_deleted_v2: bool,
+}
+
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[diesel(primary_key(token_data_id))]
+#[diesel(table_name = current_token_datas_v2)]
+pub struct CurrentTokenDataV2Query {
+    pub token_data_id: String,
+    pub collection_id: String,
+    pub token_name: String,
+    pub maximum: Option<BigDecimal>,
+    pub supply: BigDecimal,
+    pub largest_property_version_v1: Option<BigDecimal>,
+    pub token_uri: String,
+    pub description: String,
+    pub token_properties: serde_json::Value,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub inserted_at: chrono::NaiveDateTime,
+    pub decimals: i64,
+    pub is_deleted_v2: Option<bool>,
     // Deperecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
 }
@@ -139,8 +173,55 @@ impl TokenDataV2 {
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
                     decimals: None,
+                    is_deleted_v2: Some(false),
                 },
             )))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// This handles the case where token is burned but objectCore is still there
+    pub async fn get_burned_nft_v2_from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<CurrentDeletedTokenDataV2>> {
+        let token_data_id = standardize_address(&write_resource.address.to_string());
+        if tokens_burned
+            .get(&standardize_address(&token_data_id))
+            .is_some()
+        {
+            return Ok(Some(CurrentDeletedTokenDataV2 {
+                token_data_id,
+                last_transaction_version: txn_version,
+                last_transaction_timestamp: txn_timestamp,
+                is_deleted_v2: false,
+            }));
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// This handles the case where token is burned and objectCore is deleted
+    pub async fn get_burned_nft_v2_from_delete_resource(
+        delete_resource: &DeleteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<CurrentDeletedTokenDataV2>> {
+        let token_data_id = standardize_address(&delete_resource.address.to_string());
+        if tokens_burned
+            .get(&standardize_address(&token_data_id))
+            .is_some()
+        {
+            return Ok(Some(CurrentDeletedTokenDataV2 {
+                token_data_id,
+                last_transaction_version: txn_version,
+                last_transaction_timestamp: txn_timestamp,
+                is_deleted_v2: false,
+            }));
         } else {
             Ok(None)
         }
@@ -213,6 +294,7 @@ impl TokenDataV2 {
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
                         decimals: None,
+                        is_deleted_v2: None,
                     },
                 )));
             } else {
