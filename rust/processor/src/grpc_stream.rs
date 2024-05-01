@@ -177,11 +177,58 @@ pub async fn get_stream(
         num_of_transactions = ?count,
         "[Parser] Setting up GRPC stream",
     );
-    let request = grpc_request_builder(starting_version, count, auth_token, processor_name);
-    rpc_client
-        .get_transactions(request)
-        .await
-        .expect("[Parser] Failed to get grpc response. Is the server running?")
+
+    // TODO: move this to a config file
+    // Retry this connection a few times before giving up
+    let mut connect_retries = 0;
+    let stream_res = loop {
+        let timeout_res = timeout(Duration::from_secs(5), async {
+            let request = grpc_request_builder(
+                starting_version,
+                count,
+                auth_token.clone(),
+                processor_name.clone(),
+            );
+            rpc_client.get_transactions(request).await
+        })
+        .await;
+        match timeout_res {
+            Ok(client) => break Ok(client),
+            Err(e) => {
+                error!(
+                    processor_name = processor_name,
+                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    start_version = starting_version,
+                    end_version = ending_version,
+                    retries = connect_retries,
+                    error = ?e,
+                    "[Parser] Timeout making grpc request. Retrying...",
+                );
+                connect_retries += 1;
+                if connect_retries >= RECONNECTION_MAX_RETRIES {
+                    break Err(e);
+                }
+            },
+        }
+    }
+    .expect("[Parser] Timed out making grpc request after max retries.");
+
+    match stream_res {
+        Ok(stream) => stream,
+        Err(e) => {
+            error!(
+                processor_name = processor_name,
+                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                stream_address = indexer_grpc_data_service_address.to_string(),
+                start_version = starting_version,
+                ending_version = ending_version,
+                error = ?e,
+                "[Parser] Failed to get grpc response. Is the server running?"
+            );
+            panic!("[Parser] Failed to get grpc response. Is the server running?");
+        },
+    }
 }
 
 pub async fn get_chain_id(
