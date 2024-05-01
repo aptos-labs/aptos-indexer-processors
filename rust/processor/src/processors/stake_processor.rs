@@ -6,6 +6,9 @@ use crate::{
     models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
+        delegator_allowlist::{
+            CurrentDelegatedStakingPoolAllowlist, DelegatedStakingPoolAllowlist,
+        },
         delegator_balances::{
             CurrentDelegatorBalance, CurrentDelegatorBalanceMap, DelegatorBalance,
         },
@@ -302,8 +305,9 @@ fn insert_delegator_pools_query(
          .on_conflict(staking_pool_address)
          .do_update()
          .set((
-             first_transaction_version.eq(excluded(first_transaction_version)),
-             inserted_at.eq(excluded(inserted_at)),
+            first_transaction_version.eq(excluded(first_transaction_version)),
+            allowlist_enabled.eq(excluded(allowlist_enabled)),
+            inserted_at.eq(excluded(inserted_at)),
          )),
      Some(
          " WHERE delegated_staking_pools.first_transaction_version >= EXCLUDED.first_transaction_version ",
@@ -415,6 +419,9 @@ impl ProcessorTrait for StakeProcessor {
         let mut all_current_delegated_voter = AHashMap::new();
         let mut all_vote_delegation_handle_to_pool_address = AHashMap::new();
 
+        let mut all_delegator_allowlist = vec![];
+        let mut all_current_delegator_allowlist = AHashMap::new();
+
         for txn in &transactions {
             // Add votes data
             let current_stake_pool_voter = CurrentStakingPoolVoter::from_transaction(txn).unwrap();
@@ -429,9 +436,23 @@ impl ProcessorTrait for StakeProcessor {
             // Add delegator pools
             let (delegator_pools, mut delegator_pool_balances, current_delegator_pool_balances) =
                 DelegatorPool::from_transaction(txn).unwrap();
-            all_delegator_pools.extend(delegator_pools);
+            for (pool_address, pool) in delegator_pools.iter() {
+                // We need to keep the first transaction version for each pool.
+                if let Some(existing_pool) = all_delegator_pools.get_mut(pool_address) {
+                    existing_pool.allowlist_enabled = pool.allowlist_enabled;
+                } else {
+                    all_delegator_pools.insert(pool_address.clone(), pool.clone());
+                }
+            }
             all_delegator_pool_balances.append(&mut delegator_pool_balances);
             all_current_delegator_pool_balances.extend(current_delegator_pool_balances);
+
+            // Add delegator pool allowlist.
+            let delegator_allowlist = DelegatedStakingPoolAllowlist::from_transaction(txn).unwrap();
+            all_delegator_allowlist.extend(delegator_allowlist);
+            let current_delegator_allowlist =
+                CurrentDelegatedStakingPoolAllowlist::from_transaction(txn).unwrap();
+            all_current_delegator_allowlist.extend(current_delegator_allowlist);
 
             // Moving the transaction code here is the new paradigm to avoid redoing a lot of the duplicate work
             // Currently only delegator voting follows this paradigm

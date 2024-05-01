@@ -101,6 +101,18 @@ pub struct ReactivateStakeEvent {
     pub delegator_address: String,
     pub pool_address: String,
 }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EnableAllowlistingEvent {
+    pub pool_address: String,
+    pub enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EnableDelegatorAllowlistingEvent {
+    pub pool_address: String,
+    pub delegator_address: String,
+    pub enabled: bool,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StakeTableItem {
@@ -193,6 +205,8 @@ pub enum StakeEvent {
     UnlockStakeEvent(UnlockStakeEvent),
     WithdrawStakeEvent(WithdrawStakeEvent),
     ReactivateStakeEvent(ReactivateStakeEvent),
+    AllowlistingEvent(EnableAllowlistingEvent),
+    AllowlistDelegatorEvent(EnableDelegatorAllowlistingEvent),
 }
 
 impl StakeEvent {
@@ -214,6 +228,13 @@ impl StakeEvent {
             },
             "0x1::delegation_pool::ReactivateStakeEvent" => serde_json::from_str(data)
                 .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner))),
+            "0x1::delegation_pool::EnableDelegatorsAllowlisting"
+            | "0x1::delegation_pool::DisableDelegatorsAllowlisting" => {
+                serde_json::from_str(data).map(|inner| Some(StakeEvent::AllowlistingEvent(inner)))
+            },
+            "0x1::delegation_pool::AllowlistDelegator"
+            | "0x1::delegation_pool::RemoveDelegatorFromAllowlist" => serde_json::from_str(data)
+                .map(|inner| Some(StakeEvent::AllowlistDelegatorEvent(inner))),
             _ => Ok(None),
         }
         .context(format!(
