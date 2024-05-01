@@ -403,26 +403,29 @@ pub enum TokenEvent {
 impl TokenEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<TokenEvent>> {
         match data_type {
-            "0x3::token::MintTokenEvent" => {
+            "0x3::token::MintTokenEvent" | "0x3::token::MintToken" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::MintTokenEvent(inner)))
             },
-            "0x3::token::BurnTokenEvent" => {
+            "0x3::token::BurnTokenEvent" | "0x3::token::BurnToken" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::BurnTokenEvent(inner)))
             },
-            "0x3::token::MutateTokenPropertyMapEvent" => serde_json::from_str(data)
-                .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner))),
-            "0x3::token::WithdrawEvent" => {
+            "0x3::token::MutateTokenPropertyMapEvent" | "0x3::token::MutateTokenPropertyMap" => {
+                serde_json::from_str(data)
+                    .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner)))
+            },
+            "0x3::token::WithdrawEvent" | "0x3::token::Withdraw" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::WithdrawTokenEvent(inner)))
             },
-            "0x3::token::DepositEvent" => {
+            "0x3::token::DepositEvent" | "0x3::token::Deposit" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::DepositTokenEvent(inner)))
             },
-            "0x3::token_transfers::TokenOfferEvent" => {
+            "0x3::token_transfers::TokenOfferEvent" | "0x3::token_transfers::TokenOffer" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::OfferTokenEvent(inner)))
             },
-            "0x3::token_transfers::TokenCancelOfferEvent" => serde_json::from_str(data)
+            "0x3::token_transfers::TokenCancelOfferEvent"
+            | "0x3::token_transfers::TokenCancelOffer" => serde_json::from_str(data)
                 .map(|inner| Some(TokenEvent::CancelTokenOfferEvent(inner))),
-            "0x3::token_transfers::TokenClaimEvent" => {
+            "0x3::token_transfers::TokenClaimEvent" | "0x3::token_transfers::TokenClaim" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::ClaimTokenEvent(inner)))
             },
             _ => Ok(None),

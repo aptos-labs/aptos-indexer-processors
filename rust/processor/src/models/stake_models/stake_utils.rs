@@ -198,21 +198,24 @@ pub enum StakeEvent {
 impl StakeEvent {
     pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<Self>> {
         match data_type {
-            "0x1::aptos_governance::VoteEvent" => {
+            "0x1::aptos_governance::VoteEvent" | "0x1::aptos_governance::Vote" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::GovernanceVoteEvent(inner)))
             },
-            "0x1::stake::DistributeRewardsEvent" => serde_json::from_str(data)
-                .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner))),
-            "0x1::delegation_pool::AddStakeEvent" => {
+            "0x1::stake::DistributeRewardsEvent" | "0x1::stake::DistributeRewards" => {
+                serde_json::from_str(data)
+                    .map(|inner| Some(StakeEvent::DistributeRewardsEvent(inner)))
+            },
+            "0x1::delegation_pool::AddStakeEvent" | "0x1::delegation_pool::AddStake" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::AddStakeEvent(inner)))
             },
-            "0x1::delegation_pool::UnlockStakeEvent" => {
+            "0x1::delegation_pool::UnlockStakeEvent" | "0x1::delegation_pool::UnlockStake" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::UnlockStakeEvent(inner)))
             },
-            "0x1::delegation_pool::WithdrawStakeEvent" => {
+            "0x1::delegation_pool::WithdrawStakeEvent" | "0x1::delegation_pool::WithdrawStake" => {
                 serde_json::from_str(data).map(|inner| Some(StakeEvent::WithdrawStakeEvent(inner)))
             },
-            "0x1::delegation_pool::ReactivateStakeEvent" => serde_json::from_str(data)
+            "0x1::delegation_pool::ReactivateStakeEvent"
+            | "0x1::delegation_pool::ReactivateStake" => serde_json::from_str(data)
                 .map(|inner| Some(StakeEvent::ReactivateStakeEvent(inner))),
             _ => Ok(None),
         }

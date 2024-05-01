@@ -20,6 +20,7 @@ use crate::{
             },
             v2_fungible_asset_utils::FeeStatement,
         },
+        should_skip,
         user_transactions_models::signatures::Signature,
     },
     processors::coin_processor::APTOS_COIN_TYPE_STR,
@@ -198,14 +199,18 @@ impl CoinActivity {
             }
         }
         for (index, event) in events.iter().enumerate() {
+            if should_skip(index, event, events) {
+                continue;
+            }
             let event_type = event.type_str.clone();
-            if let Some(parsed_event) =
+            if let Some((parsed_event, coin_type_option)) =
                 CoinEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
             {
                 coin_activities.push(Self::from_parsed_event(
                     &event_type,
                     event,
                     &parsed_event,
+                    coin_type_option,
                     txn_version,
                     &all_event_to_coin_type,
                     block_height,
@@ -228,6 +233,7 @@ impl CoinActivity {
         event_type: &str,
         event: &EventPB,
         coin_event: &CoinEvent,
+        coin_type_option: Option<String>,
         txn_version: i64,
         event_to_coin_type: &EventToCoinType,
         block_height: i64,
@@ -235,23 +241,38 @@ impl CoinActivity {
         transaction_timestamp: chrono::NaiveDateTime,
         event_index: i64,
     ) -> Self {
-        let amount = match coin_event {
-            CoinEvent::WithdrawCoinEvent(inner) => inner.amount.clone(),
-            CoinEvent::DepositCoinEvent(inner) => inner.amount.clone(),
+        let (owner_address, amount) = match coin_event {
+            CoinEvent::WithdrawCoinEvent(inner) => (
+                standardize_address(&event.key.as_ref().unwrap().account_address),
+                inner.amount.clone(),
+            ),
+            CoinEvent::DepositCoinEvent(inner) => (
+                standardize_address(&event.key.as_ref().unwrap().account_address),
+                inner.amount.clone(),
+            ),
+            CoinEvent::WithdrawCoinEventV2(inner) => {
+                (standardize_address(&inner.account), inner.amount.clone())
+            },
+            CoinEvent::DepositCoinEventV2(inner) => {
+                (standardize_address(&inner.account), inner.amount.clone())
+            },
         };
-        let event_move_guid = EventGuidResource {
-            addr: standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
-            creation_num: event.key.as_ref().unwrap().creation_number as i64,
-        };
-        let coin_type =
+        let coin_type = if let Some(coin_type) = coin_type_option {
+            coin_type
+        } else {
+            let event_move_guid = EventGuidResource {
+                addr: standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
+                creation_num: event.key.as_ref().unwrap().creation_number as i64,
+            };
             event_to_coin_type
-                .get(&event_move_guid)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                        txn_version, event_move_guid, event_to_coin_type
-                    )
-                }).clone();
+                    .get(&event_move_guid)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                            txn_version, event_move_guid, event_to_coin_type
+                        )
+                    }).clone()
+        };
 
         Self {
             transaction_version: txn_version,
@@ -260,7 +281,7 @@ impl CoinActivity {
             ),
             event_creation_number: event.key.as_ref().unwrap().creation_number as i64,
             event_sequence_number: event.sequence_number as i64,
-            owner_address: standardize_address(&event.key.as_ref().unwrap().account_address),
+            owner_address,
             coin_type,
             amount,
             activity_type: event_type.to_string(),
