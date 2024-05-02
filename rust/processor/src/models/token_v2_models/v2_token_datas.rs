@@ -41,6 +41,7 @@ pub struct TokenDataV2 {
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    // Deperecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
 }
 
@@ -61,6 +62,7 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    // Deperecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
 }
 
@@ -77,13 +79,15 @@ impl TokenDataV2 {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             let mut token_name = inner.get_name_trunc();
-            let mut is_fungible_v2 = Some(false);
+            let is_fungible_v2;
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
             if let Some(object_metadata) = object_metadatas.get(&token_data_id) {
                 let fungible_asset_metadata = object_metadata.fungible_asset_metadata.as_ref();
                 if fungible_asset_metadata.is_some() {
                     is_fungible_v2 = Some(true);
+                } else {
+                    is_fungible_v2 = Some(false);
                 }
                 token_properties = object_metadata
                     .property_map
@@ -192,7 +196,7 @@ impl TokenDataV2 {
                         token_standard: TokenStandard::V1.to_string(),
                         is_fungible_v2: None,
                         transaction_timestamp: txn_timestamp,
-                        decimals: Some(0),
+                        decimals: None,
                     },
                     CurrentTokenDataV2 {
                         token_data_id,
@@ -208,7 +212,7 @@ impl TokenDataV2 {
                         is_fungible_v2: None,
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
-                        decimals: Some(0),
+                        decimals: None,
                     },
                 )));
             } else {

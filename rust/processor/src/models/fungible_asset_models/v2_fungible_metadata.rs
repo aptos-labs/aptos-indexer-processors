@@ -63,12 +63,16 @@ impl FungibleAssetMetadataModel {
             let asset_type = standardize_address(&write_resource.address.to_string());
             if let Some(object_metadata) = object_metadatas.get(&asset_type) {
                 let object = &object_metadata.object.object_core;
-                let (mut maximum_v2, mut supply_v2) = (None, None);
                 let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
-                if let Some(fungible_asset_supply) = fungible_asset_supply {
-                    supply_v2 = Some(fungible_asset_supply.current.clone());
-                    maximum_v2 = fungible_asset_supply.get_maximum();
-                }
+                let (maximum_v2, supply_v2) =
+                    if let Some(fungible_asset_supply) = fungible_asset_supply {
+                        (
+                            fungible_asset_supply.get_maximum(),
+                            Some(fungible_asset_supply.current.clone()),
+                        )
+                    } else {
+                        (None, None)
+                    };
 
                 return Ok(Some(Self {
                     asset_type: asset_type.clone(),
