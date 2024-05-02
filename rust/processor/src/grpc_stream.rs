@@ -74,6 +74,7 @@ pub async fn get_stream(
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
     starting_version: u64,
     ending_version: Option<u64>,
     auth_token: String,
@@ -121,7 +122,7 @@ pub async fn get_stream(
     let mut connect_retries = 0;
     let connect_res = loop {
         let res = timeout(
-            Duration::from_secs(5),
+            indexer_grpc_reconnection_timeout_secs,
             RawDataClient::connect(channel.clone()),
         )
         .await;
@@ -182,7 +183,7 @@ pub async fn get_stream(
     // Retry this connection a few times before giving up
     let mut connect_retries = 0;
     let stream_res = loop {
-        let timeout_res = timeout(Duration::from_secs(5), async {
+        let timeout_res = timeout(indexer_grpc_reconnection_timeout_secs, async {
             let request = grpc_request_builder(
                 starting_version,
                 count,
@@ -235,6 +236,7 @@ pub async fn get_chain_id(
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
     auth_token: String,
     processor_name: String,
 ) -> u64 {
@@ -248,6 +250,7 @@ pub async fn get_chain_id(
         indexer_grpc_data_service_address.clone(),
         indexer_grpc_http2_ping_interval,
         indexer_grpc_http2_ping_timeout,
+        indexer_grpc_reconnection_timeout_secs,
         1,
         Some(2),
         auth_token.clone(),
@@ -304,6 +307,7 @@ pub async fn create_fetcher_loop(
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
     starting_version: u64,
     request_ending_version: Option<u64>,
     auth_token: String,
@@ -324,6 +328,7 @@ pub async fn create_fetcher_loop(
         indexer_grpc_data_service_address.clone(),
         indexer_grpc_http2_ping_interval,
         indexer_grpc_http2_ping_timeout,
+        indexer_grpc_reconnection_timeout_secs,
         starting_version,
         request_ending_version,
         auth_token.clone(),
@@ -634,6 +639,7 @@ pub async fn create_fetcher_loop(
                 indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
+                indexer_grpc_reconnection_timeout_secs,
                 next_version_to_fetch,
                 request_ending_version,
                 auth_token.clone(),
