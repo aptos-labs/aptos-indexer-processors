@@ -61,6 +61,7 @@ pub struct Worker {
 }
 
 impl Worker {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         processor_config: ProcessorConfig,
         postgres_connection_string: String,
@@ -170,6 +171,7 @@ impl Worker {
             self.indexer_grpc_data_service_address.clone(),
             self.grpc_http2_config.grpc_http2_ping_interval_in_secs(),
             self.grpc_http2_config.grpc_http2_ping_timeout_in_secs(),
+            self.grpc_http2_config.grpc_connection_timeout_secs(),
             self.auth_token.clone(),
             processor_name.to_string(),
         )
@@ -186,6 +188,8 @@ impl Worker {
             self.grpc_http2_config.grpc_http2_ping_interval_in_secs();
         let indexer_grpc_http2_ping_timeout =
             self.grpc_http2_config.grpc_http2_ping_timeout_in_secs();
+        let indexer_grpc_reconnection_timeout_secs =
+            self.grpc_http2_config.grpc_connection_timeout_secs();
         let pb_channel_txn_chunk_size = self.pb_channel_txn_chunk_size;
 
         // Create a transaction fetcher thread that will continuously fetch transactions from the GRPC stream
@@ -209,6 +213,7 @@ impl Worker {
                 indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
+                indexer_grpc_reconnection_timeout_secs,
                 starting_version,
                 request_ending_version,
                 auth_token.clone(),
