@@ -114,6 +114,9 @@ pub struct IndexerGrpcHttp2Config {
 
     /// Indexer GRPC http2 ping timeout in seconds. Defaults to 10.
     indexer_grpc_http2_ping_timeout_in_secs: u64,
+
+    /// Seconds before timeout for grpc connection.
+    indexer_grpc_connection_timeout_secs: u64,
 }
 
 impl IndexerGrpcHttp2Config {
@@ -124,6 +127,10 @@ impl IndexerGrpcHttp2Config {
     pub fn grpc_http2_ping_timeout_in_secs(&self) -> Duration {
         Duration::from_secs(self.indexer_grpc_http2_ping_timeout_in_secs)
     }
+
+    pub fn grpc_connection_timeout_secs(&self) -> Duration {
+        Duration::from_secs(self.indexer_grpc_connection_timeout_secs)
+    }
 }
 
 impl Default for IndexerGrpcHttp2Config {
@@ -131,6 +138,7 @@ impl Default for IndexerGrpcHttp2Config {
         Self {
             indexer_grpc_http2_ping_interval_in_secs: 30,
             indexer_grpc_http2_ping_timeout_in_secs: 10,
+            indexer_grpc_connection_timeout_secs: 5,
         }
     }
 }

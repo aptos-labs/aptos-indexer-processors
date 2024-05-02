@@ -74,6 +74,7 @@ pub async fn get_stream(
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
     starting_version: u64,
     ending_version: Option<u64>,
     auth_token: String,
@@ -121,7 +122,7 @@ pub async fn get_stream(
     let mut connect_retries = 0;
     let connect_res = loop {
         let res = timeout(
-            Duration::from_secs(5),
+            indexer_grpc_reconnection_timeout_secs,
             RawDataClient::connect(channel.clone()),
         )
         .await;
@@ -177,17 +178,65 @@ pub async fn get_stream(
         num_of_transactions = ?count,
         "[Parser] Setting up GRPC stream",
     );
-    let request = grpc_request_builder(starting_version, count, auth_token, processor_name);
-    rpc_client
-        .get_transactions(request)
-        .await
-        .expect("[Parser] Failed to get grpc response. Is the server running?")
+
+    // TODO: move this to a config file
+    // Retry this connection a few times before giving up
+    let mut connect_retries = 0;
+    let stream_res = loop {
+        let timeout_res = timeout(indexer_grpc_reconnection_timeout_secs, async {
+            let request = grpc_request_builder(
+                starting_version,
+                count,
+                auth_token.clone(),
+                processor_name.clone(),
+            );
+            rpc_client.get_transactions(request).await
+        })
+        .await;
+        match timeout_res {
+            Ok(client) => break Ok(client),
+            Err(e) => {
+                error!(
+                    processor_name = processor_name,
+                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    start_version = starting_version,
+                    end_version = ending_version,
+                    retries = connect_retries,
+                    error = ?e,
+                    "[Parser] Timeout making grpc request. Retrying...",
+                );
+                connect_retries += 1;
+                if connect_retries >= RECONNECTION_MAX_RETRIES {
+                    break Err(e);
+                }
+            },
+        }
+    }
+    .expect("[Parser] Timed out making grpc request after max retries.");
+
+    match stream_res {
+        Ok(stream) => stream,
+        Err(e) => {
+            error!(
+                processor_name = processor_name,
+                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                stream_address = indexer_grpc_data_service_address.to_string(),
+                start_version = starting_version,
+                ending_version = ending_version,
+                error = ?e,
+                "[Parser] Failed to get grpc response. Is the server running?"
+            );
+            panic!("[Parser] Failed to get grpc response. Is the server running?");
+        },
+    }
 }
 
 pub async fn get_chain_id(
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
     auth_token: String,
     processor_name: String,
 ) -> u64 {
@@ -201,6 +250,7 @@ pub async fn get_chain_id(
         indexer_grpc_data_service_address.clone(),
         indexer_grpc_http2_ping_interval,
         indexer_grpc_http2_ping_timeout,
+        indexer_grpc_reconnection_timeout_secs,
         1,
         Some(2),
         auth_token.clone(),
@@ -257,6 +307,7 @@ pub async fn create_fetcher_loop(
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
     starting_version: u64,
     request_ending_version: Option<u64>,
     auth_token: String,
@@ -277,6 +328,7 @@ pub async fn create_fetcher_loop(
         indexer_grpc_data_service_address.clone(),
         indexer_grpc_http2_ping_interval,
         indexer_grpc_http2_ping_timeout,
+        indexer_grpc_reconnection_timeout_secs,
         starting_version,
         request_ending_version,
         auth_token.clone(),
@@ -587,6 +639,7 @@ pub async fn create_fetcher_loop(
                 indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
+                indexer_grpc_reconnection_timeout_secs,
                 next_version_to_fetch,
                 request_ending_version,
                 auth_token.clone(),
