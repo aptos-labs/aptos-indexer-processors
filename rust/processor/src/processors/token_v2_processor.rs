@@ -354,6 +354,8 @@ fn insert_current_token_datas_v2_query(
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 decimals.eq(excluded(decimals)),
+                // Intentionally not including is_deleted because it should always be true in this part
+                // and doesn't need to override
             )),
         Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
