@@ -128,7 +128,7 @@ impl FungibleAssetMetadataModel {
                         supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
                         supply_aggregator_table_key_v1: supply_aggregator_table_key,
                         token_standard: TokenStandard::V1.to_string(),
-                        is_token_v2: Some(false),
+                        is_token_v2: None,
                         supply_v2: None,
                         maximum_v2: None,
                     }))
