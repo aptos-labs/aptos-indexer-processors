@@ -193,12 +193,12 @@ impl TokenDataV2 {
             .get(&standardize_address(&token_data_id))
             .is_some()
         {
-            return Ok(Some(CurrentDeletedTokenDataV2 {
+            Ok(Some(CurrentDeletedTokenDataV2 {
                 token_data_id,
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
                 is_deleted_v2: false,
-            }));
+            }))
         } else {
             Ok(None)
         }
@@ -216,12 +216,12 @@ impl TokenDataV2 {
             .get(&standardize_address(&token_data_id))
             .is_some()
         {
-            return Ok(Some(CurrentDeletedTokenDataV2 {
+            Ok(Some(CurrentDeletedTokenDataV2 {
                 token_data_id,
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
                 is_deleted_v2: false,
-            }));
+            }))
         } else {
             Ok(None)
         }
