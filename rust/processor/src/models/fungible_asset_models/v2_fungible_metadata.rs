@@ -13,12 +13,12 @@ use crate::{
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::util::standardize_address,
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
+use bigdecimal::BigDecimal;
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -44,26 +44,8 @@ pub struct FungibleAssetMetadataModel {
     pub supply_aggregator_table_key_v1: Option<String>,
     pub token_standard: String,
     pub is_token_v2: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(primary_key(asset_type))]
-#[diesel(table_name = fungible_asset_metadata)]
-pub struct FungibleAssetMetadataQuery {
-    pub asset_type: String,
-    pub creator_address: String,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: i32,
-    pub icon_uri: Option<String>,
-    pub project_uri: Option<String>,
-    pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub supply_aggregator_table_handle_v1: Option<String>,
-    pub supply_aggregator_table_key_v1: Option<String>,
-    pub token_standard: String,
-    pub inserted_at: chrono::NaiveDateTime,
-    pub is_token_v2: Option<bool>,
+    pub supply_v2: Option<BigDecimal>,
+    pub maximum_v2: Option<BigDecimal>,
 }
 
 impl FungibleAssetMetadataModel {
@@ -81,7 +63,16 @@ impl FungibleAssetMetadataModel {
             let asset_type = standardize_address(&write_resource.address.to_string());
             if let Some(object_metadata) = object_metadatas.get(&asset_type) {
                 let object = &object_metadata.object.object_core;
-                let is_token_v2 = object_metadata.token.is_some();
+                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
+                let (maximum_v2, supply_v2) =
+                    if let Some(fungible_asset_supply) = fungible_asset_supply {
+                        (
+                            fungible_asset_supply.get_maximum(),
+                            Some(fungible_asset_supply.current.clone()),
+                        )
+                    } else {
+                        (None, None)
+                    };
 
                 return Ok(Some(Self {
                     asset_type: asset_type.clone(),
@@ -96,7 +87,9 @@ impl FungibleAssetMetadataModel {
                     supply_aggregator_table_handle_v1: None,
                     supply_aggregator_table_key_v1: None,
                     token_standard: TokenStandard::V2.to_string(),
-                    is_token_v2: Some(is_token_v2),
+                    is_token_v2: None,
+                    supply_v2,
+                    maximum_v2,
                 }));
             }
         }
@@ -135,7 +128,9 @@ impl FungibleAssetMetadataModel {
                         supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
                         supply_aggregator_table_key_v1: supply_aggregator_table_key,
                         token_standard: TokenStandard::V1.to_string(),
-                        is_token_v2: Some(false),
+                        is_token_v2: None,
+                        supply_v2: None,
+                        maximum_v2: None,
                     }))
                 } else {
                     Ok(None)
@@ -143,55 +138,5 @@ impl FungibleAssetMetadataModel {
             },
             _ => Ok(None),
         }
-    }
-
-    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
-    /// 1. If metadata is present without token object, then it's not a token
-    /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_fungible_asset(
-        conn: &mut PgPoolConnection<'_>,
-        asset_type: &str,
-        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
-        txn_version: i64,
-    ) -> bool {
-        // 1. If metadata is present without token object, then it's not a token
-        if let Some(object_data) = object_aggregated_data_mapping.get(asset_type) {
-            if object_data.fungible_asset_metadata.is_some() {
-                return object_data.token.is_none();
-            }
-        }
-        // 2. If metadata is not present, we will do a lookup in the db.
-        match FungibleAssetMetadataQuery::get_by_asset_type(conn, asset_type).await {
-            Ok(metadata) => {
-                if let Some(is_token_v2) = metadata.is_token_v2 {
-                    return !is_token_v2;
-                }
-
-                // If is_token_v2 is null, then the metadata is a v1 coin info, and it's not a token
-                true
-            },
-            Err(_) => {
-                tracing::error!(
-                    transaction_version = txn_version,
-                    lookup_key = asset_type,
-                    "Missing fungible_asset_metadata for asset_type: {}. You probably should backfill db.",
-                    asset_type,
-                );
-                // Default
-                true
-            },
-        }
-    }
-}
-
-impl FungibleAssetMetadataQuery {
-    pub async fn get_by_asset_type(
-        conn: &mut PgPoolConnection<'_>,
-        asset_type: &str,
-    ) -> diesel::QueryResult<Self> {
-        fungible_asset_metadata::table
-            .filter(fungible_asset_metadata::asset_type.eq(asset_type))
-            .first::<Self>(conn)
-            .await
     }
 }
