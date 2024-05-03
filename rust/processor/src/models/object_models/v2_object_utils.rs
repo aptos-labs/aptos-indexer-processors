@@ -52,6 +52,32 @@ pub struct ObjectAggregatedData {
     pub token_identifier: Option<TokenIdentifiers>,
 }
 
+impl Default for ObjectAggregatedData {
+    fn default() -> Self {
+        Self {
+            object: ObjectWithMetadata {
+                object_core: ObjectCore {
+                    allow_ungated_transfer: false,
+                    guid_creation_num: BigDecimal::default(),
+                    owner: String::default(),
+                },
+                state_key_hash: String::default(),
+            },
+            transfer_events: Vec::new(),
+            fungible_asset_metadata: None,
+            fungible_asset_supply: None,
+            fungible_asset_store: None,
+            aptos_collection: None,
+            fixed_supply: None,
+            property_map: None,
+            token: None,
+            unlimited_supply: None,
+            concurrent_supply: None,
+            token_identifier: None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectCore {
     pub allow_ungated_transfer: bool,

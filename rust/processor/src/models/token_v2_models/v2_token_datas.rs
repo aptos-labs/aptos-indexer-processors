@@ -12,12 +12,11 @@ use crate::{
         token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::util::standardize_address,
 };
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
-use bigdecimal::{BigDecimal, Zero};
+use bigdecimal::BigDecimal;
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +33,7 @@ pub struct TokenDataV2 {
     pub collection_id: String,
     pub token_name: String,
     pub maximum: Option<BigDecimal>,
-    pub supply: BigDecimal,
+    pub supply: Option<BigDecimal>,
     pub largest_property_version_v1: Option<BigDecimal>,
     pub token_uri: String,
     pub token_properties: serde_json::Value,
@@ -42,7 +41,8 @@ pub struct TokenDataV2 {
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub transaction_timestamp: chrono::NaiveDateTime,
-    pub decimals: i64,
+    // Deperecated, but still here for backwards compatibility
+    pub decimals: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -53,7 +53,7 @@ pub struct CurrentTokenDataV2 {
     pub collection_id: String,
     pub token_name: String,
     pub maximum: Option<BigDecimal>,
-    pub supply: BigDecimal,
+    pub supply: Option<BigDecimal>,
     pub largest_property_version_v1: Option<BigDecimal>,
     pub token_uri: String,
     pub token_properties: serde_json::Value,
@@ -62,28 +62,8 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub decimals: i64,
-}
-
-#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(primary_key(token_data_id))]
-#[diesel(table_name = current_token_datas_v2)]
-pub struct CurrentTokenDataV2Query {
-    pub token_data_id: String,
-    pub collection_id: String,
-    pub token_name: String,
-    pub maximum: Option<BigDecimal>,
-    pub supply: BigDecimal,
-    pub largest_property_version_v1: Option<BigDecimal>,
-    pub token_uri: String,
-    pub description: String,
-    pub token_properties: serde_json::Value,
-    pub token_standard: String,
-    pub is_fungible_v2: Option<bool>,
-    pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
-    pub decimals: i64,
+    // Deperecated, but still here for backwards compatibility
+    pub decimals: Option<i64>,
 }
 
 impl TokenDataV2 {
@@ -99,21 +79,15 @@ impl TokenDataV2 {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             let mut token_name = inner.get_name_trunc();
-            // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
-            let (mut maximum, mut supply, mut decimals, mut is_fungible_v2) =
-                (None, BigDecimal::zero(), 0, Some(false));
+            let is_fungible_v2;
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
             if let Some(object_metadata) = object_metadatas.get(&token_data_id) {
                 let fungible_asset_metadata = object_metadata.fungible_asset_metadata.as_ref();
-                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
-                if let Some(metadata) = fungible_asset_metadata {
-                    if let Some(fa_supply) = fungible_asset_supply {
-                        maximum = fa_supply.get_maximum();
-                        supply = fa_supply.current.clone();
-                        decimals = metadata.decimals as i64;
-                        is_fungible_v2 = Some(true);
-                    }
+                if fungible_asset_metadata.is_some() {
+                    is_fungible_v2 = Some(true);
+                } else {
+                    is_fungible_v2 = Some(false);
                 }
                 token_properties = object_metadata
                     .property_map
@@ -139,8 +113,8 @@ impl TokenDataV2 {
                     token_data_id: token_data_id.clone(),
                     collection_id: collection_id.clone(),
                     token_name: token_name.clone(),
-                    maximum: maximum.clone(),
-                    supply: supply.clone(),
+                    maximum: None,
+                    supply: None,
                     largest_property_version_v1: None,
                     token_uri: token_uri.clone(),
                     token_properties: token_properties.clone(),
@@ -148,14 +122,14 @@ impl TokenDataV2 {
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2,
                     transaction_timestamp: txn_timestamp,
-                    decimals,
+                    decimals: None,
                 },
                 CurrentTokenDataV2 {
                     token_data_id,
                     collection_id,
                     token_name,
-                    maximum,
-                    supply,
+                    maximum: None,
+                    supply: None,
                     largest_property_version_v1: None,
                     token_uri,
                     token_properties,
@@ -164,7 +138,7 @@ impl TokenDataV2 {
                     is_fungible_v2,
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
-                    decimals,
+                    decimals: None,
                 },
             )))
         } else {
@@ -212,7 +186,7 @@ impl TokenDataV2 {
                         collection_id: collection_id.clone(),
                         token_name: token_name.clone(),
                         maximum: Some(token_data.maximum.clone()),
-                        supply: token_data.supply.clone(),
+                        supply: Some(token_data.supply.clone()),
                         largest_property_version_v1: Some(
                             token_data.largest_property_version.clone(),
                         ),
@@ -222,14 +196,14 @@ impl TokenDataV2 {
                         token_standard: TokenStandard::V1.to_string(),
                         is_fungible_v2: None,
                         transaction_timestamp: txn_timestamp,
-                        decimals: 0,
+                        decimals: None,
                     },
                     CurrentTokenDataV2 {
                         token_data_id,
                         collection_id,
                         token_name,
                         maximum: Some(token_data.maximum),
-                        supply: token_data.supply,
+                        supply: Some(token_data.supply),
                         largest_property_version_v1: Some(token_data.largest_property_version),
                         token_uri,
                         token_properties: token_data.default_properties,
@@ -238,7 +212,7 @@ impl TokenDataV2 {
                         is_fungible_v2: None,
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
-                        decimals: 0,
+                        decimals: None,
                     },
                 )));
             } else {
@@ -251,50 +225,5 @@ impl TokenDataV2 {
             }
         }
         Ok(None)
-    }
-
-    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
-    /// 1. If metadata is present with a token object, then is a token
-    /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_token(
-        conn: &mut PgPoolConnection<'_>,
-        token_data_id: &str,
-        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
-        txn_version: i64,
-    ) -> bool {
-        if let Some(object_data) = object_aggregated_data_mapping.get(token_data_id) {
-            return object_data.token.is_some();
-        }
-        match CurrentTokenDataV2Query::get_exists(conn, token_data_id).await {
-            Ok(is_token) => is_token,
-            Err(e) => {
-                // TODO: Standardize this error handling
-                panic!("Version: {}, error {:?}", txn_version, e)
-            },
-        }
-    }
-}
-
-impl CurrentTokenDataV2Query {
-    /// TODO: change this to diesel exists. Also this only checks once so may miss some data if coming from another thread
-    pub async fn get_exists(
-        conn: &mut PgPoolConnection<'_>,
-        token_data_id: &str,
-    ) -> anyhow::Result<bool> {
-        match current_token_datas_v2::table
-            .filter(current_token_datas_v2::token_data_id.eq(token_data_id))
-            .first::<Self>(conn)
-            .await
-            .optional()
-        {
-            Ok(result) => {
-                if result.is_some() {
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            },
-            Err(e) => anyhow::bail!("Error checking if token_data_id exists: {:?}", e),
-        }
     }
 }
