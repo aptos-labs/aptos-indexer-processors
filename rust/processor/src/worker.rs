@@ -714,8 +714,8 @@ pub fn build_processor(
         ProcessorConfig::DefaultProcessor => {
             Processor::from(DefaultProcessor::new(db_pool, per_table_chunk_sizes))
         },
-        ProcessorConfig::EventsProcessor => {
-            Processor::from(EventsProcessor::new(db_pool, per_table_chunk_sizes))
+        ProcessorConfig::EventsProcessor(config) => {
+            Processor::from(EventsProcessor::new(db_pool, config.clone(), per_table_chunk_sizes))
         },
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool, per_table_chunk_sizes))
