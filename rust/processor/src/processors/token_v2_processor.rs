@@ -287,9 +287,25 @@ fn insert_current_collections_v2_query(
         diesel::insert_into(schema::current_collections_v2::table)
             .values(items_to_insert)
             .on_conflict(collection_id)
-            .do_nothing(),
-        None,
-    )
+            .do_update()
+            .set((
+                creator_address.eq(excluded(creator_address)),
+                collection_name.eq(excluded(collection_name)),
+                description.eq(excluded(description)),
+                uri.eq(excluded(uri)),
+                current_supply.eq(excluded(current_supply)),
+                max_supply.eq(excluded(max_supply)),
+                total_minted_v2.eq(excluded(total_minted_v2)),
+                mutable_description.eq(excluded(mutable_description)),
+                mutable_uri.eq(excluded(mutable_uri)),
+                table_handle_v1.eq(excluded(table_handle_v1)),
+                token_standard.eq(excluded(token_standard)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_collections_v2.last_transaction_version <= excluded.last_transaction_version "),
+     )
 }
 
 fn insert_current_token_datas_v2_query(
@@ -306,9 +322,18 @@ fn insert_current_token_datas_v2_query(
             .on_conflict(token_data_id)
             .do_update()
             .set((
+                collection_id.eq(excluded(collection_id)),
+                token_name.eq(excluded(token_name)),
                 maximum.eq(excluded(maximum)),
                 supply.eq(excluded(supply)),
+                largest_property_version_v1.eq(excluded(largest_property_version_v1)),
+                token_uri.eq(excluded(token_uri)),
+                description.eq(excluded(description)),
+                token_properties.eq(excluded(token_properties)),
+                token_standard.eq(excluded(token_standard)),
                 is_fungible_v2.eq(excluded(is_fungible_v2)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 decimals.eq(excluded(decimals)),
             )),
@@ -330,8 +355,16 @@ fn insert_current_token_ownerships_v2_query(
             .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
             .do_update()
             .set((
+                amount.eq(excluded(amount)),
+                table_type_v1.eq(excluded(table_type_v1)),
+                token_properties_mutated_v1.eq(excluded(token_properties_mutated_v1)),
+                is_soulbound_v2.eq(excluded(is_soulbound_v2)),
+                token_standard.eq(excluded(token_standard)),
                 is_fungible_v2.eq(excluded(is_fungible_v2)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
+                non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
             )),
         Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
@@ -351,6 +384,9 @@ fn insert_current_deleted_token_ownerships_v2_query(
             .on_conflict((token_data_id, property_version_v1, owner_address, storage_id))
             .do_update()
             .set((
+                amount.eq(excluded(amount)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 is_fungible_v2.eq(excluded(is_fungible_v2)),
                 inserted_at.eq(excluded(inserted_at)),
             )),
@@ -391,8 +427,14 @@ fn insert_current_token_v2_metadatas_query(
         diesel::insert_into(schema::current_token_v2_metadata::table)
             .values(items_to_insert)
             .on_conflict((object_address, resource_type))
-            .do_nothing(),
-        None,
+            .do_update()
+            .set((
+                data.eq(excluded(data)),
+                state_key_hash.eq(excluded(state_key_hash)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
+        Some(" WHERE current_token_v2_metadata.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
 
