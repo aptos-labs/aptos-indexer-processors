@@ -85,7 +85,7 @@ impl CollectionV2 {
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }

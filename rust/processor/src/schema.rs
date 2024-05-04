@@ -635,6 +635,31 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_unified_fungible_asset_balances (storage_id) {
+        #[max_length = 66]
+        storage_id -> Varchar,
+        #[max_length = 66]
+        owner_address -> Varchar,
+        #[max_length = 66]
+        asset_type -> Varchar,
+        #[max_length = 1000]
+        coin_type -> Nullable<Varchar>,
+        is_primary -> Nullable<Bool>,
+        is_frozen -> Bool,
+        amount_v1 -> Nullable<Numeric>,
+        amount_v2 -> Nullable<Numeric>,
+        amount -> Nullable<Numeric>,
+        last_transaction_version_v1 -> Nullable<Int8>,
+        last_transaction_version_v2 -> Nullable<Int8>,
+        last_transaction_version -> Nullable<Int8>,
+        last_transaction_timestamp_v1 -> Nullable<Timestamp>,
+        last_transaction_timestamp_v2 -> Nullable<Timestamp>,
+        last_transaction_timestamp -> Nullable<Timestamp>,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     delegated_staking_activities (transaction_version, event_index) {
         transaction_version -> Int8,
         event_index -> Int8,
@@ -1266,6 +1291,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_ownerships_v2,
     current_token_pending_claims,
     current_token_v2_metadata,
+    current_unified_fungible_asset_balances,
     delegated_staking_activities,
     delegated_staking_pool_balances,
     delegated_staking_pools,

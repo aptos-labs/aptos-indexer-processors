@@ -15,16 +15,29 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use sha2::Digest;
 use std::str::FromStr;
+use tiny_keccak::{Hasher, Sha3};
 
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 // Max length of entry function id string to ensure that db doesn't explode
 pub const MAX_ENTRY_FUNCTION_LENGTH: usize = 1000;
 
+pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
+lazy_static! {
+    pub static ref APT_METADATA_ADDRESS_RAW: [u8; 32] = {
+        let mut addr = [0u8; 32];
+        addr[31] = 10u8;
+        addr
+    };
+    pub static ref APT_METADATA_ADDRESS_HEX: String =
+        format!("0x{}", hex::encode(*APT_METADATA_ADDRESS_RAW));
+}
 // Supporting structs to get clean payload without escaped strings
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryFunctionPayloadClean {
@@ -63,6 +76,14 @@ pub fn standardize_address(handle: &str) -> String {
 
 pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
+}
+
+pub fn sha3_256(buffer: &[u8]) -> [u8; 32] {
+    let mut output = [0; 32];
+    let mut sha3 = Sha3::v256();
+    sha3.update(buffer);
+    sha3.finalize(&mut output);
+    output
 }
 
 pub fn truncate_str(val: &str, max_chars: usize) -> String {
@@ -328,7 +349,7 @@ where
     D: Deserializer<'de>,
 {
     let s = <String>::deserialize(deserializer)?;
-    Ok(convert_hex(s.clone()).unwrap_or(s))
+    Ok(String::from_utf8(hex_to_raw_bytes(&s).unwrap()).unwrap_or(s))
 }
 
 /// Convert the bcs serialized vector<u8> to its original string format
@@ -388,10 +409,9 @@ pub fn convert_bcs_token_object_propertymap(s: Value) -> Option<Value> {
     }
 }
 
-/// Convert the vector<u8> that is directly generated from b"xxx"
-pub fn convert_hex(val: String) -> Option<String> {
-    let decoded = hex::decode(val.strip_prefix("0x").unwrap_or(&*val)).ok()?;
-    String::from_utf8(decoded).ok()
+/// Convert from hex string to raw byte string
+pub fn hex_to_raw_bytes(val: &str) -> anyhow::Result<Vec<u8>> {
+    Ok(hex::decode(val.strip_prefix("0x").unwrap_or(val))?)
 }
 
 /// Deserialize from string to type T

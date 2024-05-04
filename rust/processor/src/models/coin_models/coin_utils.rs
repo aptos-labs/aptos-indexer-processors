@@ -8,8 +8,8 @@ use crate::{
     models::default_models::move_resources::MoveResource,
     utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
 };
-use anyhow::{Context, Result};
-use aptos_protos::transaction::v1::{move_type::Content, MoveType, WriteResource};
+use anyhow::{bail, Context, Result};
+use aptos_protos::transaction::v1::{move_type::Content, DeleteResource, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -229,6 +229,8 @@ impl CoinInfoType {
 pub enum CoinResource {
     CoinInfoResource(CoinInfoResource),
     CoinStoreResource(CoinStoreResource),
+    CoinInfoDeletion,
+    CoinStoreDeletion,
 }
 
 impl CoinResource {
@@ -262,11 +264,27 @@ impl CoinResource {
         ))
     }
 
+    fn from_delete_resource_internal(data_type: &str, txn_version: i64) -> Result<CoinResource> {
+        match data_type {
+            x if x == format!("{}::coin::CoinInfo", COIN_ADDR) => {
+                Ok(CoinResource::CoinInfoDeletion)
+            },
+            x if x == format!("{}::coin::CoinStore", COIN_ADDR) => {
+                Ok(CoinResource::CoinStoreDeletion)
+            },
+            _ => bail!(
+                "Resource unsupported! Call is_resource_supported first. version {} type {}",
+                txn_version,
+                data_type
+            ),
+        }
+    }
+
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> Result<Option<CoinResource>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !CoinResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -279,6 +297,20 @@ impl CoinResource {
         Ok(Some(Self::from_resource(
             &type_str,
             resource.data.as_ref().unwrap(),
+            txn_version,
+        )?))
+    }
+
+    pub fn from_delete_resource(
+        delete_resource: &DeleteResource,
+        txn_version: i64,
+    ) -> Result<Option<CoinResource>> {
+        let type_str = MoveResource::get_outer_type_from_delete_resource(delete_resource);
+        if !CoinResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        Ok(Some(Self::from_delete_resource_internal(
+            &type_str,
             txn_version,
         )?))
     }

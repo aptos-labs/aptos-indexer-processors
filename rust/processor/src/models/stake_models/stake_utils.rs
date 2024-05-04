@@ -167,7 +167,7 @@ impl StakeResource {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !Self::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -323,7 +323,7 @@ impl DelegationVoteGovernanceRecordsResource {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         let resource = MoveResource::from_write_resource(
             write_resource,
             0, // Placeholder, this isn't used anyway

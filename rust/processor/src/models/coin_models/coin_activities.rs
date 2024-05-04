@@ -22,11 +22,13 @@ use crate::{
         },
         user_transactions_models::signatures::Signature,
     },
-    processors::coin_processor::APTOS_COIN_TYPE_STR,
     schema::coin_activities,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        util::{get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal},
+        util::{
+            get_entry_function_from_user_request, standardize_address, u64_to_bigdecimal,
+            APTOS_COIN_TYPE_STR,
+        },
     },
 };
 use ahash::AHashMap;

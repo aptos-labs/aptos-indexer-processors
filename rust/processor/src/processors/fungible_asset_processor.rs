@@ -7,7 +7,8 @@ use crate::{
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalance, CurrentFungibleAssetMapping, FungibleAssetBalance,
+                CurrentFungibleAssetBalance, CurrentFungibleAssetMapping,
+                CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
             },
             v2_fungible_asset_utils::{
                 FeeStatement, FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
@@ -37,8 +38,6 @@ use diesel::{
 };
 use std::fmt::Debug;
 use tracing::error;
-
-pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
 
 pub struct FungibleAssetProcessor {
     connection_pool: PgDbPool,
@@ -74,6 +73,10 @@ async fn insert_to_db(
     fungible_asset_metadata: &[FungibleAssetMetadataModel],
     fungible_asset_balances: &[FungibleAssetBalance],
     current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
+    current_unified_fungible_asset_balances: (
+        &[CurrentUnifiedFungibleAssetBalance],
+        &[CurrentUnifiedFungibleAssetBalance],
+    ),
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -111,7 +114,7 @@ async fn insert_to_db(
         ),
     );
     let cfab = execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_fungible_asset_balances_query,
         current_fungible_asset_balances,
         get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
@@ -119,8 +122,28 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let (faa_res, fam_res, fab_res, cfab_res) = tokio::join!(faa, fam, fab, cfab);
-    for res in [faa_res, fam_res, fab_res, cfab_res] {
+
+    let cufab_v1 = execute_in_chunks(
+        conn.clone(),
+        insert_current_unified_fungible_asset_balances_v1_query,
+        current_unified_fungible_asset_balances.0,
+        get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
+            "current_united_fungible_asset_balances",
+            per_table_chunk_sizes,
+        ),
+    );
+    let cufab_v2 = execute_in_chunks(
+        conn,
+        insert_current_unified_fungible_asset_balances_v2_query,
+        current_unified_fungible_asset_balances.1,
+        get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
+            "current_united_fungible_asset_balances",
+            per_table_chunk_sizes,
+        ),
+    );
+    let (faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res) =
+        tokio::join!(faa, fam, fab, cfab, cufab_v1, cufab_v2);
+    for res in [faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res] {
         res?;
     }
 
@@ -227,6 +250,63 @@ fn insert_current_fungible_asset_balances_query(
     )
 }
 
+fn insert_current_unified_fungible_asset_balances_v1_query(
+    items_to_insert: Vec<CurrentUnifiedFungibleAssetBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_unified_fungible_asset_balances::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_unified_fungible_asset_balances::table)
+            .values(items_to_insert)
+            .on_conflict(storage_id)
+            .do_update()
+            .set(
+                (
+                    owner_address.eq(excluded(owner_address)),
+                    asset_type.eq(excluded(asset_type)),
+                    coin_type.eq(excluded(coin_type)),
+                    is_frozen.eq(excluded(is_frozen)),
+                    amount_v1.eq(excluded(amount_v1)),
+                    last_transaction_timestamp_v1.eq(excluded(last_transaction_timestamp_v1)),
+                    last_transaction_version_v1.eq(excluded(last_transaction_version_v1)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )
+            ),
+        Some(" WHERE current_unified_fungible_asset_balances.last_transaction_version_v1 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v1 <= excluded.last_transaction_version_v1"),
+    )
+}
+
+fn insert_current_unified_fungible_asset_balances_v2_query(
+    items_to_insert: Vec<CurrentUnifiedFungibleAssetBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_unified_fungible_asset_balances::dsl::*;
+    (
+        diesel::insert_into(schema::current_unified_fungible_asset_balances::table)
+            .values(items_to_insert)
+            .on_conflict(storage_id)
+            .do_update()
+            .set(
+                (
+                    owner_address.eq(excluded(owner_address)),
+                    asset_type.eq(excluded(asset_type)),
+                    is_primary.eq(excluded(is_primary)),
+                    is_frozen.eq(excluded(is_frozen)),
+                    amount_v2.eq(excluded(amount_v2)),
+                    last_transaction_timestamp_v2.eq(excluded(last_transaction_timestamp_v2)),
+                    last_transaction_version_v2.eq(excluded(last_transaction_version_v2)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )
+            ),
+        Some(" WHERE current_unified_fungible_asset_balances.last_transaction_version_v2 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v2 <= excluded.last_transaction_version_v2 "),
+    )
+}
+
 #[async_trait]
 impl ProcessorTrait for FungibleAssetProcessor {
     fn name(&self) -> &'static str {
@@ -248,11 +328,15 @@ impl ProcessorTrait for FungibleAssetProcessor {
             fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
+            current_unified_fungible_asset_balances,
         ) = parse_v2_coin(&transactions).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
+        let (coin_balance, fa_balance): (Vec<_>, Vec<_>) = current_unified_fungible_asset_balances
+            .into_iter()
+            .partition(|x| x.is_primary.is_none());
         let tx_result = insert_to_db(
             self.get_pool(),
             self.name(),
@@ -262,6 +346,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             &fungible_asset_metadata,
             &fungible_asset_balances,
             &current_fungible_asset_balances,
+            (&coin_balance, &fa_balance),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -300,6 +385,7 @@ async fn parse_v2_coin(
     Vec<FungibleAssetMetadataModel>,
     Vec<FungibleAssetBalance>,
     Vec<CurrentFungibleAssetBalance>,
+    Vec<CurrentUnifiedFungibleAssetBalance>,
 ) {
     let mut fungible_asset_activities = vec![];
     let mut fungible_asset_balances = vec![];
@@ -409,6 +495,21 @@ async fn parse_v2_coin(
                     {
                         aggregated_data.fungible_asset_supply = Some(fungible_asset_supply);
                     }
+                }
+            } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap() {
+                if let Some((balance, current_balance, event_to_coin)) =
+                    FungibleAssetBalance::get_v1_from_delete_resource(
+                        delete_resource,
+                        index as i64,
+                        txn_version,
+                        txn_timestamp,
+                    )
+                    .unwrap()
+                {
+                    fungible_asset_balances.push(balance);
+                    current_fungible_asset_balances
+                        .insert(current_balance.storage_id.clone(), current_balance.clone());
+                    event_to_v1_coin_type.extend(event_to_coin);
                 }
             }
         }
@@ -542,14 +643,21 @@ async fn parse_v2_coin(
     let mut current_fungible_asset_balances = current_fungible_asset_balances
         .into_values()
         .collect::<Vec<CurrentFungibleAssetBalance>>();
+
     // Sort by PK
     fungible_asset_metadata.sort_by(|a, b| a.asset_type.cmp(&b.asset_type));
     current_fungible_asset_balances.sort_by(|a, b| a.storage_id.cmp(&b.storage_id));
 
+    // Process the unified balance
+    let current_unified_fungible_asset_balances = current_fungible_asset_balances
+        .iter()
+        .map(CurrentUnifiedFungibleAssetBalance::from)
+        .collect::<Vec<_>>();
     (
         fungible_asset_activities,
         fungible_asset_metadata,
         fungible_asset_balances,
         current_fungible_asset_balances,
+        current_unified_fungible_asset_balances,
     )
 }

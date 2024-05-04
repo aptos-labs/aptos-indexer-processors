@@ -116,9 +116,21 @@ impl MoveResource {
         }
     }
 
-    pub fn get_outer_type_from_resource(write_resource: &WriteResource) -> String {
+    pub fn get_outer_type_from_write_resource(write_resource: &WriteResource) -> String {
         let move_struct_tag =
             Self::convert_move_struct_tag(write_resource.r#type.as_ref().unwrap());
+
+        format!(
+            "{}::{}::{}",
+            move_struct_tag.get_address(),
+            move_struct_tag.module,
+            move_struct_tag.name,
+        )
+    }
+
+    pub fn get_outer_type_from_delete_resource(delete_resource: &DeleteResource) -> String {
+        let move_struct_tag =
+            Self::convert_move_struct_tag(delete_resource.r#type.as_ref().unwrap());
 
         format!(
             "{}::{}::{}",

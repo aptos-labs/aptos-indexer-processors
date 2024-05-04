@@ -7,7 +7,8 @@
 
 use crate::{
     models::default_models::move_tables::TableItem,
-    processors::coin_processor::APTOS_COIN_TYPE_STR, schema::coin_supply, utils::util::hash_str,
+    schema::coin_supply,
+    utils::util::{hash_str, APTOS_COIN_TYPE_STR},
 };
 use anyhow::Context;
 use aptos_protos::transaction::v1::WriteTableItem;

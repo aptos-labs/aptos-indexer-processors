@@ -419,7 +419,7 @@ impl TableMetadataForToken {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<TableHandleToOwner>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }

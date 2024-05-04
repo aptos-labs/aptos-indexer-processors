@@ -220,7 +220,7 @@ impl AnsWriteResource {
         ans_v2_contract_address: &str,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         let data = write_resource.data.as_str();
 
         match type_str.clone() {

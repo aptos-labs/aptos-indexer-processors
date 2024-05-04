@@ -21,6 +21,7 @@ use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
 
@@ -28,6 +29,10 @@ pub const TOKEN_V2_ADDR: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000004";
 
 pub const DEFAULT_OWNER_ADDRESS: &str = "unknown";
+
+lazy_static! {
+    pub static ref V2_STANDARD: String = TokenStandard::V2.to_string();
+}
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 /// Maps address to burn event. If it's an old event previous_owner will be empty
@@ -87,7 +92,7 @@ impl AptosCollection {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -134,7 +139,7 @@ impl TokenV2 {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -191,7 +196,7 @@ impl FixedSupply {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -225,7 +230,7 @@ impl UnlimitedSupply {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -257,7 +262,7 @@ impl ConcurrentSupply {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -431,7 +436,7 @@ impl PropertyMapModel {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -462,7 +467,7 @@ impl TokenIdentifiers {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2TokenResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
