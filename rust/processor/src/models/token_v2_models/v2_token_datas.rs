@@ -15,7 +15,7 @@ use crate::{
     utils::util::standardize_address,
 };
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource, WriteTableItem};
-use bigdecimal::{BigDecimal, Zero};
+use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
