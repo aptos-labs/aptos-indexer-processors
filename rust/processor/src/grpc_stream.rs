@@ -405,7 +405,7 @@ pub async fn create_fetcher_loop(
                     channel_size = txn_sender.len(),
                     size_in_bytes,
                     duration_in_secs,
-                    tps = fetch_ma.avg() as u64,
+                    tps = fetch_ma.avg().ceil() as u64,
                     bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
                     step,
                     "{}",
@@ -511,7 +511,7 @@ pub async fn create_fetcher_loop(
 
                 let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
                 send_ma.tick_now(num_txns as u64);
-                let tps = send_ma.avg() as u64;
+                let tps = send_ma.avg().ceil() as u64;
                 let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
 
                 let channel_size = txn_sender.len();

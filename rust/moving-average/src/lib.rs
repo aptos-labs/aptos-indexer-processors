@@ -49,12 +49,13 @@ impl MovingAverage {
         self.avg()
     }
 
+    // This is required to called after tick_now/tick is called.
     pub fn avg(&self) -> f64 {
         if self.values.len() < 2 {
             0.0
         } else {
             let elapsed = self.values.back().unwrap().0 - self.values.front().unwrap().0;
-            self.sum as f64 / elapsed as f64
+            (self.sum * 1000) as f64 / elapsed as f64
         }
     }
 
