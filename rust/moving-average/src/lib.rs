@@ -64,11 +64,10 @@ impl MovingAverage {
     }
 }
 
-
+#[cfg(test)]
 mod test {
-    use std::thread::sleep;
-
     use super::*;
+
     #[test]
     fn test_moving_average() {
         // 10 Second window.
@@ -76,11 +75,10 @@ mod test {
         // 9 seconds spent at 100 TPS.
         for _ in 0..9 {
             ma.tick_now(100);
-            sleep(std::time::Duration::from_secs(1));
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
         // No matter what algorithm we use, the average should be 99 at least.
         let avg = ma.avg();
         assert!(avg >= 99.0, "Average is too low: {}", avg);
     }
-
 }
