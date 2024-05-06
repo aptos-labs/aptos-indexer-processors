@@ -78,9 +78,9 @@ mod test {
             ma.tick_now(100);
             sleep(std::time::Duration::from_secs(1));
         }
-        // No matter what algorithm we use, the average should be 100 at least.
+        // No matter what algorithm we use, the average should be 99 at least.
         let avg = ma.avg();
-        assert!(avg >= 90.0, "Average is too low: {}", avg);
+        assert!(avg >= 99.0, "Average is too low: {}", avg);
     }
 
 }
