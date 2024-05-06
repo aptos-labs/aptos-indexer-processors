@@ -62,32 +62,9 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub decimals: i64,
-    pub is_deleted_v2: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(primary_key(token_data_id))]
-#[diesel(table_name = current_token_datas_v2)]
-pub struct CurrentTokenDataV2Query {
-    pub token_data_id: String,
-    pub collection_id: String,
-    pub token_name: String,
-    pub maximum: Option<BigDecimal>,
-    pub supply: BigDecimal,
-    pub largest_property_version_v1: Option<BigDecimal>,
-    pub token_uri: String,
-    pub description: String,
-    pub token_properties: serde_json::Value,
-    pub token_standard: String,
-    pub is_fungible_v2: Option<bool>,
-    pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub inserted_at: chrono::NaiveDateTime,
-    pub decimals: i64,
-    pub is_deleted_v2: Option<bool>,
-    // Deperecated, but still here for backwards compatibility
+    // Deprecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
+    pub is_deleted_v2: Option<bool>,
 }
 
 impl TokenDataV2 {
@@ -186,7 +163,7 @@ impl TokenDataV2 {
                 collection_id: burn_event_v2.get_collection_address(),
                 token_name: "".to_string(),
                 maximum: None,
-                supply: BigDecimal::zero(),
+                supply: None,
                 largest_property_version_v1: None,
                 token_uri: "".to_string(),
                 token_properties: serde_json::Value::Null,
@@ -195,7 +172,7 @@ impl TokenDataV2 {
                 is_fungible_v2: Some(false),
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
-                decimals: 0,
+                decimals: None,
                 is_deleted_v2: Some(true),
             }))
         } else {
@@ -218,7 +195,7 @@ impl TokenDataV2 {
                 collection_id: burn_event_v2.get_collection_address(),
                 token_name: "".to_string(),
                 maximum: None,
-                supply: BigDecimal::zero(),
+                supply: None,
                 largest_property_version_v1: None,
                 token_uri: "".to_string(),
                 token_properties: serde_json::Value::Null,
@@ -227,7 +204,7 @@ impl TokenDataV2 {
                 is_fungible_v2: Some(false),
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
-                decimals: 0,
+                decimals: None,
                 is_deleted_v2: Some(true),
             }))
         } else {
