@@ -432,7 +432,7 @@ impl Worker {
                 // We've processed things: do some data and metrics
 
                 ma.tick_now((last_txn_version - first_txn_version) + 1);
-                let tps = (ma.avg() * 1000.0) as u64;
+                let tps = ma.avg().ceil() as u64;
 
                 let num_processed = (last_txn_version - first_txn_version) + 1;
 
