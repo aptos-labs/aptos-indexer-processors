@@ -12,9 +12,7 @@ use crate::{
         token_v2_models::{
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
             v2_token_activities::TokenActivityV2,
-            v2_token_datas::{
-                CurrentDeletedTokenDataV2, CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2,
-            },
+            v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
             v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
             v2_token_ownerships::{
                 CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
@@ -99,7 +97,7 @@ async fn insert_to_db(
     current_collections_v2: &[CurrentCollectionV2],
     (current_token_datas_v2, current_deleted_token_datas_v2): (
         &[CurrentTokenDataV2],
-        &[CurrentDeletedTokenDataV2],
+        &[CurrentTokenDataV2],
     ),
     (current_token_ownerships_v2, current_deleted_token_ownerships_v2): (
         &[CurrentTokenOwnershipV2],
@@ -159,7 +157,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_deleted_token_datas_v2_query,
         current_deleted_token_datas_v2,
-        get_config_table_chunk_size::<CurrentDeletedTokenDataV2>(
+        get_config_table_chunk_size::<CurrentTokenDataV2>(
             "current_token_datas_v2",
             per_table_chunk_sizes,
         ),
@@ -362,7 +360,7 @@ fn insert_current_token_datas_v2_query(
 }
 
 fn insert_current_deleted_token_datas_v2_query(
-    items_to_insert: Vec<CurrentDeletedTokenDataV2>,
+    items_to_insert: Vec<CurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -589,7 +587,7 @@ async fn parse_v2_token(
     Vec<TokenOwnershipV2>,
     Vec<CurrentCollectionV2>,
     Vec<CurrentTokenDataV2>,
-    Vec<CurrentDeletedTokenDataV2>,
+    Vec<CurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
@@ -604,10 +602,8 @@ async fn parse_v2_token(
         AHashMap::new();
     let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         AHashMap::new();
-    let mut current_deleted_token_datas_v2: AHashMap<
-        CurrentTokenDataV2PK,
-        CurrentDeletedTokenDataV2,
-    > = AHashMap::new();
+    let mut current_deleted_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+        AHashMap::new();
     let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
         CurrentTokenOwnershipV2,
@@ -726,10 +722,15 @@ async fn parse_v2_token(
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address(), Some(burn_event));
+                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
                 }
-                if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address(), None);
+                if let Some(old_burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
+                    let burn_event = Burn::new(
+                        standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
+                        old_burn_event.get_token_address(),
+                        "".to_string(),
+                    );
+                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
                 }
                 if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap() {
                     tokens_minted.insert(mint_event.get_token_address());
@@ -1080,7 +1081,7 @@ async fn parse_v2_token(
         .collect::<Vec<CurrentTokenDataV2>>();
     let mut current_deleted_token_datas_v2 = current_deleted_token_datas_v2
         .into_values()
-        .collect::<Vec<CurrentDeletedTokenDataV2>>();
+        .collect::<Vec<CurrentTokenDataV2>>();
     let mut current_token_ownerships_v2 = current_token_ownerships_v2
         .into_values()
         .collect::<Vec<CurrentTokenOwnershipV2>>();

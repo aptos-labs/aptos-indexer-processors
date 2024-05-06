@@ -66,16 +66,6 @@ pub struct CurrentTokenDataV2 {
     pub is_deleted_v2: Option<bool>,
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(token_data_id))]
-#[diesel(table_name = current_token_datas_v2)]
-pub struct CurrentDeletedTokenDataV2 {
-    pub token_data_id: String,
-    pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub is_deleted_v2: bool,
-}
-
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_data_id))]
 #[diesel(table_name = current_token_datas_v2)]
@@ -187,17 +177,26 @@ impl TokenDataV2 {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         tokens_burned: &TokenV2Burned,
-    ) -> anyhow::Result<Option<CurrentDeletedTokenDataV2>> {
+    ) -> anyhow::Result<Option<CurrentTokenDataV2>> {
         let token_data_id = standardize_address(&write_resource.address.to_string());
-        if tokens_burned
-            .get(&standardize_address(&token_data_id))
-            .is_some()
-        {
-            Ok(Some(CurrentDeletedTokenDataV2 {
+        // reminder that v1 events won't get to this codepath
+        if let Some(burn_event_v2) = tokens_burned.get(&standardize_address(&token_data_id)) {
+            Ok(Some(CurrentTokenDataV2 {
                 token_data_id,
+                collection_id: burn_event_v2.get_collection_address(),
+                token_name: "".to_string(),
+                maximum: None,
+                supply: BigDecimal::zero(),
+                largest_property_version_v1: None,
+                token_uri: "".to_string(),
+                token_properties: serde_json::Value::Null,
+                description: "".to_string(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
-                is_deleted_v2: false,
+                decimals: 0,
+                is_deleted_v2: Some(true),
             }))
         } else {
             Ok(None)
@@ -210,17 +209,26 @@ impl TokenDataV2 {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         tokens_burned: &TokenV2Burned,
-    ) -> anyhow::Result<Option<CurrentDeletedTokenDataV2>> {
+    ) -> anyhow::Result<Option<CurrentTokenDataV2>> {
         let token_data_id = standardize_address(&delete_resource.address.to_string());
-        if tokens_burned
-            .get(&standardize_address(&token_data_id))
-            .is_some()
-        {
-            Ok(Some(CurrentDeletedTokenDataV2 {
+        // reminder that v1 events won't get to this codepath
+        if let Some(burn_event_v2) = tokens_burned.get(&standardize_address(&token_data_id)) {
+            Ok(Some(CurrentTokenDataV2 {
                 token_data_id,
+                collection_id: burn_event_v2.get_collection_address(),
+                token_name: "".to_string(),
+                maximum: None,
+                supply: BigDecimal::zero(),
+                largest_property_version_v1: None,
+                token_uri: "".to_string(),
+                token_properties: serde_json::Value::Null,
+                description: "".to_string(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
-                is_deleted_v2: false,
+                decimals: 0,
+                is_deleted_v2: Some(true),
             }))
         } else {
             Ok(None)
