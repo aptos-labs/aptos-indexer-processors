@@ -86,9 +86,9 @@ fn insert_events_query(
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
 ) {
-    use schema::events::dsl::*;
+    use schema::inbox_events::dsl::*;
     (
-        diesel::insert_into(schema::events::table)
+        diesel::insert_into(schema::inbox_events::table)
             .values(items_to_insert)
             .on_conflict((transaction_version, event_index))
             .do_update()

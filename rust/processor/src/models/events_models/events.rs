@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    schema::events,
+    schema::inbox_events,
     utils::util::{standardize_address, truncate_str},
 };
 use aptos_protos::transaction::v1::Event as EventPB;
@@ -16,7 +16,7 @@ const EVENT_TYPE_MAX_LENGTH: usize = 300;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
-#[diesel(table_name = events)]
+#[diesel(table_name = inbox_events)]
 pub struct Event {
     pub sequence_number: i64,
     pub creation_number: i64,
