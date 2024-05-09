@@ -69,6 +69,7 @@ num = { workspace = true }
 google-cloud-storage = { workspace = true }
 hyper = { workspace = true }
 lazy_static = { workspace = true }
+parquet_derive = { workspace = true }
 
 [features]
 libpq = ["diesel/postgres"]

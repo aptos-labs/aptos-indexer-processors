@@ -22,9 +22,9 @@ use crate::{
         },
         database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
-    }, IndexerGrpcProcessorConfig,
+    },
 };
-use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
+use google_cloud_storage::client::{Client as GCSClient};
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
@@ -673,7 +673,7 @@ pub async fn do_processor(
             start_version,
             end_version,
             Some(db_chain_id),
-            &gcs_client,
+            gcs_client,
         )
         .await;
 

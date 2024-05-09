@@ -149,7 +149,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
-        client: &Client,
+        _client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let mut transaction_sizes = vec![];

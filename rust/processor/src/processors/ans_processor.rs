@@ -367,7 +367,7 @@ impl ProcessorTrait for AnsProcessor {
         start_version: u64,
         end_version: u64,
         _db_chain_id: Option<u64>,
-        client: &Client,
+        _client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();

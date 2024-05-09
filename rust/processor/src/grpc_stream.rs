@@ -67,6 +67,12 @@ pub fn grpc_request_builder(
     request
         .metadata_mut()
         .insert(GRPC_REQUEST_NAME_HEADER, processor_name.parse().unwrap());
+    info!(
+        processor_name = processor_name,
+        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        start_version = starting_version,
+        end_version = transactions_count,
+        "[Parser] GRPC request built");
     request
 }
 
@@ -287,7 +293,7 @@ pub async fn create_fetcher_loop(
         Some(connection_id) => connection_id.to_str().unwrap().to_string(),
         None => "".to_string(),
     };
-    let mut resp_stream = response.into_inner();
+    let mut resp_stream: Streaming<TransactionsResponse> = response.into_inner();
     info!(
         processor_name = processor_name,
         service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -311,12 +317,12 @@ pub async fn create_fetcher_loop(
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
                 let start_txn_timestamp =
-                    r.transactions.as_slice().first().unwrap().timestamp.clone();
+                    r.transactions.as_slice().first().unwrap().timestamp.clone();  // maybe the first one can be the highwater mark. 
                 let end_version = r.transactions.as_slice().last().unwrap().version;
                 let end_txn_timestamp = r.transactions.as_slice().last().unwrap().timestamp.clone();
 
                 next_version_to_fetch = end_version + 1;
-
+                info!("number of transaction process {} from stream", r.transactions.len());
                 let size_in_bytes = r.encoded_len() as u64;
                 let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
                 let num_txns = r.transactions.len();

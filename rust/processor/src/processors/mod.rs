@@ -63,7 +63,8 @@ pub struct ProcessingResult {
     pub end_version: u64,
     pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     pub processing_duration_in_secs: f64,
-    pub db_insertion_duration_in_secs: f64,
+    pub db_insertion_duration_in_secs: f64, // make it optional
+    // pub gcs_upload_duration_in_secs: Option<f64>, // make it optional, and better naming
 }
 
 /// Base trait for all processors

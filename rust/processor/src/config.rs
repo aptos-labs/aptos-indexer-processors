@@ -12,7 +12,7 @@ use server_framework::RunnableConfig;
 use std::{sync::Arc, time::Duration};
 use url::Url;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
-use tracing::{error, info, warn};
+use tracing::{error};
 
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;
 pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;

@@ -11,6 +11,11 @@
 #[macro_use]
 extern crate diesel;
 
+// for parquet_derive
+extern crate parquet;
+#[macro_use] 
+extern crate parquet_derive;
+
 pub use config::IndexerGrpcProcessorConfig;
 
 mod config;

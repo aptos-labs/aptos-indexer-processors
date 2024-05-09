@@ -8,41 +8,58 @@ use crate::{
         move_modules::MoveModule,
         move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
-        transactions::TransactionModel,
+        new_transactions::TransactionModel,
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
-    schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
-    schemas::default_schemas::transactions::TRANSACTION_SCHEMA,
+    utils::database::{PgDbPool},
+    // schemas::default_schemas::new_transactions::TRANSACTION_SCHEMA,
 };
 use ahash::AHashMap;
-use anyhow::bail;
+
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
-use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
-};
-use std::{fmt::Debug, fs::File, sync::Arc};
+
+use std::{fmt::Debug, fmt::{Display, Formatter, Result}, fs::{File, remove_file, rename}, sync::Arc};
 use tracing::{error, info};
 
-use arrow::{datatypes::{DataType, Field, Schema}};
-use arrow::array::{Int64Array, StringArray, BooleanArray, Float64Array, ArrayRef, ListArray, StringBuilder};
-use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
-use arrow::record_batch::RecordBatch;
-use bigdecimal::{BigDecimal, ToPrimitive};
+use tokio::io::{self, AsyncReadExt};
+
+
+
+use parquet::{file::{properties::WriterProperties}};
+
+
 use google_cloud_storage::{
     client::Client,
-    http::{buckets::list::ListBucketsRequest, objects::upload::{Media, UploadObjectRequest, UploadType}},
+    http::{objects::upload::{Media, UploadObjectRequest, UploadType}, Error as StorageError},
 };
 use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow};
-use tokio::{io::AsyncReadExt, join};
+use anyhow::{Result as AnyhowResult, anyhow};
+
 use hyper::Body;
 use std::path::PathBuf;
 use tokio::fs::File as TokioFile;
+use tokio::time::{timeout, Duration};
 
+
+use parquet::record::RecordWriter; // requires deriving a reordWriter for the struct
+
+use parquet::file::reader::{FileReader};
+
+
+use chrono::{TimeZone};
+use arrow::error::ArrowError;
+
+use parquet::file::writer::{SerializedFileWriter};
+use chrono::Datelike;
+use chrono::Timelike;
+use parquet::schema::types::Type as ParquetType;
+
+const BATCH_SIZE: usize = 5000; // define BATCH_SIZE
+const MAX_FILE_SIZE_BYTES: usize = 200 * 1024 * 1024; // 200MB
+const BUCKET_REGULAR_TRAFFIC: &str = "devnet-airflow-continue";
+
+const TABLE: &str = "transactions";
 
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -58,11 +75,71 @@ pub struct ParquetProcessor {
     config: ParquetProcessorConfig,
 }
 
+#[derive(Debug)]
+// #[derive(Debug, Error)]
+pub enum ParquetProcessorError {
+    // #[error("ArrowError: {0}")]
+    ArrowError(ArrowError),
+    // #[error("ParquetError: {0}")]
+    ParquetError(parquet::errors::ParquetError),
+    // #[error("StorageError: {0}")]
+    StorageError(StorageError),
+    // #[error("IoError: {0}")]
+    IoError(io::Error),
+    //     #[error("Other error: {0}")]
+    Other(String),
+}
+
+impl std::error::Error for ParquetProcessorError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match *self {
+            ParquetProcessorError::ArrowError(ref err) => Some(err),
+            ParquetProcessorError::ParquetError(ref err) => Some(err),
+            ParquetProcessorError::StorageError(ref err) => Some(err),
+            ParquetProcessorError::IoError(ref err) => Some(err),
+            ParquetProcessorError::Other(_) => None,
+        }
+    }
+}
+
+
+
+impl Display for ParquetProcessorError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match *self {
+            ParquetProcessorError::ArrowError(ref err) => write!(f, "Arrow error: {}", err),
+            ParquetProcessorError::ParquetError(ref err) => write!(f, "Parquet error: {}", err),
+            ParquetProcessorError::StorageError(ref err) => write!(f, "Storage error: {}", err),
+            ParquetProcessorError::IoError(ref err) => write!(f, "IO error: {}", err),
+            ParquetProcessorError::Other(ref desc) => write!(f, "Error: {}", desc),
+        }
+    }
+}
+
+// Implement From trait for converting from std::io::Error
+impl From<std::io::Error> for ParquetProcessorError {
+    fn from(err: std::io::Error) -> Self {
+        ParquetProcessorError::IoError(err)
+    }
+}
+
+impl From<anyhow::Error> for ParquetProcessorError {
+    fn from(err: anyhow::Error) -> Self {
+        ParquetProcessorError::Other(err.to_string())
+    }
+}
+
+// Implement From trait for converting from std::io::Error
+impl From<parquet::errors::ParquetError> for ParquetProcessorError {
+    fn from(err: parquet::errors::ParquetError) -> Self {
+        ParquetProcessorError::ParquetError(err)
+    }
+}
+
 impl ParquetProcessor {
     pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>, config: ParquetProcessorConfig) -> Self {
 
         tracing::info!("init ParquetProcessor");
-
 
         if let Some(credentials) = config.google_application_credentials.clone() {
             std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
@@ -77,7 +154,7 @@ impl ParquetProcessor {
 }
 
 impl Debug for ParquetProcessor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let state = &self.connection_pool.state();
         write!(
             f,
@@ -95,7 +172,7 @@ impl ProcessorTrait for ParquetProcessor {
 
     async fn process_transactions(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<Transaction>, 
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
@@ -104,7 +181,6 @@ impl ProcessorTrait for ParquetProcessor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        // we can modify this to only process the transactions that we need 
         let (
             txns,
             block_metadata_transactions,
@@ -115,177 +191,35 @@ impl ProcessorTrait for ParquetProcessor {
             .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
-        let db_insertion_start = std::time::Instant::now();
+        let _parquet_conversion_start = std::time::Instant::now();
+        let db_insertion_duration_in_secs = 0.0;
 
-        let tx_result = insert_to_db(
-            self.get_pool(),
-            self.name(),
+        // Start the Parquet file handling and GCS upload
+        let _upload_result = convert_to_parquet_and_upload_to_gcs(
+            client,
+            "transactions",
+            &self.config.bucket,
             start_version,
             end_version,
+            &txns,
+            &block_metadata_transactions,
+            &write_set_changes,
             (
+                &move_modules,
+                &move_resources,
                 &table_items,
                 &current_table_items,
+                &table_metadata,
             ),
-            &self.per_table_chunk_sizes,
-        )
-        .await;
+        ).await?;
 
-        info!(
-            start_version = start_version,
-            end_version = end_version,
-            processor_name = self.name(),
-            db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64(),
-            "converting transactions to record batch and writing to parquet file",
-        );
-        // // transaction schema for the parquet file 
-        // let schema = Arc::new(Schema::new(vec![
-        //     Field::new("version", DataType::Int64, false),
-        //     Field::new("block_height", DataType::Int64, false),
-        //     Field::new("hash", DataType::Utf8, false),
-        //     Field::new("type_", DataType::Utf8, false),
-        //     // Representing `serde_json::Value` as a string. Adjust based on your actual serialization needs.
-        //     // Utf8 (json text), binary (serialized json), or  nested structure (expensive)
-        //     Field::new("payload", DataType::Utf8, true),
-        //     Field::new("state_change_hash", DataType::Utf8, false),
-        //     Field::new("event_root_hash", DataType::Utf8, false),
-        //     // Option<String> represented as nullable UTF8
-        //     Field::new("state_checkpoint_hash", DataType::Utf8, true),
-        //     // BigDecimal as String due to lack of direct support in Arrow. Consider Float64 if applicable.
-        //     Field::new("gas_used", DataType::Utf8, false),
-        //     Field::new("success", DataType::Boolean, false),
-        //     Field::new("vm_status", DataType::Utf8, false),
-        //     Field::new("accumulator_root_hash", DataType::Utf8, false),
-        //     Field::new("num_events", DataType::Int64, false),
-        //     Field::new("num_write_set_changes", DataType::Int64, false),
-        //     Field::new("epoch", DataType::Int64, false),
-        //     // Option<String> represented as nullable UTF8
-        //     Field::new("payload_type", DataType::Utf8, true),
-        // ]));
-
-        // convert a vec Transaction into a RecordBatch
-        let mut version = Int64Array::from(txns.iter().map(|x| x.version).collect::<Vec<i64>>());
-        let mut block_height = Int64Array::from(txns.iter().map(|x| x.block_height).collect::<Vec<i64>>());
-        let mut hash = StringArray::from(txns.iter().map(|x| x.hash.clone()).collect::<Vec<String>>());
-        let mut type_ = StringArray::from(txns.iter().map(|x| x.type_.clone()).collect::<Vec<String>>());
-        // For the `payload` field, you might serialize `serde_json::Value` to a JSON string
-        let mut payload_builder = StringBuilder::new();
-        for payload in txns.iter().map(|x| &x.payload) {
-            match payload {
-                Some(value) => {
-                    let serialized = serde_json::to_string(value).unwrap(); // Handle errors as needed
-                    payload_builder.append_value(&serialized);
-                },
-                None => payload_builder.append_null(),
-            }
-        }
-        let payload = payload_builder.finish();
-
-        let mut state_change_hash = StringArray::from(txns.iter().map(|x| x.state_change_hash.clone()).collect::<Vec<String>>());
-
-        // For fields that are `Option<String>`, handle `None` as null. Showing `state_checkpoint_hash` as an example:
-        let mut state_checkpoint_hash_builder = StringBuilder::new();
-        for hash in txns.iter().map(|x| &x.state_checkpoint_hash) {
-            match hash {
-                Some(value) => state_checkpoint_hash_builder.append_value(value),
-                None => state_checkpoint_hash_builder.append_null(),
-            }
-        }
-        
-        let state_checkpoint_hash = state_checkpoint_hash_builder.finish();
-        // if we want to filter None values
-        // let state_checkpoint_hash = StringArray::from(
-        //     txns.iter()
-        //         .filter_map(|x| x.state_checkpoint_hash.clone()) 
-        //         .collect::<Vec<String>>() 
-        // );
-
-        let mut event_root_hash = StringArray::from(txns.iter().map(|x| x.event_root_hash.clone()).collect::<Vec<String>>());
-        
-        let gas_used = StringArray::from(txns.iter().map(|x| x.gas_used.to_string()).collect::<Vec<String>>());
-        
-        let success = BooleanArray::from(txns.iter().map(|x| x.success).collect::<Vec<bool>>());
-        let mut vm_status = StringArray::from(txns.iter().map(|x| x.vm_status.clone()).collect::<Vec<String>>());
-        let mut accumulator_root_hash = StringArray::from(txns.iter().map(|x| x.accumulator_root_hash.clone()).collect::<Vec<String>>());
-        let mut num_events = Int64Array::from(txns.iter().map(|x| x.num_events).collect::<Vec<i64>>());
-        let mut num_write_set_changes = Int64Array::from(txns.iter().map(|x| x.num_write_set_changes).collect::<Vec<i64>>());
-        let mut epoch = Int64Array::from(txns.iter().map(|x| x.epoch).collect::<Vec<i64>>());
-
-        let mut payload_type_builder = StringBuilder::new();
-        for payload_type in txns.iter().map(|x| &x.payload_type) {
-            match payload_type {
-                Some(value) => {
-                    let serialized = serde_json::to_string(value).unwrap(); // Handle errors as needed
-                    payload_type_builder.append_value(&serialized)
-                },
-                None => payload_type_builder.append_null(),
-            }
-        }
-        let payload_type = payload_type_builder.finish();
-        
-        let record_batch = RecordBatch::try_new(Arc::new((&*TRANSACTION_SCHEMA).clone()), vec![
-            Arc::new(version),
-            Arc::new(block_height),
-            Arc::new(hash),
-            Arc::new(type_),
-            Arc::new(payload),
-            Arc::new(state_change_hash),
-            Arc::new(event_root_hash),
-            Arc::new(state_checkpoint_hash),
-            Arc::new(gas_used),
-            Arc::new(success),
-            Arc::new(vm_status),
-            Arc::new(accumulator_root_hash),
-            Arc::new(num_events),
-            Arc::new(num_write_set_changes),
-            Arc::new(epoch),
-            Arc::new(payload_type),
-        ]).unwrap();
-
-        info!(record_batch = ?record_batch, "Record batch created");
-        let result = client.list_buckets(&ListBucketsRequest{
-            project: "aptos-yuun-playground".to_string(),
-            ..Default::default()
-        }).await;
-        // log the result
-        info!(result = ?result, "List buckets result");
-        
-        // write the record_batch into parquet file
-        let file_path = PathBuf::from("some_proper_name_goes_here");
-        let file = File::create(&file_path).unwrap(); 
-
-        let props = WriterProperties::builder()
-        .set_compression(parquet::basic::Compression::LZ4)
-        .build();
-
-        let mut writer = ArrowWriter::try_new(file, record_batch.schema(), Some(props)).unwrap();
-        writer.write(&record_batch).expect("write record batch");
-        // writer must be closed to write the footer
-        writer.close().unwrap();
-            
-        // write the parquet file into gcs
-        let upload_result = upload_parquet_to_gcs(&file_path, &self.config.bucket, client).await?;
-
-
-        let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
-        match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
-            Err(e) => {
-                error!(
-                    start_version = start_version,
-                    end_version = end_version,
-                    processor_name = self.name(),
-                    error = ?e,
-                    "[Parser] Error inserting transactions to db",
-                );
-                bail!(e)
-            },
-        }
+        Ok(ProcessingResult {
+            start_version,
+            end_version,
+            processing_duration_in_secs,
+            last_transaction_timestamp,
+            db_insertion_duration_in_secs,
+        })
     }
 
     fn connection_pool(&self) -> &PgDbPool {
@@ -293,10 +227,150 @@ impl ProcessorTrait for ParquetProcessor {
     }
 }
 
+pub async fn upload_parquet_to_gcs(
+    file_path: &PathBuf,
+    table_name: &str,
+    bucket_name: &str,
+    client: &Client,
+) -> AnyhowResult<String> {
+    
+    // Re-open the file for reading
+    let mut file = TokioFile::open(&file_path).await.map_err(|e| anyhow!("Failed to open file for reading: {}", e))?;
+
+    info!("File opened for reading at path: {:?}", file_path);
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).await.map_err(|e| anyhow!("Failed to read file: {}", e))?;
+
+
+    if buffer.is_empty() {
+        error!("The file is empty and has no data to upload.");
+        return Err(anyhow!("No data to upload. The file buffer is empty."));
+    }
+    info!("File read successfully, size: {} bytes", buffer.len());
+
+    let now = chrono::Utc::now();
+    let start_of_month = now.with_day(1).unwrap().with_hour(0).unwrap().with_minute(0).unwrap().with_second(0).unwrap().with_nanosecond(0).unwrap();
+    let highwater_s = start_of_month.timestamp_millis();
+    let highwater_ms = now.timestamp_millis();  // milliseconds
+    let counter = 0; // THIS NEED TO BE REPLACED OR REIMPLEMENTED WITH AN ACTUAL LOGIC TO ENSURE FILE UNIQUENESS. 
+    let object_name: PathBuf = generate_parquet_file_path(BUCKET_REGULAR_TRAFFIC, table_name, highwater_s, highwater_ms, counter);
+
+    // let table_path = PathBuf::from(format!("{}/{}/{}/", bucket_name, gcs_bucket_root, table));
+    let file_name = object_name.to_str().unwrap().to_owned(); 
+    info!("Generated GCS object name: {}", file_name);
+    
+    let upload_type: UploadType = UploadType::Simple(Media::new(file_name.clone()));
+    let data = Body::from(buffer);
+
+    let upload_request = UploadObjectRequest {
+        bucket: bucket_name.to_owned(),
+        ..Default::default()
+    };
+
+    info!("uploading file to GCS...");
+    let upload_result = timeout(Duration::from_secs(120), client.upload_object(&upload_request, data, &upload_type)).await;
+        // .map_err(|e| anyhow!("Failed to upload file: {}", e))?;
+    
+    
+    match upload_result {
+        Ok(Ok(result)) => {
+            info!("File uploaded successfully to GCS: {}", result.name);
+            Ok(result.name)
+        },
+        Ok(Err(e)) => {
+            error!("Failed to upload file to GCS: {}", e);
+            Err(anyhow!("Failed to upload file: {}", e))
+        },
+        Err(e) => {
+            error!("Upload timed out: {}", e);
+            Err(anyhow!("Upload operation timed out"))
+        }
+    }
+}
+
+async fn convert_to_parquet_and_upload_to_gcs(
+    client: &Client,
+    _name: &'static str,
+    bucket_name: &str,
+    _start_version: u64,
+    _end_version: u64,
+    txns: &Vec<crate::models::default_models::new_transactions::Transaction>,
+    _block_metadata_transactions: &[BlockMetadataTransactionModel],
+    _wscs: &[WriteSetChangeModel],
+    (_move_modules, _move_resources, _table_items, _current_table_items, _table_metadata): (
+        &[MoveModule],
+        &[MoveResource],
+        &[TableItem],
+        &[CurrentTableItem],
+        &[TableMetadata],
+    ),
+) -> AnyhowResult<(), ParquetProcessorError> {
+    
+     let schema = txns.as_slice().schema().unwrap().clone();
+     let props = WriterProperties::builder()
+             .set_compression(parquet::basic::Compression::LZ4)
+             .build();        
+ 
+     let local_parquet_file_path = PathBuf::from("transactions.parquet");
+     info!("creating file...");
+     let mut file: File = File::options().append(true).create(true).open(&local_parquet_file_path)?;
+     info!("file created...");
+
+     info!("Processing transactions...");
+     // let mut writer = create_parquet_writer(&file, &schema, &props)?;
+     let props_arc = Arc::new(props.clone());
+     
+     let mut writer = SerializedFileWriter::new(file.try_clone()?, schema.clone(), props_arc)?;
+
+     let mut rows = Vec::with_capacity(BATCH_SIZE); 
+     let _db_insertion_duration_in_secs = 0.0;
+     let current_version = txns.first().unwrap().version;
+     info!("current file size    : {:?}", file.metadata()?.len());
+     for txn in txns {
+         // when we reach the max file size, we upload and create a new process and continue processing
+         
+         if file.metadata()?.len() >= 200 * 1024 * 1024 {
+             let new_file_path: PathBuf = PathBuf::from(format!("transactions_{}.parquet", current_version));
+             rename(local_parquet_file_path.clone(), new_file_path.clone())?;
+             info!("File size reached max size, uploading to GCS...");
+             // upload to gcs and create a new file 
+             let mut row_group_writer = writer.next_row_group()?;
+             rows.as_slice().write_to_row_group(&mut row_group_writer).unwrap();
+             row_group_writer.close().unwrap();
+             rows.clear();
+             
+             drop(writer);
+             drop(file);
+             let _upload_result = upload_parquet_to_gcs(&new_file_path, TABLE, bucket_name, client).await?;
+
+             // delete file
+             remove_file(&new_file_path)?;
+             // create a new file
+             file = File::options().append(true).create(true).open(&local_parquet_file_path)?;
+             let cloned_file = file.try_clone()?;
+             writer = SerializedFileWriter::new(cloned_file, schema.clone(), Arc::new(props.clone()))?
+         }
+         rows.push(txn.clone());   
+         // latest_version = txn.version;
+         // start_version += 1;
+     }
+
+     let mut row_group_writer = writer.next_row_group()?;
+     rows.as_slice().write_to_row_group(&mut row_group_writer).unwrap();
+     row_group_writer.close().unwrap();
+     rows.clear();
+
+
+    Ok(())     
+
+     // In places where you handle errors manually, you can construct `ProcessingError::Other`
+
+}
+
 fn process_transactions(
     transactions: Vec<Transaction>,
 ) -> (
-    Vec<crate::models::default_models::transactions::Transaction>,
+    Vec<crate::models::default_models::new_transactions::Transaction>,
     Vec<BlockMetadataTransaction>,
     Vec<WriteSetChangeModel>,
     (
@@ -362,152 +436,25 @@ fn process_transactions(
     )
 }
 
-
-
-async fn insert_to_db(
-    conn: PgDbPool,
-    name: &'static str,
-    start_version: u64,
-    end_version: u64,
-    (table_items, current_table_items): (
-        &[TableItem],
-        &[CurrentTableItem],
-    ),
-    per_table_chunk_sizes: &AHashMap<String, usize>,
-) -> Result<(), diesel::result::Error> {
-    tracing::trace!(
-        name = name,
-        start_version = start_version,
-        end_version = end_version,
-        "Inserting to db",
-    );
-
-    let ti_res = execute_in_chunks(
-        conn.clone(),
-        insert_table_items_query,
-        table_items,
-        get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
-    );
-
-    let cti_res = execute_in_chunks(
-        conn.clone(),
-        insert_current_table_items_query,
-        current_table_items,
-        get_config_table_chunk_size::<CurrentTableItem>(
-            "current_table_items",
-            per_table_chunk_sizes,
-        ),
-    );
-
-    let (ti_res, cti_res) =
-        join!(ti_res, cti_res);
-
-    for res in [
-        ti_res, cti_res,
-    ] {
-        res?;
-    }
-
-    Ok(())
+fn generate_parquet_file_path(
+    gcs_bucket_root: &str,
+    table: &str,
+    highwater_s: i64,
+    highwater_ms: i64,
+    counter: u32,
+) -> PathBuf {
+    let file_path = PathBuf::from(format!("{}/{}/{}/{}_{}.parquet", gcs_bucket_root, table, highwater_s, highwater_ms, counter));
+    info!("file_path generated: {:?}", file_path);
+    file_path
 }
 
+fn create_parquet_writer(
+    file: &File,
+    parquet_schema: &Arc<ParquetType>,
+    props: &WriterProperties
+) -> AnyhowResult<SerializedFileWriter<File>, parquet::errors::ParquetError> {
+    let file_clone = file.try_clone()?;
+    let props_arc = Arc::new(props.clone());
 
-fn insert_table_items_query(
-    items_to_insert: Vec<TableItem>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::table_items::dsl::*;
-
-    (
-        diesel::insert_into(schema::table_items::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
-}
-
-fn insert_current_table_items_query(
-    items_to_insert: Vec<CurrentTableItem>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_table_items::dsl::*;
-
-    (
-        diesel::insert_into(schema::current_table_items::table)
-            .values(items_to_insert)
-            .on_conflict((table_handle, key_hash))
-            .do_update()
-            .set((
-                key.eq(excluded(key)),
-                decoded_key.eq(excluded(decoded_key)),
-                decoded_value.eq(excluded(decoded_value)),
-                is_deleted.eq(excluded(is_deleted)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_table_items.last_transaction_version <= excluded.last_transaction_version "),
-    )
-}
-
-async fn create_and_upload_parquet_file(
-    transactions: &[TransactionModel],
-    schema: Arc<Schema>,
-    file_path: PathBuf,
-    bucket_name: &str,
-    client: &Client,
-) -> Result<String> {
-
-    // Here, include the logic to:
-    // 1. Convert transactions into a RecordBatch
-
-
-    // 2. Write the RecordBatch to a Parquet file
-    // 3. Upload the Parquet file to GCS
-    // (This will include most of the logic currently within `process_transactions` related to Parquet processing)
-    // Note: The `schema` parameter allows flexibility for schema definition from outside this function.
-
-    // For simplicity, the example below skips directly to the return statement
-    // You'll implement the detailed logic as per your existing code
-    Ok("parquet_file_path_or_upload_identifier".to_string())
-}
-
-pub async fn upload_parquet_to_gcs(
-    file_path: &PathBuf,
-    bucket_name: &str,
-    client: &Client,
-) -> Result<String> {
-    // Re-open the file for reading
-    let mut file = TokioFile::open(&file_path).await.map_err(|e| anyhow!("Failed to open file for reading: {}", e))?;
-
-    // Read the file into a Vec<u8>
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).await.map_err(|e| anyhow!("Failed to read file: {}", e))?;
-
-    // Convert the buffer into a Body for the upload
-    let data = Body::from(buffer);
-
-    // Create the UploadObjectRequest
-    let upload_request = UploadObjectRequest {
-        bucket: bucket_name.to_owned(),
-        ..Default::default()
-    };
-    
-    // Clone file_path and get the file name part as an OsStr
-    let file_name_os_str = file_path.file_name().unwrap();
-    // Convert the OsStr to a &str and ensure it's owned by storing it in a variable
-    let file_name_str = file_name_os_str.to_str().unwrap().to_owned();
-    // Specify the upload type as simple
-    let upload_type = UploadType::Simple(Media::new(file_name_str.clone()));
-
-    // Perform the upload, providing all three expected arguments
-    let result = client.upload_object(&upload_request, data, &upload_type).await
-        .map_err(|e| anyhow!("Failed to upload file: {}", e))?;
-
-    // The result object contains information about the uploaded file; you might want to return something specific from it
-    Ok(result.name)
+    SerializedFileWriter::new(file_clone, parquet_schema.clone(), props_arc)
 }
