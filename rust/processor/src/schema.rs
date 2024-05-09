@@ -538,6 +538,7 @@ diesel::table! {
         last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
         decimals -> Nullable<Int8>,
+        is_deleted_v2 -> Nullable<Bool>,
     }
 }
 

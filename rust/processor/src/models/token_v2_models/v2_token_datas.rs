@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, TokenV2};
+use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2Burned};
 use crate::{
     models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
@@ -14,7 +14,7 @@ use crate::{
     schema::{current_token_datas_v2, token_datas_v2},
     utils::util::standardize_address,
 };
-use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
+use aptos_protos::transaction::v1::{DeleteResource, WriteResource, WriteTableItem};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;
@@ -62,8 +62,9 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
-    // Deperecated, but still here for backwards compatibility
+    // Deprecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
+    pub is_deleted_v2: Option<bool>,
 }
 
 impl TokenDataV2 {
@@ -139,8 +140,73 @@ impl TokenDataV2 {
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
                     decimals: None,
+                    is_deleted_v2: Some(false),
                 },
             )))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// This handles the case where token is burned but objectCore is still there
+    pub async fn get_burned_nft_v2_from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<CurrentTokenDataV2>> {
+        let token_data_id = standardize_address(&write_resource.address.to_string());
+        // reminder that v1 events won't get to this codepath
+        if let Some(burn_event_v2) = tokens_burned.get(&standardize_address(&token_data_id)) {
+            Ok(Some(CurrentTokenDataV2 {
+                token_data_id,
+                collection_id: burn_event_v2.get_collection_address(),
+                token_name: "".to_string(),
+                maximum: None,
+                supply: None,
+                largest_property_version_v1: None,
+                token_uri: "".to_string(),
+                token_properties: serde_json::Value::Null,
+                description: "".to_string(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
+                last_transaction_version: txn_version,
+                last_transaction_timestamp: txn_timestamp,
+                decimals: None,
+                is_deleted_v2: Some(true),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// This handles the case where token is burned and objectCore is deleted
+    pub async fn get_burned_nft_v2_from_delete_resource(
+        delete_resource: &DeleteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<CurrentTokenDataV2>> {
+        let token_data_id = standardize_address(&delete_resource.address.to_string());
+        // reminder that v1 events won't get to this codepath
+        if let Some(burn_event_v2) = tokens_burned.get(&standardize_address(&token_data_id)) {
+            Ok(Some(CurrentTokenDataV2 {
+                token_data_id,
+                collection_id: burn_event_v2.get_collection_address(),
+                token_name: "".to_string(),
+                maximum: None,
+                supply: None,
+                largest_property_version_v1: None,
+                token_uri: "".to_string(),
+                token_properties: serde_json::Value::Null,
+                description: "".to_string(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
+                last_transaction_version: txn_version,
+                last_transaction_timestamp: txn_timestamp,
+                decimals: None,
+                is_deleted_v2: Some(true),
+            }))
         } else {
             Ok(None)
         }
@@ -213,6 +279,7 @@ impl TokenDataV2 {
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
                         decimals: None,
+                        is_deleted_v2: None,
                     },
                 )));
             } else {

@@ -158,7 +158,7 @@ impl TokenActivityV2 {
 
                 // the new burn event has owner address now!
                 let owner_address = if let V2TokenEvent::Burn(inner) = token_event {
-                    Some(inner.get_previous_owner_address())
+                    inner.get_previous_owner_address()
                 } else {
                     // To handle a case with the old burn events, when a token is minted and burnt in the same transaction
                     None

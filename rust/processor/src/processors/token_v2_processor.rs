@@ -97,9 +97,14 @@ async fn insert_to_db(
     token_datas_v2: &[TokenDataV2],
     token_ownerships_v2: &[TokenOwnershipV2],
     current_collections_v2: &[CurrentCollectionV2],
-    current_token_datas_v2: &[CurrentTokenDataV2],
-    current_token_ownerships_v2: &[CurrentTokenOwnershipV2],
-    current_deleted_token_ownerships_v2: &[CurrentTokenOwnershipV2],
+    (current_token_datas_v2, current_deleted_token_datas_v2): (
+        &[CurrentTokenDataV2],
+        &[CurrentTokenDataV2],
+    ),
+    (current_token_ownerships_v2, current_deleted_token_ownerships_v2): (
+        &[CurrentTokenOwnershipV2],
+        &[CurrentTokenOwnershipV2],
+    ),
     token_activities_v2: &[TokenActivityV2],
     current_token_v2_metadata: &[CurrentTokenV2Metadata],
     per_table_chunk_sizes: &AHashMap<String, usize>,
@@ -150,6 +155,15 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
+    let cdtd_v2 = execute_in_chunks(
+        conn.clone(),
+        insert_current_deleted_token_datas_v2_query,
+        current_deleted_token_datas_v2,
+        get_config_table_chunk_size::<CurrentTokenDataV2>(
+            "current_token_datas_v2",
+            per_table_chunk_sizes,
+        ),
+    );
     let cto_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_token_ownerships_v2_query,
@@ -193,11 +207,12 @@ async fn insert_to_db(
         to_v2_res,
         cc_v2_res,
         ctd_v2_res,
+        cdtd_v2_res,
         cto_v2_res,
         cdto_v2_res,
         ta_v2_res,
         ct_v2_res,
-    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cto_v2, cdto_v2, ta_v2, ct_v2,);
+    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2,);
 
     for res in [
         coll_v2_res,
@@ -205,6 +220,7 @@ async fn insert_to_db(
         to_v2_res,
         cc_v2_res,
         ctd_v2_res,
+        cdtd_v2_res,
         cto_v2_res,
         cdto_v2_res,
         ta_v2_res,
@@ -338,6 +354,31 @@ fn insert_current_token_datas_v2_query(
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
                 decimals.eq(excluded(decimals)),
+                // Intentionally not including is_deleted because it should always be true in this part
+                // and doesn't need to override
+            )),
+        Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+fn insert_current_deleted_token_datas_v2_query(
+    items_to_insert: Vec<CurrentTokenDataV2>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_token_datas_v2::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_token_datas_v2::table)
+            .values(items_to_insert)
+            .on_conflict(token_data_id)
+            .do_update()
+            .set((
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+                inserted_at.eq(excluded(inserted_at)),
+                is_deleted_v2.eq(excluded(is_deleted_v2)),
             )),
         Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
@@ -473,6 +514,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_ownerships_v2,
             current_collections_v2,
             current_token_datas_v2,
+            current_deleted_token_datas_v2,
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
             token_activities_v2,
@@ -498,9 +540,11 @@ impl ProcessorTrait for TokenV2Processor {
             &token_datas_v2,
             &token_ownerships_v2,
             &current_collections_v2,
-            &current_token_datas_v2,
-            &current_token_ownerships_v2,
-            &current_deleted_token_ownerships_v2,
+            (&current_token_datas_v2, &current_deleted_token_datas_v2),
+            (
+                &current_token_ownerships_v2,
+                &current_deleted_token_ownerships_v2,
+            ),
             &token_activities_v2,
             &current_token_v2_metadata,
             &self.per_table_chunk_sizes,
@@ -546,6 +590,7 @@ async fn parse_v2_token(
     Vec<TokenOwnershipV2>,
     Vec<CurrentCollectionV2>,
     Vec<CurrentTokenDataV2>,
+    Vec<CurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
@@ -559,6 +604,8 @@ async fn parse_v2_token(
     let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         AHashMap::new();
     let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+        AHashMap::new();
+    let mut current_deleted_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         AHashMap::new();
     let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
@@ -678,10 +725,15 @@ async fn parse_v2_token(
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address(), Some(burn_event));
+                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
                 }
-                if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address(), None);
+                if let Some(old_burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
+                    let burn_event = Burn::new(
+                        standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
+                        old_burn_event.get_token_address(),
+                        "".to_string(),
+                    );
+                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
                 }
                 if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap() {
                     tokens_minted.insert(mint_event.get_token_address());
@@ -896,6 +948,22 @@ async fn parse_v2_token(
                             );
                         }
 
+                        // Add burned NFT handling for token datas (can probably be merged with below)
+                        if let Some(deleted_token_data) =
+                            TokenDataV2::get_burned_nft_v2_from_write_resource(
+                                resource,
+                                txn_version,
+                                txn_timestamp,
+                                &tokens_burned,
+                            )
+                            .await
+                            .unwrap()
+                        {
+                            current_deleted_token_datas_v2.insert(
+                                deleted_token_data.token_data_id.clone(),
+                                deleted_token_data,
+                            );
+                        }
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
                             TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
@@ -950,7 +1018,22 @@ async fn parse_v2_token(
                         }
                     },
                     Change::DeleteResource(resource) => {
-                        // Add burned NFT handling
+                        // Add burned NFT handling for token datas (can probably be merged with below)
+                        if let Some(deleted_token_data) =
+                            TokenDataV2::get_burned_nft_v2_from_delete_resource(
+                                resource,
+                                txn_version,
+                                txn_timestamp,
+                                &tokens_burned,
+                            )
+                            .await
+                            .unwrap()
+                        {
+                            current_deleted_token_datas_v2.insert(
+                                deleted_token_data.token_data_id.clone(),
+                                deleted_token_data,
+                            );
+                        }
                         if let Some((nft_ownership, current_nft_ownership)) =
                             TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
@@ -999,6 +1082,9 @@ async fn parse_v2_token(
     let mut current_token_datas_v2 = current_token_datas_v2
         .into_values()
         .collect::<Vec<CurrentTokenDataV2>>();
+    let mut current_deleted_token_datas_v2 = current_deleted_token_datas_v2
+        .into_values()
+        .collect::<Vec<CurrentTokenDataV2>>();
     let mut current_token_ownerships_v2 = current_token_ownerships_v2
         .into_values()
         .collect::<Vec<CurrentTokenOwnershipV2>>();
@@ -1011,6 +1097,7 @@ async fn parse_v2_token(
 
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
+    current_deleted_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
     current_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
     current_token_ownerships_v2.sort_by(|a, b| {
         (
@@ -1050,6 +1137,7 @@ async fn parse_v2_token(
         token_ownerships_v2,
         current_collections_v2,
         current_token_datas_v2,
+        current_deleted_token_datas_v2,
         current_token_ownerships_v2,
         current_deleted_token_ownerships_v2,
         token_activities_v2,
