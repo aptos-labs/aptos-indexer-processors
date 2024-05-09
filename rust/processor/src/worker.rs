@@ -6,7 +6,15 @@ use crate::{
     grpc_stream::TransactionsPBResponse,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
-        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor, coin_processor::CoinProcessor, default_processor::DefaultProcessor, events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor, monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor, parquet_processor::ParquetProcessor, stake_processor::StakeProcessor, token_processor::TokenProcessor, token_v2_processor::TokenV2Processor, transaction_metadata_processor::TransactionMetadataProcessor, user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor, ProcessorConfig, ProcessorTrait
+        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
+        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
+        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
+        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
+        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        transaction_metadata_processor::TransactionMetadataProcessor,
+        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
+        ProcessorConfig, ProcessorTrait, parquet_processor::ParquetProcessor, parquet_processor::ParquetProcessorConfig
     },
     schema::ledger_infos,
     transaction_filter::TransactionFilter,
@@ -260,7 +268,7 @@ impl Worker {
 
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
-            let join_handle = self
+            let join_handle: JoinHandle<()> = self
                 .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
                 .await;
             processor_tasks.push(join_handle);
@@ -310,7 +318,7 @@ impl Worker {
             let task_index_str = task_index.to_string();
             let step = ProcessorStep::ProcessedBatch.get_step();
             let label = ProcessorStep::ProcessedBatch.get_label();
-            let mut ma = MovingAverage::new(3000);
+            let mut ma: MovingAverage = MovingAverage::new(3000);
 
             loop {
                 let txn_channel_fetch_latency = std::time::Instant::now();
@@ -398,7 +406,7 @@ impl Worker {
                     processor_name,
                     &auth_token,
                     false, // enable_verbose_logging
-                    &gcs_client
+                    &gcs_client,
                 )
                 .await;
 
@@ -678,7 +686,7 @@ pub async fn do_processor(
             start_version,
             end_version,
             Some(db_chain_id),
-            gcs_client,
+            &gcs_client,
         )
         .await;
 
