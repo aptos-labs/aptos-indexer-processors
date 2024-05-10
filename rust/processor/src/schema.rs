@@ -798,6 +798,24 @@ diesel::table! {
 }
 
 diesel::table! {
+    inbox_events (transaction_version, event_index) {
+        sequence_number -> Nullable<Int8>,
+        creation_number -> Nullable<Int8>,
+        #[max_length = 66]
+        account_address -> Nullable<Varchar>,
+        transaction_version -> Int8,
+        transaction_block_height -> Nullable<Int8>,
+        #[sql_name = "type"]
+        type_ -> Nullable<Text>,
+        data -> Nullable<Jsonb>,
+        inserted_at -> Nullable<Timestamp>,
+        event_index -> Int8,
+        #[max_length = 300]
+        indexed_type -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     indexer_status (db) {
         #[max_length = 50]
         db -> Varchar,
@@ -1273,6 +1291,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     fungible_asset_activities,
     fungible_asset_balances,
     fungible_asset_metadata,
+    inbox_events,
     indexer_status,
     ledger_infos,
     move_modules,

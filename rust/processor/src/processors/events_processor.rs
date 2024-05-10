@@ -19,18 +19,27 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventsProcessorConfig {
+    pub contract_address: String,
+}
+
 pub struct EventsProcessor {
     connection_pool: PgDbPool,
+    config: EventsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl EventsProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(connection_pool: PgDbPool, config: EventsProcessorConfig, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             connection_pool,
+            config,
             per_table_chunk_sizes,
         }
     }
@@ -77,9 +86,9 @@ fn insert_events_query(
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
 ) {
-    use schema::events::dsl::*;
+    use schema::inbox_events::dsl::*;
     (
-        diesel::insert_into(schema::events::table)
+        diesel::insert_into(schema::inbox_events::table)
             .values(items_to_insert)
             .on_conflict((transaction_version, event_index))
             .do_update()
@@ -132,7 +141,12 @@ impl ProcessorTrait for EventsProcessor {
                 _ => &default,
             };
 
-            let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
+            let mut txn_events = EventModel::from_events(raw_events, txn_version, block_height);
+
+            txn_events = txn_events.into_iter()
+                .filter(|e| e.type_.starts_with(&self.config.contract_address))
+                .collect();
+
             events.extend(txn_events);
         }
 
