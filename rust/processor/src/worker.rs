@@ -43,8 +43,6 @@ use url::Url;
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
 pub const BUFFER_SIZE: usize = 100;
-// Consumer thread will wait X seconds before panicking if it doesn't receive any data
-pub const CONSUMER_THREAD_TIMEOUT_IN_SECS: u64 = 60 * 5;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 pub struct Worker {

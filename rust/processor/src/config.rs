@@ -70,9 +70,9 @@ impl IndexerGrpcProcessorConfig {
         100_000
     }
 
-    /// Default timeout for grpc response item in milliseconds. Defaults to 30 seconds.
+    /// Default timeout for grpc response item in milliseconds. Defaults to 300 seconds.
     pub const fn default_grpc_response_item_timeout_ms() -> u64 {
-        30_000
+        60 * 5 * 1_000
     }
 }
 
