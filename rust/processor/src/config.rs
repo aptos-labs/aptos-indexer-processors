@@ -44,8 +44,8 @@ pub struct IndexerGrpcProcessorConfig {
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
 
-    #[serde(default = "IndexerGrpcProcessorConfig::default_grpc_response_item_timeout_ms")]
-    pub grpc_response_item_timeout_ms: u64,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_grpc_response_item_timeout_in_secs")]
+    pub grpc_response_item_timeout_in_secs: u64,
 
     #[serde(default)]
     pub transaction_filter: TransactionFilter,
@@ -70,9 +70,9 @@ impl IndexerGrpcProcessorConfig {
         100_000
     }
 
-    /// Default timeout for grpc response item in milliseconds. Defaults to 300 seconds.
-    pub const fn default_grpc_response_item_timeout_ms() -> u64 {
-        60 * 5 * 1_000
+    /// Default timeout for grpc response item in seconds. Defaults to 300 seconds.
+    pub const fn default_grpc_response_item_timeout_in_secs() -> u64 {
+        60 * 5
     }
 }
 
@@ -94,7 +94,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.per_table_chunk_sizes.clone(),
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
-            self.grpc_response_item_timeout_ms,
+            self.grpc_response_item_timeout_in_secs,
         )
         .await
         .context("Failed to build worker")?;

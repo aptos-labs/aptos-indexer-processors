@@ -61,7 +61,7 @@ pub struct Worker {
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
     pub transaction_filter: TransactionFilter,
-    pub grpc_response_item_timeout_ms: u64,
+    pub grpc_response_item_timeout_in_secs: u64,
 }
 
 impl Worker {
@@ -82,7 +82,7 @@ impl Worker {
         per_table_chunk_sizes: AHashMap<String, usize>,
         enable_verbose_logging: Option<bool>,
         transaction_filter: TransactionFilter,
-        grpc_response_item_timeout_ms: u64,
+        grpc_response_item_timeout_in_secs: u64,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -117,7 +117,7 @@ impl Worker {
             per_table_chunk_sizes,
             enable_verbose_logging,
             transaction_filter,
-            grpc_response_item_timeout_ms,
+            grpc_response_item_timeout_in_secs,
         })
     }
 
@@ -308,7 +308,7 @@ impl Worker {
             .grpc_chain_id
             .expect("GRPC chain ID has not been fetched yet!");
         let grpc_response_item_timeout =
-            std::time::Duration::from_millis(self.grpc_response_item_timeout_ms);
+            std::time::Duration::from_secs(self.grpc_response_item_timeout_in_secs);
         tokio::spawn(async move {
             let task_index_str = task_index.to_string();
             let step = ProcessorStep::ProcessedBatch.get_step();
