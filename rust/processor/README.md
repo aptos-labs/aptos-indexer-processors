@@ -20,7 +20,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
         processor_config:
           type: default_processor
         postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
-        indexer_grpc_data_service_address: 127.0.0.1:50051
+        indexer_grpc_data_service_address: http://127.0.0.1:50051
         indexer_grpc_http2_ping_interval_in_secs: 60
         indexer_grpc_http2_ping_timeout_in_secs: 10
         number_concurrent_processing_tasks: 10

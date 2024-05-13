@@ -1,0 +1,20 @@
+health_check_port: 8084
+server_config:
+  processor_config:
+    type: poke_processor
+    module_address: "0x296102a3893d43e11de2aa142fbb126377120d7d71c246a2f95d5b4f3ba16b30"
+  postgres_connection_string: postgresql://postgres:@localhost:5433/local_testnet
+  indexer_grpc_data_service_address: http://127.0.0.1:50051
+  indexer_grpc_http2_ping_interval_in_secs: 60
+  indexer_grpc_http2_ping_timeout_in_secs: 10
+  number_concurrent_processing_tasks: 10
+  auth_token: AUTH_TOKEN
+  transaction_filter:
+    # Only allow transactions from these contract addresses
+    focus_contract_addresses:
+     - "0x296102a3893d43e11de2aa142fbb126377120d7d71c246a2f95d5b4f3ba16b30"
+    # Skip transactions from these sender addresses
+    # skip_sender_addresses:
+    #   - "0x07"
+    # Skip all transactions that aren't user transactions
+    focus_user_transactions: true
