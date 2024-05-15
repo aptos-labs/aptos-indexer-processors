@@ -203,6 +203,8 @@ impl Worker {
         let request_ending_version = self.ending_version;
         let auth_token = self.auth_token.clone();
         let transaction_filter = self.transaction_filter.clone();
+        let grpc_response_item_timeout =
+            std::time::Duration::from_secs(self.grpc_response_item_timeout_in_secs);
         let fetcher_task = tokio::spawn(async move {
             info!(
                 processor_name = processor_name,
@@ -218,6 +220,7 @@ impl Worker {
                 indexer_grpc_http2_ping_interval,
                 indexer_grpc_http2_ping_timeout,
                 indexer_grpc_reconnection_timeout_secs,
+                grpc_response_item_timeout,
                 starting_version,
                 request_ending_version,
                 auth_token.clone(),
@@ -307,8 +310,6 @@ impl Worker {
         let chain_id = self
             .grpc_chain_id
             .expect("GRPC chain ID has not been fetched yet!");
-        let grpc_response_item_timeout =
-            std::time::Duration::from_secs(self.grpc_response_item_timeout_in_secs);
         tokio::spawn(async move {
             let task_index_str = task_index.to_string();
             let step = ProcessorStep::ProcessedBatch.get_step();
@@ -318,99 +319,188 @@ impl Worker {
             loop {
                 let txn_channel_fetch_latency = std::time::Instant::now();
 
-                let transactions_pb = fetch_transactions(
+                match fetch_transactions(
                     processor_name,
                     &stream_address,
                     receiver_clone.clone(),
                     task_index,
-                    grpc_response_item_timeout,
                 )
-                .await;
+                .await
+                {
+                    Ok(transactions_pb) => {
+                        let size_in_bytes = transactions_pb.size_in_bytes as f64;
+                        let first_txn_version = transactions_pb
+                            .transactions
+                            .first()
+                            .map(|t| t.version)
+                            .unwrap_or_default();
+                        let batch_first_txn_version = transactions_pb.start_version;
+                        let last_txn_version = transactions_pb
+                            .transactions
+                            .last()
+                            .map(|t| t.version)
+                            .unwrap_or_default();
+                        let batch_last_txn_version = transactions_pb.end_version;
+                        let start_txn_timestamp = transactions_pb.start_txn_timestamp.clone();
+                        let end_txn_timestamp = transactions_pb.end_txn_timestamp.clone();
 
-                let size_in_bytes = transactions_pb.size_in_bytes as f64;
-                let first_txn_version = transactions_pb
-                    .transactions
-                    .first()
-                    .map(|t| t.version)
-                    .unwrap_or_default();
-                let batch_first_txn_version = transactions_pb.start_version;
-                let last_txn_version = transactions_pb
-                    .transactions
-                    .last()
-                    .map(|t| t.version)
-                    .unwrap_or_default();
-                let batch_last_txn_version = transactions_pb.end_version;
-                let start_txn_timestamp = transactions_pb.start_txn_timestamp.clone();
-                let end_txn_timestamp = transactions_pb.end_txn_timestamp.clone();
+                        let start_txn_timestamp_unix = start_txn_timestamp
+                            .as_ref()
+                            .map(timestamp_to_unixtime)
+                            .unwrap_or_default();
+                        let start_txn_timestamp_iso = start_txn_timestamp
+                            .as_ref()
+                            .map(timestamp_to_iso)
+                            .unwrap_or_default();
+                        let end_txn_timestamp_iso = end_txn_timestamp
+                            .as_ref()
+                            .map(timestamp_to_iso)
+                            .unwrap_or_default();
 
-                let start_txn_timestamp_unix = start_txn_timestamp
-                    .as_ref()
-                    .map(timestamp_to_unixtime)
-                    .unwrap_or_default();
-                let start_txn_timestamp_iso = start_txn_timestamp
-                    .as_ref()
-                    .map(timestamp_to_iso)
-                    .unwrap_or_default();
-                let end_txn_timestamp_iso = end_txn_timestamp
-                    .as_ref()
-                    .map(timestamp_to_iso)
-                    .unwrap_or_default();
+                        let txn_channel_fetch_latency_sec =
+                            txn_channel_fetch_latency.elapsed().as_secs_f64();
 
-                let txn_channel_fetch_latency_sec =
-                    txn_channel_fetch_latency.elapsed().as_secs_f64();
+                        debug!(
+                            processor_name = processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            start_version = batch_first_txn_version,
+                            end_version = batch_last_txn_version,
+                            num_of_transactions =
+                                (batch_last_txn_version - batch_first_txn_version) as i64 + 1,
+                            size_in_bytes,
+                            task_index,
+                            duration_in_secs = txn_channel_fetch_latency_sec,
+                            tps = (batch_last_txn_version as f64 - batch_first_txn_version as f64)
+                                / txn_channel_fetch_latency_sec,
+                            bytes_per_sec = size_in_bytes / txn_channel_fetch_latency_sec,
+                            "[Parser][T#{}] Successfully fetched transactions from channel.",
+                            task_index
+                        );
 
-                debug!(
-                    processor_name = processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    start_version = batch_first_txn_version,
-                    end_version = batch_last_txn_version,
-                    num_of_transactions =
-                        (batch_last_txn_version - batch_first_txn_version) as i64 + 1,
-                    size_in_bytes,
-                    task_index,
-                    duration_in_secs = txn_channel_fetch_latency_sec,
-                    tps = (batch_last_txn_version as f64 - batch_first_txn_version as f64)
-                        / txn_channel_fetch_latency_sec,
-                    bytes_per_sec = size_in_bytes / txn_channel_fetch_latency_sec,
-                    "[Parser][T#{}] Successfully fetched transactions from channel.",
-                    task_index
-                );
+                        // Ensure chain_id has not changed
+                        if transactions_pb.chain_id != chain_id {
+                            error!(
+                                processor_name = processor_name,
+                                stream_address = stream_address.as_str(),
+                                chain_id = transactions_pb.chain_id,
+                                existing_id = chain_id,
+                                task_index,
+                                "[Parser][T#{}] Stream somehow changed chain id!",
+                                task_index
+                            );
+                            panic!(
+                                "[Parser][T#{}] Stream somehow changed chain id!",
+                                task_index
+                            );
+                        }
 
-                // Ensure chain_id has not changed
-                if transactions_pb.chain_id != chain_id {
-                    error!(
-                        processor_name = processor_name,
-                        stream_address = stream_address.as_str(),
-                        chain_id = transactions_pb.chain_id,
-                        existing_id = chain_id,
-                        task_index,
-                        "[Parser][T#{}] Stream somehow changed chain id!",
-                        task_index
-                    );
-                    panic!(
-                        "[Parser][T#{}] Stream somehow changed chain id!",
-                        task_index
-                    );
-                }
+                        let processing_time = std::time::Instant::now();
 
-                let processing_time = std::time::Instant::now();
+                        let res = do_processor(
+                            transactions_pb,
+                            &processor,
+                            chain_id,
+                            processor_name,
+                            &auth_token,
+                            false, // enable_verbose_logging
+                        )
+                        .await;
 
-                let res = do_processor(
-                    transactions_pb,
-                    &processor,
-                    chain_id,
-                    processor_name,
-                    &auth_token,
-                    false, // enable_verbose_logging
-                )
-                .await;
+                        let processing_result = match res {
+                            Ok(versions) => {
+                                PROCESSOR_SUCCESSES_COUNT
+                                    .with_label_values(&[processor_name])
+                                    .inc();
+                                versions
+                            },
+                            Err(e) => {
+                                error!(
+                                    processor_name = processor_name,
+                                    stream_address = stream_address.as_str(),
+                                    error = ?e,
+                                    task_index,
+                                    "[Parser][T#{}] Error processing transactions", task_index
+                                );
+                                PROCESSOR_ERRORS_COUNT
+                                    .with_label_values(&[processor_name])
+                                    .inc();
+                                panic!(
+                                    "[Parser][T#{}] Error processing '{:}' transactions: {:?}",
+                                    task_index, processor_name, e
+                                );
+                            },
+                        };
 
-                let processing_result = match res {
-                    Ok(versions) => {
-                        PROCESSOR_SUCCESSES_COUNT
-                            .with_label_values(&[processor_name])
-                            .inc();
-                        versions
+                        let processing_time = processing_time.elapsed().as_secs_f64();
+
+                        // We've processed things: do some data and metrics
+
+                        ma.tick_now((last_txn_version - first_txn_version) + 1);
+                        let tps = ma.avg().ceil() as u64;
+
+                        let num_processed = (last_txn_version - first_txn_version) + 1;
+
+                        debug!(
+                            processor_name = processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            first_txn_version,
+                            batch_first_txn_version,
+                            last_txn_version,
+                            batch_last_txn_version,
+                            start_txn_timestamp_iso,
+                            end_txn_timestamp_iso,
+                            num_of_transactions = num_processed,
+                            concurrent_tasks,
+                            task_index,
+                            size_in_bytes,
+                            processing_duration_in_secs =
+                                processing_result.processing_duration_in_secs,
+                            db_insertion_duration_in_secs =
+                                processing_result.db_insertion_duration_in_secs,
+                            duration_in_secs = processing_time,
+                            tps = tps,
+                            bytes_per_sec = size_in_bytes / processing_time,
+                            step = &step,
+                            "{}",
+                            label,
+                        );
+
+                        // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
+                        GRPC_LATENCY_BY_PROCESSOR_IN_SECS
+                            .with_label_values(&[processor_name, &task_index_str])
+                            .set(time_diff_since_pb_timestamp_in_secs(
+                                end_txn_timestamp.as_ref().unwrap(),
+                            ));
+                        LATEST_PROCESSED_VERSION
+                            .with_label_values(&[processor_name, step, label, &task_index_str])
+                            .set(last_txn_version as i64);
+                        TRANSACTION_UNIX_TIMESTAMP
+                            .with_label_values(&[processor_name, step, label, &task_index_str])
+                            .set(start_txn_timestamp_unix);
+
+                        // Single batch metrics
+                        PROCESSED_BYTES_COUNT
+                            .with_label_values(&[processor_name, step, label, &task_index_str])
+                            .inc_by(size_in_bytes as u64);
+                        NUM_TRANSACTIONS_PROCESSED_COUNT
+                            .with_label_values(&[processor_name, step, label, &task_index_str])
+                            .inc_by(num_processed);
+
+                        SINGLE_BATCH_PROCESSING_TIME_IN_SECS
+                            .with_label_values(&[processor_name, &task_index_str])
+                            .set(processing_time);
+                        SINGLE_BATCH_PARSING_TIME_IN_SECS
+                            .with_label_values(&[processor_name, &task_index_str])
+                            .set(processing_result.processing_duration_in_secs);
+                        SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
+                            .with_label_values(&[processor_name, &task_index_str])
+                            .set(processing_result.db_insertion_duration_in_secs);
+
+                        // Send the result to the gap detector
+                        gap_detector_sender
+                            .send(processing_result)
+                            .await
+                            .expect("[Parser] Failed to send versions to gap detector");
                     },
                     Err(e) => {
                         error!(
@@ -418,86 +508,11 @@ impl Worker {
                             stream_address = stream_address.as_str(),
                             error = ?e,
                             task_index,
-                            "[Parser][T#{}] Error processing transactions", task_index
+                            "[Parser][T#{}] Consumer thread error fetching transactions from channel", task_index
                         );
-                        PROCESSOR_ERRORS_COUNT
-                            .with_label_values(&[processor_name])
-                            .inc();
-                        panic!(
-                            "[Parser][T#{}] Error processing '{:}' transactions: {:?}",
-                            task_index, processor_name, e
-                        );
+                        break;
                     },
-                };
-
-                let processing_time = processing_time.elapsed().as_secs_f64();
-
-                // We've processed things: do some data and metrics
-
-                ma.tick_now((last_txn_version - first_txn_version) + 1);
-                let tps = ma.avg().ceil() as u64;
-
-                let num_processed = (last_txn_version - first_txn_version) + 1;
-
-                debug!(
-                    processor_name = processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    first_txn_version,
-                    batch_first_txn_version,
-                    last_txn_version,
-                    batch_last_txn_version,
-                    start_txn_timestamp_iso,
-                    end_txn_timestamp_iso,
-                    num_of_transactions = num_processed,
-                    concurrent_tasks,
-                    task_index,
-                    size_in_bytes,
-                    processing_duration_in_secs = processing_result.processing_duration_in_secs,
-                    db_insertion_duration_in_secs = processing_result.db_insertion_duration_in_secs,
-                    duration_in_secs = processing_time,
-                    tps = tps,
-                    bytes_per_sec = size_in_bytes / processing_time,
-                    step = &step,
-                    "{}",
-                    label,
-                );
-
-                // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
-                GRPC_LATENCY_BY_PROCESSOR_IN_SECS
-                    .with_label_values(&[processor_name, &task_index_str])
-                    .set(time_diff_since_pb_timestamp_in_secs(
-                        end_txn_timestamp.as_ref().unwrap(),
-                    ));
-                LATEST_PROCESSED_VERSION
-                    .with_label_values(&[processor_name, step, label, &task_index_str])
-                    .set(last_txn_version as i64);
-                TRANSACTION_UNIX_TIMESTAMP
-                    .with_label_values(&[processor_name, step, label, &task_index_str])
-                    .set(start_txn_timestamp_unix);
-
-                // Single batch metrics
-                PROCESSED_BYTES_COUNT
-                    .with_label_values(&[processor_name, step, label, &task_index_str])
-                    .inc_by(size_in_bytes as u64);
-                NUM_TRANSACTIONS_PROCESSED_COUNT
-                    .with_label_values(&[processor_name, step, label, &task_index_str])
-                    .inc_by(num_processed);
-
-                SINGLE_BATCH_PROCESSING_TIME_IN_SECS
-                    .with_label_values(&[processor_name, &task_index_str])
-                    .set(processing_time);
-                SINGLE_BATCH_PARSING_TIME_IN_SECS
-                    .with_label_values(&[processor_name, &task_index_str])
-                    .set(processing_result.processing_duration_in_secs);
-                SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
-                    .with_label_values(&[processor_name, &task_index_str])
-                    .set(processing_result.db_insertion_duration_in_secs);
-
-                // Send the result to the gap detector
-                gap_detector_sender
-                    .send(processing_result)
-                    .await
-                    .expect("[Parser] Failed to send versions to gap detector");
+                }
             }
         })
     }
@@ -603,48 +618,28 @@ async fn fetch_transactions(
     stream_address: &str,
     receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
     task_index: usize,
-    grpc_response_item_timeout: std::time::Duration,
-) -> TransactionsPBResponse {
+) -> Result<TransactionsPBResponse> {
     let pb_channel_fetch_time = std::time::Instant::now();
-    let txn_pb_res = match tokio::time::timeout(grpc_response_item_timeout, receiver.recv()).await {
-        Ok(Ok(res)) => Ok(res),
-        Ok(Err(_)) => {
-            error!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = stream_address,
-                "[Parser][T#{}] Consumer thread failed to receive transactions",
-                task_index
-            );
-            Err(anyhow::anyhow!(
-                "Consumer thread failed to receive transactions"
-            ))
-        },
-        Err(_) => {
-            error!(
-                processor_name = processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = stream_address,
-                "[Parser][T#{}] Consumer thread timed out waiting for transactions",
-                task_index
-            );
-            Err(anyhow::anyhow!(
-                "Consumer thread timed out waiting for transactions"
-            ))
-        },
-    };
+    let txn_pb_res = receiver.recv().await;
     // Track how much time this task spent waiting for a pb bundle
     PB_CHANNEL_FETCH_WAIT_TIME_SECS
         .with_label_values(&[processor_name, &task_index.to_string()])
         .set(pb_channel_fetch_time.elapsed().as_secs_f64());
 
     match txn_pb_res {
-        Ok(txn_pb) => txn_pb,
+        Ok(txn_pb) => Ok(txn_pb),
         Err(_e) => {
-            panic!(
-                "[Parser][T#{}] Consumer thread failed or timed out waiting for transactions",
+            error!(
+                processor_name = processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                stream_address = stream_address,
+                "[Parser][T#{}] Consumer thread receiver channel closed.",
                 task_index
             );
+            Err(anyhow::anyhow!(
+                "[Parser][T#{}] Consumer thread receiver channel closed.",
+                task_index
+            ))
         },
     }
 }

@@ -308,6 +308,7 @@ pub async fn create_fetcher_loop(
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
     indexer_grpc_reconnection_timeout_secs: Duration,
+    indexer_grpc_response_item_timeout_secs: Duration,
     starting_version: u64,
     request_ending_version: Option<u64>,
     auth_token: String,
@@ -358,8 +359,13 @@ pub async fn create_fetcher_loop(
     let mut send_ma = MovingAverage::new(3000);
 
     loop {
-        let is_success = match resp_stream.next().await {
-            Some(Ok(mut r)) => {
+        let is_success = match tokio::time::timeout(
+            indexer_grpc_response_item_timeout_secs,
+            resp_stream.next(),
+        )
+        .await
+        {
+            Ok(Some(Ok(mut r))) => {
                 reconnection_retries = 0;
                 let start_version = r.transactions.as_slice().first().unwrap().version;
                 let start_txn_timestamp =
@@ -540,7 +546,7 @@ pub async fn create_fetcher_loop(
                     .inc_by(num_filtered_txns as u64);
                 true
             },
-            Some(Err(rpc_error)) => {
+            Ok(Some(Err(rpc_error))) => {
                 tracing::warn!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -553,7 +559,7 @@ pub async fn create_fetcher_loop(
                 );
                 false
             },
-            None => {
+            Ok(None) => {
                 tracing::warn!(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
@@ -562,6 +568,19 @@ pub async fn create_fetcher_loop(
                     start_version = starting_version,
                     end_version = request_ending_version,
                     "[Parser] Stream ended."
+                );
+                false
+            },
+            Err(e) => {
+                tracing::warn!(
+                    processor_name = processor_name,
+                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    connection_id,
+                    start_version = starting_version,
+                    end_version = request_ending_version,
+                    error = ?e,
+                    "[Parser] Timeout receiving datastream response."
                 );
                 false
             },
@@ -603,7 +622,7 @@ pub async fn create_fetcher_loop(
                 service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 connection_id,
-                "[Parser] The stream is ended."
+                "[Parser] Transaction fetcher send channel is closed."
             );
             break;
         } else {
@@ -621,9 +640,9 @@ pub async fn create_fetcher_loop(
                     processor_name = processor_name,
                     service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
-                    "[Parser] Reconnected more than 100 times. Will not retry.",
+                    "[Parser] Reconnected more than {RECONNECTION_MAX_RETRIES} times. Will not retry.",
                 );
-                panic!("[Parser] Reconnected more than 100 times. Will not retry.")
+                panic!("[Parser] Reconnected more than {RECONNECTION_MAX_RETRIES} times. Will not retry.")
             }
             reconnection_retries += 1;
             info!(

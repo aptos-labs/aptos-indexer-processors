@@ -55,8 +55,8 @@ where
             bail!("Probes and metrics handler unexpectedly exited");
         },
         _ = main_task_handler => {
-            error!("Main task unexpectedly exited");
-            bail!("Main task unexpectedly exited");
+            eprintln!("Main task exited");
+            anyhow::Ok(())
         },
     }
 }
