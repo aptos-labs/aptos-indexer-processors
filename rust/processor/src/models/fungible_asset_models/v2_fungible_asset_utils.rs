@@ -206,21 +206,21 @@ pub struct FrozenEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DepositEventV2 {
-    pub store: ResourceReference,
+    pub store: String,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WithdrawEventV2 {
-    pub store: ResourceReference,
+    pub store: String,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FrozenEventV2 {
-    pub store: ResourceReference,
+    pub store: String,
     pub frozen: bool,
 }
 

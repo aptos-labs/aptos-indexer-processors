@@ -18,7 +18,6 @@ use crate::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
         should_skip,
-        token_v2_models::v2_token_utils::TokenV2,
     },
     schema,
     utils::{

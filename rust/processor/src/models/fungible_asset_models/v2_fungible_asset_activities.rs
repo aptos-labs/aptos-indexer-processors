@@ -89,20 +89,18 @@ impl FungibleAssetActivity {
                     None,
                 ),
                 FungibleAssetEvent::WithdrawEventV2(inner) => (
-                    inner.store.get_reference_address(),
+                    standardize_address(&inner.store),
                     None,
                     Some(inner.amount.clone()),
                 ),
                 FungibleAssetEvent::DepositEventV2(inner) => (
-                    inner.store.get_reference_address(),
+                    standardize_address(&inner.store),
                     None,
                     Some(inner.amount.clone()),
                 ),
-                FungibleAssetEvent::FrozenEventV2(inner) => (
-                    inner.store.get_reference_address(),
-                    Some(inner.frozen),
-                    None,
-                ),
+                FungibleAssetEvent::FrozenEventV2(inner) => {
+                    (standardize_address(&inner.store), Some(inner.frozen), None)
+                },
             };
 
             // The event account address will also help us find fungible store which tells us where to find
