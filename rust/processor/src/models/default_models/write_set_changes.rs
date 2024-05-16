@@ -16,9 +16,11 @@ use aptos_protos::transaction::v1::{
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use parquet_derive::{ParquetRecordWriter};
+use parquet::record::RecordWriter;
 
 #[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
+    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, ParquetRecordWriter
 )]
 #[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
 #[diesel(primary_key(transaction_version, index))]
@@ -201,6 +203,21 @@ impl WriteSetChange {
                 panic!("WriteSetChange type must be specified.")
             },
         }
+    }
+}
+
+pub trait DataSize {
+    fn size_of(&self) -> usize;
+}
+
+impl DataSize for WriteSetChange {
+    fn size_of(&self) -> usize {
+        let base_size = std::mem::size_of::<i64>() * 3; // Three i64 fields
+        let hash_size = self.hash.len() + self.hash.capacity(); // Actual length + allocated capacity
+        let type_size = self.type_.len() + self.type_.capacity();
+        let address_size = self.address.len() + self.address.capacity();
+        
+        base_size + hash_size + type_size + address_size
     }
 }
 

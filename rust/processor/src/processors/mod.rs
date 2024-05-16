@@ -21,7 +21,7 @@ pub mod token_processor;
 pub mod token_v2_processor;
 pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
-pub mod parquet_processor;
+pub mod parquet_default_processor;
 
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
@@ -38,10 +38,10 @@ use self::{
     token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
     transaction_metadata_processor::TransactionMetadataProcessor,
     user_transaction_processor::UserTransactionProcessor,
-    parquet_processor::{ParquetProcessor, ParquetProcessorConfig},
+    parquet_default_processor::{ParquetProcessor, ParquetProcessorConfig},
 };
 use crate::{
-    models::processor_status::ProcessorStatus,
+    models::{default_models::write_set_changes::WriteSetChangeModel, processor_status::ProcessorStatus},
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
@@ -53,6 +53,7 @@ use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
+use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use google_cloud_storage::{client::Client};
