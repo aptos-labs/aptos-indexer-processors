@@ -8,6 +8,7 @@ use crate::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
+        should_skip,
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
@@ -721,6 +722,9 @@ async fn parse_v2_token(
             // This needs to be here because we need the metadata above for token activities
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
+                if should_skip(index, event, user_txn.events.as_slice()) {
+                    continue;
+                }
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address(), burn_event);
                 }
