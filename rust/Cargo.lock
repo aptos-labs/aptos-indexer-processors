@@ -198,9 +198,9 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-test-transactions"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=f60f1f0ca1dd935330152e481e680f1beb5b44ec#f60f1f0ca1dd935330152e481e680f1beb5b44ec"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=60ee0c686c15480b2cbba224c205e03f479bcdbd#60ee0c686c15480b2cbba224c205e03f479bcdbd"
 dependencies = [
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=f60f1f0ca1dd935330152e481e680f1beb5b44ec)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=60ee0c686c15480b2cbba224c205e03f479bcdbd)",
  "serde_json",
 ]
 
@@ -309,7 +309,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.1"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=f60f1f0ca1dd935330152e481e680f1beb5b44ec#f60f1f0ca1dd935330152e481e680f1beb5b44ec"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=60ee0c686c15480b2cbba224c205e03f479bcdbd#60ee0c686c15480b2cbba224c205e03f479bcdbd"
 dependencies = [
  "futures-core",
  "pbjson",

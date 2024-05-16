@@ -1,0 +1,139 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753831,
+    "transaction_block_height": 10811321,
+    "type_": "0x3::token::TokenDataCreation",
+    "data": {
+      "id": {
+        "name": "NFT Collectible #13360",
+        "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+        "collection": "An NFT Collection Name"
+      },
+      "uri": "https://aptos.dev",
+      "name": "NFT Collectible #13360",
+      "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+      "maximum": "1",
+      "description": "",
+      "property_keys": [],
+      "property_types": [],
+      "property_values": [],
+      "mutability_config": {
+        "uri": true,
+        "maximum": true,
+        "royalty": true,
+        "properties": true,
+        "description": true
+      },
+      "royalty_payee_address": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+      "royalty_points_numerator": "0",
+      "royalty_points_denominator": "100"
+    },
+    "indexed_type": "0x3::token::TokenDataCreation",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753831,
+    "transaction_block_height": 10811321,
+    "type_": "0x3::token::Mint",
+    "data": {
+      "id": {
+        "name": "NFT Collectible #13360",
+        "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+        "collection": "An NFT Collection Name"
+      },
+      "amount": "1",
+      "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a"
+    },
+    "indexed_type": "0x3::token::Mint",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753831,
+    "transaction_block_height": 10811321,
+    "type_": "0x3::token::TokenDeposit",
+    "data": {
+      "id": {
+        "token_data_id": {
+          "name": "NFT Collectible #13360",
+          "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+          "collection": "An NFT Collection Name"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "account": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a"
+    },
+    "indexed_type": "0x3::token::TokenDeposit",
+    "event_index": 2
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753831,
+    "transaction_block_height": 10811321,
+    "type_": "0x3::token::TokenWithdraw",
+    "data": {
+      "id": {
+        "token_data_id": {
+          "name": "NFT Collectible #13360",
+          "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+          "collection": "An NFT Collection Name"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "account": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a"
+    },
+    "indexed_type": "0x3::token::TokenWithdraw",
+    "event_index": 3
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753831,
+    "transaction_block_height": 10811321,
+    "type_": "0x3::token::TokenDeposit",
+    "data": {
+      "id": {
+        "token_data_id": {
+          "name": "NFT Collectible #13360",
+          "creator": "0xcdc14b3f3edbbb739a0a7168661ae562449dd88ede045f4a310a4cf41489001a",
+          "collection": "An NFT Collection Name"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "account": "0x348cd99611633b0eb8ee803016bcd26bae4ce9d2954da8ab060cd90ecea39118"
+    },
+    "indexed_type": "0x3::token::TokenDeposit",
+    "event_index": 4
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753831,
+    "transaction_block_height": 10811321,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "6",
+      "storage_fee_octas": "97720",
+      "execution_gas_units": "8",
+      "total_charge_gas_units": "991",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 5
+  }
+]
