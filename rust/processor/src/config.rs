@@ -48,6 +48,10 @@ pub struct IndexerGrpcProcessorConfig {
     #[serde(default = "AHashMap::new")]
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
+
+    #[serde(default = "IndexerGrpcProcessorConfig::default_grpc_response_item_timeout_in_secs")]
+    pub grpc_response_item_timeout_in_secs: u64,
+
     #[serde(default)]
     pub transaction_filter: TransactionFilter,
 }
@@ -69,6 +73,11 @@ impl IndexerGrpcProcessorConfig {
     /// This prevents any unexpected changes in behavior
     pub const fn default_pb_channel_txn_chunk_size() -> usize {
         100_000
+    }
+
+    /// Default timeout for grpc response item in seconds. Defaults to 60 seconds.
+    pub const fn default_grpc_response_item_timeout_in_secs() -> u64 {
+        60
     }
 }
 
@@ -106,6 +115,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.per_table_chunk_sizes.clone(),
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
+            self.grpc_response_item_timeout_in_secs,
             gcs_client,
         )
         .await

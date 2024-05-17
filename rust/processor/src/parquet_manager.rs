@@ -25,7 +25,7 @@ use chrono::Datelike;
 use chrono::Timelike;
 use tokio::io::AsyncReadExt; // for read_to_end()
 
-const MAX_FILE_SIZE: u64 = 1500 * 1024 * 1024; // 200 MB
+const MAX_FILE_SIZE: u64 = 1000 * 1024 * 1024; // 200 MB
 const BUCKET_REGULAR_TRAFFIC: &str = "devnet-airflow-continue";
 const BATCH_SIZE: usize = 5000;
 const TABLE: &str = "write_set_changes";
