@@ -6,12 +6,11 @@ SELECT account_address,
 FROM events
 GROUP BY 1,
   2;
--- need this to query transactions that touch an account's move resources,
--- previously used move_resources, and now it's using account_transactions to deprecate move_resources
-CREATE OR REPLACE VIEW address_version_from_account_transactions AS
-SELECT account_address,
+-- need this to query transactions that touch an account's move resources
+CREATE OR REPLACE VIEW address_version_from_move_resources AS
+SELECT address,
   transaction_version
-FROM account_transactions
+FROM move_resources
 GROUP BY 1,
   2;
 -- need this for getting NFTs grouped by collections
