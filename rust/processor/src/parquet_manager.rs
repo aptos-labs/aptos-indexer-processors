@@ -25,7 +25,7 @@ use chrono::Datelike;
 use chrono::Timelike;
 use tokio::io::AsyncReadExt; // for read_to_end()
 
-const MAX_FILE_SIZE: u64 = 1000 * 1024 * 1024; // 200 MB
+const MAX_FILE_SIZE: u64 = 1500 * 1024 * 1024; // 200 MB
 const BUCKET_REGULAR_TRAFFIC: &str = "devnet-airflow-continue";
 const BATCH_SIZE: usize = 5000;
 const TABLE: &str = "write_set_changes";
@@ -80,14 +80,17 @@ impl ParquetManager {
         let mut writer: SerializedFileWriter<File> = self.writer.take().unwrap(); // Take out the writer temporarily
         // let mut rows: Vec<crate::models::default_models::write_set_changes::WriteSetChange> = Vec::with_capacity(BATCH_SIZE); 
         info!("Current file size: {:?}", self.buffer_size_bytes);
-        for wsc in wscs {
+        for wsc in wscs.clone() {
             self.buffer.push(wsc.clone());
             self.buffer_size_bytes += self.buffer.last().unwrap().size_of();
         }
 
-        if self.buffer_size_bytes >= MAX_FILE_SIZE.try_into().unwrap() {
+        // when channel is empty, we still need to upload what we have in the buffer. 
+        if self.buffer_size_bytes >= MAX_FILE_SIZE.try_into().unwrap() || wscs.is_empty() {  
             info!("buffer size {} bytes", self.buffer_size_bytes);
             info!("File size reached max size, uploading to GCS...");    
+            // add a log which versions we are uploading
+            info!("uplaoding parquet file with starting version: {} and ending version: {}", self.buffer.first().unwrap().transaction_version, self.buffer.last().unwrap().transaction_version);
             let new_file_path: PathBuf = PathBuf::from(format!("write_set_changes_{}.parquet", chrono::Utc::now().timestamp()));
             info!("Renaming file to: {:?}", new_file_path);
             rename(self.file_path.clone(), new_file_path.clone())?;
@@ -208,8 +211,8 @@ pub async fn create_parquet_manager_loop(
     let mut parquet_manager = ParquetManager::new();
 
     loop {
-        let txn_pb_res = match parquet_manager_receiver.recv().await {
-            Ok(txn_pb_res) => {
+        let txn_pb_res = match tokio::time::timeout(Duration::from_secs(5), parquet_manager_receiver.recv()).await {
+            Ok(Ok(txn_pb_res)) => {
                 info!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
@@ -217,18 +220,30 @@ pub async fn create_parquet_manager_loop(
                 );
                 txn_pb_res
             },
-            Err(_e) => {
+            Ok(Err(_e)) => {
                 error!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     error = ?_e,
                     "[Parser] Parquet manager channel has been closed",
                 );
-                panic!(
-                    "{}: Parquet manager channel has been closed",
-                    processor_name
+                ParquetData {                  // maybe add a flag that can tell it's empty
+                    data: Vec::new(),
+                    last_transaction_timestamp: None,
+                }
+            },
+            Err(_e) => {
+                error!(
+                    processor_name = processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    error = ?_e,
+                    "[Parser] Parquet manager channel timed out due to empty channel",
                 );
-            }
+                ParquetData {
+                    data: Vec::new(),
+                    last_transaction_timestamp: None,
+                }
+            },
         };
 
         let result = parquet_manager.write_and_upload(txn_pb_res, &gcs_client).await.unwrap();

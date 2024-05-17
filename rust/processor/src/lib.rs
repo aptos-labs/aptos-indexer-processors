@@ -28,5 +28,4 @@ pub mod schema;
 pub mod transaction_filter;
 pub mod utils;
 pub mod worker;
-pub mod schemas;
 pub mod parquet_manager;
