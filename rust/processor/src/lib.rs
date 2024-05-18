@@ -11,10 +11,16 @@
 #[macro_use]
 extern crate diesel;
 
+// for parquet_derive
+extern crate parquet;
+#[macro_use] 
+extern crate parquet_derive;
+
 pub use config::IndexerGrpcProcessorConfig;
 
 mod config;
 pub mod gap_detector;
+pub mod parquet_gap_detector;
 pub mod grpc_stream;
 pub mod models;
 pub mod processors;
@@ -22,3 +28,4 @@ pub mod schema;
 pub mod transaction_filter;
 pub mod utils;
 pub mod worker;
+pub mod parquet_manager;

@@ -2,23 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::IndexerGrpcHttp2Config,
-    grpc_stream::TransactionsPBResponse,
-    models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
-    processors::{
-        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
-        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
-        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
-        transaction_metadata_processor::TransactionMetadataProcessor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
-    },
-    schema::ledger_infos,
-    transaction_filter::TransactionFilter,
-    utils::{
+    config::IndexerGrpcHttp2Config, grpc_stream::TransactionsPBResponse, models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery}, parquet_manager::ParquetData, processors::{
+        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor, coin_processor::CoinProcessor, default_processor::DefaultProcessor, events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor, monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor, parquet_default_processor::ParquetProcessor, stake_processor::StakeProcessor, token_processor::TokenProcessor, token_v2_processor::TokenV2Processor, transaction_metadata_processor::TransactionMetadataProcessor, user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor, ProcessorConfig, ProcessorTrait
+    }, schema::ledger_infos, transaction_filter::TransactionFilter, utils::{
         counters::{
             ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
             NUM_TRANSACTIONS_PROCESSED_COUNT, PB_CHANNEL_FETCH_WAIT_TIME_SECS,
@@ -30,7 +16,7 @@ use crate::{
         },
         database::{execute_with_better_error_conn, new_db_pool, run_pending_migrations, PgDbPool},
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
-    },
+    }
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
@@ -38,6 +24,8 @@ use aptos_moving_average::MovingAverage;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
+use google_cloud_storage::{client::Client as GCSClient};
+use std::sync::Arc;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
@@ -56,12 +44,14 @@ pub struct Worker {
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub gap_detection_batch_size: u64,
+    pub parquet_gap_detection_batch_size: u64,
     pub grpc_chain_id: Option<u64>,
     pub pb_channel_txn_chunk_size: usize,
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
     pub transaction_filter: TransactionFilter,
     pub grpc_response_item_timeout_in_secs: u64,
+    pub gcs_client: Arc<GCSClient>,
 }
 
 impl Worker {
@@ -77,12 +67,14 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
         gap_detection_batch_size: u64,
+        parquet_gap_detection_batch_size: u64,
         // The number of transactions per protobuf batch
         pb_channel_txn_chunk_size: usize,
         per_table_chunk_sizes: AHashMap<String, usize>,
         enable_verbose_logging: Option<bool>,
         transaction_filter: TransactionFilter,
         grpc_response_item_timeout_in_secs: u64,
+        gcs_client: Arc<GCSClient>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -112,12 +104,14 @@ impl Worker {
             auth_token,
             number_concurrent_processing_tasks,
             gap_detection_batch_size,
+            parquet_gap_detection_batch_size,
             grpc_chain_id: None,
             pb_channel_txn_chunk_size,
             per_table_chunk_sizes,
             enable_verbose_logging,
             transaction_filter,
             grpc_response_item_timeout_in_secs,
+            gcs_client,
         })
     }
 
@@ -228,6 +222,9 @@ impl Worker {
             .await
         });
 
+        // TODO: refactor this to create channels for each processor
+        let (parquet_manager_sender, parquet_manager_receiver) = kanal::bounded_async::<ParquetData>(100);
+
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
@@ -236,6 +233,7 @@ impl Worker {
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
+            parquet_manager_sender.clone(),
         );
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
@@ -246,6 +244,48 @@ impl Worker {
             )
             .await;
         });
+
+        let (new_gap_detector_sender, new_gap_detector_receiver) =
+            kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
+
+        let parquet_gap_detection_batch_size = self.parquet_gap_detection_batch_size;
+        let processor = build_processor(
+            &self.processor_config,
+            self.per_table_chunk_sizes.clone(),
+            self.db_pool.clone(),
+            parquet_manager_sender.clone(),
+        );
+
+        // TOOD: this will be removed once we have a new gap detector logic added to the existing gap detector
+        tokio::spawn(async move {
+            crate::parquet_gap_detector::create_parquet_file_gap_detector_status_tracker_loop(
+                new_gap_detector_receiver,
+                processor,
+                starting_version,
+                parquet_gap_detection_batch_size,
+            )
+            .await;
+        });
+
+        let processor = build_processor(
+            &self.processor_config,
+            self.per_table_chunk_sizes.clone(),
+            self.db_pool.clone(),
+            parquet_manager_sender.clone(),
+        );
+        let gcs_client = self.gcs_client.clone();
+
+        // refactor this to send all channels to the parquet manager for each processor
+        tokio::spawn(async move {
+            crate::parquet_manager::create_parquet_manager_loop(
+                new_gap_detector_sender.clone(),
+                parquet_manager_receiver.clone(),
+                processor,
+                &gcs_client
+            )
+            .await;
+        });
+
 
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
@@ -264,8 +304,14 @@ impl Worker {
 
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
-            let join_handle = self
-                .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
+            let join_handle: JoinHandle<()> = self
+                .launch_processor_task(
+                    task_index,
+                    receiver.clone(),
+                    gap_detector_sender.clone(), 
+                    parquet_manager_sender.clone(),
+                    processor_name == "parquet_processor",
+                )
                 .await;
             processor_tasks.push(join_handle);
         }
@@ -289,6 +335,8 @@ impl Worker {
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
+        parquet_manager_sender: kanal::AsyncSender<ParquetData>,
+        is_parquet_backfill: bool,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -300,6 +348,7 @@ impl Worker {
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
+            parquet_manager_sender.clone()
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -309,11 +358,13 @@ impl Worker {
             .expect("GRPC chain ID has not been fetched yet!");
         let grpc_response_item_timeout =
             std::time::Duration::from_secs(self.grpc_response_item_timeout_in_secs);
+        let gcs_client = self.gcs_client.clone();
+
         tokio::spawn(async move {
             let task_index_str = task_index.to_string();
             let step = ProcessorStep::ProcessedBatch.get_step();
             let label = ProcessorStep::ProcessedBatch.get_label();
-            let mut ma = MovingAverage::new(3000);
+            let mut ma: MovingAverage = MovingAverage::new(3000);
 
             loop {
                 let txn_channel_fetch_latency = std::time::Instant::now();
@@ -402,6 +453,8 @@ impl Worker {
                     processor_name,
                     &auth_token,
                     false, // enable_verbose_logging
+                    &gcs_client,
+                    parquet_manager_sender.clone(),
                 )
                 .await;
 
@@ -493,11 +546,13 @@ impl Worker {
                     .with_label_values(&[processor_name, &task_index_str])
                     .set(processing_result.db_insertion_duration_in_secs);
 
-                // Send the result to the gap detector
-                gap_detector_sender
+                // Send the result to the gap detector if only it's not a parquet backfill
+                if !is_parquet_backfill {
+                    gap_detector_sender
                     .send(processing_result)
                     .await
                     .expect("[Parser] Failed to send versions to gap detector");
+                }
             }
         })
     }
@@ -656,6 +711,8 @@ pub async fn do_processor(
     processor_name: &str,
     auth_token: &str,
     enable_verbose_logging: bool,
+    gcs_client: &GCSClient,
+    parquet_manager_sender: kanal::AsyncSender<ParquetData>,
 ) -> Result<ProcessingResult> {
     // We use the value passed from the `transactions_pb` as it may have been filtered
     let start_version = transactions_pb.start_version;
@@ -669,6 +726,7 @@ pub async fn do_processor(
             processing_duration_in_secs: 0.0,
             db_insertion_duration_in_secs: 0.0,
             last_transaction_timestamp: transactions_pb.end_txn_timestamp,
+            parquet_insertion_duration_in_secs: None,
         });
     }
 
@@ -700,6 +758,7 @@ pub async fn do_processor(
             start_version,
             end_version,
             Some(db_chain_id),
+            &gcs_client
         )
         .await;
 
@@ -721,6 +780,7 @@ pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
     db_pool: PgDbPool,
+    parquet_manager_sender: kanal::AsyncSender<ParquetData>, // abstract this out so that each processor can have their own senders
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -773,5 +833,12 @@ pub fn build_processor(
         ProcessorConfig::UserTransactionProcessor => Processor::from(
             UserTransactionProcessor::new(db_pool, per_table_chunk_sizes),
         ),
+        ProcessorConfig::ParquetProcessor(config) => {
+            Processor::from(ParquetProcessor::new(
+                db_pool,
+                config.clone(),
+                parquet_manager_sender.clone(),
+            ))
+        },
     }
 }

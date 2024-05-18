@@ -9,8 +9,10 @@ use ahash::AHashMap;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use url::Url;
+use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
+use tracing::{error};
 
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;
 pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;
@@ -36,6 +38,9 @@ pub struct IndexerGrpcProcessorConfig {
     // Maximum number of batches "missing" before we assume we have an issue with gaps and abort
     #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
     pub gap_detection_batch_size: u64,
+    // Maximum number of batches "missing" before we assume we have an issue with gaps and abort
+    #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
+    pub parquet_gap_detection_batch_size: u64,
     // Number of protobuff transactions to send per chunk to the processor tasks
     #[serde(default = "IndexerGrpcProcessorConfig::default_pb_channel_txn_chunk_size")]
     pub pb_channel_txn_chunk_size: usize,
@@ -79,6 +84,21 @@ impl IndexerGrpcProcessorConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
     async fn run(&self) -> Result<()> {
+
+            // Establish GCS client
+        let gcs_config = GCSClientConfig::default()
+        .with_auth()
+        .await
+        .unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "Failed to create gRPC client config"
+            );
+            panic!();
+        });
+
+        let gcs_client = Arc::new(GCSClient::new(gcs_config));
+
         let mut worker = Worker::new(
             self.processor_config.clone(),
             self.postgres_connection_string.clone(),
@@ -90,11 +110,13 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.number_concurrent_processing_tasks,
             self.db_pool_size,
             self.gap_detection_batch_size,
+            self.parquet_gap_detection_batch_size,
             self.pb_channel_txn_chunk_size,
             self.per_table_chunk_sizes.clone(),
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
             self.grpc_response_item_timeout_in_secs,
+            gcs_client,
         )
         .await
         .context("Failed to build worker")?;

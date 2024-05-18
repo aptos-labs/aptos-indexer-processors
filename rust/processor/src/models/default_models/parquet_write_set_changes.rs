@@ -5,7 +5,7 @@
 
 use super::{
     move_modules::MoveModule,
-    move_resources::MoveResource,
+    parquet_move_resources::MoveResource,
     move_tables::{CurrentTableItem, TableItem, TableMetadata},
     transactions::Transaction,
 };
@@ -20,11 +20,8 @@ use parquet_derive::{ParquetRecordWriter};
 use parquet::record::RecordWriter;
 
 #[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, ParquetRecordWriter
+     Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter
 )]
-#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
-#[diesel(primary_key(transaction_version, index))]
-#[diesel(table_name = write_set_changes)]
 pub struct WriteSetChange {
     pub transaction_version: i64,
     pub index: i64,
@@ -32,6 +29,7 @@ pub struct WriteSetChange {
     transaction_block_height: i64,
     pub type_: String,
     pub address: String,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 impl WriteSetChange {
@@ -40,6 +38,7 @@ impl WriteSetChange {
         index: i64,
         transaction_version: i64,
         transaction_block_height: i64,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> (Self, WriteSetChangeDetail) {
         let type_ = Self::get_write_set_change_type(write_set_change);
         let change = write_set_change
@@ -57,6 +56,7 @@ impl WriteSetChange {
                     type_,
                     address: standardize_address(&inner.address.to_string()),
                     index,
+                    block_timestamp,
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_write_module(
                     inner,
@@ -75,6 +75,7 @@ impl WriteSetChange {
                     type_,
                     address: standardize_address(&inner.address.to_string()),
                     index,
+                    block_timestamp,
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_delete_module(
                     inner,
@@ -93,12 +94,14 @@ impl WriteSetChange {
                     type_,
                     address: standardize_address(&inner.address.to_string()),
                     index,
+                    block_timestamp,
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
+                    block_timestamp,
                 )),
             ),
             WriteSetChangeEnum::DeleteResource(inner) => (
@@ -111,12 +114,14 @@ impl WriteSetChange {
                     type_,
                     address: standardize_address(&inner.address.to_string()),
                     index,
+                    block_timestamp,
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
+                    block_timestamp,
                 )),
             ),
             WriteSetChangeEnum::WriteTableItem(inner) => {
@@ -136,6 +141,7 @@ impl WriteSetChange {
                         type_,
                         address: String::default(),
                         index,
+                        block_timestamp,
                     },
                     WriteSetChangeDetail::Table(
                         ti,
@@ -161,6 +167,7 @@ impl WriteSetChange {
                         type_,
                         address: String::default(),
                         index,
+                        block_timestamp,
                     },
                     WriteSetChangeDetail::Table(ti, cti, None),
                 )
@@ -172,6 +179,7 @@ impl WriteSetChange {
         write_set_changes: &[WriteSetChangePB],
         transaction_version: i64,
         transaction_block_height: i64,
+        timestamp: chrono::NaiveDateTime,
     ) -> (Vec<Self>, Vec<WriteSetChangeDetail>) {
         write_set_changes
             .iter()
@@ -182,6 +190,7 @@ impl WriteSetChange {
                     index as i64,
                     transaction_version,
                     transaction_block_height,
+                    timestamp,
                 )
             })
             .collect::<Vec<(Self, WriteSetChangeDetail)>>()

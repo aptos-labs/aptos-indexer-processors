@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
 use std::fmt::Debug;
 use tracing::error;
+use google_cloud_storage::{client::Client};
 
 pub struct AccountTransactionsProcessor {
     connection_pool: PgDbPool,
@@ -96,6 +97,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         start_version: u64,
         end_version: u64,
         _db_chain_id: Option<u64>,
+        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
@@ -135,6 +137,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
                 last_transaction_timestamp,
+                parquet_insertion_duration_in_secs: None,
             }),
             Err(err) => {
                 error!(
