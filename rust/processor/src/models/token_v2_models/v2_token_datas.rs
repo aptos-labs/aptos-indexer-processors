@@ -41,8 +41,10 @@ pub struct TokenDataV2 {
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub transaction_timestamp: chrono::NaiveDateTime,
-    // Deperecated, but still here for backwards compatibility
+    // Deprecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
+    // Here for consistency but we don't need to actually fill it
+    // pub is_deleted_v2: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
