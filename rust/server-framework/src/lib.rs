@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]
 use aptos_system_utils::profiling::start_cpu_profiling;
 use backtrace::Backtrace;
@@ -50,13 +50,11 @@ where
     });
     let main_task_handler = handle.spawn(async move { config.run().await });
     tokio::select! {
-        _ = task_handler => {
-            error!("Probes and metrics handler unexpectedly exited");
-            bail!("Probes and metrics handler unexpectedly exited");
+        res = task_handler => {
+            res.expect("Probes and metrics handler unexpectedly exited")
         },
-        _ = main_task_handler => {
-            error!("Main task unexpectedly exited");
-            bail!("Main task unexpectedly exited");
+        res = main_task_handler => {
+            res.expect("Main task handler unexpectedly exited")
         },
     }
 }
