@@ -327,6 +327,7 @@ impl Worker {
                 )
                 .await
                 {
+                    // Fetched transactions from channel
                     Ok(transactions_pb) => {
                         let size_in_bytes = transactions_pb.size_in_bytes as f64;
                         let first_txn_version = transactions_pb
@@ -502,13 +503,15 @@ impl Worker {
                             .await
                             .expect("[Parser] Failed to send versions to gap detector");
                     },
+                    // Could not fetch transactions from channel. This happens when there are
+                    // no more transactions to fetch and the channel is closed.
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
                             stream_address = stream_address.as_str(),
                             error = ?e,
                             task_index,
-                            "[Parser][T#{}] Consumer thread error fetching transactions from channel", task_index
+                            "[Parser][T#{}] Consumer thread exiting fetching loop", task_index
                         );
                         break;
                     },
