@@ -6,7 +6,6 @@ use crate::utils::database::PgDbPool;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use std::fmt::Debug;
-use google_cloud_storage::{client::Client};
 
 pub struct MonitoringProcessor {
     connection_pool: PgDbPool,
@@ -41,7 +40,6 @@ impl ProcessorTrait for MonitoringProcessor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
-        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         Ok(ProcessingResult {
             start_version,
@@ -49,7 +47,6 @@ impl ProcessorTrait for MonitoringProcessor {
             processing_duration_in_secs: 0.0,
             db_insertion_duration_in_secs: 0.0,
             last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
-            parquet_insertion_duration_in_secs: None,
         })
     }
 

@@ -4,12 +4,9 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::{
-    move_modules::MoveModule,
-    parquet_move_resources::MoveResource,
-    move_tables::{CurrentTableItem, TableItem, TableMetadata},
-    transactions::Transaction,
+    move_modules::MoveModule, move_tables::{CurrentTableItem, TableItem, TableMetadata}, parquet_move_resources::MoveResource, DataSize
 };
-use crate::{schema::write_set_changes, utils::util::standardize_address};
+use crate::{utils::util::standardize_address};
 use aptos_protos::transaction::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
     WriteSetChange as WriteSetChangePB,
@@ -17,7 +14,7 @@ use aptos_protos::transaction::v1::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use parquet_derive::{ParquetRecordWriter};
-use parquet::record::RecordWriter;
+
 
 #[derive(
      Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter
@@ -213,10 +210,6 @@ impl WriteSetChange {
             },
         }
     }
-}
-
-pub trait DataSize {
-    fn size_of(&self) -> usize;
 }
 
 impl DataSize for WriteSetChange {

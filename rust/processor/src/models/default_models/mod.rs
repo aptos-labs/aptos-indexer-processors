@@ -7,6 +7,10 @@ pub mod move_resources;
 pub mod move_tables;
 pub mod transactions;
 pub mod write_set_changes;
-pub mod new_transactions;
+pub mod parquet_transactions;
 pub mod parquet_write_set_changes;
 pub mod parquet_move_resources;
+
+pub trait DataSize {
+    fn size_of(&self) -> usize;
+}

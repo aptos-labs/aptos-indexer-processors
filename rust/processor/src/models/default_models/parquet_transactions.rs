@@ -7,7 +7,7 @@
 
 use super::{
     block_metadata_transactions::BlockMetadataTransaction,
-    parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
+    parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel}, DataSize,
 };
 use crate::{
     schema::transactions,
@@ -18,6 +18,7 @@ use crate::{
         },
     },
 };
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
     Transaction as TransactionPB, TransactionInfo,
@@ -314,6 +315,7 @@ impl Transaction {
 
     pub fn from_transactions(
         transactions: &[TransactionPB],
+        transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
     ) -> (
         Vec<Self>,
         Vec<BlockMetadataTransaction>,
@@ -328,11 +330,18 @@ impl Transaction {
         for txn in transactions {
             let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
                 Self::from_transaction(txn);
-            txns.push(txn);
+            txns.push(txn.clone());
+            transaction_version_to_struct_count.entry(txn.version).and_modify(|e| *e += 1).or_insert(1);
+
             if let Some(a) = block_metadata {
-                block_metadata_txns.push(a);
+                block_metadata_txns.push(a.clone());
+                // transaction_version_to_struct_count.entry(a.version).and_modify(|e| *e += 1);
             }
             wscs.append(&mut wsc_list);
+
+            if !wsc_list.is_empty() { 
+                transaction_version_to_struct_count.entry(wsc_list[0].transaction_version).and_modify(|e| *e += wsc_list.len() as i64);
+            }
             wsc_details.append(&mut wsc_detail_list);
         }
         (txns, block_metadata_txns, wscs, wsc_details)
@@ -341,3 +350,28 @@ impl Transaction {
 
 // Prevent conflicts with other things named `Transaction`
 pub type TransactionModel = Transaction;
+
+impl DataSize for Transaction {
+    fn size_of(&self) -> usize {
+        let base_size: usize = 
+            std::mem::size_of::<i64>() * 5 +
+            std::mem::size_of::<u64>() + 
+            std::mem::size_of::<bool>() +
+            std::mem::size_of::<Option<String>>() * 2 +
+            std::mem::size_of::<String>() * 6;
+
+
+        let dynamic_size =
+            self.hash.len() +
+            self.type_.len() +
+            self.state_change_hash.len() +
+            self.event_root_hash.len() +
+            self.vm_status.len() +
+            self.accumulator_root_hash.len() +
+            self.payload_type.as_ref().map_or(0, |s| s.len()) +
+            self.payload.as_ref().map_or(0, |s| s.len()) +
+            self.state_checkpoint_hash.as_ref().map_or(0, |s| s.len());
+            
+        base_size + dynamic_size
+    }
+}

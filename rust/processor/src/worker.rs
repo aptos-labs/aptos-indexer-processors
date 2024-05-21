@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::IndexerGrpcHttp2Config, grpc_stream::TransactionsPBResponse, models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery}, parquet_manager::ParquetData, processors::{
+    config::IndexerGrpcHttp2Config, grpc_stream::TransactionsPBResponse, models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery}, parquet_manager::{ParquetData, ParquetProcessingResult}, processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor, coin_processor::CoinProcessor, default_processor::DefaultProcessor, events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor, monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor, parquet_default_processor::ParquetProcessor, stake_processor::StakeProcessor, token_processor::TokenProcessor, token_v2_processor::TokenV2Processor, transaction_metadata_processor::TransactionMetadataProcessor, user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor, ProcessorConfig, ProcessorTrait
     }, schema::ledger_infos, transaction_filter::TransactionFilter, utils::{
         counters::{
@@ -222,8 +222,17 @@ impl Worker {
             .await
         });
 
-        // TODO: refactor this to create channels for each processor
-        let (parquet_manager_sender, parquet_manager_receiver) = kanal::bounded_async::<ParquetData>(100);
+        let parquet_sender_and_receiver = build_async_senders_and_receivers_for_processors(&self.processor_config);
+        let mut parquet_senders: Vec<kanal::AsyncSender<ParquetData>> = Vec::new();
+        let mut parquet_receivers: Vec<kanal::AsyncReceiver<ParquetData>> = Vec::new();
+        for (sender, receiver) in parquet_sender_and_receiver {
+            parquet_senders.push(sender);
+            parquet_receivers.push(receiver);
+        }
+        info!("parquet_sender size: {}", parquet_senders.len());
+        info!("parquet_receiver size: {}", parquet_receivers.len());
+        // maybe we can check the config here as well and build a vector of asyncSender/receivers here so that they can be passed to the processor.
+
 
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
@@ -233,8 +242,10 @@ impl Worker {
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
-            parquet_manager_sender.clone(),
+            // move_resource_sender.clone(),
+            parquet_senders.clone(),
         );
+        // per processor, we know how many sturcts we can get out of 
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
                 gap_detector_receiver,
@@ -246,16 +257,16 @@ impl Worker {
         });
 
         let (new_gap_detector_sender, new_gap_detector_receiver) =
-            kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
+            kanal::bounded_async::<ParquetProcessingResult>(BUFFER_SIZE);
 
         let parquet_gap_detection_batch_size = self.parquet_gap_detection_batch_size;
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
-            parquet_manager_sender.clone(),
+            // move_resource_sender.clone(),
+            parquet_senders.clone(),
         );
-
         // TOOD: this will be removed once we have a new gap detector logic added to the existing gap detector
         tokio::spawn(async move {
             crate::parquet_gap_detector::create_parquet_file_gap_detector_status_tracker_loop(
@@ -267,21 +278,21 @@ impl Worker {
             .await;
         });
 
-        let processor = build_processor(
-            &self.processor_config,
-            self.per_table_chunk_sizes.clone(),
-            self.db_pool.clone(),
-            parquet_manager_sender.clone(),
-        );
+        // let processor = build_processor(
+        //     &self.processor_config,
+        //     self.per_table_chunk_sizes.clone(),
+        //     self.db_pool.clone(),
+        //     move_resource_sender.clone(),
+        // );
         let gcs_client = self.gcs_client.clone();
 
         // refactor this to send all channels to the parquet manager for each processor
         tokio::spawn(async move {
             crate::parquet_manager::create_parquet_manager_loop(
+                gcs_client,
                 new_gap_detector_sender.clone(),
-                parquet_manager_receiver.clone(),
-                processor,
-                &gcs_client
+                parquet_receivers.clone(),
+                processor_name,
             )
             .await;
         });
@@ -309,7 +320,7 @@ impl Worker {
                     task_index,
                     receiver.clone(),
                     gap_detector_sender.clone(), 
-                    parquet_manager_sender.clone(),
+                    parquet_senders.clone(),
                     processor_name == "parquet_processor",
                 )
                 .await;
@@ -335,7 +346,7 @@ impl Worker {
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
-        parquet_manager_sender: kanal::AsyncSender<ParquetData>,
+        parquet_senders: Vec<kanal::AsyncSender<ParquetData>>,
         is_parquet_backfill: bool,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
@@ -348,7 +359,7 @@ impl Worker {
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
             self.db_pool.clone(),
-            parquet_manager_sender.clone()
+            parquet_senders.clone()
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -358,7 +369,7 @@ impl Worker {
             .expect("GRPC chain ID has not been fetched yet!");
         let grpc_response_item_timeout =
             std::time::Duration::from_secs(self.grpc_response_item_timeout_in_secs);
-        let gcs_client = self.gcs_client.clone();
+        let _gcs_client = self.gcs_client.clone();
 
         tokio::spawn(async move {
             let task_index_str = task_index.to_string();
@@ -453,8 +464,6 @@ impl Worker {
                     processor_name,
                     &auth_token,
                     false, // enable_verbose_logging
-                    &gcs_client,
-                    parquet_manager_sender.clone(),
                 )
                 .await;
 
@@ -711,8 +720,6 @@ pub async fn do_processor(
     processor_name: &str,
     auth_token: &str,
     enable_verbose_logging: bool,
-    gcs_client: &GCSClient,
-    parquet_manager_sender: kanal::AsyncSender<ParquetData>,
 ) -> Result<ProcessingResult> {
     // We use the value passed from the `transactions_pb` as it may have been filtered
     let start_version = transactions_pb.start_version;
@@ -726,7 +733,6 @@ pub async fn do_processor(
             processing_duration_in_secs: 0.0,
             db_insertion_duration_in_secs: 0.0,
             last_transaction_timestamp: transactions_pb.end_txn_timestamp,
-            parquet_insertion_duration_in_secs: None,
         });
     }
 
@@ -758,7 +764,6 @@ pub async fn do_processor(
             start_version,
             end_version,
             Some(db_chain_id),
-            &gcs_client
         )
         .await;
 
@@ -780,7 +785,7 @@ pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
     db_pool: PgDbPool,
-    parquet_manager_sender: kanal::AsyncSender<ParquetData>, // abstract this out so that each processor can have their own senders
+    parquet_senders: Vec<kanal::AsyncSender<ParquetData>>,   
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -837,8 +842,24 @@ pub fn build_processor(
             Processor::from(ParquetProcessor::new(
                 db_pool,
                 config.clone(),
-                parquet_manager_sender.clone(),
+                parquet_senders.clone(),
             ))
         },
     }
+}
+
+
+pub fn build_async_senders_and_receivers_for_processors(config: &ProcessorConfig) -> Vec<(kanal::AsyncSender<ParquetData>, kanal::AsyncReceiver<ParquetData>)> {
+    let mut senders_and_receivers: Vec<(kanal::AsyncSender<ParquetData>, kanal::AsyncReceiver<ParquetData>)> = Vec::new();
+    match config {
+        ProcessorConfig::ParquetProcessor(_) => {
+            for _ in 0..2 { // TODO: fix so that it's not hardcoded
+                senders_and_receivers.push(kanal::bounded_async::<ParquetData>(100));
+            }
+        },
+        _ => {
+            info!("No async senders for this processor for now, will be added more later");
+        },
+    }
+    senders_and_receivers
 }

@@ -31,7 +31,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tracing::{error, info};
-use google_cloud_storage::{client::Client as GCSClient};
 
 pub const CHUNK_SIZE: usize = 1000;
 
@@ -97,7 +96,6 @@ impl ProcessorTrait for NftMetadataProcessor {
         start_version: u64,
         end_version: u64,
         db_chain_id: Option<u64>,
-        client: &GCSClient,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
@@ -185,7 +183,6 @@ impl ProcessorTrait for NftMetadataProcessor {
             processing_duration_in_secs,
             db_insertion_duration_in_secs,
             last_transaction_timestamp,
-            parquet_insertion_duration_in_secs: None,
         })
     }
 

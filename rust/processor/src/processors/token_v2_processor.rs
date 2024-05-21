@@ -46,7 +46,6 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
-use google_cloud_storage::{client::Client};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -493,7 +492,6 @@ impl ProcessorTrait for TokenV2Processor {
         start_version: u64,
         end_version: u64,
         _: Option<u64>,
-        client: &Client,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
@@ -559,7 +557,6 @@ impl ProcessorTrait for TokenV2Processor {
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
                 last_transaction_timestamp,
-                parquet_insertion_duration_in_secs: None,
             }),
             Err(e) => {
                 error!(

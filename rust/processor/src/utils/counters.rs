@@ -235,6 +235,15 @@ pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Data gap warnings for parquet
+pub static PARQUET_PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!("indexer_parquet_processor_data_gap_count", "Data gap count", &[
+        "processor_name"
+    ])
+    .unwrap()
+});
+
+
 /// GRPC latency.
 pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(

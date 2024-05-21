@@ -41,7 +41,7 @@ use self::{
     parquet_default_processor::{ParquetProcessor, ParquetProcessorConfig},
 };
 use crate::{
-    models::{default_models::write_set_changes::WriteSetChangeModel, processor_status::ProcessorStatus},
+    models::{processor_status::ProcessorStatus},
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
@@ -55,7 +55,7 @@ use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use google_cloud_storage::{client::Client};
+
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProcessingResult {
@@ -64,7 +64,6 @@ pub struct ProcessingResult {
     pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     pub processing_duration_in_secs: f64,
     pub db_insertion_duration_in_secs: f64,
-    pub parquet_insertion_duration_in_secs: Option<f64>,
 }
 
 /// Base trait for all processors
@@ -80,7 +79,6 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         start_version: u64,
         end_version: u64,
         db_chain_id: Option<u64>,
-        client: &Client,
     ) -> anyhow::Result<ProcessingResult>;
 
     /// Gets a reference to the connection pool

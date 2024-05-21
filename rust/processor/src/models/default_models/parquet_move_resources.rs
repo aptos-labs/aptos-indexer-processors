@@ -3,8 +3,8 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::transactions::Transaction;
-use crate::{schema::move_resources, utils::util::standardize_address};
+use super::{DataSize};
+use crate::{utils::util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
     DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,
@@ -12,7 +12,7 @@ use aptos_protos::transaction::v1::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use parquet_derive::{ParquetRecordWriter};
-use parquet::record::RecordWriter;
+
 
 #[derive(
     Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter
@@ -139,27 +139,23 @@ impl MoveStructTag {
     }
 }
 
-pub trait DataSize {
-    fn size_of(&self) -> usize;
-}
-
 impl DataSize for MoveResource {
     fn size_of(&self) -> usize {
-        let base_size = 
-            std::mem::size_of::<i64>() * 3 +  // Three i64 fields
-            std::mem::size_of::<String>() * 5 +  // Five String fields (name, type_, address, module, state_key_hash)
-            std::mem::size_of::<Option<String>>() * 2 +  // Two Optional Strings (generic_type_params, data)
-            std::mem::size_of::<bool>() +  // One boolean field
-            std::mem::size_of::<chrono::NaiveDateTime>(); // One NaiveDateTime field
+        let base_size: usize = 
+            std::mem::size_of::<i64>() * 3 + 
+            std::mem::size_of::<String>() * 5 + 
+            std::mem::size_of::<Option<String>>() * 2 + 
+            std::mem::size_of::<bool>() + 
+            std::mem::size_of::<chrono::NaiveDateTime>();
 
         let dynamic_size = 
-            self.name.len() + self.name.capacity() +
-            self.type_.len() + self.type_.capacity() +
-            self.address.len() + self.address.capacity() +
-            self.module.len() + self.module.capacity() +
-            self.state_key_hash.len() + self.state_key_hash.capacity() +
-            self.generic_type_params.as_ref().map_or(0, |s| s.len() + s.capacity()) +
-            self.data.as_ref().map_or(0, |s| s.len() + s.capacity());
+            self.name.len() +
+            self.type_.len() +
+            self.address.len() +
+            self.module.len() +
+            self.state_key_hash.len() +
+            self.generic_type_params.as_ref().map_or(0, |s| s.len()) +
+            self.data.as_ref().map_or(0, |s| s.len());
 
         base_size + dynamic_size
     }

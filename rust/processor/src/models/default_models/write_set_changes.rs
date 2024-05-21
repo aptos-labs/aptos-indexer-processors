@@ -17,7 +17,7 @@ use aptos_protos::transaction::v1::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use parquet_derive::{ParquetRecordWriter};
-use parquet::record::RecordWriter;
+
 
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, ParquetRecordWriter
