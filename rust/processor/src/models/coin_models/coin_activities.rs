@@ -8,7 +8,6 @@
 use super::{
     coin_balances::{CoinBalance, CurrentCoinBalance},
     coin_infos::CoinInfo,
-    coin_supply::CoinSupply,
     coin_utils::{CoinEvent, EventGuidResource},
 };
 use crate::{
@@ -82,7 +81,6 @@ impl CoinActivity {
         Vec<CoinBalance>,
         AHashMap<CoinType, CoinInfo>,
         AHashMap<CurrentCoinBalancePK, CurrentCoinBalance>,
-        Vec<CoinSupply>,
     ) {
         // All the items we want to track
         let mut coin_activities = Vec::new();
@@ -92,7 +90,7 @@ impl CoinActivity {
             AHashMap::new();
         // This will help us get the coin type when we see coin deposit/withdraw events for coin activities
         let mut all_event_to_coin_type: EventToCoinType = AHashMap::new();
-        let mut all_coin_supply = Vec::new();
+
         // Extracts events and user request from genesis and user transactions. Other transactions won't have coin events
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
@@ -116,7 +114,6 @@ impl CoinActivity {
 
         // The rest are fields common to all transactions
         let txn_version = transaction.version as i64;
-        let txn_epoch = transaction.epoch as i64;
         let block_height = transaction.block_height as i64;
         let transaction_info = transaction
             .info
@@ -170,15 +167,6 @@ impl CoinActivity {
                     (None, None)
                 };
 
-            let maybe_coin_supply = if let WriteSetChangeEnum::WriteTableItem(table_item) =
-                wsc.change.as_ref().unwrap()
-            {
-                CoinSupply::from_write_table_item(table_item, txn_version, txn_timestamp, txn_epoch)
-                    .unwrap()
-            } else {
-                None
-            };
-
             if let Some(coin_info) = maybe_coin_info {
                 coin_infos.insert(coin_info.coin_type.clone(), coin_info);
             }
@@ -194,9 +182,6 @@ impl CoinActivity {
                 );
                 coin_balances.push(coin_balance);
                 all_event_to_coin_type.extend(event_to_coin_type);
-            }
-            if let Some(coin_supply) = maybe_coin_supply {
-                all_coin_supply.push(coin_supply);
             }
         }
         for (index, event) in events.iter().enumerate() {
@@ -222,7 +207,6 @@ impl CoinActivity {
             coin_balances,
             coin_infos,
             current_coin_balances,
-            all_coin_supply,
         )
     }
 
