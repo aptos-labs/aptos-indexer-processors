@@ -18,6 +18,7 @@ use crate::{
                 CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
                 TokenOwnershipV2,
             },
+            v2_token_royalty::{CurrentTokenRoyalty, TokenRoyalty},
             v2_token_utils::{
                 AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
                 PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
@@ -105,6 +106,7 @@ async fn insert_to_db(
     ),
     token_activities_v2: &[TokenActivityV2],
     current_token_v2_metadata: &[CurrentTokenV2Metadata],
+    (token_royalties_v2, current_token_royalties_v2): (&[TokenRoyalty], &[CurrentTokenRoyalty]),
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -190,11 +192,26 @@ async fn insert_to_db(
         ),
     );
     let ct_v2 = execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
         get_config_table_chunk_size::<CurrentTokenV2Metadata>(
             "current_token_v2_metadata",
+            per_table_chunk_sizes,
+        ),
+    );
+    let tr_v2 = execute_in_chunks(
+        conn.clone(),
+        insert_token_royalties_query,
+        token_royalties_v2,
+        get_config_table_chunk_size::<TokenRoyalty>("token_royalty", per_table_chunk_sizes),
+    );
+    let ctr_v2 = execute_in_chunks(
+        conn,
+        insert_current_token_royalties_query,
+        current_token_royalties_v2,
+        get_config_table_chunk_size::<CurrentTokenRoyalty>(
+            "current_token_royalty",
             per_table_chunk_sizes,
         ),
     );
@@ -210,7 +227,11 @@ async fn insert_to_db(
         cdto_v2_res,
         ta_v2_res,
         ct_v2_res,
-    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2,);
+        tr_v2_res,
+        ctr_v2_res,
+    ) = tokio::join!(
+        coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, tr_v2, ctr_v2
+    );
 
     for res in [
         coll_v2_res,
@@ -223,6 +244,8 @@ async fn insert_to_db(
         cdto_v2_res,
         ta_v2_res,
         ct_v2_res,
+        tr_v2_res,
+        ctr_v2_res,
     ] {
         res?;
     }
@@ -479,6 +502,48 @@ fn insert_current_token_v2_metadatas_query(
     )
 }
 
+fn insert_token_royalties_query(
+    items_to_insert: Vec<TokenRoyalty>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::token_royalty::dsl::*;
+
+    (
+        diesel::insert_into(schema::token_royalty::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, token_data_id))
+            .do_nothing(),
+        None,
+    )
+}
+
+fn insert_current_token_royalties_query(
+    items_to_insert: Vec<CurrentTokenRoyalty>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_token_royalty::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_token_royalty::table)
+            .values(items_to_insert)
+            .on_conflict(token_data_id)
+            .do_update()
+            .set((
+                payee_address.eq(excluded(payee_address)),
+                royalty_points_numerator.eq(excluded(royalty_points_numerator)),
+                royalty_points_denominator.eq(excluded(royalty_points_denominator)),
+                token_standard.eq(excluded(token_standard)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            )),
+        Some(" WHERE current_token_royalty.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
 #[async_trait]
 impl ProcessorTrait for TokenV2Processor {
     fn name(&self) -> &'static str {
@@ -516,6 +581,8 @@ impl ProcessorTrait for TokenV2Processor {
             current_deleted_token_ownerships_v2,
             token_activities_v2,
             current_token_v2_metadata,
+            token_royalties,
+            current_token_royalties,
         ) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
@@ -544,6 +611,7 @@ impl ProcessorTrait for TokenV2Processor {
             ),
             &token_activities_v2,
             &current_token_v2_metadata,
+            (&token_royalties, &current_token_royalties),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -592,12 +660,16 @@ async fn parse_v2_token(
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
+    Vec<TokenRoyalty>,
+    Vec<CurrentTokenRoyalty>,
 ) {
     // Token V2 and V1 combined
     let mut collections_v2 = vec![];
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
     let mut token_activities_v2 = vec![];
+    let mut token_royalties = vec![];
+
     let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         AHashMap::new();
     let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
@@ -617,6 +689,8 @@ async fn parse_v2_token(
     let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
     // Basically token properties
     let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
+        AHashMap::new();
+    let mut current_token_royalties: AHashMap<CurrentTokenDataV2PK, CurrentTokenRoyalty> =
         AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
@@ -818,6 +892,20 @@ async fn parse_v2_token(
                             current_token_datas_v2.insert(
                                 current_token_data.token_data_id.clone(),
                                 current_token_data,
+                            );
+                        }
+                        if let Some((token_royalty, current_token_royalty)) =
+                            TokenRoyalty::get_v1_from_write_table_item(
+                                table_item,
+                                txn_version,
+                                txn_timestamp,
+                            )
+                            .unwrap()
+                        {
+                            token_royalties.push(token_royalty);
+                            current_token_royalties.insert(
+                                current_token_royalty.token_data_id.clone(),
+                                current_token_royalty,
                             );
                         }
                         if let Some((token_ownership, current_token_ownership)) =
@@ -1071,6 +1159,8 @@ async fn parse_v2_token(
             }
         }
     }
+    tracing::info!("token royalties {}", token_royalties.len());
+    tracing::info!("current token royalties {}", current_token_royalties.len());
 
     // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
     let mut current_collections_v2 = current_collections_v2
@@ -1091,6 +1181,9 @@ async fn parse_v2_token(
     let mut current_deleted_token_ownerships_v2 = current_deleted_token_ownerships_v2
         .into_values()
         .collect::<Vec<CurrentTokenOwnershipV2>>();
+    let mut current_token_royalties = current_token_royalties
+        .into_values()
+        .collect::<Vec<CurrentTokenRoyalty>>();
 
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
@@ -1127,6 +1220,7 @@ async fn parse_v2_token(
                 &b.storage_id,
             ))
     });
+    current_token_royalties.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
 
     (
         collections_v2,
@@ -1139,5 +1233,7 @@ async fn parse_v2_token(
         current_deleted_token_ownerships_v2,
         token_activities_v2,
         current_token_v2_metadata,
+        token_royalties,
+        current_token_royalties,
     )
 }
