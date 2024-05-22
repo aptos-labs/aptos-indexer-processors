@@ -12,6 +12,7 @@ CREATE TABLE token_royalty (
 
 CREATE TABLE current_token_royalty (
     token_data_id VARCHAR(66) NOT NULL,
+    creator_address VARCHAR(66) NOT NULL,
     payee_address VARCHAR(66) NOT NULL,
     royalty_points_numerator NUMERIC NOT NULL,
     royalty_points_denominator NUMERIC NOT NULL,
@@ -19,5 +20,5 @@ CREATE TABLE current_token_royalty (
     last_transaction_version BIGINT NOT NULL,
     last_transaction_timestamp TIMESTAMP NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (token_data_id)
+    PRIMARY KEY (token_data_id, creator_address)
 );

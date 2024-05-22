@@ -621,9 +621,11 @@ diesel::table! {
 }
 
 diesel::table! {
-    current_token_royalty (token_data_id) {
+    current_token_royalty (token_data_id, creator_address) {
         #[max_length = 66]
         token_data_id -> Varchar,
+        #[max_length = 66]
+        creator_address -> Varchar,
         #[max_length = 66]
         payee_address -> Varchar,
         royalty_points_numerator -> Numeric,

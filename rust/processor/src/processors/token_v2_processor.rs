@@ -530,7 +530,7 @@ fn insert_current_token_royalties_query(
     (
         diesel::insert_into(schema::current_token_royalty::table)
             .values(items_to_insert)
-            .on_conflict(token_data_id)
+            .on_conflict((token_data_id, creator_address))
             .do_update()
             .set((
                 payee_address.eq(excluded(payee_address)),

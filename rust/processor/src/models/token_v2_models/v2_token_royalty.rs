@@ -28,10 +28,11 @@ pub struct TokenRoyalty {
 }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(token_data_id))]
+#[diesel(primary_key(token_data_id, creator_address))]
 #[diesel(table_name = current_token_royalty)]
 pub struct CurrentTokenRoyalty {
     pub token_data_id: String,
+    pub creator_address: String,
     pub payee_address: String,
     pub royalty_points_numerator: BigDecimal,
     pub royalty_points_denominator: BigDecimal,
@@ -70,6 +71,7 @@ impl TokenRoyalty {
             };
             if let Some(token_data_id_struct) = maybe_token_data_id {
                 let token_data_id = token_data_id_struct.to_hash();
+                let creator_address = token_data_id_struct.get_creator_address();
                 let payee_address = token_data.royalty.get_payee_address();
                 let royalty_points_numerator = token_data.royalty.royalty_points_numerator.clone();
                 let royalty_points_denominator =
@@ -86,6 +88,7 @@ impl TokenRoyalty {
                     },
                     CurrentTokenRoyalty {
                         token_data_id,
+                        creator_address,
                         payee_address,
                         royalty_points_numerator,
                         royalty_points_denominator,
