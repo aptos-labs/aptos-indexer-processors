@@ -584,7 +584,7 @@ impl V2TokenEvent {
             "0x4::collection::MintEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::MintEvent(inner)))
             },
-            "0x4::token::MutationEvent" | "0x4::token::Mutation" => {
+            "0x4::token::MutationEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
             },
             "0x4::collection::Burn" => {
@@ -593,7 +593,7 @@ impl V2TokenEvent {
             "0x4::collection::BurnEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
             },
-            "0x1::object::TransferEvent" | "0x1::object::Transfer" => {
+            "0x1::object::TransferEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TransferEvent(inner)))
             },
             _ => Ok(None),

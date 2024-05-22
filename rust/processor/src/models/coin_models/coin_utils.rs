@@ -158,20 +158,6 @@ pub struct DepositCoinEvent {
     pub amount: BigDecimal,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct WithdrawCoinEventV2 {
-    pub account: String,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub amount: BigDecimal,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DepositCoinEventV2 {
-    pub account: String,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub amount: BigDecimal,
-}
-
 pub struct CoinInfoType {
     coin_type: String,
     creator_address: String,
@@ -302,38 +288,16 @@ impl CoinResource {
 pub enum CoinEvent {
     WithdrawCoinEvent(WithdrawCoinEvent),
     DepositCoinEvent(DepositCoinEvent),
-    WithdrawCoinEventV2(WithdrawCoinEventV2),
-    DepositCoinEventV2(DepositCoinEventV2),
 }
 
 impl CoinEvent {
-    pub fn from_event(
-        data_type: &str,
-        data: &str,
-        txn_version: i64,
-    ) -> Result<Option<(CoinEvent, Option<String>)>> {
+    pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<CoinEvent>> {
         match data_type {
-            "0x1::coin::WithdrawEvent" => serde_json::from_str(data)
-                .map(|inner| Some((CoinEvent::WithdrawCoinEvent(inner), None))),
-            "0x1::coin::DepositEvent" => serde_json::from_str(data)
-                .map(|inner| Some((CoinEvent::WithdrawCoinEvent(inner), None))),
-            t if t.starts_with("0x1::coin::Withdraw") => {
-                let inner_type_start = t.find('<').unwrap();
-                serde_json::from_str(data).map(|inner| {
-                    Some((
-                        CoinEvent::WithdrawCoinEventV2(inner),
-                        Some(t[inner_type_start + 1..t.len() - 1].into()),
-                    ))
-                })
+            "0x1::coin::WithdrawEvent" => {
+                serde_json::from_str(data).map(|inner| Some(CoinEvent::WithdrawCoinEvent(inner)))
             },
-            t if t.starts_with("0x1::coin::Deposit") => {
-                let inner_type_start = t.find('<').unwrap();
-                serde_json::from_str(data).map(|inner| {
-                    Some((
-                        CoinEvent::WithdrawCoinEventV2(inner),
-                        Some(t[inner_type_start + 1..t.len() - 1].into()),
-                    ))
-                })
+            "0x1::coin::DepositEvent" => {
+                serde_json::from_str(data).map(|inner| Some(CoinEvent::DepositCoinEvent(inner)))
             },
             _ => Ok(None),
         }
