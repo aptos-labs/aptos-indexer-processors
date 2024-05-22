@@ -17,7 +17,6 @@ use crate::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
-        should_skip,
     },
     schema,
     utils::{
@@ -434,9 +433,6 @@ async fn parse_v2_coin(
 
         // Loop to handle events and collect additional metadata from events for v2
         for (index, event) in events.iter().enumerate() {
-            if should_skip(index, event, events) {
-                continue;
-            };
             if let Some(v1_activity) = FungibleAssetActivity::get_v1_from_event(
                 event,
                 txn_version,
