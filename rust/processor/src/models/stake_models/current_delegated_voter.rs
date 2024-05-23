@@ -67,7 +67,7 @@ impl CurrentDelegatedVoter {
 
     /// There are 3 pieces of information we need in order to get the delegated voters
     /// 1. We need the mapping between pool address and table handle of the governance record. This will help us
-    /// figure out what the pool address it is
+    ///    figure out what the pool address it is
     /// 2. We need to parse the governance record itself
     /// 3. All active shares prior to governance contract need to be tracked as well, the default voters are the delegators themselves
     pub async fn from_write_table_item(
