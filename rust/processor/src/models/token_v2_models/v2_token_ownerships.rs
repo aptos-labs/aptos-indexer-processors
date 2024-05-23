@@ -336,8 +336,10 @@ impl TokenOwnershipV2 {
         let token_address = standardize_address(token_address);
         if let Some(burn_event) = tokens_burned.get(&token_address) {
             // 1. Try to lookup token address in burn event mapping
-            let previous_owner = if let Some(burn_event) = burn_event {
+            let previous_owner = if let Some(previous_owner) =
                 burn_event.get_previous_owner_address()
+            {
+                previous_owner
             } else {
                 // 2. If it doesn't exist in burn event mapping, then it must be an old burn event that doesn't contain previous_owner.
                 // Do a lookup to get previous owner. This is necessary because previous owner is part of current token ownerships primary key.
