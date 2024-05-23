@@ -30,8 +30,8 @@ pub const TOKEN_V2_ADDR: &str =
 pub const DEFAULT_OWNER_ADDRESS: &str = "unknown";
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
-/// Maps address to burn event (new). The event is None if it's an old burn event.
-pub type TokenV2Burned = AHashMap<CurrentObjectPK, Option<Burn>>;
+/// Maps address to burn event. If it's an old event previous_owner will be empty
+pub type TokenV2Burned = AHashMap<CurrentObjectPK, Burn>;
 pub type TokenV2Minted = AHashSet<CurrentObjectPK>;
 pub type TokenV2MintedPK = (CurrentObjectPK, i64);
 
@@ -348,13 +348,19 @@ impl BurnEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Burn {
     collection: String,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    index: BigDecimal,
     token: String,
     previous_owner: String,
 }
 
 impl Burn {
+    pub fn new(collection: String, token: String, previous_owner: String) -> Self {
+        Burn {
+            collection,
+            token,
+            previous_owner,
+        }
+    }
+
     pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
         if let Some(V2TokenEvent::Burn(inner)) =
             V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
@@ -369,8 +375,16 @@ impl Burn {
         standardize_address(&self.token)
     }
 
-    pub fn get_previous_owner_address(&self) -> String {
-        standardize_address(&self.previous_owner)
+    pub fn get_previous_owner_address(&self) -> Option<String> {
+        if self.previous_owner.is_empty() {
+            None
+        } else {
+            Some(standardize_address(&self.previous_owner))
+        }
+    }
+
+    pub fn get_collection_address(&self) -> String {
+        standardize_address(&self.collection)
     }
 }
 
@@ -570,7 +584,7 @@ impl V2TokenEvent {
             "0x4::collection::MintEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::MintEvent(inner)))
             },
-            "0x4::token::MutationEvent" => {
+            "0x4::token::MutationEvent" | "0x4::token::Mutation" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
             },
             "0x4::collection::Burn" => {
@@ -579,7 +593,7 @@ impl V2TokenEvent {
             "0x4::collection::BurnEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
             },
-            "0x1::object::TransferEvent" => {
+            "0x1::object::TransferEvent" | "0x1::object::Transfer" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TransferEvent(inner)))
             },
             _ => Ok(None),

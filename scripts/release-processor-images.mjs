@@ -22,8 +22,8 @@
 // 3. gcloud auth configure-docker us-west1-docker.pkg.dev
 // 4. gcloud auth login --update-adc
 //
-// Once you have all prerequisites fulfilled, you can run this script via:
-// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US="${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}" ./docker/release-processor-images.mjs --language=rust --wait-for-image-seconds=1800
+// Once you have all prerequisites fulfilled, you can run this script via (note the GH context and vars):
+// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ vars.GCP_DOCKER_ARTIFACT_REPO }}" ./docker/release-processor-images.mjs --language=rust --wait-for-image-seconds=1800
 
 
 import { dirname } from "node:path";
@@ -36,7 +36,7 @@ chdir(dirname(process.argv[1]) + "/..");
 
 await import("zx/globals");
 
-const REQUIRED_ARGS = ["LANGUAGE", "GIT_SHA", "GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US"];
+const REQUIRED_ARGS = ["LANGUAGE", "GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO"];
 const OPTIONAL_ARGS = ["VERSION_TAG", "WAIT_FOR_IMAGE_SECONDS"];
 
 const parsedArgs = {};
@@ -88,13 +88,13 @@ function getImage(language) {
     return {sourceImage, targetImage};
 }
 
-const GCP_ARTIFACT_PROCESSOR_REPO_US = parsedArgs.GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US;
+const GCP_DOCKER_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
 const DOCKERHUB = "docker.io/aptoslabs";
 
 const {sourceImage, targetImage} = getImage(parsedArgs.LANGUAGE);
 console.info(chalk.yellow(`INFO: Target image: ${targetImage}`));
 
-const imageSource = `${GCP_ARTIFACT_PROCESSOR_REPO_US}/${sourceImage}:${parsedArgs.GIT_SHA}`;
+const imageSource = `${GCP_DOCKER_ARTIFACT_REPO}/${sourceImage}:${parsedArgs.GIT_SHA}`;
 const imageGitShaTarget = `${DOCKERHUB}/${targetImage}:${parsedArgs.GIT_SHA}`;
 
 console.info(chalk.green(`INFO: Waiting for ${imageSource} to become available in the source repo`));
