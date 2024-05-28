@@ -131,21 +131,21 @@ impl CoinActivity {
         // Handling gas first
         let mut entry_function_id_str = None;
         if let Some(user_request) = maybe_user_request {
-            let fee_statement = events.iter().find_map(|event| {
-                let event_type = event.type_str.as_str();
-                FeeStatement::from_event(event_type, &event.data, txn_version)
-            });
+            // let fee_statement = events.iter().find_map(|event| {
+            //     let event_type = event.type_str.as_str();
+            //     FeeStatement::from_event(event_type, &event.data, txn_version)
+            // });
 
             entry_function_id_str = get_entry_function_from_user_request(user_request);
-            coin_activities.push(Self::get_gas_event(
-                transaction_info,
-                user_request,
-                &entry_function_id_str,
-                txn_version,
-                txn_timestamp,
-                block_height,
-                fee_statement,
-            ));
+            // coin_activities.push(Self::get_gas_event(
+            //     transaction_info,
+            //     user_request,
+            //     &entry_function_id_str,
+            //     txn_version,
+            //     txn_timestamp,
+            //     block_height,
+            //     fee_statement,
+            // ));
         }
 
         // Need coin info from move resources
