@@ -104,7 +104,7 @@ fn get_primary_fungible_store_address(
     let mut preimage = hex_to_raw_bytes(owner_address)?;
     preimage.append(&mut hex_to_raw_bytes(metadata_address)?);
     preimage.push(0xFC);
-    Ok(format!("0x{}", hex::encode(sha3_256(&preimage))))
+    Ok(standardize_address(&hex::encode(sha3_256(&preimage))))
 }
 
 impl From<&CurrentFungibleAssetBalance> for CurrentUnifiedFungibleAssetBalance {
@@ -361,5 +361,14 @@ mod tests {
             metadata_address,
             fungible_store_address,
         ));
+    }
+
+    #[test]
+    fn test_paired_metadata_address() {
+        assert_eq!(
+            get_paired_metadata_address("0x1::aptos_coin::AptosCoin"),
+            *APT_METADATA_ADDRESS_HEX
+        );
+        assert_eq!(get_paired_metadata_address("0x66c34778730acbb120cefa57a3d98fd21e0c8b3a51e9baee530088b2e444e94c::moon_coin::MoonCoin"), "0xf772c28c069aa7e4417d85d771957eb3c5c11b5bf90b1965cda23b899ebc0384");
     }
 }
