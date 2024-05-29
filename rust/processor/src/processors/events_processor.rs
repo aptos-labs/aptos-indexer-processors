@@ -161,6 +161,7 @@ impl ProcessorTrait for EventsProcessor {
                 "0x1::multisig_account::TransactionExecutionSucceededEvent",
                 "0x1::multisig_account::TransactionExecutionFailedEvent",
                 "0x1::multisig_account::ExecuteRejectedTransactionEvent",
+                "0xccd1a84ccea93531d7f165b90134aa0415feb30e8757ab1632dac68c0055f5c2",
             ];
             for txn_event in txn_events {
                 if filter_addresses.iter().any(|address| txn_event.type_.contains(address)) {
