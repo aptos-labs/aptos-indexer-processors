@@ -301,7 +301,7 @@ pub async fn get_chain_id(
 /// There could be several special scenarios:
 /// 1. If we lose the connection, we will try reconnecting X times within Y seconds before crashing.
 /// 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
-/// all existing transactions are processed
+///    all existing transactions are processed
 pub async fn create_fetcher_loop(
     txn_sender: AsyncSender<TransactionsPBResponse>,
     indexer_grpc_data_service_address: Url,
