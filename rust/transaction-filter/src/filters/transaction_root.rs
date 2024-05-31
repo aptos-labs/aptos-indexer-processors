@@ -1,0 +1,43 @@
+use crate::traits::Filterable;
+use anyhow::Error;
+use aptos_protos::transaction::v1::{transaction::TransactionType, Transaction};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TransactionRootFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txn_type: Option<TransactionType>,
+}
+
+impl Filterable<Transaction> for TransactionRootFilter {
+    fn is_valid(&self) -> Result<(), Error> {
+        if self.success.is_none() && self.txn_type.is_none() {
+            return Err(Error::msg(
+                "At least one of success or txn_types must be set",
+            ));
+        };
+        Ok(())
+    }
+
+    fn is_allowed(&self, item: &Transaction) -> bool {
+        if !self
+            .success
+            .is_allowed_opt(&item.info.as_ref().map(|i| i.success))
+        {
+            return false;
+        }
+
+        if let Some(txn_type) = &self.txn_type {
+            if txn_type
+                != &TransactionType::try_from(item.r#type).expect("Invalid transaction type")
+            {
+                return false;
+            }
+        }
+
+        true
+    }
+}
