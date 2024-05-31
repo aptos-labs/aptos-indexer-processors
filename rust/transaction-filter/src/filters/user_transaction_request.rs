@@ -57,14 +57,14 @@ pub struct EntryFunctionFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub module: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub method: Option<String>,
+    pub function: Option<String>,
 }
 
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     fn is_valid(&self) -> Result<(), Error> {
-        if self.address.is_none() && self.name.is_none() && self.method.is_none() {
+        if self.address.is_none() && self.module.is_none() && self.function.is_none() {
             return Err(anyhow!(
                 "At least one of address, name or method must be set"
             ));
@@ -73,14 +73,14 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     }
 
     fn is_allowed(&self, module_id: &EntryFunctionId) -> bool {
-        if !self.name.is_allowed(&module_id.name) {
+        if !self.module.is_allowed(&module_id.name) {
             return false;
         }
 
-        if self.address.is_some() || self.method.is_some() {
+        if self.address.is_some() || self.function.is_some() {
             if let Some(module) = &module_id.module.as_ref() {
                 if !(self.address.is_allowed(&module.address)
-                    && self.method.is_allowed(&module.name))
+                    && self.function.is_allowed(&module.name))
                 {
                     return false;
                 }
