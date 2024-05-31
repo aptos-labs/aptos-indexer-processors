@@ -5,17 +5,18 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, TokenV2};
+use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2Burned};
 use crate::{
     models::{
-        object_models::{v2_object_utils::ObjectAggregatedDataMapping, v2_objects::Object},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::util::standardize_address,
 };
-use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
-use bigdecimal::{BigDecimal, Zero};
+use aptos_protos::transaction::v1::{DeleteResource, WriteResource, WriteTableItem};
+use bigdecimal::BigDecimal;
+use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +33,7 @@ pub struct TokenDataV2 {
     pub collection_id: String,
     pub token_name: String,
     pub maximum: Option<BigDecimal>,
-    pub supply: BigDecimal,
+    pub supply: Option<BigDecimal>,
     pub largest_property_version_v1: Option<BigDecimal>,
     pub token_uri: String,
     pub token_properties: serde_json::Value,
@@ -40,7 +41,10 @@ pub struct TokenDataV2 {
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub transaction_timestamp: chrono::NaiveDateTime,
-    pub decimals: i64,
+    // Deprecated, but still here for backwards compatibility
+    pub decimals: Option<i64>,
+    // Here for consistency but we don't need to actually fill it
+    // pub is_deleted_v2: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -51,7 +55,7 @@ pub struct CurrentTokenDataV2 {
     pub collection_id: String,
     pub token_name: String,
     pub maximum: Option<BigDecimal>,
-    pub supply: BigDecimal,
+    pub supply: Option<BigDecimal>,
     pub largest_property_version_v1: Option<BigDecimal>,
     pub token_uri: String,
     pub token_properties: serde_json::Value,
@@ -60,7 +64,9 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub decimals: i64,
+    // Deprecated, but still here for backwards compatibility
+    pub decimals: Option<i64>,
+    pub is_deleted_v2: Option<bool>,
 }
 
 impl TokenDataV2 {
@@ -76,25 +82,19 @@ impl TokenDataV2 {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             let mut token_name = inner.get_name_trunc();
-            // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
-            let (mut maximum, mut supply, mut decimals, mut is_fungible_v2) =
-                (None, BigDecimal::zero(), 0, Some(false));
+            let is_fungible_v2;
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
             if let Some(object_metadata) = object_metadatas.get(&token_data_id) {
                 let fungible_asset_metadata = object_metadata.fungible_asset_metadata.as_ref();
-                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
-                if let Some(metadata) = fungible_asset_metadata {
-                    if let Some(fa_supply) = fungible_asset_supply {
-                        maximum = fa_supply.get_maximum();
-                        supply = fa_supply.current.clone();
-                        decimals = metadata.decimals as i64;
-                        is_fungible_v2 = Some(true);
-                    }
+                if fungible_asset_metadata.is_some() {
+                    is_fungible_v2 = Some(true);
+                } else {
+                    is_fungible_v2 = Some(false);
                 }
                 token_properties = object_metadata
                     .property_map
-                    .clone()
+                    .as_ref()
                     .map(|m| m.inner.clone())
                     .unwrap_or(token_properties);
                 // In aggregator V2 name is now derived from a separate struct
@@ -116,8 +116,8 @@ impl TokenDataV2 {
                     token_data_id: token_data_id.clone(),
                     collection_id: collection_id.clone(),
                     token_name: token_name.clone(),
-                    maximum: maximum.clone(),
-                    supply: supply.clone(),
+                    maximum: None,
+                    supply: None,
                     largest_property_version_v1: None,
                     token_uri: token_uri.clone(),
                     token_properties: token_properties.clone(),
@@ -125,14 +125,14 @@ impl TokenDataV2 {
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2,
                     transaction_timestamp: txn_timestamp,
-                    decimals,
+                    decimals: None,
                 },
                 CurrentTokenDataV2 {
                     token_data_id,
                     collection_id,
                     token_name,
-                    maximum,
-                    supply,
+                    maximum: None,
+                    supply: None,
                     largest_property_version_v1: None,
                     token_uri,
                     token_properties,
@@ -141,9 +141,74 @@ impl TokenDataV2 {
                     is_fungible_v2,
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
-                    decimals,
+                    decimals: None,
+                    is_deleted_v2: Some(false),
                 },
             )))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// This handles the case where token is burned but objectCore is still there
+    pub async fn get_burned_nft_v2_from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<CurrentTokenDataV2>> {
+        let token_data_id = standardize_address(&write_resource.address.to_string());
+        // reminder that v1 events won't get to this codepath
+        if let Some(burn_event_v2) = tokens_burned.get(&standardize_address(&token_data_id)) {
+            Ok(Some(CurrentTokenDataV2 {
+                token_data_id,
+                collection_id: burn_event_v2.get_collection_address(),
+                token_name: "".to_string(),
+                maximum: None,
+                supply: None,
+                largest_property_version_v1: None,
+                token_uri: "".to_string(),
+                token_properties: serde_json::Value::Null,
+                description: "".to_string(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
+                last_transaction_version: txn_version,
+                last_transaction_timestamp: txn_timestamp,
+                decimals: None,
+                is_deleted_v2: Some(true),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// This handles the case where token is burned and objectCore is deleted
+    pub async fn get_burned_nft_v2_from_delete_resource(
+        delete_resource: &DeleteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<CurrentTokenDataV2>> {
+        let token_data_id = standardize_address(&delete_resource.address.to_string());
+        // reminder that v1 events won't get to this codepath
+        if let Some(burn_event_v2) = tokens_burned.get(&standardize_address(&token_data_id)) {
+            Ok(Some(CurrentTokenDataV2 {
+                token_data_id,
+                collection_id: burn_event_v2.get_collection_address(),
+                token_name: "".to_string(),
+                maximum: None,
+                supply: None,
+                largest_property_version_v1: None,
+                token_uri: "".to_string(),
+                token_properties: serde_json::Value::Null,
+                description: "".to_string(),
+                token_standard: TokenStandard::V2.to_string(),
+                is_fungible_v2: Some(false),
+                last_transaction_version: txn_version,
+                last_transaction_timestamp: txn_timestamp,
+                decimals: None,
+                is_deleted_v2: Some(true),
+            }))
         } else {
             Ok(None)
         }
@@ -189,7 +254,7 @@ impl TokenDataV2 {
                         collection_id: collection_id.clone(),
                         token_name: token_name.clone(),
                         maximum: Some(token_data.maximum.clone()),
-                        supply: token_data.supply.clone(),
+                        supply: Some(token_data.supply.clone()),
                         largest_property_version_v1: Some(
                             token_data.largest_property_version.clone(),
                         ),
@@ -199,14 +264,14 @@ impl TokenDataV2 {
                         token_standard: TokenStandard::V1.to_string(),
                         is_fungible_v2: None,
                         transaction_timestamp: txn_timestamp,
-                        decimals: 0,
+                        decimals: None,
                     },
                     CurrentTokenDataV2 {
                         token_data_id,
                         collection_id,
                         token_name,
                         maximum: Some(token_data.maximum),
-                        supply: token_data.supply,
+                        supply: Some(token_data.supply),
                         largest_property_version_v1: Some(token_data.largest_property_version),
                         token_uri,
                         token_properties: token_data.default_properties,
@@ -215,7 +280,8 @@ impl TokenDataV2 {
                         is_fungible_v2: None,
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
-                        decimals: 0,
+                        decimals: None,
+                        is_deleted_v2: None,
                     },
                 )));
             } else {
@@ -228,32 +294,5 @@ impl TokenDataV2 {
             }
         }
         Ok(None)
-    }
-
-    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
-    /// 1. If metadata is present with a token object, then is a token
-    /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_fungible_token(
-        conn: &mut PgPoolConnection<'_>,
-        address: &str,
-        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
-        txn_version: i64,
-    ) -> bool {
-        // 1. If metadata is present, the object is a token iff token struct is also present in the object
-        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
-            if object_data.fungible_asset_metadata.is_some() {
-                return object_data.token.is_some();
-            }
-        }
-        // 2. If metadata is not present, we will do a lookup in the db.
-        //  The object must exist in current_objects table for this processor to proceed
-        let object = Object::get_current_object(conn, address, txn_version).await;
-        if let Some(is_token) = object.is_token {
-            return is_token;
-        }
-        panic!(
-            "is_token is null for object_address: {}. You should probably backfill db.",
-            address
-        );
     }
 }

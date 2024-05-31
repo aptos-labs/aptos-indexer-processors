@@ -5,24 +5,27 @@ use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::account_transaction_models::account_transactions::AccountTransaction,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
 pub struct AccountTransactionsProcessor {
     connection_pool: PgDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AccountTransactionsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -42,7 +45,8 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    account_transactions: Vec<AccountTransaction>,
+    account_transactions: &[AccountTransaction],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -54,7 +58,10 @@ async fn insert_to_db(
         conn.clone(),
         insert_account_transactions_query,
         account_transactions,
-        AccountTransaction::field_count(),
+        get_config_table_chunk_size::<AccountTransaction>(
+            "account_transactions",
+            per_table_chunk_sizes,
+        ),
     )
     .await?;
     Ok(())
@@ -88,9 +95,11 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-        _: Option<u64>,
+        _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut account_transactions = AHashMap::new();
 
         for txn in &transactions {
@@ -113,7 +122,8 @@ impl ProcessorTrait for AccountTransactionsProcessor {
             self.name(),
             start_version,
             end_version,
-            account_transactions,
+            &account_transactions,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
@@ -124,7 +134,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(err) => {
                 error!(

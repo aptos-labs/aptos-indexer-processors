@@ -132,7 +132,7 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "indexer_processor_latest_version",
         "Latest version a processor has fully consumed",
-        &["processor_name", "step", "message"]
+        &["processor_name", "step", "message", "task_index"]
     )
     .unwrap()
 });
@@ -142,7 +142,17 @@ pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_processor_processed_bytes_count",
         "Count of bytes processed",
-        &["processor_name", "step", "message"]
+        &["processor_name", "step", "message", "task_index"]
+    )
+    .unwrap()
+});
+
+/// The amount of time that a task spent waiting for a protobuf bundle of transactions
+pub static PB_CHANNEL_FETCH_WAIT_TIME_SECS: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_pb_channel_fetch_wait_time_secs",
+        "Count of bytes processed",
+        &["processor_name", "task_index"]
     )
     .unwrap()
 });
@@ -152,7 +162,17 @@ pub static NUM_TRANSACTIONS_PROCESSED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| 
     register_int_counter_vec!(
         "indexer_processor_num_transactions_processed_count",
         "Number of transactions processed",
-        &["processor_name", "step", "message"]
+        &["processor_name", "step", "message", "task_index"]
+    )
+    .unwrap()
+});
+
+/// Count of transactions filtered out
+pub static NUM_TRANSACTIONS_FILTERED_OUT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_num_transactions_filtered_out_count",
+        "Number of transactions filtered out",
+        &["processor_name"]
     )
     .unwrap()
 });
@@ -167,22 +187,12 @@ pub static FETCHER_THREAD_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Overall processing time for multiple (n = number_concurrent_processing_tasks) batch of transactions
-pub static MULTI_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
-        "indexer_processor_multi_batch_processing_time_in_secs",
-        "Time taken to process multiple batches of transactions",
-        &["processor_name"]
-    )
-    .unwrap()
-});
-
-/// Overall processing time for a single batch of transactions
+/// Overall processing time for a single batch of transactions (per task)
 pub static SINGLE_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
         "indexer_processor_single_batch_processing_time_in_secs",
         "Time taken to process a single batch of transactions",
-        &["processor_name"]
+        &["processor_name", "task_index"]
     )
     .unwrap()
 });
@@ -192,7 +202,7 @@ pub static SINGLE_BATCH_PARSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
         "indexer_processor_single_batch_parsing_time_in_secs",
         "Time taken to parse a single batch of transactions",
-        &["processor_name"]
+        &["processor_name", "task_index"]
     )
     .unwrap()
 });
@@ -202,7 +212,7 @@ pub static SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(||
     register_gauge_vec!(
         "indexer_processor_single_batch_db_insertion_time_in_secs",
         "Time taken to insert to DB for a single batch of transactions",
-        &["processor_name"]
+        &["processor_name", "task_index"]
     )
     .unwrap()
 });
@@ -212,15 +222,15 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
         "indexer_processor_transaction_unix_timestamp",
         "Transaction timestamp in unixtime",
-        &["processor_name", "step", "message"]
+        &["processor_name", "step", "message", "task_index"]
     )
     .unwrap()
 });
 
 /// Data gap warnings
-pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("indexer_processor_data_gap_count", "Data gap count", &[
-        "type"
+pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!("indexer_processor_data_gap_count", "Data gap count", &[
+        "processor_name"
     ])
     .unwrap()
 });
@@ -230,7 +240,7 @@ pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
         "indexer_processor_grpc_latency_in_secs",
         "GRPC latency observed by processor",
-        &["processor_name"]
+        &["processor_name", "task_index"]
     )
     .unwrap()
 });

@@ -17,7 +17,7 @@ jobs:
   copy-images-to-docker-hub:
     strategy:
       matrix:
-        language: ["rust", "python"]
+        language: ["rust"]
     uses: ./.github/workflows/copy-processor-images-to-dockerhub.yaml
     with:
       processor_language: ${{ matrix.language }}

@@ -1,5 +1,5 @@
 {
-  "resource_version": 385,
+  "resource_version": 319,
   "metadata": {
     "version": 3,
     "sources": [
@@ -7,263 +7,6 @@
         "name": "indexer-v2",
         "kind": "postgres",
         "tables": [
-          {
-            "table": {
-              "name": "current_nft_marketplace_auctions",
-              "schema": "nft_marketplace_v2"
-            },
-            "object_relationships": [
-              {
-                "name": "current_token_data",
-                "using": {
-                  "manual_configuration": {
-                    "column_mapping": {
-                      "token_data_id": "token_data_id"
-                    },
-                    "insertion_order": null,
-                    "remote_table": {
-                      "name": "current_token_datas_v2",
-                      "schema": "public"
-                    }
-                  }
-                }
-              }
-            ],
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "buy_it_now_price",
-                    "coin_type",
-                    "collection_id",
-                    "contract_address",
-                    "current_bid_price",
-                    "current_bidder",
-                    "entry_function_id_str",
-                    "expiration_time",
-                    "fee_schedule_id",
-                    "is_deleted",
-                    "last_transaction_timestamp",
-                    "last_transaction_version",
-                    "listing_id",
-                    "marketplace",
-                    "seller",
-                    "starting_bid_price",
-                    "token_amount",
-                    "token_data_id",
-                    "token_standard"
-                  ],
-                  "filter": {},
-                  "limit": 100
-                }
-              }
-            ]
-          },
-          {
-            "table": {
-              "name": "current_nft_marketplace_collection_offers",
-              "schema": "nft_marketplace_v2"
-            },
-            "object_relationships": [
-              {
-                "name": "current_collection_v2",
-                "using": {
-                  "manual_configuration": {
-                    "column_mapping": {
-                      "collection_id": "collection_id"
-                    },
-                    "insertion_order": null,
-                    "remote_table": {
-                      "name": "current_collections_v2",
-                      "schema": "public"
-                    }
-                  }
-                }
-              }
-            ],
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "buyer",
-                    "coin_type",
-                    "collection_id",
-                    "collection_offer_id",
-                    "contract_address",
-                    "entry_function_id_str",
-                    "expiration_time",
-                    "fee_schedule_id",
-                    "is_deleted",
-                    "item_price",
-                    "last_transaction_timestamp",
-                    "last_transaction_version",
-                    "marketplace",
-                    "remaining_token_amount",
-                    "token_standard"
-                  ],
-                  "filter": {},
-                  "limit": 100
-                }
-              }
-            ]
-          },
-          {
-            "table": {
-              "name": "current_nft_marketplace_listings",
-              "schema": "nft_marketplace_v2"
-            },
-            "object_relationships": [
-              {
-                "name": "current_token_data",
-                "using": {
-                  "manual_configuration": {
-                    "column_mapping": {
-                      "token_data_id": "token_data_id"
-                    },
-                    "insertion_order": null,
-                    "remote_table": {
-                      "name": "current_token_datas_v2",
-                      "schema": "public"
-                    }
-                  }
-                }
-              }
-            ],
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "coin_type",
-                    "collection_id",
-                    "contract_address",
-                    "entry_function_id_str",
-                    "fee_schedule_id",
-                    "is_deleted",
-                    "last_transaction_timestamp",
-                    "last_transaction_version",
-                    "listing_id",
-                    "marketplace",
-                    "price",
-                    "seller",
-                    "token_amount",
-                    "token_data_id",
-                    "token_standard"
-                  ],
-                  "filter": {},
-                  "limit": 100,
-                  "allow_aggregations": true
-                }
-              }
-            ]
-          },
-          {
-            "table": {
-              "name": "current_nft_marketplace_token_offers",
-              "schema": "nft_marketplace_v2"
-            },
-            "object_relationships": [
-              {
-                "name": "current_token_data",
-                "using": {
-                  "manual_configuration": {
-                    "column_mapping": {
-                      "token_data_id": "token_data_id"
-                    },
-                    "insertion_order": null,
-                    "remote_table": {
-                      "name": "current_token_datas_v2",
-                      "schema": "public"
-                    }
-                  }
-                }
-              }
-            ],
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "buyer",
-                    "coin_type",
-                    "collection_id",
-                    "contract_address",
-                    "entry_function_id_str",
-                    "expiration_time",
-                    "fee_schedule_id",
-                    "is_deleted",
-                    "last_transaction_timestamp",
-                    "last_transaction_version",
-                    "marketplace",
-                    "offer_id",
-                    "price",
-                    "token_amount",
-                    "token_data_id",
-                    "token_standard"
-                  ],
-                  "filter": {},
-                  "limit": 100
-                }
-              }
-            ]
-          },
-          {
-            "table": {
-              "name": "nft_marketplace_activities",
-              "schema": "nft_marketplace_v2"
-            },
-            "object_relationships": [
-              {
-                "name": "current_token_data",
-                "using": {
-                  "manual_configuration": {
-                    "column_mapping": {
-                      "token_data_id": "token_data_id"
-                    },
-                    "insertion_order": null,
-                    "remote_table": {
-                      "name": "current_token_datas_v2",
-                      "schema": "public"
-                    }
-                  }
-                }
-              }
-            ],
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": [
-                    "buyer",
-                    "coin_type",
-                    "collection_id",
-                    "collection_name",
-                    "contract_address",
-                    "creator_address",
-                    "entry_function_id_str",
-                    "event_index",
-                    "event_type",
-                    "fee_schedule_id",
-                    "marketplace",
-                    "offer_or_listing_id",
-                    "price",
-                    "property_version",
-                    "seller",
-                    "token_amount",
-                    "token_data_id",
-                    "token_name",
-                    "token_standard",
-                    "transaction_timestamp",
-                    "transaction_version"
-                  ],
-                  "filter": {},
-                  "limit": 100
-                }
-              }
-            ]
-          },
           {
             "table": {
               "name": "parsed_asset_uris",
@@ -295,6 +38,23 @@
               "name": "account_transactions",
               "schema": "public"
             },
+            "object_relationships": [
+              {
+                "name": "user_transaction",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "transaction_version": "version"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "user_transactions",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
             "array_relationships": [
               {
                 "name": "coin_activities",
@@ -376,10 +136,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "account_address",
-                    "transaction_version"
-                  ],
+                  "columns": ["account_address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -495,10 +252,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "account_address",
-                    "transaction_version"
-                  ],
+                  "columns": ["account_address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -577,10 +331,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "address",
-                    "transaction_version"
-                  ],
+                  "columns": ["address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -879,17 +630,19 @@
                 "role": "anonymous",
                 "permission": {
                   "columns": [
-                    "last_transaction_version",
+                    "domain",
+                    "domain_expiration_timestamp",
+                    "domain_with_suffix",
+                    "expiration_timestamp",
                     "is_active",
                     "is_primary",
-                    "domain",
+                    "last_transaction_version",
                     "owner_address",
                     "registered_address",
                     "subdomain",
+                    "subdomain_expiration_policy",
                     "token_name",
-                    "token_standard",
-                    "domain_with_suffix",
-                    "expiration_timestamp"
+                    "token_standard"
                   ],
                   "filter": {},
                   "limit": 100,
@@ -1400,9 +1153,11 @@
                     }
                   }
                 }
-              },
+              }
+            ],
+            "array_relationships": [
               {
-                "name": "current_token_ownership",
+                "name": "current_token_ownerships",
                 "using": {
                   "manual_configuration": {
                     "column_mapping": {
@@ -1423,7 +1178,9 @@
                 "permission": {
                   "columns": [
                     "collection_id",
+                    "decimals",
                     "description",
+                    "is_deleted_v2",
                     "is_fungible_v2",
                     "largest_property_version_v1",
                     "last_transaction_timestamp",
@@ -1568,6 +1325,7 @@
                     "is_soulbound_v2",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "non_transferrable_by_owner",
                     "owner_address",
                     "property_version_v1",
                     "storage_id",
@@ -1819,10 +1577,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "delegator_address",
-                    "pool_address"
-                  ],
+                  "columns": ["delegator_address", "pool_address"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1939,10 +1694,12 @@
                     "icon_uri",
                     "last_transaction_timestamp",
                     "last_transaction_version",
+                    "maximum_v2",
                     "name",
                     "project_uri",
                     "supply_aggregator_table_handle_v1",
                     "supply_aggregator_table_key_v1",
+                    "supply_v2",
                     "symbol",
                     "token_standard"
                   ],
@@ -1961,10 +1718,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "db",
-                    "is_indexer_up"
-                  ],
+                  "columns": ["db", "is_indexer_up"],
                   "filter": {},
                   "limit": 100
                 }
@@ -1980,9 +1734,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "chain_id"
-                  ],
+                  "columns": ["chain_id"],
                   "filter": {}
                 }
               }
@@ -1997,10 +1749,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "address",
-                    "transaction_version"
-                  ],
+                  "columns": ["address", "transaction_version"],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -2017,10 +1766,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "num_active_delegator",
-                    "pool_address"
-                  ],
+                  "columns": ["num_active_delegator", "pool_address"],
                   "filter": {},
                   "limit": 100
                 }
@@ -2075,6 +1821,35 @@
           },
           {
             "table": {
+              "name": "signatures",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "is_sender_primary",
+                    "multi_agent_index",
+                    "multi_sig_index",
+                    "public_key",
+                    "public_key_indices",
+                    "signature",
+                    "signer",
+                    "threshold",
+                    "transaction_block_height",
+                    "transaction_version",
+                    "type"
+                  ],
+                  "filter": {},
+                  "limit": 100
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "table_items",
               "schema": "public"
             },
@@ -2105,11 +1880,7 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": [
-                    "handle",
-                    "key_type",
-                    "value_type"
-                  ],
+                  "columns": ["handle", "key_type", "value_type"],
                   "filter": {},
                   "limit": 100
                 }
@@ -2446,11 +2217,9 @@
             "query_name": "Latest Processor Status"
           }
         },
-        "methods": [
-          "GET"
-        ],
+        "methods": ["GET"],
         "name": "Latest Processor Status",
-        "url": "get_lastest_processor_status"
+        "url": "get_latest_processor_status"
       }
     ],
     "api_limits": {

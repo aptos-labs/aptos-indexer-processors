@@ -11,7 +11,7 @@ use crate::{
         default_models::move_resources::MoveResource,
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::{
-            collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
+            collection_datas::CollectionData,
             token_utils::{CollectionDataIdType, TokenWriteSet},
             tokens::TableHandleToOwner,
         },
@@ -201,6 +201,8 @@ impl CollectionV2 {
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -220,16 +222,27 @@ impl CollectionV2 {
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
                 None => {
-                    match Self::get_collection_creator_for_v1(conn, &table_handle)
-                        .await
-                        .context(format!(
-                            "Failed to get collection creator for table handle {}, txn version {}",
-                            table_handle, txn_version
-                        )) {
+                    match Self::get_collection_creator_for_v1(
+                        conn,
+                        &table_handle,
+                        query_retries,
+                        query_retry_delay_ms,
+                    )
+                    .await
+                    .context(format!(
+                        "Failed to get collection creator for table handle {}, txn version {}",
+                        table_handle, txn_version
+                    )) {
                         Ok(ca) => ca,
                         Err(_) => {
                             // Try our best by getting from the older collection data
-                            match CollectionData::get_collection_creator(conn, &table_handle).await
+                            match CollectionData::get_collection_creator(
+                                conn,
+                                &table_handle,
+                                query_retries,
+                                query_retry_delay_ms,
+                            )
+                            .await
                             {
                                 Ok(creator) => creator,
                                 Err(_) => {
@@ -298,15 +311,19 @@ impl CollectionV2 {
     async fn get_collection_creator_for_v1(
         conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match Self::get_by_table_handle(conn, table_handle).await {
                 Ok(creator) => return Ok(creator),
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

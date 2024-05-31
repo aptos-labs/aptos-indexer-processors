@@ -5,10 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::{
-    v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
-    v2_fungible_metadata::FungibleAssetMetadataModel,
-};
+use super::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent};
 use crate::{
     models::{
         coin_models::{
@@ -19,7 +16,7 @@ use crate::{
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_activities,
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::util::standardize_address,
 };
 use ahash::AHashMap;
 use anyhow::Context;
@@ -70,7 +67,6 @@ impl FungibleAssetActivity {
         event_index: i64,
         entry_function_id_str: &Option<String>,
         object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
-        conn: &mut PgPoolConnection<'_>,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(fa_event) =
@@ -84,17 +80,6 @@ impl FungibleAssetActivity {
                 let object_core = &object_metadata.object.object_core;
                 let fungible_asset = object_metadata.fungible_asset_store.as_ref().unwrap();
                 let asset_type = fungible_asset.metadata.get_reference_address();
-                // If it's a fungible token, return early
-                if !FungibleAssetMetadataModel::is_address_fungible_asset(
-                    conn,
-                    &asset_type,
-                    object_aggregated_data_mapping,
-                    txn_version,
-                )
-                .await
-                {
-                    return Ok(None);
-                }
 
                 let (is_frozen, amount) = match fa_event {
                     FungibleAssetEvent::WithdrawEvent(inner) => (None, Some(inner.amount.clone())),
@@ -146,15 +131,18 @@ impl FungibleAssetActivity {
                 addr: standardize_address(event_key.account_address.as_str()),
                 creation_num: event_key.creation_number as i64,
             };
-            let coin_type =
-                event_to_coin_type
-                    .get(&event_move_guid)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                            txn_version, event_move_guid, event_to_coin_type
-                        )
-                    }).clone();
+            // Given this mapping only contains coin type < 1000 length, we should not assume that the mapping exists.
+            // If it doesn't exist, skip.
+            let coin_type = match event_to_coin_type.get(&event_move_guid) {
+                Some(coin_type) => coin_type.clone(),
+                None => {
+                    tracing::warn!(
+                        "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                        txn_version, event_move_guid, event_to_coin_type
+                    );
+                    return Ok(None);
+                },
+            };
             let storage_id =
                 CoinInfoType::get_storage_id(coin_type.as_str(), event_move_guid.addr.as_str());
             Ok(Some(Self {

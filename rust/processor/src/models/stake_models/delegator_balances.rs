@@ -5,10 +5,7 @@
 
 use super::delegator_pools::{DelegatorPool, DelegatorPoolBalanceMetadata, PoolBalanceMetadata};
 use crate::{
-    models::{
-        default_models::move_tables::TableItem,
-        token_models::collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
-    },
+    models::default_models::move_tables::TableItem,
     schema::{current_delegator_balances, delegator_balances},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
@@ -18,7 +15,7 @@ use aptos_protos::transaction::v1::{
     write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, Zero};
-use diesel::{prelude::*, ExpressionMethods};
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -137,6 +134,8 @@ impl CurrentDelegatorBalance {
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -153,6 +152,8 @@ impl CurrentDelegatorBalance {
                     match Self::get_staking_pool_from_inactive_share_handle(
                         conn,
                         &inactive_pool_handle,
+                        query_retries,
+                        query_retry_delay_ms,
                     )
                     .await
                     {
@@ -257,6 +258,8 @@ impl CurrentDelegatorBalance {
         inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
         inactive_share_to_pool: &ShareToPoolMapping,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -269,13 +272,17 @@ impl CurrentDelegatorBalance {
                 .map(|metadata| metadata.staking_pool_address.clone())
             {
                 Some(pool_address) => pool_address,
-                None => {
-                    Self::get_staking_pool_from_inactive_share_handle(conn, &inactive_pool_handle)
-                        .await
-                        .context(format!("Failed to get staking pool address from inactive share handle {}, txn version {}",
-                                         inactive_pool_handle, txn_version
-                        ))?
-                }
+                None => Self::get_staking_pool_from_inactive_share_handle(
+                    conn,
+                    &inactive_pool_handle,
+                    query_retries,
+                    query_retry_delay_ms,
+                )
+                .await
+                .context(format!(
+                    "Failed to get staking pool from inactive share handle {}, txn version {}",
+                    inactive_pool_handle, txn_version
+                ))?,
             };
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
@@ -364,17 +371,21 @@ impl CurrentDelegatorBalance {
     pub async fn get_staking_pool_from_inactive_share_handle(
         conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match CurrentDelegatorBalanceQuery::get_by_inactive_share_handle(conn, table_handle)
                 .await
             {
                 Ok(current_delegator_balance) => return Ok(current_delegator_balance.pool_address),
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }
@@ -387,6 +398,8 @@ impl CurrentDelegatorBalance {
         transaction: &Transaction,
         active_pool_to_staking_pool: &ShareToStakingPoolMapping,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<(Vec<DelegatorBalance>, CurrentDelegatorBalanceMap)> {
         let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = AHashMap::new();
         let mut inactive_share_to_pool: ShareToPoolMapping = AHashMap::new();
@@ -436,6 +449,8 @@ impl CurrentDelegatorBalance {
                             &inactive_pool_to_staking_pool,
                             &inactive_share_to_pool,
                             conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()
@@ -461,6 +476,8 @@ impl CurrentDelegatorBalance {
                             &inactive_pool_to_staking_pool,
                             &inactive_share_to_pool,
                             conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()

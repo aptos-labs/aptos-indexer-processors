@@ -15,13 +15,10 @@ use crate::{
 };
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
-use diesel::{prelude::*, ExpressionMethods};
+use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-pub const QUERY_RETRIES: u32 = 5;
-pub const QUERY_RETRY_DELAY_MS: u64 = 500;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash, transaction_version))]
@@ -89,6 +86,8 @@ impl CollectionData {
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
         conn: &mut PgPoolConnection<'_>,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionData)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -107,7 +106,14 @@ impl CollectionData {
                 .map(|table_metadata| table_metadata.get_owner_address());
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
-                None => match Self::get_collection_creator(conn, &table_handle).await {
+                None => match Self::get_collection_creator(
+                    conn,
+                    &table_handle,
+                    query_retries,
+                    query_retry_delay_ms,
+                )
+                .await
+                {
                     Ok(creator) => creator,
                     Err(_) => {
                         tracing::error!(
@@ -169,15 +175,19 @@ impl CollectionData {
     pub async fn get_collection_creator(
         conn: &mut PgPoolConnection<'_>,
         table_handle: &str,
+        query_retries: u32,
+        query_retry_delay_ms: u64,
     ) -> anyhow::Result<String> {
-        let mut retried = 0;
-        while retried < QUERY_RETRIES {
-            retried += 1;
+        let mut tried = 0;
+        while tried < query_retries {
+            tried += 1;
             match CurrentCollectionDataQuery::get_by_table_handle(conn, table_handle).await {
                 Ok(current_collection_data) => return Ok(current_collection_data.creator_address),
                 Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS))
-                        .await;
+                    if tried < query_retries {
+                        tokio::time::sleep(std::time::Duration::from_millis(query_retry_delay_ms))
+                            .await;
+                    }
                 },
             }
         }

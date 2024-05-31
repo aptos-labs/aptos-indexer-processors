@@ -1,13 +1,7 @@
 [workspace]
 resolver = "2"
 
-members = [
-    "indexer-metrics",
-    "moving-average",
-    "post-processor",
-    "processor",
-    "server-framework",
-]
+members = ["indexer-metrics", "moving-average", "processor", "server-framework"]
 
 [workspace.package]
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
@@ -25,8 +19,9 @@ aptos-moving-average = { path = "moving-average" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.62"
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", tag = "aptos-node-v1.12.1" }
+aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
 async-trait = "0.1.53"
-aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5d1cefad0ea0d37fb08e9aec7847080745c83f9c" }
 backtrace = "0.3.58"
 base64 = "0.13.0"
 bb8 = "0.8.1"
@@ -34,13 +29,23 @@ bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+# Do NOT enable the postgres feature here, it is conditionally enabled in a feature
+# block in the Cargo.toml file for the processor crate.
+# https://github.com/aptos-labs/aptos-indexer-processors/pull/325
 diesel = { version = "2.1", features = [
     "chrono",
     "postgres_backend",
     "numeric",
     "serde_json",
 ] }
-diesel-async = { version = "0.4", features = ["postgres", "bb8", "tokio"] }
+# Use the crate version once this feature gets released on crates.io:
+# https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = [
+    "async-connection-wrapper",
+    "postgres",
+    "bb8",
+    "tokio",
+] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 diesel_async_migrations = { git = "https://github.com/niroco/diesel_async_migrations", rev = "11f331b73c5cfcc894380074f748d8fda710ac12" }
 enum_dispatch = "0.3.12"
@@ -55,6 +60,11 @@ cloud-storage = { version = "0.11.1", features = ["global-client"] }
 google-cloud-googleapis = "0.10.0"
 google-cloud-pubsub = "0.18.0"
 hex = "0.4.3"
+itertools = "0.12.1"
+jemallocator = { version = "0.5.0", features = [
+    "profiling",
+    "unprefixed_malloc_on_supported_platforms",
+] }
 kanal = { version = "0.1.0-pre8", features = ["async"] }
 once_cell = "1.10.0"
 num_cpus = "1.16.0"
@@ -79,13 +89,14 @@ tempfile = "3.3.0"
 toml = "0.7.4"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 tokio = { version = "1.35.1", features = ["full"] }
-tonic = { version = "0.10.2", features = [
+tonic = { version = "0.11.0", features = [
     "tls",
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
+    "zstd",
 ] }
 tracing = "0.1.34"
 unescape = "0.1.0"

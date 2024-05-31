@@ -9,15 +9,16 @@ use super::v2_fungible_asset_utils::FungibleAssetMetadata;
 use crate::{
     models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
-        object_models::{v2_object_utils::ObjectAggregatedDataMapping, v2_objects::Object},
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,
-    utils::{database::PgPoolConnection, util::standardize_address},
+    utils::util::standardize_address,
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
-use diesel::sql_types::Text;
+use bigdecimal::BigDecimal;
+use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -42,12 +43,9 @@ pub struct FungibleAssetMetadataModel {
     pub supply_aggregator_table_handle_v1: Option<String>,
     pub supply_aggregator_table_key_v1: Option<String>,
     pub token_standard: String,
-}
-
-#[derive(Debug, QueryableByName)]
-pub struct AssetTypeFromTable {
-    #[diesel(sql_type = Text)]
-    pub asset_type: String,
+    pub is_token_v2: Option<bool>,
+    pub supply_v2: Option<BigDecimal>,
+    pub maximum_v2: Option<BigDecimal>,
 }
 
 impl FungibleAssetMetadataModel {
@@ -65,10 +63,16 @@ impl FungibleAssetMetadataModel {
             let asset_type = standardize_address(&write_resource.address.to_string());
             if let Some(object_metadata) = object_metadatas.get(&asset_type) {
                 let object = &object_metadata.object.object_core;
-                // Do not write here if asset is fungible token
-                if object_metadata.token.is_some() {
-                    return Ok(None);
-                }
+                let fungible_asset_supply = object_metadata.fungible_asset_supply.as_ref();
+                let (maximum_v2, supply_v2) =
+                    if let Some(fungible_asset_supply) = fungible_asset_supply {
+                        (
+                            fungible_asset_supply.get_maximum(),
+                            Some(fungible_asset_supply.current.clone()),
+                        )
+                    } else {
+                        (None, None)
+                    };
 
                 return Ok(Some(Self {
                     asset_type: asset_type.clone(),
@@ -83,6 +87,9 @@ impl FungibleAssetMetadataModel {
                     supply_aggregator_table_handle_v1: None,
                     supply_aggregator_table_key_v1: None,
                     token_standard: TokenStandard::V2.to_string(),
+                    is_token_v2: None,
+                    supply_v2,
+                    maximum_v2,
                 }));
             }
         }
@@ -121,6 +128,9 @@ impl FungibleAssetMetadataModel {
                         supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
                         supply_aggregator_table_key_v1: supply_aggregator_table_key,
                         token_standard: TokenStandard::V1.to_string(),
+                        is_token_v2: None,
+                        supply_v2: None,
+                        maximum_v2: None,
                     }))
                 } else {
                     Ok(None)
@@ -128,30 +138,5 @@ impl FungibleAssetMetadataModel {
             },
             _ => Ok(None),
         }
-    }
-
-    /// A fungible asset can also be a token. We will make a best effort guess at whether this is a fungible token.
-    /// 1. If metadata is present without token object, then it's not a token
-    /// 2. If metadata is not present, we will do a lookup in the db.
-    pub async fn is_address_fungible_asset(
-        conn: &mut PgPoolConnection<'_>,
-        address: &str,
-        object_aggregated_data_mapping: &ObjectAggregatedDataMapping,
-        txn_version: i64,
-    ) -> bool {
-        // 1. If metadata is present without token object, then it's not a token
-        if let Some(object_data) = object_aggregated_data_mapping.get(address) {
-            if object_data.fungible_asset_metadata.is_some() {
-                return object_data.token.is_none();
-            }
-        }
-        // 2. If metadata is not present, we will do a lookup in the db.
-        // The object must exist in current_objects table for this processor to proceed
-        // If it doesn't exist or is null, then you probably need to backfill objects processor
-        let object = Object::get_current_object(conn, address, txn_version).await;
-        if let (Some(is_fa), Some(is_token)) = (object.is_fungible_asset, object.is_token) {
-            return is_fa && !is_token;
-        }
-        panic!("is_fungible_asset and/or is_token is null for object_address: {}. You should probably backfill db.", address);
     }
 }

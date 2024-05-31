@@ -13,7 +13,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
         util::standardize_address,
     },
 };
@@ -28,7 +28,6 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
@@ -44,10 +43,15 @@ pub struct AnsProcessorConfig {
 pub struct AnsProcessor {
     connection_pool: PgDbPool,
     config: AnsProcessorConfig,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AnsProcessor {
-    pub fn new(connection_pool: PgDbPool, config: AnsProcessorConfig) -> Self {
+    pub fn new(
+        connection_pool: PgDbPool,
+        config: AnsProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         tracing::info!(
             ans_v1_primary_names_table_handle = config.ans_v1_primary_names_table_handle,
             ans_v1_name_records_table_handle = config.ans_v1_name_records_table_handle,
@@ -57,6 +61,7 @@ impl AnsProcessor {
         Self {
             connection_pool,
             config,
+            per_table_chunk_sizes,
         }
     }
 }
@@ -77,14 +82,15 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    current_ans_lookups: Vec<CurrentAnsLookup>,
-    ans_lookups: Vec<AnsLookup>,
-    current_ans_primary_names: Vec<CurrentAnsPrimaryName>,
-    ans_primary_names: Vec<AnsPrimaryName>,
-    current_ans_lookups_v2: Vec<CurrentAnsLookupV2>,
-    ans_lookups_v2: Vec<AnsLookupV2>,
-    current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2>,
-    ans_primary_names_v2: Vec<AnsPrimaryNameV2>,
+    current_ans_lookups: &[CurrentAnsLookup],
+    ans_lookups: &[AnsLookup],
+    current_ans_primary_names: &[CurrentAnsPrimaryName],
+    ans_primary_names: &[AnsPrimaryName],
+    current_ans_lookups_v2: &[CurrentAnsLookupV2],
+    ans_lookups_v2: &[AnsLookupV2],
+    current_ans_primary_names_v2: &[CurrentAnsPrimaryNameV2],
+    ans_primary_names_v2: &[AnsPrimaryNameV2],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -92,62 +98,86 @@ async fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    execute_in_chunks(
+    let cal = execute_in_chunks(
         conn.clone(),
         insert_current_ans_lookups_query,
         current_ans_lookups,
-        CurrentAnsLookup::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentAnsLookup>(
+            "current_ans_lookup",
+            per_table_chunk_sizes,
+        ),
+    );
+    let al = execute_in_chunks(
         conn.clone(),
         insert_ans_lookups_query,
         ans_lookups,
-        AnsLookup::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<AnsLookup>("ans_lookup", per_table_chunk_sizes),
+    );
+    let capn = execute_in_chunks(
         conn.clone(),
         insert_current_ans_primary_names_query,
         current_ans_primary_names,
-        CurrentAnsPrimaryName::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentAnsPrimaryName>(
+            "current_ans_primary_name",
+            per_table_chunk_sizes,
+        ),
+    );
+    let apn = execute_in_chunks(
         conn.clone(),
         insert_ans_primary_names_query,
         ans_primary_names,
-        AnsPrimaryName::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<AnsPrimaryName>("ans_primary_name", per_table_chunk_sizes),
+    );
+    let cal_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_ans_lookups_v2_query,
         current_ans_lookups_v2,
-        CurrentAnsLookupV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentAnsLookupV2>(
+            "current_ans_lookup_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let al_v2 = execute_in_chunks(
         conn.clone(),
         insert_ans_lookups_v2_query,
         ans_lookups_v2,
-        AnsLookupV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<AnsLookupV2>("ans_lookup_v2", per_table_chunk_sizes),
+    );
+    let capn_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_ans_primary_names_v2_query,
         current_ans_primary_names_v2,
-        CurrentAnsPrimaryNameV2::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+        get_config_table_chunk_size::<CurrentAnsPrimaryNameV2>(
+            "current_ans_primary_name_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+    let apn_v2 = execute_in_chunks(
+        conn,
         insert_ans_primary_names_v2_query,
         ans_primary_names_v2,
-        AnsPrimaryNameV2::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<AnsPrimaryNameV2>(
+            "ans_primary_name_v2",
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let (cal_res, al_res, capn_res, apn_res, cal_v2_res, al_v2_res, capn_v2_res, apn_v2_res) =
+        tokio::join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2);
+
+    for res in vec![
+        cal_res,
+        al_res,
+        capn_res,
+        apn_res,
+        cal_v2_res,
+        al_v2_res,
+        capn_v2_res,
+        apn_v2_res,
+    ] {
+        res?;
+    }
+
     Ok(())
 }
 
@@ -255,6 +285,7 @@ fn insert_current_ans_lookups_v2_query(
                 token_name.eq(excluded(token_name)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
+                subdomain_expiration_policy.eq(excluded(subdomain_expiration_policy)),
             )),
         Some(" WHERE current_ans_lookup_v2.last_transaction_version <= excluded.last_transaction_version "),
     )
@@ -272,7 +303,11 @@ fn insert_ans_lookups_v2_query(
         diesel::insert_into(schema::ans_lookup_v2::table)
             .values(item_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .do_update()
+            .set((
+                inserted_at.eq(excluded(inserted_at)),
+                subdomain_expiration_policy.eq(excluded(subdomain_expiration_policy)),
+            )),
         None,
     )
 }
@@ -333,6 +368,7 @@ impl ProcessorTrait for AnsProcessor {
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let (
             all_current_ans_lookups,
@@ -359,14 +395,15 @@ impl ProcessorTrait for AnsProcessor {
             self.name(),
             start_version,
             end_version,
-            all_current_ans_lookups,
-            all_ans_lookups,
-            all_current_ans_primary_names,
-            all_ans_primary_names,
-            all_current_ans_lookups_v2,
-            all_ans_lookups_v2,
-            all_current_ans_primary_names_v2,
-            all_ans_primary_names_v2,
+            &all_current_ans_lookups,
+            &all_ans_lookups,
+            &all_current_ans_primary_names,
+            &all_ans_primary_names,
+            &all_current_ans_lookups_v2,
+            &all_ans_lookups_v2,
+            &all_current_ans_primary_names_v2,
+            &all_ans_primary_names_v2,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
@@ -378,7 +415,7 @@ impl ProcessorTrait for AnsProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(
@@ -431,7 +468,7 @@ fn parse_ans(
                     .with_label_values(&["AnsProcessor"])
                     .inc();
                 tracing::warn!(
-                    transaction_version = transaction.version,
+                    transaction_version = txn_version,
                     "Transaction data doesn't exist",
                 );
                 continue;

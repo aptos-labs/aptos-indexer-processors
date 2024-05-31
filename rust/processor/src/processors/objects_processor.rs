@@ -3,21 +3,16 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
-        object_models::{
-            v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-            },
-            v2_objects::{CurrentObject, Object},
-        },
-        token_v2_models::v2_token_utils::TokenV2,
+    models::object_models::{
+        v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
+        v2_objects::{CurrentObject, Object},
     },
     schema,
     utils::{
-        database::{execute_in_chunks, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
         util::standardize_address,
     },
+    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -28,17 +23,35 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectsProcessorConfig {
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
+}
 pub struct ObjectsProcessor {
     connection_pool: PgDbPool,
+    config: ObjectsProcessorConfig,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl ObjectsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(
+        connection_pool: PgDbPool,
+        config: ObjectsProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
+        Self {
+            connection_pool,
+            config,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -58,7 +71,8 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
+    (objects, current_objects): (&[Object], &[CurrentObject]),
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -67,20 +81,22 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let io = execute_in_chunks(
         conn.clone(),
         insert_objects_query,
         objects,
-        Object::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<Object>("objects", per_table_chunk_sizes),
+    );
+    let co = execute_in_chunks(
         conn,
         insert_current_objects_query,
         current_objects,
-        CurrentObject::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<CurrentObject>("current_objects", per_table_chunk_sizes),
+    );
+    let (io_res, co_res) = tokio::join!(io, co);
+    for res in [io_res, co_res] {
+        res?;
+    }
 
     Ok(())
 }
@@ -97,11 +113,7 @@ fn insert_objects_query(
             .values(items_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
             .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                is_token.eq(excluded(is_token)),
-                is_fungible_asset.eq(excluded(is_fungible_asset)),
-            )),
+            .set((inserted_at.eq(excluded(inserted_at)),)),
         None,
     )
 }
@@ -126,8 +138,6 @@ fn insert_current_objects_query(
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
-                is_token.eq(excluded(is_token)),
-                is_fungible_asset.eq(excluded(is_fungible_asset)),
             )),
         Some(
             " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
@@ -149,7 +159,11 @@ impl ProcessorTrait for ObjectsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         // Moving object handling here because we need a single object
         // map through transactions for lookups
@@ -197,29 +211,7 @@ impl ProcessorTrait for ObjectsProcessor {
                 }
             }
 
-            // Second pass to get all other structs related to the object
-            for wsc in changes.iter() {
-                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    let address = standardize_address(&wr.address.to_string());
-
-                    // Find structs related to object
-                    if let Some(aggregated_data) = object_metadata_helper.get_mut(&address) {
-                        if let Some(token) = TokenV2::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            // Object is a token if it has 0x4::token::Token struct
-                            aggregated_data.token = Some(token);
-                        }
-                        if let Some(fungible_asset_store) =
-                            FungibleAssetStore::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            // Object is a fungible asset if it has a 0x1::fungible_asset::FungibleAssetStore
-                            aggregated_data.fungible_asset_store = Some(fungible_asset_store);
-                        }
-                    }
-                }
-            }
-
-            // Third pass to construct the object data
+            // Second pass to construct the object data
             for (index, wsc) in changes.iter().enumerate() {
                 let index: i64 = index as i64;
                 match wsc.change.as_ref().unwrap() {
@@ -246,6 +238,8 @@ impl ProcessorTrait for ObjectsProcessor {
                             index,
                             &all_current_objects,
                             &mut conn,
+                            query_retries,
+                            query_retry_delay_ms,
                         )
                         .await
                         .unwrap()
@@ -274,7 +268,8 @@ impl ProcessorTrait for ObjectsProcessor {
             self.name(),
             start_version,
             end_version,
-            (all_objects, all_current_objects),
+            (&all_objects, &all_current_objects),
+            &self.per_table_chunk_sizes,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
@@ -285,7 +280,7 @@ impl ProcessorTrait for ObjectsProcessor {
                 end_version,
                 processing_duration_in_secs,
                 db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             }),
             Err(e) => {
                 error!(

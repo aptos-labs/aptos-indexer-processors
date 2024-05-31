@@ -31,10 +31,16 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install deps and run linter
         run: |
+          sudo apt update && sudo apt install libdw-dev
           cargo install cargo-sort
           rustup update
           rustup toolchain install nightly
           rustup component add clippy --toolchain nightly
           rustup component add rustfmt --toolchain nightly
           scripts/rust_lint.sh --check
+        working-directory: rust
+      - run: bash scripts/check_banned_deps.sh
+        working-directory: rust
+      - name: Ensure the --no-default-features build passes too
+        run: cargo build --no-default-features
         working-directory: rust

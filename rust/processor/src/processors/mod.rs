@@ -19,6 +19,7 @@ pub mod objects_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
+pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
 
 use self::{
@@ -30,10 +31,11 @@ use self::{
     fungible_asset_processor::FungibleAssetProcessor,
     monitoring_processor::MonitoringProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
-    objects_processor::ObjectsProcessor,
-    stake_processor::StakeProcessor,
+    objects_processor::{ObjectsProcessor, ObjectsProcessorConfig},
+    stake_processor::{StakeProcessor, StakeProcessorConfig},
     token_processor::{TokenProcessor, TokenProcessorConfig},
-    token_v2_processor::TokenV2Processor,
+    token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
+    transaction_metadata_processor::TransactionMetadataProcessor,
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
@@ -47,18 +49,16 @@ use crate::{
 };
 use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
-use diesel::{upsert::excluded, ExpressionMethods};
+use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-type StartVersion = u64;
-type EndVersion = u64;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProcessingResult {
-    pub start_version: StartVersion,
-    pub end_version: EndVersion,
-    pub last_transaction_timstamp: Option<aptos_protos::util::timestamp::Timestamp>,
+    pub start_version: u64,
+    pub end_version: u64,
+    pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     pub processing_duration_in_secs: f64,
     pub db_insertion_duration_in_secs: f64,
 }
@@ -187,10 +187,11 @@ pub enum ProcessorConfig {
     FungibleAssetProcessor,
     MonitoringProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
-    ObjectsProcessor,
-    StakeProcessor,
+    ObjectsProcessor(ObjectsProcessorConfig),
+    StakeProcessor(StakeProcessorConfig),
     TokenProcessor(TokenProcessorConfig),
-    TokenV2Processor,
+    TokenV2Processor(TokenV2ProcessorConfig),
+    TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
 
@@ -232,6 +233,7 @@ pub enum Processor {
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,
+    TransactionMetadataProcessor,
     UserTransactionProcessor,
 }
 

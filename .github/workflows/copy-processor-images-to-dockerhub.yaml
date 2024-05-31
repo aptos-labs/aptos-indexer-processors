@@ -69,6 +69,6 @@ jobs:
         env:
           FORCE_COLOR: 3 # Force color output as per https://github.com/google/zx#using-github-actions
           GIT_SHA: ${{ inputs.GIT_SHA }}
-          GCP_DOCKER_ARTIFACT_PROCESSOR_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
         run: pnpm release-processor-images --language=${{ inputs.processor_language }} --version-tag=${{ inputs.version_tag }} --wait-for-image-seconds=3600
         working-directory: scripts

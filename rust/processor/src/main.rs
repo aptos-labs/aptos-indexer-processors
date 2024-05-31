@@ -6,6 +6,10 @@ use clap::Parser;
 use processor::IndexerGrpcProcessorConfig;
 use server_framework::ServerArgs;
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 const RUNTIME_WORKER_MULTIPLIER: usize = 2;
 
 fn main() -> Result<()> {

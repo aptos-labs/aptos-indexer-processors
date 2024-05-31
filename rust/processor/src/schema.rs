@@ -44,6 +44,7 @@ diesel::table! {
         token_name -> Varchar,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        subdomain_expiration_policy -> Nullable<Int8>,
     }
 }
 
@@ -263,6 +264,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        subdomain_expiration_policy -> Nullable<Int8>,
     }
 }
 
@@ -449,8 +451,6 @@ diesel::table! {
         last_transaction_version -> Int8,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
-        is_token -> Nullable<Bool>,
-        is_fungible_asset -> Nullable<Bool>,
     }
 }
 
@@ -525,7 +525,7 @@ diesel::table! {
         #[max_length = 128]
         token_name -> Varchar,
         maximum -> Nullable<Numeric>,
-        supply -> Numeric,
+        supply -> Nullable<Numeric>,
         largest_property_version_v1 -> Nullable<Numeric>,
         #[max_length = 512]
         token_uri -> Varchar,
@@ -537,7 +537,8 @@ diesel::table! {
         last_transaction_version -> Int8,
         last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
-        decimals -> Int8,
+        decimals -> Nullable<Int8>,
+        is_deleted_v2 -> Nullable<Bool>,
     }
 }
 
@@ -692,6 +693,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    event_size_info (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
+        type_tag_bytes -> Int8,
+        total_bytes -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     events (transaction_version, event_index) {
         sequence_number -> Int8,
         creation_number -> Int8,
@@ -787,6 +798,9 @@ diesel::table! {
         #[max_length = 10]
         token_standard -> Varchar,
         inserted_at -> Timestamp,
+        is_token_v2 -> Nullable<Bool>,
+        supply_v2 -> Nullable<Numeric>,
+        maximum_v2 -> Nullable<Numeric>,
     }
 }
 
@@ -869,8 +883,6 @@ diesel::table! {
         allow_ungated_transfer -> Bool,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
-        is_token -> Nullable<Bool>,
-        is_fungible_asset -> Nullable<Bool>,
     }
 }
 
@@ -1059,7 +1071,7 @@ diesel::table! {
         #[max_length = 128]
         token_name -> Varchar,
         maximum -> Nullable<Numeric>,
-        supply -> Numeric,
+        supply -> Nullable<Numeric>,
         largest_property_version_v1 -> Nullable<Numeric>,
         #[max_length = 512]
         token_uri -> Varchar,
@@ -1070,7 +1082,8 @@ diesel::table! {
         is_fungible_v2 -> Nullable<Bool>,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
-        decimals -> Int8,
+        decimals -> Nullable<Int8>,
+        is_deleted_v2 -> Nullable<Bool>,
     }
 }
 
@@ -1145,6 +1158,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    transaction_size_info (transaction_version) {
+        transaction_version -> Int8,
+        size_bytes -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -1208,6 +1229,16 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    write_set_size_info (transaction_version, index) {
+        transaction_version -> Int8,
+        index -> Int8,
+        key_bytes -> Int8,
+        value_bytes -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
     ans_lookup,
@@ -1245,6 +1276,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     delegated_staking_pool_balances,
     delegated_staking_pools,
     delegator_balances,
+    event_size_info,
     events,
     fungible_asset_activities,
     fungible_asset_balances,
@@ -1268,7 +1300,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships,
     token_ownerships_v2,
     tokens,
+    transaction_size_info,
     transactions,
     user_transactions,
     write_set_changes,
+    write_set_size_info,
 );
