@@ -3624,6 +3624,7 @@ dependencies = [
  "anyhow",
  "aptos-protos",
  "lz4",
+ "memchr",
  "prost 0.12.3",
  "serde",
  "serde_json",

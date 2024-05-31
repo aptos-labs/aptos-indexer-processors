@@ -1,4 +1,4 @@
-use crate::traits::Filterable;
+use crate::{filters::PositionalFilter, traits::Filterable};
 use anyhow::{anyhow, Error};
 use aptos_protos::transaction::v1::{
     multisig_transaction_payload, transaction_payload, EntryFunctionId, EntryFunctionPayload,
@@ -102,21 +102,28 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
 pub struct UserTransactionPayloadFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<EntryFunctionFilter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<Vec<PositionalFilter<String>>>,
+    // TODO: handle type args?
 }
 
 impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), Error> {
-        if self.function.is_none() {
-            return Err(Error::msg("At least one of function must be set"));
+        if self.function.is_none() && self.arguments.is_none() {
+            return Err(Error::msg(
+                "At least one of function or arguments must be set",
+            ));
         };
         self.function.is_valid()?;
+        self.arguments.is_valid()?;
         Ok(())
     }
 
     #[inline]
     fn is_allowed(&self, payload: &EntryFunctionPayload) -> bool {
         self.function.is_allowed_opt(&payload.function)
+            && self.arguments.is_allowed(&payload.arguments)
     }
 }
 
