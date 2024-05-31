@@ -9,7 +9,7 @@ use crate::{
         coin_models::coin_utils::COIN_ADDR, default_models::move_resources::MoveResource,
         token_models::token_utils::URI_LENGTH, token_v2_models::v2_token_utils::ResourceReference,
     },
-    utils::util::{deserialize_from_string, truncate_str, AggregatorU128, AggregatorU64},
+    utils::util::{deserialize_from_string, truncate_str, Aggregator},
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::WriteResource;
@@ -189,7 +189,7 @@ impl FungibleAssetSupply {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConcurrentFungibleAssetSupply {
-    pub current: AggregatorU128,
+    pub current: Aggregator,
 }
 
 impl ConcurrentFungibleAssetSupply {
@@ -197,7 +197,7 @@ impl ConcurrentFungibleAssetSupply {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str: String = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str: String = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }
@@ -224,7 +224,7 @@ impl ConcurrentFungibleAssetSupply {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConcurrentFungibleAssetBalance {
-    pub balance: AggregatorU64,
+    pub balance: Aggregator,
 }
 
 impl ConcurrentFungibleAssetBalance {
@@ -232,7 +232,7 @@ impl ConcurrentFungibleAssetBalance {
         write_resource: &WriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<Self>> {
-        let type_str: String = MoveResource::get_outer_type_from_resource(write_resource);
+        let type_str: String = MoveResource::get_outer_type_from_write_resource(write_resource);
         if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
             return Ok(None);
         }

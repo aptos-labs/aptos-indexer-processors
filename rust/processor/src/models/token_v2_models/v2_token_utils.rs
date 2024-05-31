@@ -13,8 +13,7 @@ use crate::{
     },
     utils::util::{
         deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,
-        standardize_address, truncate_str, AggregatorSnapshotU64, AggregatorU64,
-        DerivedStringSnapshot,
+        standardize_address, truncate_str, Aggregator, AggregatorSnapshot, DerivedStringSnapshot,
     },
 };
 use ahash::{AHashMap, AHashSet};
@@ -253,8 +252,8 @@ impl UnlimitedSupply {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConcurrentSupply {
-    pub current_supply: AggregatorU64,
-    pub total_minted: AggregatorU64,
+    pub current_supply: Aggregator,
+    pub total_minted: Aggregator,
 }
 
 impl ConcurrentSupply {
@@ -310,7 +309,7 @@ impl MintEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Mint {
     collection: String,
-    pub index: AggregatorSnapshotU64,
+    pub index: AggregatorSnapshot,
     token: String,
 }
 
