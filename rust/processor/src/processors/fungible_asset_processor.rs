@@ -11,7 +11,8 @@ use crate::{
                 CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
             },
             v2_fungible_asset_utils::{
-                FeeStatement, FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+                ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FeeStatement,
+                FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
             },
             v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
         },
@@ -494,6 +495,26 @@ async fn parse_v2_coin(
                             .unwrap()
                     {
                         aggregated_data.fungible_asset_supply = Some(fungible_asset_supply);
+                    }
+                    if let Some(concurrent_fungible_asset_supply) =
+                        ConcurrentFungibleAssetSupply::from_write_resource(
+                            write_resource,
+                            txn_version,
+                        )
+                        .unwrap()
+                    {
+                        aggregated_data.concurrent_fungible_asset_supply =
+                            Some(concurrent_fungible_asset_supply);
+                    }
+                    if let Some(concurrent_fungible_asset_balance) =
+                        ConcurrentFungibleAssetBalance::from_write_resource(
+                            write_resource,
+                            txn_version,
+                        )
+                        .unwrap()
+                    {
+                        aggregated_data.concurrent_fungible_asset_balance =
+                            Some(concurrent_fungible_asset_balance);
                     }
                 }
             } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap() {

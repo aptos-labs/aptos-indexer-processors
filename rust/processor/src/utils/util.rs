@@ -470,6 +470,15 @@ pub struct AggregatorSnapshotU64 {
     pub value: BigDecimal,
 }
 
+// TODO: How is this different from AgggregatorU64?
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AggregatorU128 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub value: BigDecimal,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub max_value: BigDecimal,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DerivedStringSnapshot {
     pub value: String,

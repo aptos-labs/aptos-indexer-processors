@@ -250,6 +250,8 @@ async fn parse_v2_token(
                             token: None,
                             fungible_asset_metadata: None,
                             fungible_asset_supply: None,
+                            concurrent_fungible_asset_supply: None,
+                            concurrent_fungible_asset_balance: None,
                             fungible_asset_store: None,
                             token_identifier: None,
                         },

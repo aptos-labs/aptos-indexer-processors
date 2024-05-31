@@ -9,7 +9,7 @@ use crate::{
         coin_models::coin_utils::COIN_ADDR, default_models::move_resources::MoveResource,
         token_models::token_utils::URI_LENGTH, token_v2_models::v2_token_utils::ResourceReference,
     },
-    utils::util::{deserialize_from_string, truncate_str},
+    utils::util::{deserialize_from_string, truncate_str, AggregatorU128, AggregatorU64},
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::WriteResource;
@@ -188,6 +188,76 @@ impl FungibleAssetSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConcurrentFungibleAssetSupply {
+    pub current: AggregatorU128,
+}
+
+impl ConcurrentFungibleAssetSupply {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str: String = MoveResource::get_outer_type_from_resource(write_resource);
+        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2FungibleAssetResource::ConcurrentFungibleAssetSupply(inner) =
+            V2FungibleAssetResource::from_resource(
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConcurrentFungibleAssetBalance {
+    pub balance: AggregatorU64,
+}
+
+impl ConcurrentFungibleAssetBalance {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str: String = MoveResource::get_outer_type_from_resource(write_resource);
+        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2FungibleAssetResource::ConcurrentFungibleAssetBalance(inner) =
+            V2FungibleAssetResource::from_resource(
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DepositEvent {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
@@ -209,14 +279,18 @@ pub enum V2FungibleAssetResource {
     FungibleAssetMetadata(FungibleAssetMetadata),
     FungibleAssetStore(FungibleAssetStore),
     FungibleAssetSupply(FungibleAssetSupply),
+    ConcurrentFungibleAssetSupply(ConcurrentFungibleAssetSupply),
+    ConcurrentFungibleAssetBalance(ConcurrentFungibleAssetBalance),
 }
 
 impl V2FungibleAssetResource {
     pub fn is_resource_supported(data_type: &str) -> bool {
         [
             format!("{}::fungible_asset::Supply", COIN_ADDR),
+            format!("{}::fungible_asset::ConcurrentSupply", COIN_ADDR),
             format!("{}::fungible_asset::Metadata", COIN_ADDR),
             format!("{}::fungible_asset::FungibleStore", COIN_ADDR),
+            format!("{}::fungible_asset::ConcurrentBalance", COIN_ADDR),
         ]
         .contains(&data_type.to_string())
     }
@@ -231,6 +305,10 @@ impl V2FungibleAssetResource {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::FungibleAssetSupply(inner)))
             },
+            x if x == format!("{}::fungible_asset::ConcurrentSupply", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::ConcurrentFungibleAssetSupply(inner)))
+            },
             x if x == format!("{}::fungible_asset::Metadata", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::FungibleAssetMetadata(inner)))
@@ -238,6 +316,10 @@ impl V2FungibleAssetResource {
             x if x == format!("{}::fungible_asset::FungibleStore", COIN_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::FungibleAssetStore(inner)))
+            },
+            x if x == format!("{}::fungible_asset::ConcurrentFungibleBalance", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::ConcurrentFungibleAssetBalance(inner)))
             },
             _ => Ok(None),
         }
@@ -312,4 +394,6 @@ mod tests {
             panic!("Wrong type")
         }
     }
+
+    // TODO: Add similar tests for ConcurrentFungibleAssetSupply.
 }

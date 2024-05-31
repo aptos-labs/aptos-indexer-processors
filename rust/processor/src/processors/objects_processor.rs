@@ -205,6 +205,8 @@ impl ProcessorTrait for ObjectsProcessor {
                             property_map: None,
                             transfer_events: vec![],
                             fungible_asset_supply: None,
+                            concurrent_fungible_asset_supply: None,
+                            concurrent_fungible_asset_balance: None,
                             token_identifier: None,
                         });
                     }
