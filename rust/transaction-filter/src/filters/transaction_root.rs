@@ -13,6 +13,7 @@ pub struct TransactionRootFilter {
 }
 
 impl Filterable<Transaction> for TransactionRootFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.success.is_none() && self.txn_type.is_none() {
             return Err(Error::msg(
@@ -22,6 +23,7 @@ impl Filterable<Transaction> for TransactionRootFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &Transaction) -> bool {
         if !self
             .success

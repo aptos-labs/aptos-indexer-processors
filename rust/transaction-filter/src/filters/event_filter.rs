@@ -12,6 +12,7 @@ pub struct EventFilter {
 }
 
 impl Filterable<Event> for EventFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.struct_type.is_none() {
             return Err(Error::msg("At least one of struct_type must be set"));
@@ -21,6 +22,7 @@ impl Filterable<Event> for EventFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &Event) -> bool {
         if let Some(struct_type_filter) = &self.struct_type {
             if let Some(Content::Struct(struct_tag)) =

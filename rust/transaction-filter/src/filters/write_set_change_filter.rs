@@ -20,6 +20,7 @@ pub struct WriteSetChangeFilter {
 }
 
 impl Filterable<WriteSetChange> for WriteSetChangeFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.change_type.is_none() && self.change.is_none() {
             return Err(Error::msg(
@@ -30,6 +31,7 @@ impl Filterable<WriteSetChange> for WriteSetChangeFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &WriteSetChange) -> bool {
         if let Some(change_type) = &self.change_type {
             if (*change_type as i32) != item.r#type {
@@ -102,6 +104,7 @@ pub enum ChangeItemFilter {
 }
 
 impl Filterable<Change> for ChangeItemFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         match self {
             ChangeItemFilter::ResourceChange(rcf) => rcf.is_valid(),
@@ -110,6 +113,7 @@ impl Filterable<Change> for ChangeItemFilter {
         }
     }
 
+    #[inline]
     fn is_allowed(&self, item: &Change) -> bool {
         match item {
             Change::DeleteModule(dm) => {
@@ -168,6 +172,7 @@ pub enum ResourceChange<'a> {
 }
 
 impl Filterable<ResourceChange<'_>> for ResourceChangeFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.resource_type.is_none() && self.address.is_none() {
             return Err(Error::msg(
@@ -178,6 +183,7 @@ impl Filterable<ResourceChange<'_>> for ResourceChangeFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &ResourceChange) -> bool {
         match &item {
             ResourceChange::DeleteResource(dr) => {
@@ -221,6 +227,7 @@ pub enum ModuleChange<'a> {
 }
 
 impl Filterable<ModuleChange<'_>> for ModuleChangeFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.address.is_none() {
             return Err(Error::msg("At least one of address must be set"));
@@ -228,6 +235,7 @@ impl Filterable<ModuleChange<'_>> for ModuleChangeFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &ModuleChange) -> bool {
         if let Some(address) = &self.address {
             return match &item {
@@ -252,6 +260,7 @@ pub enum TableChange<'a> {
     WriteTableItem(&'a WriteTableItem),
 }
 impl Filterable<TableChange<'_>> for TableChangeFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.handle.is_none() && self.key.is_none() && self.key_type_str.is_none() {
             return Err(Error::msg(
@@ -261,6 +270,7 @@ impl Filterable<TableChange<'_>> for TableChangeFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &TableChange) -> bool {
         match &item {
             TableChange::DeleteTableItem(dti) => {

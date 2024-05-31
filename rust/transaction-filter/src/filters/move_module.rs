@@ -13,6 +13,7 @@ pub struct MoveModuleFilter {
 }
 
 impl Filterable<MoveModuleId> for MoveModuleFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.address.is_none() && self.name.is_none() {
             return Err(anyhow!("At least one of address or name must be set"));
@@ -20,6 +21,7 @@ impl Filterable<MoveModuleId> for MoveModuleFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, module_id: &MoveModuleId) -> bool {
         self.address.is_allowed(&module_id.address) && self.name.is_allowed(&module_id.name)
     }
@@ -37,6 +39,7 @@ pub struct MoveStructTagFilter {
 }
 
 impl Filterable<MoveStructTag> for MoveStructTagFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.address.is_none() && self.module.is_none() && self.name.is_none() {
             return Err(anyhow!(
@@ -46,6 +49,7 @@ impl Filterable<MoveStructTag> for MoveStructTagFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, struct_tag: &MoveStructTag) -> bool {
         self.address.is_allowed(&struct_tag.address)
             && self.module.is_allowed(&struct_tag.module)

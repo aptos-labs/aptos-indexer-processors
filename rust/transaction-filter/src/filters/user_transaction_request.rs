@@ -18,6 +18,7 @@ pub struct UserTransactionRequestFilter {
 }
 
 impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.sender.is_none() && self.payload.is_none() {
             return Err(Error::msg("At least one of sender or payload must be set"));
@@ -26,6 +27,7 @@ impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &UserTransactionRequest) -> bool {
         if let Some(sender_filter) = &self.sender {
             if &item.sender != sender_filter {
@@ -63,6 +65,7 @@ pub struct EntryFunctionFilter {
 }
 
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.address.is_none() && self.module.is_none() && self.function.is_none() {
             return Err(anyhow!(
@@ -72,6 +75,7 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, module_id: &EntryFunctionId) -> bool {
         if !self.module.is_allowed(&module_id.name) {
             return false;
@@ -101,6 +105,7 @@ pub struct UserTransactionPayloadFilter {
 }
 
 impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         if self.function.is_none() {
             return Err(Error::msg("At least one of function must be set"));
@@ -109,6 +114,7 @@ impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, payload: &EntryFunctionPayload) -> bool {
         self.function.is_allowed_opt(&payload.function)
     }

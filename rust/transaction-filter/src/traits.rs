@@ -5,13 +5,14 @@ pub trait Filterable<T> {
     /// Whether this filter is correctly configured/initialized
     /// Any call to `is_valid` is responsible for recursively checking the validity of any nested filters
     fn is_valid(&self) -> Result<(), Error>;
-
     fn is_allowed(&self, item: &T) -> bool;
 
+    #[inline]
     fn is_allowed_vec(&self, items: &[T]) -> bool {
         items.iter().all(|item| self.is_allowed(item))
     }
 
+    #[inline]
     fn is_allowed_opt(&self, item: &Option<T>) -> bool {
         match item {
             Some(item) => self.is_allowed(item),
@@ -19,6 +20,7 @@ pub trait Filterable<T> {
         }
     }
 
+    #[inline]
     fn is_allowed_opt_vec(&self, items: &Option<&Vec<T>>) -> bool {
         match items {
             Some(items) => self.is_allowed_vec(items),
@@ -32,6 +34,7 @@ impl<T, F> Filterable<T> for Option<F>
 where
     F: Filterable<T>,
 {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         match self {
             Some(filter) => filter.is_valid(),
@@ -39,6 +42,7 @@ where
         }
     }
 
+    #[inline]
     fn is_allowed(&self, item: &T) -> bool {
         match self {
             Some(filter) => filter.is_allowed(item),
@@ -46,6 +50,7 @@ where
         }
     }
 
+    #[inline]
     fn is_allowed_opt(&self, item: &Option<T>) -> bool {
         match self {
             Some(filter) => filter.is_allowed_opt(item),
@@ -55,10 +60,12 @@ where
 }
 
 impl Filterable<String> for Option<String> {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &String) -> bool {
         match self {
             Some(filter) => filter == item,
@@ -68,10 +75,12 @@ impl Filterable<String> for Option<String> {
 }
 
 impl Filterable<i32> for Option<i32> {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &i32) -> bool {
         match self {
             Some(filter) => filter == item,
@@ -81,10 +90,12 @@ impl Filterable<i32> for Option<i32> {
 }
 
 impl Filterable<bool> for Option<bool> {
+    #[inline]
     fn is_valid(&self) -> Result<(), Error> {
         Ok(())
     }
 
+    #[inline]
     fn is_allowed(&self, item: &bool) -> bool {
         match self {
             Some(filter) => filter == item,
