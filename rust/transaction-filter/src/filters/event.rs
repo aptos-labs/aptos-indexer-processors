@@ -1,4 +1,4 @@
-use crate::{filters::MoveStructTagFilter, traits::Filterable};
+use crate::{filters::MoveStructTagFilter, json_search::JsonSearchTerm, traits::Filterable};
 use anyhow::Error;
 use aptos_protos::transaction::v1::{move_type::Content, Event};
 use serde::{Deserialize, Serialize};
@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct EventFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<JsonSearchTerm>,
     // Only for events that have a struct as their generic
     #[serde(skip_serializing_if = "Option::is_none")]
     pub struct_type: Option<MoveStructTagFilter>,
@@ -14,10 +16,13 @@ pub struct EventFilter {
 impl Filterable<Event> for EventFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), Error> {
-        if self.struct_type.is_none() {
-            return Err(Error::msg("At least one of struct_type must be set"));
+        if self.data.is_none() && self.struct_type.is_none() {
+            return Err(Error::msg(
+                "At least one of data or struct_type must be set",
+            ));
         };
 
+        self.data.is_valid()?;
         self.struct_type.is_valid()?;
         Ok(())
     }
@@ -34,6 +39,10 @@ impl Filterable<Event> for EventFilter {
             } else {
                 return false;
             }
+        }
+
+        if !self.data.is_allowed(&item.data) {
+            return false;
         }
 
         true

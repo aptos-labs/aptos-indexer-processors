@@ -202,7 +202,7 @@ pub fn double_encode_json_string(s: String) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::borrow::Cow;
+    use std::{borrow::Cow, str::FromStr};
 
     #[test]
     fn test_double_encode_json_string() {
@@ -286,5 +286,122 @@ mod tests {
         // Bools
         search_test_case(&test_json, "trueval", serde_json::Value::Bool(true));
         search_test_case(&test_json, "falseval", serde_json::Value::Bool(false));
+    }
+
+    /**
+    For searching `inner.address: 0x5` in a singly nested json, the results are:
+    ```text
+    BENCH: Memchr took 19.75µs for 1000 iters (19ns each)
+    BENCH: Serde Search took 1.82875ms for 1000 iters (1.828µs each)
+    Memchr is 96x faster than Serde
+    ```
+
+    If we double that json- i.e add an inner2 with the contents of test_json, we get:
+    ```text
+    BENCH: Memchr took 54.334µs for 1000 iters (54ns each)
+    BENCH: Serde Search took 14.213292ms for 1000 iters (14.213µs each)
+    Memchr is 263x faster than Serde
+    ```
+
+    This is excluding memory allocation, for which serde Value is [not great](https://github.com/serde-rs/json/issues/635)
+
+    if we look at something like graffio txns, we’d be looking at more than three orders of magnitude in difference
+    The main problem/optimization is that memchr does a tiny bit of work on startup (few ns), but is then re-used forever;
+    as long as the stream remains, the per json search is relatively constant, because it’s just so fast, and our jsons are relatively small
+
+    Serde however is not: it scales pretty linearly (and then some), and so the larger the json, the bigger the delta
+
+    Whether we care about an extra 25-50ms per batch is a different story and this is, of course, with serde;
+    it’s possible using one of the more efficient json parsers I looked into we could shave, maybe, [20-30% off that time](https://github.com/serde-rs/json-benchmark)
+    **/
+    #[test]
+    fn test_bench_json_search_vs_serde() {
+        let mut test_json = json!(
+            {
+              // String and nested string
+              "address": "0x3",
+              "inner": {
+                "b": "c",
+                "address": "0x5"
+              },
+
+              // Null
+              "nullval": null,
+
+              // Numbers
+              "somenum": 5,
+              "bignum": "101",
+
+               // Bools
+              "trueval": true,
+              "falseval": false,
+            }
+        );
+
+        let test_json_clone = test_json.clone();
+        test_json
+            .get_mut("inner")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("inner2".to_string(), test_json_clone);
+
+        let test_json_encoded = serde_json::Value::String(test_json.to_string()).to_string();
+
+        let needle =
+            JsonSearchTerm::new("address".into(), serde_json::Value::String("0x5".into())).unwrap();
+
+        let start = std::time::Instant::now();
+
+        const ITERATIONS: usize = 1000;
+        for _ in 0..ITERATIONS {
+            needle.find(&test_json_encoded);
+        }
+
+        let elapsed = start.elapsed();
+        let memchr_average = elapsed / ITERATIONS as u32;
+        println!(
+            "BENCH: Memchr took {:?} for {} iters ({:?} each)",
+            elapsed, ITERATIONS, memchr_average
+        );
+
+        let json_search_term = ["inner".to_string(), "address".to_string()];
+        let json_search_value = serde_json::Value::String("0x5".into());
+        for _ in 0..ITERATIONS {
+            let test_json_serval = serde_json::Value::from_str(&test_json_encoded).unwrap();
+            let test_json_serval =
+                serde_json::Value::from_str(test_json_serval.as_str().unwrap()).unwrap();
+
+            if !test_json_serval.is_object() {
+                panic!("Expected object");
+            }
+            let mut current = &test_json_serval;
+            for key in json_search_term.iter() {
+                if let Some(next) = current.get(key) {
+                    current = next;
+                } else {
+                    break;
+                }
+            }
+
+            // Ensure we found the value
+            if current != &json_search_value {
+                panic!(
+                    "Failed to find needle in haystack: \n{:} \n{:} \n<<<",
+                    current, json_search_value
+                );
+            }
+        }
+        let elapsed = start.elapsed();
+        let serde_average = elapsed / ITERATIONS as u32;
+        println!(
+            "BENCH: Serde Search took {:?} for {} iters ({:?} each)",
+            elapsed, ITERATIONS, serde_average
+        );
+
+        println!(
+            "Memchr is {:?}x faster than Serde",
+            serde_average.as_nanos() / memchr_average.as_nanos()
+        );
     }
 }
