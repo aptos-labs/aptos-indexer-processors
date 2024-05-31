@@ -16,7 +16,7 @@ use crate::{
     utils::util::standardize_address,
 };
 use ahash::AHashMap;
-use aptos_protos::transaction::v1::WriteResource;
+use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;
@@ -107,6 +107,49 @@ impl FungibleAssetMetadataModel {
                 let coin_info_type = &CoinInfoType::from_move_type(
                     &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
                     write_resource.type_str.as_ref(),
+                    txn_version,
+                );
+                let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
+                    .get_aggregator_metadata()
+                    .map(|agg| (Some(agg.handle), Some(agg.key)))
+                    .unwrap_or((None, None));
+                // If asset type is too long, just ignore
+                if let Some(asset_type) = coin_info_type.get_coin_type_below_max() {
+                    Ok(Some(Self {
+                        asset_type,
+                        creator_address: coin_info_type.get_creator_address(),
+                        name: inner.get_name_trunc(),
+                        symbol: inner.get_symbol_trunc(),
+                        decimals: inner.decimals,
+                        icon_uri: None,
+                        project_uri: None,
+                        last_transaction_version: txn_version,
+                        last_transaction_timestamp: txn_timestamp,
+                        supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
+                        supply_aggregator_table_key_v1: supply_aggregator_table_key,
+                        token_standard: TokenStandard::V1.to_string(),
+                        is_token_v2: None,
+                        supply_v2: None,
+                        maximum_v2: None,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            },
+            _ => Ok(None),
+        }
+    }
+
+    pub fn get_v1_from_delete_resource(
+        delete_resource: &DeleteResource,
+        txn_version: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+    ) -> anyhow::Result<Option<Self>> {
+        match &CoinResource::from_delete_resource(delete_resource, txn_version)? {
+            Some(CoinResource::CoinInfoResource(inner)) => {
+                let coin_info_type = &CoinInfoType::from_move_type(
+                    &delete_resource.r#type.as_ref().unwrap().generic_type_params[0],
+                    delete_resource.type_str.as_ref(),
                     txn_version,
                 );
                 let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner

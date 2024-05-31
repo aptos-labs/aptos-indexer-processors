@@ -595,6 +595,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
 
 [[package]]
+name = "crunchy"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
+
+[[package]]
 name = "crypto-common"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2208,6 +2214,7 @@ dependencies = [
  "itertools 0.12.1",
  "jemallocator",
  "kanal",
+ "lazy_static",
  "native-tls",
  "num_cpus",
  "once_cell",
@@ -2222,6 +2229,7 @@ dependencies = [
  "sha2 0.9.9",
  "sha3",
  "strum",
+ "tiny-keccak",
  "tokio",
  "tokio-postgres",
  "tonic 0.11.0",
@@ -3203,6 +3211,15 @@ checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "tiny-keccak"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
+dependencies = [
+ "crunchy",
 ]
 
 [[package]]

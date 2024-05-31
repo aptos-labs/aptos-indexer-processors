@@ -27,8 +27,6 @@ use diesel::{
 use std::fmt::Debug;
 use tracing::error;
 
-pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
-
 pub struct CoinProcessor {
     connection_pool: PgDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
