@@ -14,8 +14,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct WriteSetChangeFilter {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub change_type: Option<ChangeType>,
     // TODO: handle actual changes!!!
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub change: Option<ChangeItemFilter>,
 }
 
@@ -176,7 +178,7 @@ impl Filterable<ResourceChange<'_>> for ResourceChangeFilter {
     fn is_valid(&self) -> Result<(), Error> {
         if self.resource_type.is_none() && self.address.is_none() {
             return Err(Error::msg(
-                "At least one of resource_type, address must be set",
+                "At least one of resource_type or address must be set",
             ));
         };
         self.resource_type.is_valid()?;

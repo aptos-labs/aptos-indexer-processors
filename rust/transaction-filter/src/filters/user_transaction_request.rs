@@ -69,7 +69,7 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     fn is_valid(&self) -> Result<(), Error> {
         if self.address.is_none() && self.module.is_none() && self.function.is_none() {
             return Err(anyhow!(
-                "At least one of address, name or method must be set"
+                "At least one of address, name or function must be set"
             ));
         };
         Ok(())

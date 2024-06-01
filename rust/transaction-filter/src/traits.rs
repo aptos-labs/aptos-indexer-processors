@@ -5,6 +5,7 @@ pub trait Filterable<T> {
     /// Whether this filter is correctly configured/initialized
     /// Any call to `is_valid` is responsible for recursively checking the validity of any nested filters
     fn is_valid(&self) -> Result<(), Error>;
+
     fn is_allowed(&self, item: &T) -> bool;
 
     #[inline]

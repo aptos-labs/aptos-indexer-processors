@@ -1,3 +1,4 @@
+mod api_filter;
 pub mod filters;
 pub mod traits;
 
