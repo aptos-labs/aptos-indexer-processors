@@ -290,7 +290,7 @@ impl V2FungibleAssetResource {
             format!("{}::fungible_asset::ConcurrentSupply", COIN_ADDR),
             format!("{}::fungible_asset::Metadata", COIN_ADDR),
             format!("{}::fungible_asset::FungibleStore", COIN_ADDR),
-            format!("{}::fungible_asset::ConcurrentBalance", COIN_ADDR),
+            format!("{}::fungible_asset::ConcurrentFungibleBalance", COIN_ADDR),
         ]
         .contains(&data_type.to_string())
     }
