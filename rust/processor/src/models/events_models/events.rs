@@ -55,7 +55,7 @@ impl Event {
         transaction_block_height: i64,
         event_index: i64,
         request: &Option<UserTransactionRequest>,
-        inserted_at: &Option<Timestamp>
+        inserted_at: &Option<Timestamp>,
     ) -> Self {
         let t: &str = event.type_str.as_ref();
         // GET request OR none
@@ -67,7 +67,7 @@ impl Event {
         let event_name = parts.get(2).unwrap_or(&"");
         let event_name = event_name.split("<").next().unwrap_or("");
 
-        if request_data.is_some(){
+        if request_data.is_some() {
             let entry_function_payload_json = match request_data.unwrap().payload.as_ref().unwrap() {
                 aptos_protos::transaction::v1::transaction_payload::Payload::EntryFunctionPayload(entry_function_payload) => {
                     serde_json::to_value(entry_function_payload).ok()
@@ -100,10 +100,9 @@ impl Event {
                 module_address: t.split("::").next().unwrap_or("").to_string(),
                 module_name: t.split("::").nth(1).unwrap_or("").to_string(),
                 event_name: event_name.to_string(),
-                inserted_at: timestamp_to_naive(inserted_at)
+                inserted_at: timestamp_to_naive(inserted_at),
             }
-        }
-        else {
+        } else {
             Event {
                 account_address: standardize_address(
                     event.key.as_ref().unwrap().account_address.as_str(),
@@ -122,7 +121,7 @@ impl Event {
                 module_address: t.split("::").next().unwrap().to_string(),
                 module_name: t.split("::").nth(1).unwrap().to_string(),
                 event_name: event_name.to_string(),
-                inserted_at: timestamp_to_naive(inserted_at)
+                inserted_at: timestamp_to_naive(inserted_at),
             }
         }
     }
@@ -132,7 +131,7 @@ impl Event {
         transaction_version: i64,
         transaction_block_height: i64,
         request: &Option<UserTransactionRequest>,
-        inserted_at: &Option<Timestamp>
+        inserted_at: &Option<Timestamp>,
     ) -> Vec<Self> {
         events
             .iter()
@@ -144,7 +143,7 @@ impl Event {
                     transaction_block_height,
                     index as i64,
                     request,
-                    inserted_at
+                    inserted_at,
                 )
             })
             .collect::<Vec<EventModel>>()
