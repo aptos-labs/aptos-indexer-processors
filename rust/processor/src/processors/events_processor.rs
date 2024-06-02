@@ -19,9 +19,10 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug};
 use tracing::error;
 
+const FILTERED_EVENTS: HashSet<&str> = HashSet::from(["0x1::transaction_fee::FeeStatement"]);
 pub struct EventsProcessor {
     connection_pool: PgDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
@@ -133,7 +134,12 @@ impl ProcessorTrait for EventsProcessor {
             };
 
             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-            events.extend(txn_events);
+            let filtered = txn_events
+                .iter()
+                .copied()
+                .filter(|e| !FILTERED_EVENTS.contains(e.type_.as_str()))
+                .collect();
+            events.extend(filtered);
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
