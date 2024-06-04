@@ -165,6 +165,13 @@ impl FungibleAssetBalance {
                 let asset_type = inner.metadata.get_reference_address();
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);
 
+                let concurrent_balance = object_data
+                    .concurrent_fungible_asset_balance
+                    .as_ref()
+                    .map(|concurrent_fungible_asset_balance| {
+                        concurrent_fungible_asset_balance.balance.value.clone()
+                    });
+
                 let coin_balance = Self {
                     transaction_version: txn_version,
                     write_set_change_index,
@@ -173,7 +180,9 @@ impl FungibleAssetBalance {
                     asset_type: asset_type.clone(),
                     is_primary,
                     is_frozen: inner.frozen,
-                    amount: inner.balance.clone(),
+                    amount: concurrent_balance
+                        .clone()
+                        .unwrap_or_else(|| inner.balance.clone()),
                     transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V2.to_string(),
                 };
@@ -183,7 +192,7 @@ impl FungibleAssetBalance {
                     asset_type: asset_type.clone(),
                     is_primary,
                     is_frozen: inner.frozen,
-                    amount: inner.balance.clone(),
+                    amount: concurrent_balance.unwrap_or_else(|| inner.balance.clone()),
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V2.to_string(),

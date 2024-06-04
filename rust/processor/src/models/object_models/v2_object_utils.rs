@@ -9,7 +9,8 @@ use crate::{
     models::{
         default_models::move_resources::MoveResource,
         fungible_asset_models::v2_fungible_asset_utils::{
-            FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+            ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FungibleAssetMetadata,
+            FungibleAssetStore, FungibleAssetSupply,
         },
         token_v2_models::v2_token_utils::{
             AptosCollection, ConcurrentSupply, FixedSupply, PropertyMapModel, TokenIdentifiers,
@@ -41,7 +42,9 @@ pub struct ObjectAggregatedData {
     // Fungible asset structs
     pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
     pub fungible_asset_supply: Option<FungibleAssetSupply>,
+    pub concurrent_fungible_asset_supply: Option<ConcurrentFungibleAssetSupply>,
     pub fungible_asset_store: Option<FungibleAssetStore>,
+    pub concurrent_fungible_asset_balance: Option<ConcurrentFungibleAssetBalance>,
     // Token v2 structs
     pub aptos_collection: Option<AptosCollection>,
     pub fixed_supply: Option<FixedSupply>,
@@ -66,6 +69,8 @@ impl Default for ObjectAggregatedData {
             transfer_events: Vec::new(),
             fungible_asset_metadata: None,
             fungible_asset_supply: None,
+            concurrent_fungible_asset_supply: None,
+            concurrent_fungible_asset_balance: None,
             fungible_asset_store: None,
             aptos_collection: None,
             fixed_supply: None,

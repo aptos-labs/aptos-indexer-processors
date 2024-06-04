@@ -457,7 +457,7 @@ pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
 
 /* COMMON STRUCTS */
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AggregatorU64 {
+pub struct Aggregator {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub value: BigDecimal,
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -465,7 +465,7 @@ pub struct AggregatorU64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AggregatorSnapshotU64 {
+pub struct AggregatorSnapshot {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub value: BigDecimal,
 }
