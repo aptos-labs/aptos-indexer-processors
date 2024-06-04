@@ -30,13 +30,15 @@ use tracing::error;
 pub struct DefaultProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    skip_deprecated_tables: bool,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>, skip_deprecated_tables: bool) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
+            skip_deprecated_tables,
         }
     }
 }
@@ -53,7 +55,7 @@ impl Debug for DefaultProcessor {
 }
 
 async fn insert_to_db(
-    conn: ArcDbPool,
+    conn: PgDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -68,6 +70,7 @@ async fn insert_to_db(
         &[TableMetadata],
     ),
     per_table_chunk_sizes: &AHashMap<String, usize>,
+    skip_deprecated_tables: bool,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -76,12 +79,6 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let txns_res = execute_in_chunks(
-        conn.clone(),
-        insert_transactions_query,
-        txns,
-        get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    );
     let bmt_res = execute_in_chunks(
         conn.clone(),
         insert_block_metadata_transactions_query,
@@ -91,27 +88,11 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let wst_res = execute_in_chunks(
-        conn.clone(),
-        insert_write_set_changes_query,
-        wscs,
-        get_config_table_chunk_size::<WriteSetChangeModel>(
-            "write_set_changes",
-            per_table_chunk_sizes,
-        ),
-    );
     let mm_res = execute_in_chunks(
         conn.clone(),
         insert_move_modules_query,
         move_modules,
         get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
-    );
-
-    let mr_res = execute_in_chunks(
-        conn.clone(),
-        insert_move_resources_query,
-        move_resources,
-        get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
     );
 
     let ti_res = execute_in_chunks(
@@ -138,13 +119,52 @@ async fn insert_to_db(
         get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
     );
 
-    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
+    if !skip_deprecated_tables {
+        tracing::trace!(
+            name = name,
+            start_version = start_version,
+            end_version = end_version,
+            "Inserting to deprecated tables",
+        );
+            let txns_res = execute_in_chunks(
+            conn.clone(),
+            insert_transactions_query,
+            txns,
+            get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
+        );
+        let wst_res = execute_in_chunks(
+            conn.clone(),
+            insert_write_set_changes_query,
+            wscs,
+            get_config_table_chunk_size::<WriteSetChangeModel>(
+                "write_set_changes",
+                per_table_chunk_sizes,
+            ),
+        );
+        let mr_res = execute_in_chunks(
+            conn.clone(),
+            insert_move_resources_query,
+            move_resources,
+            get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
+        );
+
+        let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
         join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
 
-    for res in [
-        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-    ] {
-        res?;
+        for res in [
+            txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
+        ] {
+            res?;
+        }
+    } else {
+        let (bmt_res, mm_res, ti_res, cti_res, tm_res) =
+        join!(bmt_res, mm_res, ti_res, cti_res, tm_res);
+
+        for res in [
+            bmt_res, mm_res, ti_res, cti_res, tm_res,
+        ] {
+            res?;
+        }
     }
 
     Ok(())
@@ -341,6 +361,7 @@ impl ProcessorTrait for DefaultProcessor {
                 &table_metadata,
             ),
             &self.per_table_chunk_sizes,
+            self.skip_deprecated_tables,
         )
         .await;
 

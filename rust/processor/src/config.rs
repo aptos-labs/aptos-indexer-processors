@@ -49,6 +49,8 @@ pub struct IndexerGrpcProcessorConfig {
 
     #[serde(default)]
     pub transaction_filter: TransactionFilter,
+    // flag to skip db writes for the deprecated tables
+    pub skip_deprecated_tables: Option<bool>,
 }
 
 impl IndexerGrpcProcessorConfig {
@@ -95,6 +97,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
             self.grpc_response_item_timeout_in_secs,
+            self.skip_deprecated_tables,
         )
         .await
         .context("Failed to build worker")?;
