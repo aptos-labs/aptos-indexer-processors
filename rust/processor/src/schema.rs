@@ -715,8 +715,14 @@ diesel::table! {
         data -> Jsonb,
         inserted_at -> Timestamp,
         event_index -> Int8,
-        #[max_length = 300]
+        #[max_length = 600]
         indexed_type -> Varchar,
+        from -> Varchar,
+        entry_function_id_str -> Varchar,
+        entry_function_payload -> Jsonb,
+        module_address -> Varchar,
+        module_name -> Varchar,
+        event_name -> Varchar,
     }
 }
 

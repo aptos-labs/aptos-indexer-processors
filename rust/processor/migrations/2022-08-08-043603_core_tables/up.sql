@@ -212,6 +212,12 @@ CREATE TABLE events (
   transaction_version BIGINT NOT NULL,
   transaction_block_height BIGINT NOT NULL,
   type TEXT NOT NULL,
+  "from" VARCHAR(100),
+  entry_function_id_str VARCHAR,
+  entry_function_payload jsonb,
+  module_address VARCHAR(300),
+  module_name VARCHAR(300),
+  event_name VARCHAR(300),
   data jsonb NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
@@ -224,6 +230,14 @@ CREATE TABLE events (
 );
 CREATE INDEX ev_addr_type_index ON events (account_address);
 CREATE INDEX ev_insat_index ON events (inserted_at);
+CREATE INDEX ev_from_module_address_inserted_at ON events ("from", module_address, module_name, event_name, inserted_at);
+CREATE INDEX ev_entry_function_id_str_index ON events (entry_function_id_str);
+CREATE INDEX ev_module_name_index ON events (module_name);
+CREATE INDEX ev_event_name_index ON events (event_name);
+CREATE INDEX ev_module_address_module_name_event_name_transaction_version_index ON events (module_address, module_name, event_name, transaction_version);
+CREATE INDEX ev_module_address_transaction_version_index ON events (module_address, transaction_version);
+
+
 -- write set changes
 CREATE TABLE write_set_changes (
   transaction_version BIGINT NOT NULL,

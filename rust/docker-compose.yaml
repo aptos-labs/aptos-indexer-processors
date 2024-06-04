@@ -1,0 +1,17 @@
+# docker build . -t indexer-processor
+# docker run -it --network host --mount type=bind,source=/tmp/config.yaml,target=/config.yaml indexer-processor -c /config.yaml
+version: '3.8'
+services:
+  processor:
+    image: indexer-processor
+    container_name: processor
+    network_mode: host
+    volumes:
+      - ./config.yaml:/config.yaml
+    command: -c ./config.yaml
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
