@@ -26,7 +26,7 @@ pub struct PublicOrApiFilter {
 }
 
 impl Filterable<Transaction> for PublicOrApiFilter {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.root_filter.is_none()
             && self.user_transaction_filter.is_none()
             && self.event_filter.is_none()
@@ -197,7 +197,6 @@ mod test {
         };
 
         let wscf_res = WriteSetChangeFilter {
-            change_type: Some(aptos_protos::transaction::v1::write_set_change::Type::WriteResource),
             change: Some(ChangeItemFilter::ResourceChange(ResourceChangeFilter {
                 resource_type: Some(MoveStructTagFilter {
                     address: Some("0x001af32".into()),
@@ -208,9 +207,6 @@ mod test {
             })),
         };
         let wscf_table = WriteSetChangeFilter {
-            change_type: Some(
-                aptos_protos::transaction::v1::write_set_change::Type::WriteTableItem,
-            ),
             change: Some(ChangeItemFilter::TableChange(TableChangeFilter {
                 handle: Some("0x796857465434253644536475453432453".into()),
                 key: Some("table_key".into()),
@@ -218,7 +214,6 @@ mod test {
             })),
         };
         let wscf_mod = WriteSetChangeFilter {
-            change_type: Some(aptos_protos::transaction::v1::write_set_change::Type::WriteModule),
             change: Some(ChangeItemFilter::ModuleChange(ModuleChangeFilter {
                 address: Some("0x0000098".into()),
             })),

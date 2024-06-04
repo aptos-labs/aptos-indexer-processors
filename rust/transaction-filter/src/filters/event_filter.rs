@@ -13,7 +13,7 @@ pub struct EventFilter {
 
 impl Filterable<Event> for EventFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.struct_type.is_none() {
             return Err(Error::msg("At least one of struct_type must be set"));
         };

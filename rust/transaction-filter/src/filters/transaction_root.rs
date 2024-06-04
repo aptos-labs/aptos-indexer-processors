@@ -14,7 +14,7 @@ pub struct TransactionRootFilter {
 
 impl Filterable<Transaction> for TransactionRootFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.success.is_none() && self.txn_type.is_none() {
             return Err(Error::msg(
                 "At least one of success or txn_types must be set",

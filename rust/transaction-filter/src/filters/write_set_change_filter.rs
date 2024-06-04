@@ -1,9 +1,8 @@
 use crate::{filters::MoveStructTagFilter, traits::Filterable};
 use anyhow::Error;
 use aptos_protos::transaction::v1::{
-    write_set_change::{Change, Type as ChangeType},
-    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteSetChange,
-    WriteTableItem,
+    write_set_change::Change, DeleteModule, DeleteResource, DeleteTableItem, WriteModule,
+    WriteResource, WriteSetChange, WriteTableItem,
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,8 +13,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct WriteSetChangeFilter {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub change_type: Option<ChangeType>,
     // TODO: handle actual changes!!!
     #[serde(skip_serializing_if = "Option::is_none")]
     pub change: Option<ChangeItemFilter>,
@@ -23,11 +20,9 @@ pub struct WriteSetChangeFilter {
 
 impl Filterable<WriteSetChange> for WriteSetChangeFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
-        if self.change_type.is_none() && self.change.is_none() {
-            return Err(Error::msg(
-                "At least one of change_type or change must be set",
-            ));
+    fn validate_state(&self) -> Result<(), Error> {
+        if self.change.is_none() {
+            return Err(Error::msg("At least one of change must be set"));
         };
         self.change.is_valid()?;
         Ok(())
@@ -35,12 +30,6 @@ impl Filterable<WriteSetChange> for WriteSetChangeFilter {
 
     #[inline]
     fn is_allowed(&self, item: &WriteSetChange) -> bool {
-        if let Some(change_type) = &self.change_type {
-            if (*change_type as i32) != item.r#type {
-                return false;
-            }
-        }
-
         if let Some(change_filter) = &self.change {
             if let Some(change) = item.change.as_ref() {
                 match change {
@@ -107,7 +96,7 @@ pub enum ChangeItemFilter {
 
 impl Filterable<Change> for ChangeItemFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         match self {
             ChangeItemFilter::ResourceChange(rcf) => rcf.is_valid(),
             ChangeItemFilter::ModuleChange(mcf) => mcf.is_valid(),
@@ -175,7 +164,7 @@ pub enum ResourceChange<'a> {
 
 impl Filterable<ResourceChange<'_>> for ResourceChangeFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.resource_type.is_none() && self.address.is_none() {
             return Err(Error::msg(
                 "At least one of resource_type or address must be set",
@@ -230,7 +219,7 @@ pub enum ModuleChange<'a> {
 
 impl Filterable<ModuleChange<'_>> for ModuleChangeFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.address.is_none() {
             return Err(Error::msg("At least one of address must be set"));
         };
@@ -263,7 +252,7 @@ pub enum TableChange<'a> {
 }
 impl Filterable<TableChange<'_>> for TableChangeFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.handle.is_none() && self.key.is_none() && self.key_type_str.is_none() {
             return Err(Error::msg(
                 "At least one of handle, key, or key_type must be set",

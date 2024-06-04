@@ -3,8 +3,19 @@ use anyhow::Error;
 /// Simple trait to allow for filtering of items of type T
 pub trait Filterable<T> {
     /// Whether this filter is correctly configured/initialized
-    /// Any call to `is_valid` is responsible for recursively checking the validity of any nested filters
-    fn is_valid(&self) -> Result<(), Error>;
+    /// Any call to `validate_state` is responsible for recursively checking the validity of any nested filters *by calling `is_valid`*
+    /// The actual public API is via `is_valid` which will call `validate_state` and return an error if it fails, but annotated with the filter type/path
+    fn validate_state(&self) -> Result<(), Error>;
+
+    #[inline]
+    fn is_valid(&self) -> Result<(), Error> {
+        println!("calling: {}", std::any::type_name::<Self>());
+        // This is a convenience method to allow for the error to be annotated with the filter type/path
+        self.validate_state().map_err(|e| {
+            println!("erroring: {}", std::any::type_name::<Self>());
+            e.context(std::any::type_name::<T>())
+        })
+    }
 
     fn is_allowed(&self, item: &T) -> bool;
 
@@ -36,7 +47,7 @@ where
     F: Filterable<T>,
 {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         match self {
             Some(filter) => filter.is_valid(),
             None => Ok(()),
@@ -62,7 +73,7 @@ where
 
 impl Filterable<String> for Option<String> {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -77,7 +88,7 @@ impl Filterable<String> for Option<String> {
 
 impl Filterable<i32> for Option<i32> {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -92,7 +103,7 @@ impl Filterable<i32> for Option<i32> {
 
 impl Filterable<bool> for Option<bool> {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -102,5 +113,54 @@ impl Filterable<bool> for Option<bool> {
             Some(filter) => filter == item,
             None => true,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use anyhow::anyhow;
+
+    #[derive(Debug, PartialEq)]
+    pub struct InnerStruct {
+        pub a: Option<String>,
+    }
+
+    impl Filterable<InnerStruct> for InnerStruct {
+        fn validate_state(&self) -> Result<(), Error> {
+            Err(anyhow!("this is an error"))
+        }
+
+        fn is_allowed(&self, _item: &InnerStruct) -> bool {
+            true
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub struct OuterStruct {
+        pub inner: Option<InnerStruct>,
+    }
+
+    impl Filterable<InnerStruct> for OuterStruct {
+        fn validate_state(&self) -> Result<(), Error> {
+            self.inner.is_valid()?;
+            Ok(())
+        }
+
+        fn is_allowed(&self, item: &InnerStruct) -> bool {
+            self.inner.is_allowed(item)
+        }
+    }
+
+    #[test]
+    fn test_error_prop() {
+        let inner = InnerStruct {
+            a: Some("test".to_string()),
+        };
+        let outer = OuterStruct { inner: Some(inner) };
+
+        let res = outer.is_valid();
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().to_string(), "err");
     }
 }

@@ -19,7 +19,7 @@ pub struct UserTransactionRequestFilter {
 
 impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.sender.is_none() && self.payload.is_none() {
             return Err(Error::msg("At least one of sender or payload must be set"));
         };
@@ -66,7 +66,7 @@ pub struct EntryFunctionFilter {
 
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.address.is_none() && self.module.is_none() && self.function.is_none() {
             return Err(anyhow!(
                 "At least one of address, name or function must be set"
@@ -106,7 +106,7 @@ pub struct UserTransactionPayloadFilter {
 
 impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.function.is_none() {
             return Err(Error::msg("At least one of function must be set"));
         };
