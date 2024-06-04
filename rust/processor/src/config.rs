@@ -9,7 +9,7 @@ use ahash::AHashMap;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 use url::Url;
 
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;
@@ -49,8 +49,8 @@ pub struct IndexerGrpcProcessorConfig {
 
     #[serde(default)]
     pub transaction_filter: TransactionFilter,
-    // flag to skip db writes for the deprecated tables
-    pub skip_deprecated_tables: Option<bool>,
+    // String vector for deprecated tables to skip db writes
+    pub deprecated_tables: HashSet<String>,
 }
 
 impl IndexerGrpcProcessorConfig {
@@ -97,7 +97,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.enable_verbose_logging,
             self.transaction_filter.clone(),
             self.grpc_response_item_timeout_in_secs,
-            self.skip_deprecated_tables,
+            self.deprecated_tables.clone(),
         )
         .await
         .context("Failed to build worker")?;

@@ -37,6 +37,7 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
+use std::collections::HashSet;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
@@ -64,7 +65,7 @@ pub struct Worker {
     pub enable_verbose_logging: Option<bool>,
     pub transaction_filter: TransactionFilter,
     pub grpc_response_item_timeout_in_secs: u64,
-    pub skip_deprecated_tables: Option<bool>,
+    pub deprecated_tables: HashSet<String>,
 }
 
 impl Worker {
@@ -86,7 +87,7 @@ impl Worker {
         enable_verbose_logging: Option<bool>,
         transaction_filter: TransactionFilter,
         grpc_response_item_timeout_in_secs: u64,
-        skip_deprecated_tables: Option<bool>,
+        deprecated_tables: HashSet<String>,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -122,7 +123,7 @@ impl Worker {
             enable_verbose_logging,
             transaction_filter,
             grpc_response_item_timeout_in_secs,
-            skip_deprecated_tables,
+            deprecated_tables,
         })
     }
 
@@ -243,8 +244,8 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
+            self.deprecated_tables.clone(),
             self.db_pool.clone(),
-            self.skip_deprecated_tables.unwrap_or(false),
         );
         tokio::spawn(async move {
             crate::gap_detector::create_gap_detector_status_tracker_loop(
@@ -308,8 +309,8 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
+            self.deprecated_tables.clone(),
             self.db_pool.clone(),
-            self.skip_deprecated_tables.unwrap_or(false),
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -725,8 +726,8 @@ pub async fn do_processor(
 pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: HashSet<String>,
     db_pool: ArcDbPool,
-    skip_deprecated_tables: bool,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -740,9 +741,11 @@ pub fn build_processor(
         ProcessorConfig::CoinProcessor => {
             Processor::from(CoinProcessor::new(db_pool, per_table_chunk_sizes))
         },
-        ProcessorConfig::DefaultProcessor => {
-            Processor::from(DefaultProcessor::new(db_pool, per_table_chunk_sizes, skip_deprecated_tables))
-        },
+        ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(
+            db_pool,
+            per_table_chunk_sizes,
+            deprecated_tables,
+        )),
         ProcessorConfig::EventsProcessor => {
             Processor::from(EventsProcessor::new(db_pool, per_table_chunk_sizes))
         },

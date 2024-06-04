@@ -23,9 +23,8 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::fmt::Debug;
 use tokio::join;
-use tracing::error;
+use std::{collections::HashSet, fmt::Debug};
 
 pub struct DefaultProcessor {
     connection_pool: ArcDbPool,
@@ -34,11 +33,15 @@ pub struct DefaultProcessor {
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>, skip_deprecated_tables: bool) -> Self {
+    pub fn new(
+        connection_pool: ArcDbPool,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: HashSet<String>,
+    ) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
-            skip_deprecated_tables,
+            deprecated_tables,
         }
     }
 }
@@ -70,7 +73,7 @@ async fn insert_to_db(
         &[TableMetadata],
     ),
     per_table_chunk_sizes: &AHashMap<String, usize>,
-    skip_deprecated_tables: bool,
+    deprecated_tables: &HashSet<String>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -79,7 +82,7 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let bmt_res = execute_in_chunks(
+    execute_in_chunks(
         conn.clone(),
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
@@ -87,22 +90,26 @@ async fn insert_to_db(
             "block_metadata_transactions",
             per_table_chunk_sizes,
         ),
-    );
-    let mm_res = execute_in_chunks(
+    )
+    .await?;
+
+    execute_in_chunks(
         conn.clone(),
         insert_move_modules_query,
         move_modules,
         get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
-    );
+    )
+    .await?;
 
-    let ti_res = execute_in_chunks(
+    execute_in_chunks(
         conn.clone(),
         insert_table_items_query,
         table_items,
         get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
-    );
+    )
+    .await?;
 
-    let cti_res = execute_in_chunks(
+    execute_in_chunks(
         conn.clone(),
         insert_current_table_items_query,
         current_table_items,
@@ -110,29 +117,29 @@ async fn insert_to_db(
             "current_table_items",
             per_table_chunk_sizes,
         ),
-    );
+    )
+    .await?;
 
-    let tm_res = execute_in_chunks(
+    execute_in_chunks(
         conn.clone(),
         insert_table_metadata_query,
         table_metadata,
         get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
-    );
+    )
+    .await?;
 
-    if !skip_deprecated_tables {
-        tracing::trace!(
-            name = name,
-            start_version = start_version,
-            end_version = end_version,
-            "Inserting to deprecated tables",
-        );
-            let txns_res = execute_in_chunks(
+    if !deprecated_tables.contains(&"transactions".to_string()) {
+        execute_in_chunks(
             conn.clone(),
             insert_transactions_query,
             txns,
             get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-        );
-        let wst_res = execute_in_chunks(
+        )
+        .await?;
+    };
+
+    if !deprecated_tables.contains(&"write_set_changes".to_string()) {
+        execute_in_chunks(
             conn.clone(),
             insert_write_set_changes_query,
             wscs,
@@ -140,32 +147,19 @@ async fn insert_to_db(
                 "write_set_changes",
                 per_table_chunk_sizes,
             ),
-        );
-        let mr_res = execute_in_chunks(
+        )
+        .await?;
+    };
+
+    if !deprecated_tables.contains(&"move_resources".to_string()) {
+        execute_in_chunks(
             conn.clone(),
             insert_move_resources_query,
             move_resources,
             get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
-        );
-
-        let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
-        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
-
-        for res in [
-            txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-        ] {
-            res?;
-        }
-    } else {
-        let (bmt_res, mm_res, ti_res, cti_res, tm_res) =
-        join!(bmt_res, mm_res, ti_res, cti_res, tm_res);
-
-        for res in [
-            bmt_res, mm_res, ti_res, cti_res, tm_res,
-        ] {
-            res?;
-        }
-    }
+        )
+        .await?;
+    };
 
     Ok(())
 }
@@ -361,7 +355,7 @@ impl ProcessorTrait for DefaultProcessor {
                 &table_metadata,
             ),
             &self.per_table_chunk_sizes,
-            self.skip_deprecated_tables,
+            &self.deprecated_tables,
         )
         .await;
 
