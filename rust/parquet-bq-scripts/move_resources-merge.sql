@@ -46,3 +46,4 @@ THEN
     staging.data,
     staging.state_key_hash
   );
+  

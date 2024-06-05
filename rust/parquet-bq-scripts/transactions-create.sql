@@ -22,5 +22,5 @@ CREATE TABLE `{}`
   PRIMARY KEY(txn_version) NOT ENFORCED
 )
 PARTITION BY TIMESTAMP_TRUNC(block_timestamp,DAY)
-CLUSTER BY txn_version, txn_type, block_height
+CLUSTER BY txn_version, txn_type, block_height, txn_hash
 ;

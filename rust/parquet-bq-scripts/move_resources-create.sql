@@ -17,5 +17,5 @@ CREATE TABLE `{}`
   PRIMARY KEY(txn_version, write_set_change_index) NOT ENFORCED
 )
 PARTITION BY TIMESTAMP_TRUNC(block_timestamp, DAY)
-CLUSTER BY txn_version, resource_type, block_height
+CLUSTER BY txn_version, resource_type, block_height, state_key_hash, resource_address
 ;
