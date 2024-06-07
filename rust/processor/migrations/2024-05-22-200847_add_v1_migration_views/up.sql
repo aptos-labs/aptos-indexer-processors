@@ -4,7 +4,8 @@ CREATE SCHEMA IF NOT EXISTS legacy_migration_v1;
 -- Replace `move_resources` with account transactions
 -- account_transactions already has index on transaction_version
 CREATE OR REPLACE VIEW legacy_migration_v1.move_resources AS
-SELECT *
+SELECT account_address as address,
+    transaction_version
 FROM account_transactions at2;
 -- replace `coin_activities` with `fungible_asset_activities`
 CREATE OR REPLACE VIEW legacy_migration_v1.coin_activities AS
