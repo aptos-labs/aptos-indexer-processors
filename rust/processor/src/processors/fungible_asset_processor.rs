@@ -135,7 +135,7 @@ async fn insert_to_db(
         ),
     );
     let cufab_v2 = execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_unified_fungible_asset_balances_v2_query,
         current_unified_fungible_asset_balances.1,
         get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
