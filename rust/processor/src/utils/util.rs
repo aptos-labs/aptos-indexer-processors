@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::models::events_models::events::Event;
 use crate::{
     models::property_map::{PropertyMap, TokenObjectPropertyMap},
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
@@ -433,6 +434,22 @@ pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
 pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
     let t: Vec<&str> = move_type.split("::").collect();
     t.last().unwrap()
+}
+
+pub fn is_multisig_wallet_created_transaction(txn_event: &Event) -> bool {
+    let Some(entry_function_payload) = txn_event.entry_function_payload.as_object() else {
+        return false;
+    };
+    let Some(function) = entry_function_payload.get("function") else {
+        return false;
+    };
+    let Some(name) = function.get("name") else {
+        return false;
+    };
+    let Some(name_str) = name.as_str() else {
+        return false;
+    };
+    name_str == "create_with_owners"
 }
 
 /* COMMON STRUCTS */
