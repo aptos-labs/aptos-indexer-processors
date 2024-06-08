@@ -22,6 +22,8 @@ use diesel::{
 use once_cell::sync::Lazy;
 use std::fmt::Debug;
 use tracing::error;
+use crate::utils::util::is_multisig_wallet_created_transaction;
+
 static FILTERED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| vec!["0x1::transaction_fee::FeeStatement"]);
 static REQUIRED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
     vec![
@@ -186,7 +188,7 @@ impl ProcessorTrait for EventsProcessor {
             );
             for txn_event in txn_events {
                 if REQUIRED_EVENTS.contains(&txn_event.type_.as_str())
-                    || !FILTERED_EVENTS.contains(&txn_event.type_.as_str())
+                    || !FILTERED_EVENTS.contains(&txn_event.type_.as_str()) || is_multisig_wallet_created_transaction(&txn_event)
                 {
                     events.push(txn_event);
                 }
