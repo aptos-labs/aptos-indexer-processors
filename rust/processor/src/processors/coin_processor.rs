@@ -8,7 +8,6 @@ use crate::{
             coin_activities::CoinActivity,
             coin_balances::{CoinBalance, CurrentCoinBalance},
             coin_infos::CoinInfo,
-            coin_supply::CoinSupply,
         },
         fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
@@ -61,7 +60,6 @@ async fn insert_to_db(
     coin_infos: &[CoinInfo],
     coin_balances: &[CoinBalance],
     current_coin_balances: &[CurrentCoinBalance],
-    coin_supply: &[CoinSupply],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -98,15 +96,9 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let cs = execute_in_chunks(
-        conn,
-        insert_coin_supply_query,
-        coin_supply,
-        get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
-    );
 
-    let (ca_res, ci_res, cb_res, ccb_res, cs_res) = tokio::join!(ca, ci, cb, ccb, cs);
-    for res in [ca_res, ci_res, cb_res, ccb_res, cs_res] {
+    let (ca_res, ci_res, cb_res, ccb_res) = tokio::join!(ca, ci, cb, ccb);
+    for res in [ca_res, ci_res, cb_res, ccb_res] {
         res?;
     }
     Ok(())
@@ -206,23 +198,6 @@ fn insert_current_coin_balances_query(
     )
 }
 
-fn insert_coin_supply_query(
-    items_to_insert: Vec<CoinSupply>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::coin_supply::dsl::*;
-
-    (
-        diesel::insert_into(schema::coin_supply::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, coin_type_hash))
-            .do_nothing(),
-        None,
-    )
-}
-
 #[async_trait]
 impl ProcessorTrait for CoinProcessor {
     fn name(&self) -> &'static str {
@@ -244,26 +219,18 @@ impl ProcessorTrait for CoinProcessor {
             all_coin_infos,
             all_coin_balances,
             all_current_coin_balances,
-            all_coin_supply,
         ) = tokio::task::spawn_blocking(move || {
             let mut all_coin_activities = vec![];
             let mut all_coin_balances = vec![];
             let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
             let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
                 AHashMap::new();
-            let mut all_coin_supply = vec![];
 
             for txn in &transactions {
-                let (
-                    mut coin_activities,
-                    mut coin_balances,
-                    coin_infos,
-                    current_coin_balances,
-                    mut coin_supply,
-                ) = CoinActivity::from_transaction(txn);
+                let (mut coin_activities, mut coin_balances, coin_infos, current_coin_balances) =
+                    CoinActivity::from_transaction(txn);
                 all_coin_activities.append(&mut coin_activities);
                 all_coin_balances.append(&mut coin_balances);
-                all_coin_supply.append(&mut coin_supply);
                 // For coin infos, we only want to keep the first version, so insert only if key is not present already
                 for (key, value) in coin_infos {
                     all_coin_infos.entry(key).or_insert(value);
@@ -286,7 +253,6 @@ impl ProcessorTrait for CoinProcessor {
                 all_coin_infos,
                 all_coin_balances,
                 all_current_coin_balances,
-                all_coin_supply,
             )
         })
         .await
@@ -304,7 +270,6 @@ impl ProcessorTrait for CoinProcessor {
             &all_coin_infos,
             &all_coin_balances,
             &all_current_coin_balances,
-            &all_coin_supply,
             &self.per_table_chunk_sizes,
         )
         .await;

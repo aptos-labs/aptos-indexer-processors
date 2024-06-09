@@ -4,6 +4,7 @@
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     models::{
+        coin_models::coin_supply::CoinSupply,
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             v2_fungible_asset_balances::{
@@ -78,6 +79,7 @@ async fn insert_to_db(
         &[CurrentUnifiedFungibleAssetBalance],
         &[CurrentUnifiedFungibleAssetBalance],
     ),
+    coin_supply: &[CoinSupply],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -123,7 +125,6 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-
     let cufab_v1 = execute_in_chunks(
         conn.clone(),
         insert_current_unified_fungible_asset_balances_v1_query,
@@ -134,7 +135,7 @@ async fn insert_to_db(
         ),
     );
     let cufab_v2 = execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_unified_fungible_asset_balances_v2_query,
         current_unified_fungible_asset_balances.1,
         get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
@@ -142,9 +143,17 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let (faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res) =
-        tokio::join!(faa, fam, fab, cfab, cufab_v1, cufab_v2);
-    for res in [faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res] {
+    let cs = execute_in_chunks(
+        conn,
+        insert_coin_supply_query,
+        coin_supply,
+        get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
+    );
+    let (faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res) =
+        tokio::join!(faa, fam, fab, cfab, cufab_v1, cufab_v2, cs);
+    for res in [
+        faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res,
+    ] {
         res?;
     }
 
@@ -308,6 +317,23 @@ fn insert_current_unified_fungible_asset_balances_v2_query(
     )
 }
 
+fn insert_coin_supply_query(
+    items_to_insert: Vec<CoinSupply>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::coin_supply::dsl::*;
+
+    (
+        diesel::insert_into(schema::coin_supply::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, coin_type_hash))
+            .do_nothing(),
+        None,
+    )
+}
+
 #[async_trait]
 impl ProcessorTrait for FungibleAssetProcessor {
     fn name(&self) -> &'static str {
@@ -330,6 +356,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             fungible_asset_balances,
             current_fungible_asset_balances,
             current_unified_fungible_asset_balances,
+            coin_supply,
         ) = parse_v2_coin(&transactions).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
@@ -348,6 +375,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             &fungible_asset_balances,
             &current_fungible_asset_balances,
             (&coin_balance, &fa_balance),
+            &coin_supply,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -387,9 +415,11 @@ async fn parse_v2_coin(
     Vec<FungibleAssetBalance>,
     Vec<CurrentFungibleAssetBalance>,
     Vec<CurrentUnifiedFungibleAssetBalance>,
+    Vec<CoinSupply>,
 ) {
     let mut fungible_asset_activities = vec![];
     let mut fungible_asset_balances = vec![];
+    let mut all_coin_supply = vec![];
     let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = AHashMap::new();
     let mut fungible_asset_metadata: FungibleAssetMetadataMapping = AHashMap::new();
 
@@ -420,6 +450,7 @@ async fn parse_v2_coin(
             .seconds;
         let txn_timestamp =
             NaiveDateTime::from_timestamp_opt(txn_timestamp, 0).expect("Txn Timestamp is invalid!");
+        let txn_epoch = txn.epoch as i64;
 
         let default = vec![];
         let (events, user_request, entry_function_id_str) = match txn_data {
@@ -598,60 +629,79 @@ async fn parse_v2_coin(
 
         // Loop to handle all the other changes
         for (index, wsc) in transaction_info.changes.iter().enumerate() {
-            if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                if let Some(fa_metadata) = FungibleAssetMetadataModel::get_v1_from_write_resource(
-                    write_resource,
-                    txn_version,
-                    txn_timestamp,
-                )
-                .unwrap_or_else(|e| {
-                    tracing::error!(
-                        transaction_version = txn_version,
-                        index = index,
-                            error = ?e,
-                        "[Parser] error parsing fungible metadata v1");
-                    panic!("[Parser] error parsing fungible metadata v1");
-                }) {
-                    fungible_asset_metadata.insert(fa_metadata.asset_type.clone(), fa_metadata);
-                }
-                if let Some(fa_metadata) = FungibleAssetMetadataModel::get_v2_from_write_resource(
-                    write_resource,
-                    txn_version,
-                    txn_timestamp,
-                    &fungible_asset_object_helper,
-                )
-                .unwrap_or_else(|e| {
-                    tracing::error!(
-                        transaction_version = txn_version,
-                        index = index,
-                            error = ?e,
-                        "[Parser] error parsing fungible metadata v2");
-                    panic!("[Parser] error parsing fungible metadata v2");
-                }) {
-                    fungible_asset_metadata.insert(fa_metadata.asset_type.clone(), fa_metadata);
-                }
-                if let Some((balance, curr_balance)) =
-                    FungibleAssetBalance::get_v2_from_write_resource(
-                        write_resource,
-                        index as i64,
+            match wsc.change.as_ref().unwrap() {
+                Change::WriteResource(write_resource) => {
+                    if let Some(fa_metadata) =
+                        FungibleAssetMetadataModel::get_v1_from_write_resource(
+                            write_resource,
+                            txn_version,
+                            txn_timestamp,
+                        )
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                            transaction_version = txn_version,
+                            index = index,
+                                error = ?e,
+                            "[Parser] error parsing fungible metadata v1");
+                            panic!("[Parser] error parsing fungible metadata v1");
+                        })
+                    {
+                        fungible_asset_metadata.insert(fa_metadata.asset_type.clone(), fa_metadata);
+                    }
+                    if let Some(fa_metadata) =
+                        FungibleAssetMetadataModel::get_v2_from_write_resource(
+                            write_resource,
+                            txn_version,
+                            txn_timestamp,
+                            &fungible_asset_object_helper,
+                        )
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                            transaction_version = txn_version,
+                            index = index,
+                                error = ?e,
+                            "[Parser] error parsing fungible metadata v2");
+                            panic!("[Parser] error parsing fungible metadata v2");
+                        })
+                    {
+                        fungible_asset_metadata.insert(fa_metadata.asset_type.clone(), fa_metadata);
+                    }
+                    if let Some((balance, curr_balance)) =
+                        FungibleAssetBalance::get_v2_from_write_resource(
+                            write_resource,
+                            index as i64,
+                            txn_version,
+                            txn_timestamp,
+                            &fungible_asset_object_helper,
+                        )
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                            transaction_version = txn_version,
+                            index = index,
+                                error = ?e,
+                            "[Parser] error parsing fungible balance v2");
+                            panic!("[Parser] error parsing fungible balance v2");
+                        })
+                    {
+                        fungible_asset_balances.push(balance);
+                        current_fungible_asset_balances
+                            .insert(curr_balance.storage_id.clone(), curr_balance);
+                    }
+                },
+                Change::WriteTableItem(table_item) => {
+                    if let Some(coin_supply) = CoinSupply::from_write_table_item(
+                        table_item,
                         txn_version,
                         txn_timestamp,
-                        &fungible_asset_object_helper,
+                        txn_epoch,
                     )
-                    .await
-                    .unwrap_or_else(|e| {
-                        tracing::error!(
-                        transaction_version = txn_version,
-                        index = index,
-                            error = ?e,
-                        "[Parser] error parsing fungible balance v2");
-                        panic!("[Parser] error parsing fungible balance v2");
-                    })
-                {
-                    fungible_asset_balances.push(balance);
-                    current_fungible_asset_balances
-                        .insert(curr_balance.storage_id.clone(), curr_balance);
-                }
+                    .unwrap()
+                    {
+                        all_coin_supply.push(coin_supply);
+                    }
+                },
+                _ => {},
             }
         }
     }
@@ -680,5 +730,6 @@ async fn parse_v2_coin(
         fungible_asset_balances,
         current_fungible_asset_balances,
         current_unified_fungible_asset_balances,
+        all_coin_supply,
     )
 }
