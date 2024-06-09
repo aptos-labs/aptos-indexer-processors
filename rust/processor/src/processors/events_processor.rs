@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use crate::utils::database::PgPoolConnection;
+use crate::utils::util::{
+    is_multisig_wallet_created_transaction, standardize_address, truncate_str,
+};
 use crate::{
     models::events_models::events::EventModel,
     schema,
@@ -12,7 +16,11 @@ use crate::{
 };
 use ahash::AHashMap;
 use anyhow::bail;
-use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
+use aptos_protos::transaction::v1::write_set_change::Change;
+use aptos_protos::transaction::v1::{
+    transaction::TxnData, Event, EventKey, Transaction, WriteSetChange,
+};
+use aptos_protos::util::timestamp::Timestamp;
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
@@ -21,10 +29,17 @@ use diesel::{
 };
 use once_cell::sync::Lazy;
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
 use tracing::error;
-use crate::utils::util::is_multisig_wallet_created_transaction;
+use tracing::log::info;
 
-static FILTERED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| vec!["0x1::transaction_fee::FeeStatement"]);
+static FILTERED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
+    vec![
+        "0x1::transaction_fee::FeeStatement",
+        "0x1::multisig_account::create_with_owners",
+    ]
+});
 static REQUIRED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
     vec![
         "0x111ae3e5bc816a5e63c2da97d0aa3886519e0cd5e4b046659fa35796bd11542a",
@@ -161,6 +176,7 @@ impl ProcessorTrait for EventsProcessor {
                     continue;
                 },
             };
+
             let default = vec![];
             let raw_events = match txn_data {
                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
@@ -179,6 +195,39 @@ impl ProcessorTrait for EventsProcessor {
             }
             let inserted_at = txn.timestamp.clone();
 
+            if let TxnData::User(txn_inner) = txn_data {
+                let changes = &txn.clone().info.unwrap().changes;
+                let filtered = changes.iter().filter(|c| {
+                    let Change::WriteResource(write_resource) = &c.change.as_ref().unwrap() else {
+                        return false;
+                    };
+                    write_resource.type_str.as_str() == "0x1::multisig_account::MultisigAccount"
+                });
+                filtered.for_each(|c| {
+                    if let Change::WriteResource(write_resource) = &c.change.as_ref().unwrap() {
+                        let from = tnx_user_request.as_ref().unwrap().sender.as_str();
+                        let event = Event {
+                            key: Some(EventKey {
+                                account_address: standardize_address(from),
+                                creation_number: txn_inner.clone().request.unwrap().sequence_number,
+                            }),
+                            sequence_number: txn_inner.clone().request.unwrap().sequence_number,
+                            r#type: None,
+                            type_str: write_resource.type_str.to_string(),
+                            data: write_resource.data.to_string(),
+                        };
+                        let txn_create_multisig_event = EventModel::from_event(
+                            &event,
+                            txn_version,
+                            block_height,
+                            events.len() as i64,
+                            tnx_user_request,
+                            &inserted_at,
+                        );
+                        events.push(txn_create_multisig_event);
+                    }
+                });
+            }
             let txn_events = EventModel::from_events(
                 raw_events,
                 txn_version,
@@ -187,8 +236,9 @@ impl ProcessorTrait for EventsProcessor {
                 &inserted_at,
             );
             for txn_event in txn_events {
-                if REQUIRED_EVENTS.contains(&txn_event.type_.as_str())
-                    || !FILTERED_EVENTS.contains(&txn_event.type_.as_str()) || is_multisig_wallet_created_transaction(&txn_event)
+                if (!FILTERED_EVENTS.contains(&txn_event.type_.as_str())
+                    || REQUIRED_EVENTS.contains(&txn_event.type_.as_str()))
+                    && !FILTERED_EVENTS.contains(&txn_event.entry_function_id_str.as_str())
                 {
                     events.push(txn_event);
                 }
