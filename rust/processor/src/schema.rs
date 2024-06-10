@@ -455,6 +455,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_pokes (initial_poker_address, recipient_poker_address) {
+        #[max_length = 66]
+        initial_poker_address -> Varchar,
+        #[max_length = 66]
+        recipient_poker_address -> Varchar,
+        initial_poker_is_next_poker -> Bool,
+        times_poked -> Int8,
+        last_transaction_version -> Int8,
+        last_poke_at -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_staking_pool_voter (staking_pool_address) {
         #[max_length = 66]
         staking_pool_address -> Varchar,
@@ -1297,6 +1311,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_delegator_balances,
     current_fungible_asset_balances,
     current_objects,
+    current_pokes,
     current_staking_pool_voter,
     current_table_items,
     current_token_datas,

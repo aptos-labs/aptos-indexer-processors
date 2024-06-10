@@ -16,6 +16,7 @@ pub mod fungible_asset_processor;
 pub mod monitoring_processor;
 pub mod nft_metadata_processor;
 pub mod objects_processor;
+pub mod poke_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
@@ -32,6 +33,7 @@ use self::{
     monitoring_processor::MonitoringProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
     objects_processor::{ObjectsProcessor, ObjectsProcessorConfig},
+    poke_processor::{PokeProcessor, PokeProcessorConfig},
     stake_processor::{StakeProcessor, StakeProcessorConfig},
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
@@ -188,6 +190,7 @@ pub enum ProcessorConfig {
     MonitoringProcessor,
     NftMetadataProcessor(NftMetadataProcessorConfig),
     ObjectsProcessor(ObjectsProcessorConfig),
+    PokeProcessor(PokeProcessorConfig),
     StakeProcessor(StakeProcessorConfig),
     TokenProcessor(TokenProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
@@ -230,6 +233,7 @@ pub enum Processor {
     MonitoringProcessor,
     NftMetadataProcessor,
     ObjectsProcessor,
+    PokeProcessor,
     StakeProcessor,
     TokenProcessor,
     TokenV2Processor,

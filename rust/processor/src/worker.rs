@@ -10,8 +10,9 @@ use crate::{
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
-        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
-        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        objects_processor::ObjectsProcessor, poke_processor::PokeProcessor,
+        stake_processor::StakeProcessor, token_processor::TokenProcessor,
+        token_v2_processor::TokenV2Processor,
         transaction_metadata_processor::TransactionMetadataProcessor,
         user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
@@ -746,6 +747,11 @@ pub fn build_processor(
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
         },
         ProcessorConfig::ObjectsProcessor(config) => Processor::from(ObjectsProcessor::new(
+            db_pool,
+            config.clone(),
+            per_table_chunk_sizes,
+        )),
+        ProcessorConfig::PokeProcessor(config) => Processor::from(PokeProcessor::new(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
