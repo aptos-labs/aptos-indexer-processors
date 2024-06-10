@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::transactions::Transaction;
-use crate::{schema::move_modules, utils::util::standardize_address};
+use crate::{models::TableName, schema::move_modules, utils::util::standardize_address};
 use aptos_protos::transaction::v1::{
     DeleteModule, MoveModule as MoveModulePB, MoveModuleBytecode, WriteModule,
 };
@@ -40,6 +40,11 @@ pub struct MoveModuleByteCodeParsed {
     pub structs: serde_json::Value,
 }
 
+impl TableName for MoveModule {
+    fn table_name() -> &'static str {
+        "move_modules"
+    }
+}
 impl MoveModule {
     pub fn from_write_module(
         write_module: &WriteModule,

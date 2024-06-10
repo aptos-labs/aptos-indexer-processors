@@ -57,6 +57,7 @@ native-tls = { workspace = true }
 postgres-native-tls = { workspace = true }
 tiny-keccak = { workspace = true }
 tokio-postgres = { workspace = true }
+bitflags = "2.5.0"
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

@@ -10,6 +10,7 @@ use super::{
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
+    models::TableName,
     schema::transactions,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
@@ -18,6 +19,7 @@ use crate::{
             u64_to_bigdecimal,
         },
     },
+    worker::TableFlags,
 };
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
@@ -47,6 +49,11 @@ pub struct Transaction {
     pub num_write_set_changes: i64,
     pub epoch: i64,
     pub payload_type: Option<String>,
+}
+impl TableName for Transaction {
+    fn table_name() -> &'static str {
+        "transactions"
+    }
 }
 
 impl Default for Transaction {
@@ -146,8 +153,9 @@ impl Transaction {
 
     pub fn from_transaction(
         transaction: &TransactionPB,
+        deprecated_tables: &TableFlags,
     ) -> (
-        Self,
+        Option<Self>,
         Option<BlockMetadataTransaction>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
@@ -174,7 +182,7 @@ impl Transaction {
                     epoch,
                     block_height,
                 );
-                return (transaction_out, None, Vec::new(), Vec::new());
+                return (Some(transaction_out), None, Vec::new(), Vec::new());
             },
         };
         let version = transaction.version as i64;
@@ -186,82 +194,19 @@ impl Transaction {
             .timestamp
             .as_ref()
             .expect("Transaction timestamp doesn't exist!");
-        match txn_data {
-            TxnData::User(user_txn) => {
-                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
-                    &transaction_info.changes,
-                    version,
-                    block_height,
-                );
-                let payload = user_txn
-                    .request
-                    .as_ref()
-                    .expect("Getting user request failed.")
-                    .payload
-                    .as_ref()
-                    .expect("Getting payload failed.");
-                let payload_cleaned = get_clean_payload(payload, version);
-                let payload_type = get_payload_type(payload);
 
-                (
-                    Self::from_transaction_info_with_data(
-                        transaction_info,
-                        payload_cleaned,
-                        Some(payload_type),
-                        version,
-                        transaction_type,
-                        user_txn.events.len() as i64,
-                        block_height,
-                        epoch,
-                    ),
+        let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
+            &transaction_info.changes,
+            version,
+            block_height,
+            deprecated_tables,
+        );
+
+        if deprecated_tables.contains(TableFlags::TRANSACTIONS) {
+            // we still have to handle block metadata txn.
+            if let TxnData::BlockMetadata(block_metadata_txn) = txn_data {
+                return (
                     None,
-                    wsc,
-                    wsc_detail,
-                )
-            },
-            TxnData::Genesis(genesis_txn) => {
-                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
-                    &transaction_info.changes,
-                    version,
-                    block_height,
-                );
-                let payload = genesis_txn.payload.as_ref().unwrap();
-                let payload_cleaned = get_clean_writeset(payload, version);
-                // It's genesis so no big deal
-                let payload_type = None;
-                (
-                    Self::from_transaction_info_with_data(
-                        transaction_info,
-                        payload_cleaned,
-                        payload_type,
-                        version,
-                        transaction_type,
-                        genesis_txn.events.len() as i64,
-                        block_height,
-                        epoch,
-                    ),
-                    None,
-                    wsc,
-                    wsc_detail,
-                )
-            },
-            TxnData::BlockMetadata(block_metadata_txn) => {
-                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
-                    &transaction_info.changes,
-                    version,
-                    block_height,
-                );
-                (
-                    Self::from_transaction_info_with_data(
-                        transaction_info,
-                        None,
-                        None,
-                        version,
-                        transaction_type,
-                        block_metadata_txn.events.len() as i64,
-                        block_height,
-                        epoch,
-                    ),
                     Some(BlockMetadataTransaction::from_transaction(
                         block_metadata_txn,
                         version,
@@ -271,10 +216,82 @@ impl Transaction {
                     )),
                     wsc,
                     wsc_detail,
+                );
+            }
+            return (None, None, wsc, wsc_detail);
+        }
+
+        match txn_data {
+            TxnData::User(user_txn) => {
+                let payload = user_txn
+                    .request
+                    .as_ref()
+                    .expect("Getting user request failed.")
+                    .payload
+                    .as_ref()
+                    .expect("Getting payload failed.");
+                let payload_cleaned = get_clean_payload(payload, version);
+                let payload_type = get_payload_type(payload);
+                (
+                    Some(Self::from_transaction_info_with_data(
+                        transaction_info,
+                        payload_cleaned,
+                        Some(payload_type),
+                        version,
+                        transaction_type,
+                        user_txn.events.len() as i64,
+                        block_height,
+                        epoch,
+                    )),
+                    None,
+                    wsc,
+                    wsc_detail,
                 )
             },
+            TxnData::Genesis(genesis_txn) => {
+                let payload = genesis_txn.payload.as_ref().unwrap();
+                let payload_cleaned = get_clean_writeset(payload, version);
+                // It's genesis so no big deal
+                let payload_type = None;
+                (
+                    Some(Self::from_transaction_info_with_data(
+                        transaction_info,
+                        payload_cleaned,
+                        payload_type,
+                        version,
+                        transaction_type,
+                        genesis_txn.events.len() as i64,
+                        block_height,
+                        epoch,
+                    )),
+                    None,
+                    wsc,
+                    wsc_detail,
+                )
+            },
+            TxnData::BlockMetadata(block_metadata_txn) => (
+                Some(Self::from_transaction_info_with_data(
+                    transaction_info,
+                    None,
+                    None,
+                    version,
+                    transaction_type,
+                    block_metadata_txn.events.len() as i64,
+                    block_height,
+                    epoch,
+                )),
+                Some(BlockMetadataTransaction::from_transaction(
+                    block_metadata_txn,
+                    version,
+                    block_height,
+                    epoch,
+                    timestamp,
+                )),
+                wsc,
+                wsc_detail,
+            ),
             TxnData::StateCheckpoint(_) => (
-                Self::from_transaction_info_with_data(
+                Some(Self::from_transaction_info_with_data(
                     transaction_info,
                     None,
                     None,
@@ -283,13 +300,13 @@ impl Transaction {
                     0,
                     block_height,
                     epoch,
-                ),
+                )),
                 None,
                 vec![],
                 vec![],
             ),
             TxnData::Validator(_) => (
-                Self::from_transaction_info_with_data(
+                Some(Self::from_transaction_info_with_data(
                     transaction_info,
                     None,
                     None,
@@ -298,7 +315,7 @@ impl Transaction {
                     0,
                     block_height,
                     epoch,
-                ),
+                )),
                 None,
                 vec![],
                 vec![],
@@ -308,6 +325,7 @@ impl Transaction {
 
     pub fn from_transactions(
         transactions: &[TransactionPB],
+        deprecated_tables: &TableFlags,
     ) -> (
         Vec<Self>,
         Vec<BlockMetadataTransaction>,
@@ -321,8 +339,10 @@ impl Transaction {
 
         for txn in transactions {
             let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
-                Self::from_transaction(txn);
-            txns.push(txn);
+                Self::from_transaction(txn, deprecated_tables);
+            if let Some(txn) = txn {
+                txns.push(txn);
+            }
             if let Some(a) = block_metadata {
                 block_metadata_txns.push(a);
             }

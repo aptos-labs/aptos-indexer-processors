@@ -37,7 +37,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
           # Skip all transactions that aren't user transactions
           focus_user_transactions: false
         deprecated_tables: [
-          "move_resources",
+          "MOVE_RESOURCES",
         ]
       ```
 

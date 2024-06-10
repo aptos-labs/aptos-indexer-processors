@@ -5,6 +5,7 @@
 
 use super::transactions::Transaction;
 use crate::{
+    models::TableName,
     schema::{current_table_items, table_items, table_metadatas},
     utils::util::{hash_str, standardize_address},
 };
@@ -25,6 +26,12 @@ pub struct CurrentTableItem {
     pub is_deleted: bool,
 }
 
+impl TableName for CurrentTableItem {
+    fn table_name() -> &'static str {
+        "current_table_items"
+    }
+}
+
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
 )]
@@ -42,6 +49,12 @@ pub struct TableItem {
     pub is_deleted: bool,
 }
 
+impl TableName for TableItem {
+    fn table_name() -> &'static str {
+        "table_items"
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(handle))]
 #[diesel(table_name = table_metadatas)]
@@ -49,6 +62,12 @@ pub struct TableMetadata {
     pub handle: String,
     pub key_type: String,
     pub value_type: String,
+}
+
+impl TableName for TableMetadata {
+    fn table_name() -> &'static str {
+        "table_metadatas"
+    }
 }
 
 impl TableItem {

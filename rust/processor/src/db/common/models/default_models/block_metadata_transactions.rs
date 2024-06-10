@@ -7,6 +7,7 @@
 
 use super::transactions::Transaction;
 use crate::{
+    models::TableName,
     schema::block_metadata_transactions,
     utils::util::{parse_timestamp, standardize_address},
 };
@@ -33,6 +34,12 @@ pub struct BlockMetadataTransaction {
     pub proposer: String,
     pub failed_proposer_indices: serde_json::Value,
     pub timestamp: chrono::NaiveDateTime,
+}
+
+impl TableName for BlockMetadataTransaction {
+    fn table_name() -> &'static str {
+        "block_metadata_transactions"
+    }
 }
 
 impl BlockMetadataTransaction {

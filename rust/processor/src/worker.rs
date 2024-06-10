@@ -37,6 +37,7 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
+use bitflags::bitflags;
 use std::collections::HashSet;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
@@ -47,6 +48,20 @@ use url::Url;
 // machines accordingly.
 pub const BUFFER_SIZE: usize = 100;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
+
+bitflags! {
+    #[derive(Debug, Clone, Copy)]
+    pub struct TableFlags: u32 {
+        const TRANSACTIONS = 0b00000001;
+        const BLOCK_METADATA_TRANSACTIONS = 0b00000010;
+        const WRITE_SET_CHANGES = 0b00000100;
+        const MOVE_MODULES = 0b00001000;
+        const MOVE_RESOURCES = 0b00010000;
+        const TABLE_ITEMS = 0b00100000;
+        const CURRENT_TABLE_ITEMS = 0b01000000;
+        const TABLE_METADATA = 0b10000000;
+    }
+}
 
 pub struct Worker {
     pub db_pool: ArcDbPool,
@@ -65,7 +80,7 @@ pub struct Worker {
     pub enable_verbose_logging: Option<bool>,
     pub transaction_filter: TransactionFilter,
     pub grpc_response_item_timeout_in_secs: u64,
-    pub deprecated_tables: HashSet<String>,
+    pub deprecated_tables: TableFlags,
 }
 
 impl Worker {
@@ -106,6 +121,14 @@ impl Worker {
             "[Parser] Finish creating the connection pool"
         );
         let number_concurrent_processing_tasks = number_concurrent_processing_tasks.unwrap_or(10);
+
+        let mut deprecated_tables_flags = TableFlags::empty();
+        for table in deprecated_tables.iter() {
+            if let Some(flags) = TableFlags::from_name(table) {
+                deprecated_tables_flags |= flags;
+            }
+        }
+
         Ok(Self {
             db_pool: conn_pool,
             processor_config,
@@ -123,7 +146,7 @@ impl Worker {
             enable_verbose_logging,
             transaction_filter,
             grpc_response_item_timeout_in_secs,
-            deprecated_tables,
+            deprecated_tables: deprecated_tables_flags,
         })
     }
 
@@ -244,7 +267,7 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
-            self.deprecated_tables.clone(),
+            self.deprecated_tables,
             self.db_pool.clone(),
         );
         tokio::spawn(async move {
@@ -309,7 +332,7 @@ impl Worker {
         let processor = build_processor(
             &self.processor_config,
             self.per_table_chunk_sizes.clone(),
-            self.deprecated_tables.clone(),
+            self.deprecated_tables,
             self.db_pool.clone(),
         );
 
@@ -726,7 +749,7 @@ pub async fn do_processor(
 pub fn build_processor(
     config: &ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
-    deprecated_tables: HashSet<String>,
+    deprecated_tables: TableFlags,
     db_pool: ArcDbPool,
 ) -> Processor {
     match config {

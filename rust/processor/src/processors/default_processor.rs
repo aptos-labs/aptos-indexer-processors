@@ -13,6 +13,7 @@ use crate::{
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -25,18 +26,19 @@ use diesel::{
 };
 use tokio::join;
 use std::{collections::HashSet, fmt::Debug};
+use tracing::error;
 
 pub struct DefaultProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
-    skip_deprecated_tables: bool,
+    deprecated_tables: TableFlags,
 }
 
 impl DefaultProcessor {
     pub fn new(
         connection_pool: ArcDbPool,
         per_table_chunk_sizes: AHashMap<String, usize>,
-        deprecated_tables: HashSet<String>,
+        deprecated_tables: TableFlags,
     ) -> Self {
         Self {
             connection_pool,
@@ -58,7 +60,7 @@ impl Debug for DefaultProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -73,7 +75,6 @@ async fn insert_to_db(
         &[TableMetadata],
     ),
     per_table_chunk_sizes: &AHashMap<String, usize>,
-    deprecated_tables: &HashSet<String>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -82,84 +83,88 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let txns_res = execute_in_chunks(
+        conn.clone(),
+        insert_transactions_query,
+        txns,
+        get_config_table_chunk_size::<TransactionModel>(
+            TransactionModel::table_name(),
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let bmt_res = execute_in_chunks(
         conn.clone(),
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
         get_config_table_chunk_size::<BlockMetadataTransactionModel>(
-            "block_metadata_transactions",
+            BlockMetadataTransaction::table_name(),
             per_table_chunk_sizes,
         ),
-    )
-    .await?;
+    );
 
-    execute_in_chunks(
+    let wst_res = execute_in_chunks(
+        conn.clone(),
+        insert_write_set_changes_query,
+        wscs,
+        get_config_table_chunk_size::<WriteSetChangeModel>(
+            WriteSetChangeModel::table_name(),
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let mm_res = execute_in_chunks(
         conn.clone(),
         insert_move_modules_query,
         move_modules,
-        get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
-    )
-    .await?;
+        get_config_table_chunk_size::<MoveModule>(MoveModule::table_name(), per_table_chunk_sizes),
+    );
 
-    execute_in_chunks(
+    let mr_res = execute_in_chunks(
+        conn.clone(),
+        insert_move_resources_query,
+        move_resources,
+        get_config_table_chunk_size::<MoveResource>(
+            MoveResource::table_name(),
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let ti_res = execute_in_chunks(
         conn.clone(),
         insert_table_items_query,
         table_items,
-        get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
-    )
-    .await?;
+        get_config_table_chunk_size::<TableItem>(TableItem::table_name(), per_table_chunk_sizes),
+    );
 
-    execute_in_chunks(
+    let cti_res = execute_in_chunks(
         conn.clone(),
         insert_current_table_items_query,
         current_table_items,
         get_config_table_chunk_size::<CurrentTableItem>(
-            "current_table_items",
+            CurrentTableItem::table_name(),
             per_table_chunk_sizes,
         ),
-    )
-    .await?;
+    );
 
-    execute_in_chunks(
+    let tm_res = execute_in_chunks(
         conn.clone(),
         insert_table_metadata_query,
         table_metadata,
-        get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
-    )
-    .await?;
+        get_config_table_chunk_size::<TableMetadata>(
+            TableMetadata::table_name(),
+            per_table_chunk_sizes,
+        ),
+    );
 
-    if !deprecated_tables.contains(&"transactions".to_string()) {
-        execute_in_chunks(
-            conn.clone(),
-            insert_transactions_query,
-            txns,
-            get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-        )
-        .await?;
-    };
+    let (txns_res, wst_res, mr_res, bmt_res, mm_res, ti_res, cti_res, tm_res) =
+        join!(txns_res, wst_res, mr_res, bmt_res, mm_res, ti_res, cti_res, tm_res);
 
-    if !deprecated_tables.contains(&"write_set_changes".to_string()) {
-        execute_in_chunks(
-            conn.clone(),
-            insert_write_set_changes_query,
-            wscs,
-            get_config_table_chunk_size::<WriteSetChangeModel>(
-                "write_set_changes",
-                per_table_chunk_sizes,
-            ),
-        )
-        .await?;
-    };
-
-    if !deprecated_tables.contains(&"move_resources".to_string()) {
-        execute_in_chunks(
-            conn.clone(),
-            insert_move_resources_query,
-            move_resources,
-            get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
-        )
-        .await?;
-    };
+    for res in [
+        txns_res, bmt_res, mm_res, ti_res, cti_res, tm_res, wst_res, mr_res,
+    ] {
+        res?;
+    }
 
     Ok(())
 }
@@ -327,15 +332,15 @@ impl ProcessorTrait for DefaultProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let flags = self.deprecated_tables;
         let (
             txns,
             block_metadata_transactions,
             write_set_changes,
             (move_modules, move_resources, table_items, current_table_items, table_metadata),
-        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+        ) = tokio::task::spawn_blocking(move || process_transactions(transactions, flags))
             .await
             .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
-
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -355,7 +360,6 @@ impl ProcessorTrait for DefaultProcessor {
                 &table_metadata,
             ),
             &self.per_table_chunk_sizes,
-            &self.deprecated_tables,
         )
         .await;
 
@@ -388,6 +392,7 @@ impl ProcessorTrait for DefaultProcessor {
 
 fn process_transactions(
     transactions: Vec<Transaction>,
+    flags: TableFlags,
 ) -> (
     Vec<crate::db::common::models::default_models::transactions::Transaction>,
     Vec<BlockMetadataTransaction>,
@@ -401,7 +406,7 @@ fn process_transactions(
     ),
 ) {
     let (txns, block_metadata_txns, write_set_changes, wsc_details) =
-        TransactionModel::from_transactions(&transactions);
+        TransactionModel::from_transactions(&transactions, &flags);
     let mut block_metadata_transactions = vec![];
     for block_metadata_txn in block_metadata_txns {
         block_metadata_transactions.push(block_metadata_txn.clone());
