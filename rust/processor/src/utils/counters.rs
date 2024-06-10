@@ -254,3 +254,13 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Processor gas processed.
+pub static PROCESSOR_GAS_PROCESSED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_processor_gas_processed_count",
+        "Processor gas processed",
+        &["processor_name"]
+    )
+    .unwrap()
+});
