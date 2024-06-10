@@ -84,7 +84,7 @@ pub async fn get_stream(
 ) -> Response<Streaming<TransactionsResponse>> {
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
@@ -112,7 +112,7 @@ pub async fn get_stream(
 
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
@@ -133,7 +133,7 @@ pub async fn get_stream(
             Err(e) => {
                 error!(
                     processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     start_version = starting_version,
                     end_version = ending_version,
@@ -160,7 +160,7 @@ pub async fn get_stream(
         Err(e) => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 start_version = starting_version,
                 ending_version = ending_version,
@@ -173,7 +173,7 @@ pub async fn get_stream(
     let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
@@ -200,7 +200,7 @@ pub async fn get_stream(
             Err(e) => {
                 error!(
                     processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     start_version = starting_version,
                     end_version = ending_version,
@@ -222,7 +222,7 @@ pub async fn get_stream(
         Err(e) => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 start_version = starting_version,
                 ending_version = ending_version,
@@ -244,7 +244,7 @@ pub async fn get_chain_id(
 ) -> u64 {
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         "[Parser] Connecting to GRPC stream to get chain id",
     );
@@ -266,7 +266,7 @@ pub async fn get_chain_id(
     let mut resp_stream = response.into_inner();
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         connection_id,
         "[Parser] Successfully connected to GRPC stream to get chain id",
@@ -277,7 +277,7 @@ pub async fn get_chain_id(
         Some(Err(rpc_error)) => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 connection_id,
                 error = ?rpc_error,
@@ -288,7 +288,7 @@ pub async fn get_chain_id(
         None => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 connection_id,
                 "[Parser] Stream ended before getting response fo for chain id"
@@ -450,7 +450,7 @@ impl TransactionStream {
 
                         info!(
                             processor_name = self.processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.indexer_grpc_data_service_address.to_string(),
                             connection_id = self.connection_id,
                             start_version,
@@ -580,7 +580,7 @@ impl TransactionStream {
                         let channel_size = self.txn_sender.len();
                         debug!(
                             processor_name = self.processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.indexer_grpc_data_service_address.to_string(),
                             connection_id = self.connection_id,
                             start_version,
@@ -607,7 +607,7 @@ impl TransactionStream {
                     Some(Err(rpc_error)) => {
                         tracing::warn!(
                             processor_name = self.processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.indexer_grpc_data_service_address.to_string(),
                             self.connection_id,
                             start_version = self.starting_version,
@@ -621,7 +621,7 @@ impl TransactionStream {
                     None => {
                         tracing::warn!(
                             processor_name = self.processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.indexer_grpc_data_service_address.to_string(),
                             connection_id = self.connection_id,
                             start_version = self.starting_version,
@@ -636,7 +636,7 @@ impl TransactionStream {
             Err(e) => {
                 tracing::warn!(
                     processor_name = self.processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = self.indexer_grpc_data_service_address.to_string(),
                     connection_id = self.connection_id,
                     start_version = self.starting_version,
@@ -656,7 +656,7 @@ impl TransactionStream {
         if is_end {
             info!(
                 processor_name = self.processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = self.indexer_grpc_data_service_address.to_string(),
                 connection_id = self.connection_id,
                 ending_version = self.request_ending_version,
@@ -668,7 +668,7 @@ impl TransactionStream {
                 let channel_size = self.txn_sender.len();
                 info!(
                     processor_name = self.processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = self.indexer_grpc_data_service_address.to_string(),
                     connection_id = self.connection_id,
                     channel_size,
@@ -681,7 +681,7 @@ impl TransactionStream {
             }
             info!(
                 processor_name = self.processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = self.indexer_grpc_data_service_address.to_string(),
                 connection_id = self.connection_id,
                 "[Parser] Transaction fetcher send channel is closed."
