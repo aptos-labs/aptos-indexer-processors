@@ -57,6 +57,7 @@ static REQUIRED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
         "0x17f1e926a81639e9557f4e4934df93452945ec30bc962e11351db59eb0d78c33",
         "0x1::voting",
         "0x1::aptos_governance",
+        "0x1::delegation_pool",
         "0x05a97986a9d031c4567e15b797be516910cfcb4156312482efc6a19c0a30c948",
         "0xfaf4e633ae9eb31366c9ca24214231760926576c7b625313b3688b5e900731f6",
         "0x163df34fccbf003ce219d3f1d9e70d140b60622cb9dd47599c25fb2f797ba6e",

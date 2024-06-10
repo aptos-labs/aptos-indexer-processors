@@ -1,4 +1,4 @@
-config.yaml
+config*.yaml
 cursor.txt
 build
 node_modules/
