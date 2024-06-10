@@ -621,6 +621,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_token_royalty_v1 (token_data_id) {
+        #[max_length = 66]
+        token_data_id -> Varchar,
+        #[max_length = 66]
+        payee_address -> Varchar,
+        royalty_points_numerator -> Numeric,
+        royalty_points_denominator -> Numeric,
+        last_transaction_version -> Int8,
+        last_transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_token_v2_metadata (object_address, resource_type) {
         #[max_length = 66]
         object_address -> Varchar,
@@ -1290,6 +1304,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_ownerships,
     current_token_ownerships_v2,
     current_token_pending_claims,
+    current_token_royalty_v1,
     current_token_v2_metadata,
     current_unified_fungible_asset_balances,
     delegated_staking_activities,

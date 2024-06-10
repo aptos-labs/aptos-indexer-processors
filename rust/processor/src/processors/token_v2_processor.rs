@@ -10,6 +10,7 @@ use crate::{
         },
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
+            v1_token_royalty::CurrentTokenRoyaltyV1,
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
             v2_token_activities::TokenActivityV2,
             v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
@@ -105,6 +106,7 @@ async fn insert_to_db(
     ),
     token_activities_v2: &[TokenActivityV2],
     current_token_v2_metadata: &[CurrentTokenV2Metadata],
+    current_token_royalties_v1: &[CurrentTokenRoyaltyV1],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -190,11 +192,20 @@ async fn insert_to_db(
         ),
     );
     let ct_v2 = execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_v2_metadatas_query,
         current_token_v2_metadata,
         get_config_table_chunk_size::<CurrentTokenV2Metadata>(
             "current_token_v2_metadata",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ctr_v1 = execute_in_chunks(
+        conn,
+        insert_current_token_royalties_v1_query,
+        current_token_royalties_v1,
+        get_config_table_chunk_size::<CurrentTokenRoyaltyV1>(
+            "current_token_royalty_v1",
             per_table_chunk_sizes,
         ),
     );
@@ -210,7 +221,10 @@ async fn insert_to_db(
         cdto_v2_res,
         ta_v2_res,
         ct_v2_res,
-    ) = tokio::join!(coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2,);
+        ctr_v1_res,
+    ) = tokio::join!(
+        coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, ctr_v1
+    );
 
     for res in [
         coll_v2_res,
@@ -223,6 +237,7 @@ async fn insert_to_db(
         cdto_v2_res,
         ta_v2_res,
         ct_v2_res,
+        ctr_v1_res,
     ] {
         res?;
     }
@@ -479,6 +494,30 @@ fn insert_current_token_v2_metadatas_query(
     )
 }
 
+fn insert_current_token_royalties_v1_query(
+    items_to_insert: Vec<CurrentTokenRoyaltyV1>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_token_royalty_v1::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_token_royalty_v1::table)
+            .values(items_to_insert)
+            .on_conflict(token_data_id)
+            .do_update()
+            .set((
+                payee_address.eq(excluded(payee_address)),
+                royalty_points_numerator.eq(excluded(royalty_points_numerator)),
+                royalty_points_denominator.eq(excluded(royalty_points_denominator)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
+            )),
+        Some(" WHERE current_token_royalty_v1.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
 #[async_trait]
 impl ProcessorTrait for TokenV2Processor {
     fn name(&self) -> &'static str {
@@ -516,6 +555,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_deleted_token_ownerships_v2,
             token_activities_v2,
             current_token_v2_metadata,
+            current_token_royalties_v1,
         ) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
@@ -544,6 +584,7 @@ impl ProcessorTrait for TokenV2Processor {
             ),
             &token_activities_v2,
             &current_token_v2_metadata,
+            &current_token_royalties_v1,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -592,12 +633,14 @@ async fn parse_v2_token(
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
+    Vec<CurrentTokenRoyaltyV1>,
 ) {
     // Token V2 and V1 combined
     let mut collections_v2 = vec![];
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
     let mut token_activities_v2 = vec![];
+
     let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         AHashMap::new();
     let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
@@ -617,6 +660,8 @@ async fn parse_v2_token(
     let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
     // Basically token properties
     let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
+        AHashMap::new();
+    let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, CurrentTokenRoyaltyV1> =
         AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
@@ -818,6 +863,19 @@ async fn parse_v2_token(
                             current_token_datas_v2.insert(
                                 current_token_data.token_data_id.clone(),
                                 current_token_data,
+                            );
+                        }
+                        if let Some(current_token_royalty) =
+                            CurrentTokenRoyaltyV1::get_v1_from_write_table_item(
+                                table_item,
+                                txn_version,
+                                txn_timestamp,
+                            )
+                            .unwrap()
+                        {
+                            current_token_royalties_v1.insert(
+                                current_token_royalty.token_data_id.clone(),
+                                current_token_royalty,
                             );
                         }
                         if let Some((token_ownership, current_token_ownership)) =
@@ -1091,6 +1149,9 @@ async fn parse_v2_token(
     let mut current_deleted_token_ownerships_v2 = current_deleted_token_ownerships_v2
         .into_values()
         .collect::<Vec<CurrentTokenOwnershipV2>>();
+    let mut current_token_royalties_v1 = current_token_royalties_v1
+        .into_values()
+        .collect::<Vec<CurrentTokenRoyaltyV1>>();
 
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
@@ -1127,6 +1188,7 @@ async fn parse_v2_token(
                 &b.storage_id,
             ))
     });
+    current_token_royalties_v1.sort();
 
     (
         collections_v2,
@@ -1139,5 +1201,6 @@ async fn parse_v2_token(
         current_deleted_token_ownerships_v2,
         token_activities_v2,
         current_token_v2_metadata,
+        current_token_royalties_v1,
     )
 }
