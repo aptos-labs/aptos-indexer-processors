@@ -20,6 +20,7 @@ aptos-protos = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bigdecimal = { workspace = true }
+bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 diesel = { workspace = true }
@@ -57,7 +58,6 @@ native-tls = { workspace = true }
 postgres-native-tls = { workspace = true }
 tiny-keccak = { workspace = true }
 tokio-postgres = { workspace = true }
-bitflags = "2.5.0"
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
