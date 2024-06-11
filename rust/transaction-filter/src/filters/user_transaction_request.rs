@@ -1,8 +1,8 @@
 use crate::{errors::FilterError, filters::PositionalFilter, traits::Filterable};
 use anyhow::{anyhow, Error};
 use aptos_protos::transaction::v1::{
-    multisig_transaction_payload, transaction_payload, EntryFunctionId, EntryFunctionPayload,
-    TransactionPayload, UserTransactionRequest,
+    multisig_transaction_payload, transaction::TxnData, transaction_payload, EntryFunctionId,
+    EntryFunctionPayload, Transaction, TransactionPayload,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ pub struct UserTransactionRequestFilter {
     pub payload: Option<UserTransactionPayloadFilter>,
 }
 
-impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
+impl Filterable<Transaction> for UserTransactionRequestFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
         if self.sender.is_none() && self.payload.is_none() {
@@ -28,16 +28,26 @@ impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
     }
 
     #[inline]
-    fn is_allowed(&self, item: &UserTransactionRequest) -> bool {
+    fn is_allowed(&self, txn: &Transaction) -> bool {
+        let user_request = if let Some(TxnData::User(u)) = txn.txn_data.as_ref() {
+            if let Some(user_request) = u.request.as_ref() {
+                user_request
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        };
+
         if let Some(sender_filter) = &self.sender {
-            if &item.sender != sender_filter {
+            if &user_request.sender != sender_filter {
                 return false;
             }
         }
 
         if let Some(payload_filter) = &self.payload {
             // Get the entry_function_payload from both UserPayload and MultisigPayload
-            let entry_function_payload = item
+            let entry_function_payload = user_request
                 .payload
                 .as_ref()
                 .and_then(get_entry_function_payload_from_transaction_payload);

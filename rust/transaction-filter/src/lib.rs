@@ -1,4 +1,3 @@
-pub mod api_filter;
 pub mod filter_operator;
 pub mod filters;
 pub mod json_search;

@@ -33,20 +33,7 @@ impl Filterable<Transaction> for APIFilter {
     fn is_allowed(&self, txn: &Transaction) -> bool {
         match self {
             APIFilter::TransactionRootFilter(filter) => filter.is_allowed(txn),
-            APIFilter::UserTransactionRequestFilter(ut_filter) => txn
-                .txn_data
-                .as_ref()
-                .map(|txn_data| {
-                    if let TxnData::User(u) = txn_data {
-                        u.request
-                            .as_ref()
-                            .map(|req| ut_filter.is_allowed(req))
-                            .unwrap_or(false)
-                    } else {
-                        false
-                    }
-                })
-                .unwrap_or(false),
+            APIFilter::UserTransactionRequestFilter(ut_filter) => ut_filter.is_allowed(&txn),
             APIFilter::EventFilter(events_filter) => {
                 if let Some(txn_data) = &txn.txn_data {
                     let events = match txn_data {
