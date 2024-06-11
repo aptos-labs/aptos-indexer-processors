@@ -3,7 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::default_models::{
+    db::common::models::default_models::{
         block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
         move_modules::MoveModule,
         move_resources::MoveResource,
@@ -12,7 +12,7 @@ use crate::{
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -28,12 +28,12 @@ use tokio::join;
 use tracing::error;
 
 pub struct DefaultProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
@@ -53,7 +53,7 @@ impl Debug for DefaultProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -366,7 +366,7 @@ impl ProcessorTrait for DefaultProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }
@@ -374,7 +374,7 @@ impl ProcessorTrait for DefaultProcessor {
 fn process_transactions(
     transactions: Vec<Transaction>,
 ) -> (
-    Vec<crate::models::default_models::transactions::Transaction>,
+    Vec<crate::db::common::models::default_models::transactions::Transaction>,
     Vec<BlockMetadataTransaction>,
     Vec<WriteSetChangeModel>,
     (

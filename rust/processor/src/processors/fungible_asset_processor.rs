@@ -3,7 +3,7 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
+    db::common::models::{
         coin_models::coin_supply::CoinSupply,
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
@@ -24,7 +24,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::{get_entry_function_from_user_request, standardize_address},
     },
 };
@@ -42,12 +42,12 @@ use std::fmt::Debug;
 use tracing::error;
 
 pub struct FungibleAssetProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl FungibleAssetProcessor {
-    pub fn new(connection_pool: PgDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
@@ -67,7 +67,7 @@ impl Debug for FungibleAssetProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
@@ -401,7 +401,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }
