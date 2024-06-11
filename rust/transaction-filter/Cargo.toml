@@ -15,6 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-protos = { workspace = true }
+# SIMD for string search. TODO: benchmark this on various real inputs to see if it's worth it
+memchr = { workspace = true }
 
 prost = { workspace = true }
 
@@ -24,6 +26,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-# we only decompress the fixture protos in tests
+# we only decompress the fixture protos in test
 lz4 = "1.24.0"
 

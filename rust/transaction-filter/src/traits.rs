@@ -1,22 +1,46 @@
-use anyhow::Error;
+use crate::errors::FilterError;
+use serde::Serialize;
+use std::fmt::Debug;
 
 /// Simple trait to allow for filtering of items of type T
-pub trait Filterable<T> {
+pub trait Filterable<T>
+where
+    Self: Debug + Serialize,
+{
     /// Whether this filter is correctly configured/initialized
     /// Any call to `validate_state` is responsible for recursively checking the validity of any nested filters *by calling `is_valid`*
     /// The actual public API is via `is_valid` which will call `validate_state` and return an error if it fails, but annotated with the filter type/path
-    fn validate_state(&self) -> Result<(), Error>;
+    fn validate_state(&self) -> Result<(), FilterError>;
 
+    /**
+     * This is a convenience method to allow for the error to be annotated with the filter type/path at each level
+     * This is the public API for checking the validity of a filter!
+     * Example output looks like:
+     * ```text
+     *   FilterError: This is a test error!.
+     *   Trace Path:
+     *   transaction_filter::traits::test::InnerStruct:   {"a":"test"}
+     *   core::option::Option<transaction_filter::traits::test::InnerStruct>:   {"a":"test"}
+     *   transaction_filter::traits::test::OuterStruct:   {"inner":{"a":"test"}}
+     *  ```
+     **/
     #[inline]
-    fn is_valid(&self) -> Result<(), Error> {
-        println!("calling: {}", std::any::type_name::<Self>());
-        // This is a convenience method to allow for the error to be annotated with the filter type/path
-        self.validate_state().map_err(|e| {
-            println!("erroring: {}", std::any::type_name::<Self>());
-            e.context(std::any::type_name::<T>())
+    fn is_valid(&self) -> Result<(), FilterError> {
+        // T
+        self.validate_state().map_err(|mut e| {
+            e.add_trace(
+                serde_json::to_string(self).unwrap(),
+                std::any::type_name::<Self>().to_string(),
+            );
+            e
         })
     }
 
+    /// Whether the item is allowed by this filter
+    /// This is the core method that should be implemented by any filter
+    /// This is the method that should be called by any parent filter to determine if an item is allowed
+    /// *If a filter doesn't explicitly prevent an item, then it should be allowed*
+    /// This forces the logic of `if !child_filter.is_allowed(item) { return false; }` for any parent filter
     fn is_allowed(&self, item: &T) -> bool;
 
     #[inline]
@@ -47,7 +71,7 @@ where
     F: Filterable<T>,
 {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         match self {
             Some(filter) => filter.is_valid(),
             None => Ok(()),
@@ -73,7 +97,7 @@ where
 
 impl Filterable<String> for Option<String> {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         Ok(())
     }
 
@@ -88,7 +112,7 @@ impl Filterable<String> for Option<String> {
 
 impl Filterable<i32> for Option<i32> {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         Ok(())
     }
 
@@ -103,7 +127,7 @@ impl Filterable<i32> for Option<i32> {
 
 impl Filterable<bool> for Option<bool> {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         Ok(())
     }
 
@@ -121,14 +145,14 @@ mod test {
     use super::*;
     use anyhow::anyhow;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Serialize, PartialEq)]
     pub struct InnerStruct {
         pub a: Option<String>,
     }
 
     impl Filterable<InnerStruct> for InnerStruct {
-        fn validate_state(&self) -> Result<(), Error> {
-            Err(anyhow!("this is an error"))
+        fn validate_state(&self) -> Result<(), FilterError> {
+            Err(anyhow!("This is a test error!").into())
         }
 
         fn is_allowed(&self, _item: &InnerStruct) -> bool {
@@ -136,13 +160,13 @@ mod test {
         }
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Serialize)]
     pub struct OuterStruct {
         pub inner: Option<InnerStruct>,
     }
 
     impl Filterable<InnerStruct> for OuterStruct {
-        fn validate_state(&self) -> Result<(), Error> {
+        fn validate_state(&self) -> Result<(), FilterError> {
             self.inner.is_valid()?;
             Ok(())
         }
@@ -161,6 +185,7 @@ mod test {
 
         let res = outer.is_valid();
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err().to_string(), "err");
+        let error = res.unwrap_err();
+        assert_eq!(error.to_string(), "Filter Error: This is a test error!\nTrace Path:\ntransaction_filter::traits::test::InnerStruct:   {\"a\":\"test\"}\ncore::option::Option<transaction_filter::traits::test::InnerStruct>:   {\"a\":\"test\"}\ntransaction_filter::traits::test::OuterStruct:   {\"inner\":{\"a\":\"test\"}}");
     }
 }

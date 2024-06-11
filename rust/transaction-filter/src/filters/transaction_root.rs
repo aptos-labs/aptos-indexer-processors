@@ -1,4 +1,4 @@
-use crate::traits::Filterable;
+use crate::{errors::FilterError, traits::Filterable};
 use anyhow::Error;
 use aptos_protos::transaction::v1::{transaction::TransactionType, Transaction};
 use serde::{Deserialize, Serialize};
@@ -14,11 +14,9 @@ pub struct TransactionRootFilter {
 
 impl Filterable<Transaction> for TransactionRootFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.success.is_none() && self.txn_type.is_none() {
-            return Err(Error::msg(
-                "At least one of success or txn_types must be set",
-            ));
+            return Err(Error::msg("At least one of success or txn_types must be set").into());
         };
         Ok(())
     }

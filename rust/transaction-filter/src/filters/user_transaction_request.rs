@@ -1,8 +1,8 @@
-use crate::traits::Filterable;
+use crate::{errors::FilterError, filters::PositionalFilter, traits::Filterable};
 use anyhow::{anyhow, Error};
 use aptos_protos::transaction::v1::{
-    multisig_transaction_payload, transaction_payload, EntryFunctionId, EntryFunctionPayload,
-    TransactionPayload, UserTransactionRequest,
+    multisig_transaction_payload, transaction::TxnData, transaction_payload, EntryFunctionId,
+    EntryFunctionPayload, Transaction, TransactionPayload,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,27 +17,37 @@ pub struct UserTransactionRequestFilter {
     pub payload: Option<UserTransactionPayloadFilter>,
 }
 
-impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
+impl Filterable<Transaction> for UserTransactionRequestFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.sender.is_none() && self.payload.is_none() {
-            return Err(Error::msg("At least one of sender or payload must be set"));
+            return Err(Error::msg("At least one of sender or payload must be set").into());
         };
         self.payload.is_valid()?;
         Ok(())
     }
 
     #[inline]
-    fn is_allowed(&self, item: &UserTransactionRequest) -> bool {
+    fn is_allowed(&self, txn: &Transaction) -> bool {
+        let user_request = if let Some(TxnData::User(u)) = txn.txn_data.as_ref() {
+            if let Some(user_request) = u.request.as_ref() {
+                user_request
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        };
+
         if let Some(sender_filter) = &self.sender {
-            if &item.sender != sender_filter {
+            if &user_request.sender != sender_filter {
                 return false;
             }
         }
 
         if let Some(payload_filter) = &self.payload {
             // Get the entry_function_payload from both UserPayload and MultisigPayload
-            let entry_function_payload = item
+            let entry_function_payload = user_request
                 .payload
                 .as_ref()
                 .and_then(get_entry_function_payload_from_transaction_payload);
@@ -66,11 +76,9 @@ pub struct EntryFunctionFilter {
 
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.address.is_none() && self.module.is_none() && self.function.is_none() {
-            return Err(anyhow!(
-                "At least one of address, name or function must be set"
-            ));
+            return Err(anyhow!("At least one of address, name or function must be set").into());
         };
         Ok(())
     }
@@ -102,21 +110,26 @@ impl Filterable<EntryFunctionId> for EntryFunctionFilter {
 pub struct UserTransactionPayloadFilter {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<EntryFunctionFilter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<Vec<PositionalFilter<String>>>,
+    // TODO: handle type args?
 }
 
 impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
-        if self.function.is_none() {
-            return Err(Error::msg("At least one of function must be set"));
+    fn validate_state(&self) -> Result<(), FilterError> {
+        if self.function.is_none() && self.arguments.is_none() {
+            return Err(Error::msg("At least one of function or arguments must be set").into());
         };
         self.function.is_valid()?;
+        self.arguments.is_valid()?;
         Ok(())
     }
 
     #[inline]
     fn is_allowed(&self, payload: &EntryFunctionPayload) -> bool {
         self.function.is_allowed_opt(&payload.function)
+            && self.arguments.is_allowed(&payload.arguments)
     }
 }
 

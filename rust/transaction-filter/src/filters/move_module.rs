@@ -1,5 +1,5 @@
-use crate::traits::Filterable;
-use anyhow::{anyhow, Error};
+use crate::{errors::FilterError, traits::Filterable};
+use anyhow::anyhow;
 use aptos_protos::transaction::v1::{MoveModuleId, MoveStructTag};
 use serde::{Deserialize, Serialize};
 
@@ -14,9 +14,9 @@ pub struct MoveModuleFilter {
 
 impl Filterable<MoveModuleId> for MoveModuleFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.address.is_none() && self.name.is_none() {
-            return Err(anyhow!("At least one of address or name must be set"));
+            return Err(anyhow!("At least one of address or name must be set").into());
         };
         Ok(())
     }
@@ -40,11 +40,9 @@ pub struct MoveStructTagFilter {
 
 impl Filterable<MoveStructTag> for MoveStructTagFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.address.is_none() && self.module.is_none() && self.name.is_none() {
-            return Err(anyhow!(
-                "At least one of address, module or name must be set"
-            ));
+            return Err(anyhow!("At least one of address, module or name must be set").into());
         };
         Ok(())
     }
