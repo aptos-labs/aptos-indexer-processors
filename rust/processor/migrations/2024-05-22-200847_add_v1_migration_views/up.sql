@@ -4,11 +4,9 @@ CREATE SCHEMA IF NOT EXISTS legacy_migration_v1;
 -- Replace `move_resources` with account transactions
 -- account_transactions already has index on transaction_version
 CREATE OR REPLACE VIEW legacy_migration_v1.move_resources AS
-SELECT
-    transaction_version,
+SELECT transaction_version,
     account_address as address
 FROM account_transactions at2;
-
 CREATE OR REPLACE VIEW legacy_migration_v1.address_version_from_move_resources AS
 SELECT transaction_version,
     account_address as address
@@ -52,11 +50,26 @@ SELECT transaction_version,
     inserted_at
 FROM public.fungible_asset_balances
 WHERE token_standard = 'v1';
+-- replace `coin_infos` with `fungible_asset_metadata`
+CREATE OR REPLACE VIEW legacy_migration_v1.coin_infos AS
+SELECT encode(sha256(asset_type::bytea), 'hex'),
+    asset_type as coin_type,
+    last_transaction_version as transaction_version_created,
+    creator_address,
+    name,
+    symbol,
+    decimals,
+    last_transaction_timestamp as transaction_created_timestamp,
+    inserted_at,
+    supply_aggregator_table_handle_v1 as supply_aggregator_table_handle,
+    supply_aggregator_table_key_v1 as supply_aggregator_table_key
+FROM public.fungible_asset_metadata
+WHERE token_standard = 'v1';
 CREATE INDEX IF NOT EXISTS lm1_cb_tv_oa_ct_index ON public.fungible_asset_balances USING btree (transaction_version, owner_address, asset_type);
 -- replace `current_coin_balances` with `current_fungible_asset_balances`
 CREATE OR REPLACE VIEW legacy_migration_v1.current_coin_balances AS
 SELECT owner_address,
-    substring(asset_type, 64) as coin_type_hash,
+    encode(sha256(asset_type::bytea), 'hex') as coin_type_hash,
     asset_type as coin_type,
     amount,
     last_transaction_version,
@@ -180,7 +193,7 @@ SELECT token_data_id AS token_data_id_hash,
     supply,
     largest_property_version_v1 AS largest_property_version,
     token_uri AS metadata_uri,
-    -- Join on new royalty table
+    -- Null b/c we're not tracking royalty on transaction level
     '' as payee_address,
     null as royalty_points_numerator,
     null as royalty_points_denominator,
@@ -210,12 +223,9 @@ SELECT token_data_id AS token_data_id_hash,
     COALESCE(supply, 0) AS supply,
     largest_property_version_v1 AS largest_property_version,
     token_uri AS metadata_uri,
-    -- TODO: Join on a new table for v1 royalty
-    '' as payee_address,
-    -- TODO: Join on a new table for v1 royalty
-    null as royalty_points_numerator,
-    -- TODO: Join on a new table for v1 royalty
-    null as royalty_points_denominator,
+    COALESCE(payee_address, '') as payee_address,
+    royalty_points_numerator,
+    royalty_points_denominator,
     -- Validated this is fine, since most are true anyway
     TRUE AS maximum_mutable,
     TRUE AS uri_mutable,

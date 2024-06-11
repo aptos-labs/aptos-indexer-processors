@@ -3,6 +3,7 @@ DROP VIEW IF EXISTS legacy_migration_v1.move_resources;
 DROP VIEW IF EXISTS legacy_migration_v1.address_version_from_move_resources;
 DROP VIEW IF EXISTS legacy_migration_v1.coin_activities;
 DROP VIEW IF EXISTS legacy_migration_v1.coin_balances;
+DROP VIEW IF EXISTS legacy_migration_v1.coin_infos;
 DROP VIEW IF EXISTS legacy_migration_v1.current_coin_balances;
 DROP VIEW IF EXISTS legacy_migration_v1.token_activities;
 DROP VIEW IF EXISTS legacy_migration_v1.token_ownerships;
