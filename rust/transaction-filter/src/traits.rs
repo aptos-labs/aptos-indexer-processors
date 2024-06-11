@@ -36,6 +36,11 @@ where
         })
     }
 
+    /// Whether the item is allowed by this filter
+    /// This is the core method that should be implemented by any filter
+    /// This is the method that should be called by any parent filter to determine if an item is allowed
+    /// *If a filter doesn't explicitly prevent an item, then it should be allowed*
+    /// This forces the logic of `if !child_filter.is_allowed(item) { return false; }` for any parent filter
     fn is_allowed(&self, item: &T) -> bool;
 
     #[inline]
