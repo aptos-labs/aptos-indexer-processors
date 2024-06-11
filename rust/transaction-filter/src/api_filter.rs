@@ -110,57 +110,24 @@ impl Filterable<Transaction> for PublicOrApiFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::filters::{
-        user_transaction_request::EntryFunctionFilter,
-        write_set_change_filter::{
-            ChangeItemFilter, ModuleChangeFilter, ResourceChangeFilter, TableChangeFilter,
+    use crate::{
+        filters::{
+            user_transaction_request::EntryFunctionFilter,
+            write_set_change_filter::{
+                ChangeItemFilter, ModuleChangeFilter, ResourceChangeFilter, TableChangeFilter,
+            },
+            MoveStructTagFilter, PositionalFilter, UserTransactionPayloadFilter,
         },
-        MoveStructTagFilter, UserTransactionPayloadFilter,
+        json_search::{JsonOrStringSearch, JsonSearchTerm},
+        test_lib::{load_graffio_fixture, load_random_april_3mb_fixture, load_taptos_fixture},
     };
     use aptos_protos::indexer::v1::TransactionsInStorage;
-    use prost::Message;
-    use std::io::Read;
-
-    // Decompress fixtures first, Ex:
-
-    fn decompress_fixture(bytes: &[u8]) -> TransactionsInStorage {
-        let mut decompressor = lz4::Decoder::new(bytes).expect("Lz4 decompression failed.");
-        let mut decompressed = Vec::new();
-        decompressor
-            .read_to_end(&mut decompressed)
-            .expect("Lz4 decompression failed.");
-        TransactionsInStorage::decode(decompressed.as_slice()).expect("Failed to parse transaction")
-    }
-
-    #[allow(dead_code)]
-    fn load_taptos_fixture() -> TransactionsInStorage {
-        let data = include_bytes!(
-            "../fixtures/compressed_files_lz4_00008bc1d5adcf862d3967c1410001fb_705101000.pb.lz4"
-        );
-        decompress_fixture(data)
-    }
-
-    #[allow(dead_code)]
-    fn load_random_april_3mb_fixture() -> TransactionsInStorage {
-        let data = include_bytes!(
-            "../fixtures/compressed_files_lz4_0013c194ec4fdbfb8db7306170aac083_445907000.pb.lz4"
-        );
-        decompress_fixture(data)
-    }
-
-    #[allow(dead_code)]
-    fn load_graffio_fixture() -> TransactionsInStorage {
-        let data = include_bytes!(
-            "../fixtures/compressed_files_lz4_f3d880d9700c70d71fefe71aa9218aa9_301616000.pb.lz4"
-        );
-        decompress_fixture(data)
-    }
 
     #[test]
     pub fn test_query_parsing() {
         let trf = TransactionRootFilter {
-            success: Some(false),
-            txn_type: None,
+            success: Some(true),
+            txn_type: Some(aptos_protos::transaction::v1::transaction::TransactionType::User),
         };
 
         let utrf = UserTransactionRequestFilter {
@@ -171,28 +138,28 @@ mod test {
                     module: Some("module".into()),
                     function: Some("F".into()),
                 }),
+                arguments: Some(vec![PositionalFilter {
+                    index: 0,
+                    value: "0x0011".into(),
+                }]),
             }),
         };
 
-        let ef = EventFilter {
+        let ef1 = EventFilter {
+            data: Some(JsonSearchTerm::new("spins".into(), 5.into()).unwrap()),
             struct_type: Some(MoveStructTagFilter {
                 address: Some("0x0077".into()),
                 module: Some("roulette".into()),
                 name: Some("spin".into()),
             }),
         };
-        let ef_econia = EventFilter {
+
+        let ef2 = EventFilter {
+            data: Some(JsonSearchTerm::new("debt".into(), 12.into()).unwrap()),
             struct_type: Some(MoveStructTagFilter {
-                address: Some("0x00ECONIA".into()),
-                module: None,
-                name: None,
-            }),
-        };
-        let ef_aries = EventFilter {
-            struct_type: Some(MoveStructTagFilter {
-                address: Some("0x00ARIES".into()),
-                module: None,
-                name: None,
+                address: Some("0x0052".into()),
+                module: Some("lending".into()),
+                name: Some("borrow_to_gamble".into()),
             }),
         };
 
@@ -204,12 +171,13 @@ mod test {
                     name: Some("airplane".into()),
                 }),
                 address: Some("0x001af32".into()),
+                data: Some(JsonSearchTerm::new("takeoff".into(), true.into()).unwrap()),
             })),
         };
         let wscf_table = WriteSetChangeFilter {
             change: Some(ChangeItemFilter::TableChange(TableChangeFilter {
                 handle: Some("0x796857465434253644536475453432453".into()),
-                key: Some("table_key".into()),
+                key: Some(JsonOrStringSearch::String("table_key".into())),
                 key_type_str: Some("0x423453466345::some_module::SomeStruct".into()),
             })),
         };
@@ -222,7 +190,7 @@ mod test {
         let query = PublicOrApiFilter {
             root_filter: Some(trf),
             user_transaction_filter: Some(utrf),
-            event_filter: Some(vec![ef, ef_econia, ef_aries]),
+            event_filter: Some(vec![ef1, ef2]),
             write_set_change_filter: Some(vec![wscf_res, wscf_table, wscf_mod]),
         };
 

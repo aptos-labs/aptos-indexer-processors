@@ -157,7 +157,7 @@ impl JsonSearchTerm {
 }
 
 impl Filterable<String> for JsonSearchTerm {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         // Validation is performed elsewhere
         Ok(())
     }
@@ -176,7 +176,7 @@ pub enum JsonOrStringSearch {
 }
 
 impl Filterable<String> for JsonOrStringSearch {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         match self {
             JsonOrStringSearch::Json(json) => json.is_valid(),
             JsonOrStringSearch::String(_) => Ok(()),

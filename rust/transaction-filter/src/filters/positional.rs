@@ -18,7 +18,7 @@ impl<T> Filterable<Vec<T>> for PositionalFilter<T>
 where
     T: PartialEq + Debug,
 {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -31,7 +31,7 @@ impl<T> Filterable<Vec<T>> for Vec<PositionalFilter<T>>
 where
     T: PartialEq + Debug,
 {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         if self.is_empty() {
             return Err(Error::msg(
                 "PositionalFilter must have at least one element",

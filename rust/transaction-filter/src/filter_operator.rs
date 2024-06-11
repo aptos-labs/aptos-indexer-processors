@@ -22,7 +22,7 @@ pub enum APIFilter {
 }
 
 impl Filterable<Transaction> for APIFilter {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         match self {
             APIFilter::TransactionRootFilter(filter) => filter.is_valid(),
             APIFilter::UserTransactionRequestFilter(filter) => filter.is_valid(),
@@ -74,6 +74,7 @@ impl Filterable<Transaction> for APIFilter {
 pub enum FilterOperator {
     And(LogicalAnd),
     Or(LogicalOr),
+    Not(LogicalNot),
     Filter(APIFilter),
 }
 
@@ -86,16 +87,21 @@ impl FilterOperator {
         FilterOperator::Or(LogicalOr { or })
     }
 
+    pub fn new_not(not: Vec<FilterOperator>) -> Self {
+        FilterOperator::Not(LogicalNot { not })
+    }
+
     pub fn new_filter(filter: APIFilter) -> Self {
         FilterOperator::Filter(filter)
     }
 }
 
 impl Filterable<Transaction> for FilterOperator {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         match self {
             FilterOperator::And(and) => and.is_valid(),
             FilterOperator::Or(or) => or.is_valid(),
+            FilterOperator::Not(not) => not.is_valid(),
             FilterOperator::Filter(filter) => filter.is_valid(),
         }
     }
@@ -104,6 +110,7 @@ impl Filterable<Transaction> for FilterOperator {
         match self {
             FilterOperator::And(and) => and.is_allowed(item),
             FilterOperator::Or(or) => or.is_allowed(item),
+            FilterOperator::Not(not) => not.is_allowed(item),
             FilterOperator::Filter(filter) => filter.is_allowed(item),
         }
     }
@@ -115,7 +122,7 @@ pub struct LogicalAnd {
 }
 
 impl Filterable<Transaction> for LogicalAnd {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         for filter in &self.and {
             filter.is_valid()?;
         }
@@ -133,7 +140,7 @@ pub struct LogicalOr {
 }
 
 impl Filterable<Transaction> for LogicalOr {
-    fn is_valid(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), Error> {
         for filter in &self.or {
             filter.is_valid()?;
         }
@@ -142,6 +149,24 @@ impl Filterable<Transaction> for LogicalOr {
 
     fn is_allowed(&self, item: &Transaction) -> bool {
         self.or.iter().any(|filter| filter.is_allowed(item))
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LogicalNot {
+    not: Vec<FilterOperator>,
+}
+
+impl Filterable<Transaction> for LogicalNot {
+    fn validate_state(&self) -> Result<(), Error> {
+        for filter in &self.not {
+            filter.is_valid()?;
+        }
+        Ok(())
+    }
+
+    fn is_allowed(&self, item: &Transaction) -> bool {
+        !self.not.iter().any(|filter| filter.is_allowed(item))
     }
 }
 
@@ -157,45 +182,8 @@ mod test {
             MoveStructTagFilter, PositionalFilter, UserTransactionPayloadFilter,
         },
         json_search::{JsonOrStringSearch, JsonSearchTerm},
+        test_lib::load_graffio_fixture,
     };
-    use aptos_protos::indexer::v1::TransactionsInStorage;
-    use prost::Message;
-    use std::io::Read;
-
-    // Decompress fixtures first, Ex:
-
-    fn decompress_fixture(bytes: &[u8]) -> TransactionsInStorage {
-        let mut decompressor = lz4::Decoder::new(bytes).expect("Lz4 decompression failed.");
-        let mut decompressed = Vec::new();
-        decompressor
-            .read_to_end(&mut decompressed)
-            .expect("Lz4 decompression failed.");
-        TransactionsInStorage::decode(decompressed.as_slice()).expect("Failed to parse transaction")
-    }
-
-    #[allow(dead_code)]
-    fn load_taptos_fixture() -> TransactionsInStorage {
-        let data = include_bytes!(
-            "../fixtures/compressed_files_lz4_00008bc1d5adcf862d3967c1410001fb_705101000.pb.lz4"
-        );
-        decompress_fixture(data)
-    }
-
-    #[allow(dead_code)]
-    fn load_random_april_3mb_fixture() -> TransactionsInStorage {
-        let data = include_bytes!(
-            "../fixtures/compressed_files_lz4_0013c194ec4fdbfb8db7306170aac083_445907000.pb.lz4"
-        );
-        decompress_fixture(data)
-    }
-
-    #[allow(dead_code)]
-    fn load_graffio_fixture() -> TransactionsInStorage {
-        let data = include_bytes!(
-            "../fixtures/compressed_files_lz4_f3d880d9700c70d71fefe71aa9218aa9_301616000.pb.lz4"
-        );
-        decompress_fixture(data)
-    }
 
     #[test]
     pub fn test_query_parsing() {
@@ -229,7 +217,6 @@ mod test {
         };
 
         let wscf_res = WriteSetChangeFilter {
-            change_type: Some(aptos_protos::transaction::v1::write_set_change::Type::WriteResource),
             change: Some(ChangeItemFilter::ResourceChange(ResourceChangeFilter {
                 resource_type: Some(MoveStructTagFilter {
                     address: Some("0x001af32".into()),
@@ -241,9 +228,6 @@ mod test {
             })),
         };
         let wscf_table = WriteSetChangeFilter {
-            change_type: Some(
-                aptos_protos::transaction::v1::write_set_change::Type::WriteTableItem,
-            ),
             change: Some(ChangeItemFilter::TableChange(TableChangeFilter {
                 handle: Some("0x796857465434253644536475453432453".into()),
                 key: Some(JsonOrStringSearch::String("table_key".into())),
@@ -251,7 +235,6 @@ mod test {
             })),
         };
         let wscf_mod = WriteSetChangeFilter {
-            change_type: Some(aptos_protos::transaction::v1::write_set_change::Type::WriteModule),
             change: Some(ChangeItemFilter::ModuleChange(ModuleChangeFilter {
                 address: Some("0x0000098".into()),
             })),

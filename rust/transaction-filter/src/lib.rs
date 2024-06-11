@@ -1,8 +1,11 @@
-pub mod filter_operator;
 pub mod api_filter;
+pub mod filter_operator;
 pub mod filters;
 pub mod json_search;
 pub mod traits;
+
+#[cfg(test)]
+pub mod test_lib;
 
 /**
 The goal of transaction filtering is to be able to save resources downstream of wherever filtering is used.

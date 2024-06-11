@@ -27,6 +27,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-# we only decompress the fixture protos in tests
+# we only decompress the fixture protos in test
 lz4 = "1.24.0"
 
