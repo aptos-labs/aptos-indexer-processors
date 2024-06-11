@@ -21,6 +21,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
 use tracing::{debug, error, info};
+use transaction_filter::transaction_filter::TransactionFilter;
 use url::Url;
 
 /// GRPC request metadata key for the token ID.
@@ -34,6 +35,8 @@ const GRPC_CONNECTION_ID: &str = "x-aptos-connection-id";
 pub const RECONNECTION_MAX_RETRIES: u64 = 5;
 /// 256MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
+
+const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
@@ -82,7 +85,7 @@ pub async fn get_stream(
 ) -> Response<Streaming<TransactionsResponse>> {
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
@@ -110,7 +113,7 @@ pub async fn get_stream(
 
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
@@ -131,7 +134,7 @@ pub async fn get_stream(
             Err(e) => {
                 error!(
                     processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     start_version = starting_version,
                     end_version = ending_version,
@@ -158,7 +161,7 @@ pub async fn get_stream(
         Err(e) => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 start_version = starting_version,
                 ending_version = ending_version,
@@ -171,7 +174,7 @@ pub async fn get_stream(
     let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         start_version = starting_version,
         end_version = ending_version,
@@ -198,7 +201,7 @@ pub async fn get_stream(
             Err(e) => {
                 error!(
                     processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = indexer_grpc_data_service_address.to_string(),
                     start_version = starting_version,
                     end_version = ending_version,
@@ -220,7 +223,7 @@ pub async fn get_stream(
         Err(e) => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 start_version = starting_version,
                 ending_version = ending_version,
@@ -242,7 +245,7 @@ pub async fn get_chain_id(
 ) -> u64 {
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         "[Parser] Connecting to GRPC stream to get chain id",
     );
@@ -264,7 +267,7 @@ pub async fn get_chain_id(
     let mut resp_stream = response.into_inner();
     info!(
         processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+        service_type = PROCESSOR_SERVICE_TYPE,
         stream_address = indexer_grpc_data_service_address.to_string(),
         connection_id,
         "[Parser] Successfully connected to GRPC stream to get chain id",
@@ -275,7 +278,7 @@ pub async fn get_chain_id(
         Some(Err(rpc_error)) => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 connection_id,
                 error = ?rpc_error,
@@ -286,7 +289,7 @@ pub async fn get_chain_id(
         None => {
             error!(
                 processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                service_type = PROCESSOR_SERVICE_TYPE,
                 stream_address = indexer_grpc_data_service_address.to_string(),
                 connection_id,
                 "[Parser] Stream ended before getting response fo for chain id"
@@ -296,13 +299,7 @@ pub async fn get_chain_id(
     }
 }
 
-/// Gets a batch of transactions from the stream. Batch size is set in the grpc server.
-/// The number of batches depends on our config
-/// There could be several special scenarios:
-/// 1. If we lose the connection, we will try reconnecting X times within Y seconds before crashing.
-/// 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
-///    all existing transactions are processed
-pub async fn create_fetcher_loop(
+pub struct TransactionStream {
     txn_sender: AsyncSender<TransactionsPBResponse>,
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
@@ -313,55 +310,111 @@ pub async fn create_fetcher_loop(
     request_ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
-    transaction_filter: crate::transaction_filter::TransactionFilter,
-    // The number of transactions per protobuf batch
+    transaction_filter: TransactionFilter,
     pb_channel_txn_chunk_size: usize,
-) {
-    info!(
-        processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
-        start_version = starting_version,
-        end_version = request_ending_version,
-        "[Parser] Connecting to GRPC stream",
-    );
-    let mut response = get_stream(
-        indexer_grpc_data_service_address.clone(),
-        indexer_grpc_http2_ping_interval,
-        indexer_grpc_http2_ping_timeout,
-        indexer_grpc_reconnection_timeout_secs,
-        starting_version,
-        request_ending_version,
-        auth_token.clone(),
-        processor_name.to_string(),
-    )
-    .await;
-    let mut connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
-        Some(connection_id) => connection_id.to_str().unwrap().to_string(),
-        None => "".to_string(),
-    };
-    let mut resp_stream = response.into_inner();
-    info!(
-        processor_name = processor_name,
-        service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
-        connection_id,
-        start_version = starting_version,
-        end_version = request_ending_version,
-        "[Parser] Successfully connected to GRPC stream",
-    );
+    resp_stream: Option<Streaming<TransactionsResponse>>,
+    connection_id: Option<String>,
+    grpc_channel_recv_latency: std::time::Instant,
+    next_version_to_fetch: u64,
+    reconnection_retries: u64,
+    last_fetched_version: i64,
+    fetch_ma: MovingAverage,
+    send_ma: MovingAverage,
+}
 
-    let mut grpc_channel_recv_latency = std::time::Instant::now();
-    let mut next_version_to_fetch = starting_version;
-    let mut reconnection_retries = 0;
-    let mut last_fetched_version = starting_version as i64 - 1;
-    let mut fetch_ma = MovingAverage::new(3000);
-    let mut send_ma = MovingAverage::new(3000);
-
-    loop {
-        let is_success = match tokio::time::timeout(
+impl TransactionStream {
+    pub fn new(
+        txn_sender: AsyncSender<TransactionsPBResponse>,
+        indexer_grpc_data_service_address: Url,
+        indexer_grpc_http2_ping_interval: Duration,
+        indexer_grpc_http2_ping_timeout: Duration,
+        indexer_grpc_reconnection_timeout_secs: Duration,
+        indexer_grpc_response_item_timeout_secs: Duration,
+        starting_version: u64,
+        request_ending_version: Option<u64>,
+        auth_token: String,
+        processor_name: String,
+        transaction_filter: TransactionFilter,
+        pb_channel_txn_chunk_size: usize,
+    ) -> Self {
+        Self {
+            txn_sender,
+            indexer_grpc_data_service_address,
+            indexer_grpc_http2_ping_interval,
+            indexer_grpc_http2_ping_timeout,
+            indexer_grpc_reconnection_timeout_secs,
             indexer_grpc_response_item_timeout_secs,
-            resp_stream.next(),
+            starting_version,
+            request_ending_version,
+            auth_token,
+            processor_name,
+            transaction_filter,
+            pb_channel_txn_chunk_size,
+            resp_stream: None,
+            connection_id: None,
+            grpc_channel_recv_latency: std::time::Instant::now(),
+            next_version_to_fetch: starting_version,
+            reconnection_retries: 0,
+            last_fetched_version: starting_version as i64 - 1,
+            fetch_ma: MovingAverage::new(3000),
+            send_ma: MovingAverage::new(3000),
+        }
+    }
+
+    async fn init_stream(&mut self) {
+        info!(
+            processor_name = self.processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            start_version = self.starting_version,
+            end_version = self.request_ending_version,
+            "[Parser] Connecting to GRPC stream",
+        );
+        let response = get_stream(
+            self.indexer_grpc_data_service_address.clone(),
+            self.indexer_grpc_http2_ping_interval,
+            self.indexer_grpc_http2_ping_timeout,
+            self.indexer_grpc_reconnection_timeout_secs,
+            self.starting_version,
+            self.request_ending_version,
+            self.auth_token.clone(),
+            self.processor_name.to_string(),
+        )
+        .await;
+        let connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
+            Some(connection_id) => connection_id.to_str().unwrap().to_string(),
+            None => "".to_string(),
+        };
+        self.connection_id = Some(connection_id);
+        self.resp_stream = Some(response.into_inner());
+        info!(
+            processor_name = self.processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            connection_id = self.connection_id,
+            start_version = self.starting_version,
+            end_version = self.request_ending_version,
+            "[Parser] Successfully connected to GRPC stream",
+        );
+    }
+
+    /// Gets a batch of transactions from the stream. Batch size is set in the grpc server.
+    /// The number of batches depends on our config
+    /// There could be several special scenarios:
+    /// 1. If we lose the connection, we will try reconnecting X times within Y seconds before crashing.
+    /// 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
+    ///    all existing transactions are processed
+    ///
+    /// Returns
+    /// - true if should continue fetching
+    /// - false if we reached the end of the stream or there is an error and the loop should stop
+    pub async fn get_next_transaction_batch(&mut self) -> bool {
+        let is_success = match tokio::time::timeout(
+            self.indexer_grpc_response_item_timeout_secs,
+            self.resp_stream
+                .as_mut()
+                .expect("[Parser] GRPC stream is not initialized. Did you call init_stream?")
+                .next(),
         )
         .await
         {
@@ -369,7 +422,7 @@ pub async fn create_fetcher_loop(
             Ok(response) => {
                 match response {
                     Some(Ok(mut r)) => {
-                        reconnection_retries = 0;
+                        self.reconnection_retries = 0;
                         let start_version = r.transactions.as_slice().first().unwrap().version;
                         let start_txn_timestamp =
                             r.transactions.as_slice().first().unwrap().timestamp.clone();
@@ -377,18 +430,20 @@ pub async fn create_fetcher_loop(
                         let end_txn_timestamp =
                             r.transactions.as_slice().last().unwrap().timestamp.clone();
 
-                        next_version_to_fetch = end_version + 1;
+                        self.next_version_to_fetch = end_version + 1;
 
                         let size_in_bytes = r.encoded_len() as u64;
                         let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
                         let num_txns = r.transactions.len();
-                        let duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64();
-                        fetch_ma.tick_now(num_txns as u64);
+                        let duration_in_secs =
+                            self.grpc_channel_recv_latency.elapsed().as_secs_f64();
+                        self.fetch_ma.tick_now(num_txns as u64);
 
                         let num_txns = r.transactions.len();
 
                         // Filter out the txns we don't care about
-                        r.transactions.retain(|txn| transaction_filter.include(txn));
+                        r.transactions
+                            .retain(|txn| self.transaction_filter.include(txn));
 
                         let num_txn_post_filter = r.transactions.len();
                         let num_filtered_txns = num_txns - num_txn_post_filter;
@@ -396,10 +451,10 @@ pub async fn create_fetcher_loop(
                         let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
 
                         info!(
-                            processor_name = processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
+                            processor_name = self.processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            connection_id = self.connection_id,
                             start_version,
                             end_version,
                             start_txn_timestamp_iso = start_txn_timestamp
@@ -412,32 +467,32 @@ pub async fn create_fetcher_loop(
                                 .unwrap_or_default(),
                             num_of_transactions = end_version - start_version + 1,
                             num_filtered_txns,
-                            channel_size = txn_sender.len(),
+                            channel_size = self.txn_sender.len(),
                             size_in_bytes,
                             duration_in_secs,
-                            tps = fetch_ma.avg().ceil() as u64,
+                            tps = self.fetch_ma.avg().ceil() as u64,
                             bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
                             step,
                             "{}",
                             label,
                         );
 
-                        if last_fetched_version + 1 != start_version as i64 {
+                        if self.last_fetched_version + 1 != start_version as i64 {
                             error!(
-                                batch_start_version = last_fetched_version + 1,
-                                last_fetched_version,
+                                batch_start_version = self.last_fetched_version + 1,
+                                self.last_fetched_version,
                                 current_fetched_version = start_version,
                                 "[Parser] Received batch with gap from GRPC stream"
                             );
                             panic!("[Parser] Received batch with gap from GRPC stream");
                         }
-                        last_fetched_version = end_version as i64;
+                        self.last_fetched_version = end_version as i64;
 
                         LATEST_PROCESSED_VERSION
-                            .with_label_values(&[&processor_name, step, label, "-"])
+                            .with_label_values(&[&self.processor_name, step, label, "-"])
                             .set(end_version as i64);
                         TRANSACTION_UNIX_TIMESTAMP
-                            .with_label_values(&[&processor_name, step, label, "-"])
+                            .with_label_values(&[&self.processor_name, step, label, "-"])
                             .set(
                                 start_txn_timestamp
                                     .as_ref()
@@ -445,16 +500,16 @@ pub async fn create_fetcher_loop(
                                     .unwrap_or_default(),
                             );
                         PROCESSED_BYTES_COUNT
-                            .with_label_values(&[&processor_name, step, label, "-"])
+                            .with_label_values(&[&self.processor_name, step, label, "-"])
                             .inc_by(size_in_bytes);
                         NUM_TRANSACTIONS_PROCESSED_COUNT
-                            .with_label_values(&[&processor_name, step, label, "-"])
+                            .with_label_values(&[&self.processor_name, step, label, "-"])
                             .inc_by(end_version - start_version + 1);
 
                         let txn_channel_send_latency = std::time::Instant::now();
 
                         //potentially break txn_pb into many `TransactionsPBResponse` that are each `pb_channel_txn_chunk_size` txns max in size
-                        if num_txn_post_filter < pb_channel_txn_chunk_size {
+                        if num_txn_post_filter < self.pb_channel_txn_chunk_size {
                             // We only need to send one; avoid the chunk/clone
                             let txn_pb = TransactionsPBResponse {
                                 transactions: r.transactions,
@@ -466,13 +521,13 @@ pub async fn create_fetcher_loop(
                                 size_in_bytes,
                             };
 
-                            match txn_sender.send(txn_pb).await {
+                            match self.txn_sender.send(txn_pb).await {
                                 Ok(()) => {},
                                 Err(e) => {
                                     error!(
-                                        processor_name = processor_name,
-                                        stream_address = indexer_grpc_data_service_address.to_string(),
-                                        connection_id,
+                                        processor_name = self.processor_name,
+                                        stream_address = self.indexer_grpc_data_service_address.to_string(),
+                                        connection_id = self.connection_id,
                                         error = ?e,
                                         "[Parser] Error sending GRPC response to channel."
                                     );
@@ -486,7 +541,7 @@ pub async fn create_fetcher_loop(
                             let pb_txn_chunks: Vec<Vec<Transaction>> = r
                                 .transactions
                                 .into_iter()
-                                .chunks(pb_channel_txn_chunk_size)
+                                .chunks(self.pb_channel_txn_chunk_size)
                                 .into_iter()
                                 .map(|chunk| chunk.collect())
                                 .collect();
@@ -503,13 +558,13 @@ pub async fn create_fetcher_loop(
                                     size_in_bytes,
                                 };
 
-                                match txn_sender.send(txn_pb).await {
+                                match self.txn_sender.send(txn_pb).await {
                                     Ok(()) => {},
                                     Err(e) => {
                                         error!(
-                                            processor_name = processor_name,
-                                            stream_address = indexer_grpc_data_service_address.to_string(),
-                                            connection_id,
+                                            processor_name = self.processor_name,
+                                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                                            connection_id = self.connection_id,
                                             error = ?e,
                                             "[Parser] Error sending GRPC response to channel."
                                         );
@@ -520,16 +575,16 @@ pub async fn create_fetcher_loop(
                         }
 
                         let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-                        send_ma.tick_now(num_txns as u64);
-                        let tps = send_ma.avg().ceil() as u64;
+                        self.send_ma.tick_now(num_txns as u64);
+                        let tps = self.send_ma.avg().ceil() as u64;
                         let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
 
-                        let channel_size = txn_sender.len();
+                        let channel_size = self.txn_sender.len();
                         debug!(
-                            processor_name = processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
+                            processor_name = self.processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            connection_id = self.connection_id,
                             start_version,
                             end_version,
                             channel_size,
@@ -541,24 +596,24 @@ pub async fn create_fetcher_loop(
                             "[Parser] Successfully sent transactions to channel."
                         );
                         FETCHER_THREAD_CHANNEL_SIZE
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[&self.processor_name])
                             .set(channel_size as i64);
-                        grpc_channel_recv_latency = std::time::Instant::now();
+                        self.grpc_channel_recv_latency = std::time::Instant::now();
 
                         NUM_TRANSACTIONS_FILTERED_OUT_COUNT
-                            .with_label_values(&[&processor_name])
+                            .with_label_values(&[&self.processor_name])
                             .inc_by(num_filtered_txns as u64);
                         true
                     },
                     // Error receiving datastream response
                     Some(Err(rpc_error)) => {
                         tracing::warn!(
-                            processor_name = processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
-                            start_version = starting_version,
-                            end_version = request_ending_version,
+                            processor_name = self.processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            self.connection_id,
+                            start_version = self.starting_version,
+                            end_version = self.request_ending_version,
                             error = ?rpc_error,
                             "[Parser] Error receiving datastream response."
                         );
@@ -567,12 +622,12 @@ pub async fn create_fetcher_loop(
                     // Stream is finished
                     None => {
                         tracing::warn!(
-                            processor_name = processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
-                            start_version = starting_version,
-                            end_version = request_ending_version,
+                            processor_name = self.processor_name,
+                            service_type = PROCESSOR_SERVICE_TYPE,
+                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            connection_id = self.connection_id,
+                            start_version = self.starting_version,
+                            end_version = self.request_ending_version,
                             "[Parser] Stream ended."
                         );
                         false
@@ -582,12 +637,12 @@ pub async fn create_fetcher_loop(
             // Timeout receiving datastream response
             Err(e) => {
                 tracing::warn!(
-                    processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                    stream_address = indexer_grpc_data_service_address.to_string(),
-                    connection_id,
-                    start_version = starting_version,
-                    end_version = request_ending_version,
+                    processor_name = self.processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = self.indexer_grpc_data_service_address.to_string(),
+                    connection_id = self.connection_id,
+                    start_version = self.starting_version,
+                    end_version = self.request_ending_version,
                     error = ?e,
                     "[Parser] Timeout receiving datastream response."
                 );
@@ -595,29 +650,29 @@ pub async fn create_fetcher_loop(
             },
         };
         // Check if we're at the end of the stream
-        let is_end = if let Some(ending_version) = request_ending_version {
-            next_version_to_fetch > ending_version
+        let is_end = if let Some(ending_version) = self.request_ending_version {
+            self.next_version_to_fetch > ending_version
         } else {
             false
         };
         if is_end {
             info!(
-                processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                connection_id,
-                ending_version = request_ending_version,
-                next_version_to_fetch = next_version_to_fetch,
+                processor_name = self.processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                stream_address = self.indexer_grpc_data_service_address.to_string(),
+                connection_id = self.connection_id,
+                ending_version = self.request_ending_version,
+                next_version_to_fetch = self.next_version_to_fetch,
                 "[Parser] Reached ending version.",
             );
             // Wait for the fetched transactions to finish processing before closing the channel
             loop {
-                let channel_size = txn_sender.len();
+                let channel_size = self.txn_sender.len();
                 info!(
-                    processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                    stream_address = indexer_grpc_data_service_address.to_string(),
-                    connection_id,
+                    processor_name = self.processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = self.indexer_grpc_data_service_address.to_string(),
+                    connection_id = self.connection_id,
                     channel_size,
                     "[Parser] Waiting for channel to be empty"
                 );
@@ -627,68 +682,127 @@ pub async fn create_fetcher_loop(
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
             info!(
-                processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                connection_id,
+                processor_name = self.processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                stream_address = self.indexer_grpc_data_service_address.to_string(),
+                connection_id = self.connection_id,
                 "[Parser] Transaction fetcher send channel is closed."
             );
-            break;
+
+            // If we're at the end of the stream, return false to signal that the fetcher should stop looping
+            false
         } else {
             // The rest is to see if we need to reconnect
-            if is_success {
-                continue;
+            if !is_success {
+                self.reconnect_to_grpc().await;
             }
 
-            // Sleep for 100ms between reconnect tries
-            // TODO: Turn this into exponential backoff
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            true
+        }
+    }
 
-            if reconnection_retries >= RECONNECTION_MAX_RETRIES {
-                error!(
-                    processor_name = processor_name,
-                    service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                    stream_address = indexer_grpc_data_service_address.to_string(),
-                    "[Parser] Reconnected more than {RECONNECTION_MAX_RETRIES} times. Will not retry.",
-                );
-                panic!("[Parser] Reconnected more than {RECONNECTION_MAX_RETRIES} times. Will not retry.")
-            }
-            reconnection_retries += 1;
-            info!(
-                processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                starting_version = next_version_to_fetch,
-                ending_version = request_ending_version,
-                reconnection_retries = reconnection_retries,
-                "[Parser] Reconnecting to GRPC stream"
+    async fn reconnect_to_grpc(&mut self) {
+        // Sleep for 100ms between reconnect tries
+        // TODO: Turn this into exponential backoff
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        if self.reconnection_retries >= RECONNECTION_MAX_RETRIES {
+            error!(
+                processor_name = self.processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                stream_address = self.indexer_grpc_data_service_address.to_string(),
+                "[Parser] Reconnected more than 100 times. Will not retry.",
             );
-            response = get_stream(
-                indexer_grpc_data_service_address.clone(),
-                indexer_grpc_http2_ping_interval,
-                indexer_grpc_http2_ping_timeout,
-                indexer_grpc_reconnection_timeout_secs,
-                next_version_to_fetch,
-                request_ending_version,
-                auth_token.clone(),
-                processor_name.to_string(),
-            )
-            .await;
-            connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
-                Some(connection_id) => connection_id.to_str().unwrap().to_string(),
-                None => "".to_string(),
-            };
-            resp_stream = response.into_inner();
-            info!(
-                processor_name = processor_name,
-                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                connection_id,
-                starting_version = next_version_to_fetch,
-                ending_version = request_ending_version,
-                reconnection_retries = reconnection_retries,
-                "[Parser] Successfully reconnected to GRPC stream"
-            );
+            panic!("[Parser] Reconnected more than 100 times. Will not retry.")
+        }
+        self.reconnection_retries += 1;
+        info!(
+            processor_name = self.processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            starting_version = self.next_version_to_fetch,
+            ending_version = self.request_ending_version,
+            reconnection_retries = self.reconnection_retries,
+            "[Parser] Reconnecting to GRPC stream"
+        );
+        let response = get_stream(
+            self.indexer_grpc_data_service_address.clone(),
+            self.indexer_grpc_http2_ping_interval,
+            self.indexer_grpc_http2_ping_timeout,
+            self.indexer_grpc_reconnection_timeout_secs,
+            self.next_version_to_fetch,
+            self.request_ending_version,
+            self.auth_token.clone(),
+            self.processor_name.to_string(),
+        )
+        .await;
+        let connection_id = match response.metadata().get(GRPC_CONNECTION_ID) {
+            Some(connection_id) => connection_id.to_str().unwrap().to_string(),
+            None => "".to_string(),
+        };
+        self.connection_id = Some(connection_id);
+        self.resp_stream = Some(response.into_inner());
+        info!(
+            processor_name = self.processor_name,
+            service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            connection_id = self.connection_id,
+            starting_version = self.next_version_to_fetch,
+            ending_version = self.request_ending_version,
+            reconnection_retries = self.reconnection_retries,
+            "[Parser] Successfully reconnected to GRPC stream"
+        );
+    }
+
+    pub async fn get_chain_id(self) -> u64 {
+        get_chain_id(
+            self.indexer_grpc_data_service_address,
+            self.indexer_grpc_http2_ping_interval,
+            self.indexer_grpc_http2_ping_timeout,
+            self.indexer_grpc_reconnection_timeout_secs,
+            self.auth_token,
+            self.processor_name,
+        )
+        .await
+    }
+}
+
+pub async fn create_fetcher_loop(
+    txn_sender: AsyncSender<TransactionsPBResponse>,
+    indexer_grpc_data_service_address: Url,
+    indexer_grpc_http2_ping_interval: Duration,
+    indexer_grpc_http2_ping_timeout: Duration,
+    indexer_grpc_reconnection_timeout_secs: Duration,
+    indexer_grpc_response_item_timeout_secs: Duration,
+    starting_version: u64,
+    request_ending_version: Option<u64>,
+    auth_token: String,
+    processor_name: String,
+    transaction_filter: TransactionFilter,
+    // The number of transactions per protobuf batch
+    pb_channel_txn_chunk_size: usize,
+) {
+    let mut transaction_stream = TransactionStream::new(
+        txn_sender,
+        indexer_grpc_data_service_address,
+        indexer_grpc_http2_ping_interval,
+        indexer_grpc_http2_ping_timeout,
+        indexer_grpc_reconnection_timeout_secs,
+        indexer_grpc_response_item_timeout_secs,
+        starting_version,
+        request_ending_version,
+        auth_token,
+        processor_name,
+        transaction_filter,
+        pb_channel_txn_chunk_size,
+    );
+
+    transaction_stream.init_stream().await;
+
+    loop {
+        let should_continue_fetching = transaction_stream.get_next_transaction_batch().await;
+        if !should_continue_fetching {
+            break;
         }
     }
 }

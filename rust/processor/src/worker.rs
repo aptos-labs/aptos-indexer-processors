@@ -3,7 +3,6 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    grpc_stream::TransactionsPBResponse,
     models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -17,7 +16,6 @@ use crate::{
         ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
-    transaction_filter::TransactionFilter,
     utils::{
         counters::{
             ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
@@ -34,9 +32,11 @@ use crate::{
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
+use aptos_indexer_transaction_stream::transaction_stream::TransactionsPBResponse;
 use aptos_moving_average::MovingAverage;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
+use transaction_filter::transaction_filter::TransactionFilter;
 use url::Url;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
@@ -171,7 +171,7 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // get the chain id
-        let chain_id = crate::grpc_stream::get_chain_id(
+        let chain_id = aptos_indexer_transaction_stream::transaction_stream::get_chain_id(
             self.indexer_grpc_data_service_address.clone(),
             self.grpc_http2_config.grpc_http2_ping_interval_in_secs(),
             self.grpc_http2_config.grpc_http2_ping_timeout_in_secs(),
@@ -214,7 +214,7 @@ impl Worker {
                 "[Parser] Starting fetcher thread"
             );
 
-            crate::grpc_stream::create_fetcher_loop(
+            aptos_indexer_transaction_stream::transaction_stream::create_fetcher_loop(
                 tx.clone(),
                 indexer_grpc_data_service_address.clone(),
                 indexer_grpc_http2_ping_interval,

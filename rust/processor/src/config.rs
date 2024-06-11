@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig,
-    transaction_filter::TransactionFilter, worker::Worker,
+    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig, worker::Worker,
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
 use std::time::Duration;
+use transaction_filter::transaction_filter::TransactionFilter;
 use url::Url;
 
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;

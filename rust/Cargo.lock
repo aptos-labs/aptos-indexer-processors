@@ -117,6 +117,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
+name = "aptos-indexer-transaction-stream"
+version = "0.1.0"
+dependencies = [
+ "aptos-moving-average",
+ "aptos-protos",
+ "bigdecimal",
+ "chrono",
+ "futures-util",
+ "itertools 0.12.1",
+ "kanal",
+ "once_cell",
+ "prometheus",
+ "prost 0.12.3",
+ "tokio",
+ "tonic 0.11.0",
+ "tracing",
+ "transaction-filter",
+ "url",
+]
+
+[[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
 dependencies = [
@@ -2191,6 +2212,7 @@ version = "1.0.0"
 dependencies = [
  "ahash",
  "anyhow",
+ "aptos-indexer-transaction-stream",
  "aptos-moving-average",
  "aptos-protos",
  "async-trait",
@@ -2234,6 +2256,7 @@ dependencies = [
  "tokio-postgres",
  "tonic 0.11.0",
  "tracing",
+ "transaction-filter",
  "unescape",
  "url",
 ]
@@ -3612,6 +3635,15 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "transaction-filter"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "aptos-protos",
+ "serde",
 ]
 
 [[package]]
