@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 
-members = ["indexer-metrics", "moving-average", "processor", "server-framework"]
+members = ["indexer-metrics", "moving-average", "processor", "server-framework", "transaction-filter"]
 
 [workspace.package]
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
@@ -57,6 +57,7 @@ gcloud-sdk = { version = "0.20.4", features = [
     "google-cloud-bigquery-storage-v1",
 ] }
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
+derive_builder = "0.20.0"
 google-cloud-googleapis = "0.10.0"
 google-cloud-pubsub = "0.18.0"
 hex = "0.4.3"
@@ -68,6 +69,8 @@ jemallocator = { version = "0.5.0", features = [
 ] }
 kanal = { version = "0.1.0-pre8", features = ["async"] }
 once_cell = "1.10.0"
+# SIMD for string search
+memchr = "2.7.2"
 num_cpus = "1.16.0"
 pbjson = "0.5.1"
 prometheus = { version = "0.13.0", default-features = false }
@@ -82,11 +85,12 @@ reqwest = { version = "0.11.20", features = [
 ] }
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
-serde_yaml = "0.8.24"
+serde_yaml = "0.9.34"
 sha2 = "0.9.3"
 sha3 = "0.9.1"
 strum = { version = "0.24.1", features = ["derive"] }
 tempfile = "3.3.0"
+thiserror = "1.0.61"
 toml = "0.7.4"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
