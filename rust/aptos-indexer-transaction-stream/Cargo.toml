@@ -1,0 +1,30 @@
+[package]
+name = "aptos-indexer-transaction-stream"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
+bigdecimal = { workspace = true }
+chrono = { workspace = true }
+futures-util = { workspace = true }
+itertools = { workspace = true }
+kanal = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+prost = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+transaction-filter = { workspace = true }
+url = { workspace = true }

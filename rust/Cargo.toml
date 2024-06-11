@@ -1,7 +1,14 @@
 [workspace]
 resolver = "2"
 
-members = ["indexer-metrics", "moving-average", "processor", "server-framework"]
+members = [
+    "aptos-indexer-transaction-stream",
+    "indexer-metrics",
+    "moving-average",
+    "processor",
+    "server-framework",
+    "transaction-filter",
+]
 
 [workspace.package]
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
@@ -16,6 +23,8 @@ rust-version = "1.75"
 processor = { path = "processor" }
 server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }
+aptos-indexer-transaction-stream = { path = "aptos-indexer-transaction-stream" }
+transaction-filter = { path = "transaction-filter" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.62"

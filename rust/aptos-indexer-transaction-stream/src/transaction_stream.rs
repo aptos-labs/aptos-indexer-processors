@@ -21,6 +21,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
 use tracing::{debug, error, info};
+use transaction_filter::transaction_filter::TransactionFilter;
 use url::Url;
 
 /// GRPC request metadata key for the token ID.
@@ -309,7 +310,7 @@ pub struct TransactionStream {
     request_ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
-    transaction_filter: crate::transaction_filter::TransactionFilter,
+    transaction_filter: TransactionFilter,
     pb_channel_txn_chunk_size: usize,
     resp_stream: Option<Streaming<TransactionsResponse>>,
     connection_id: Option<String>,
@@ -333,7 +334,7 @@ impl TransactionStream {
         request_ending_version: Option<u64>,
         auth_token: String,
         processor_name: String,
-        transaction_filter: crate::transaction_filter::TransactionFilter,
+        transaction_filter: TransactionFilter,
         pb_channel_txn_chunk_size: usize,
     ) -> Self {
         Self {
@@ -777,7 +778,7 @@ pub async fn create_fetcher_loop(
     request_ending_version: Option<u64>,
     auth_token: String,
     processor_name: String,
-    transaction_filter: crate::transaction_filter::TransactionFilter,
+    transaction_filter: TransactionFilter,
     // The number of transactions per protobuf batch
     pb_channel_txn_chunk_size: usize,
 ) {
