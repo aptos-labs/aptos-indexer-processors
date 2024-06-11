@@ -24,7 +24,7 @@ mod db;
 pub mod gap_detectors;
 pub mod grpc_stream;
 pub mod processors;
-#[path = "db/postgres/schema.rs"]
+#[path = "db/cockroachdb/schema.rs"]
 pub mod schema;
 pub mod transaction_filter;
 pub mod utils;

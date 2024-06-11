@@ -28,7 +28,7 @@ pub type DbPool = Pool<MyDbConnection>;
 pub type ArcDbPool = Arc<DbPool>;
 pub type DbPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/postgres/migrations");
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/cockroachdb/migrations");
 
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
 

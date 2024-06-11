@@ -1,0 +1,96 @@
+CREATE TABLE account_transactions (
+    transaction_version bigint NOT NULL,
+    account_address character varying(66) NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL
+);
+CREATE INDEX at_version_index ON account_transactions (transaction_version DESC);
+
+CREATE TABLE block_metadata_transactions (
+    version bigint NOT NULL,
+    block_height bigint NOT NULL,
+    id character varying(66) NOT NULL,
+    round bigint NOT NULL,
+    epoch bigint NOT NULL,
+    previous_block_votes_bitvec jsonb NOT NULL,
+    proposer character varying(66) NOT NULL,
+    failed_proposer_indices jsonb NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE current_fungible_asset_balances (
+    storage_id character varying(66) NOT NULL,
+    owner_address character varying(66) NOT NULL,
+    asset_type character varying(1000) NOT NULL,
+    is_primary boolean NOT NULL,
+    is_frozen boolean NOT NULL,
+    amount numeric NOT NULL,
+    last_transaction_timestamp timestamp without time zone NOT NULL,
+    last_transaction_version bigint NOT NULL,
+    token_standard character varying(10) NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL
+);
+CREATE INDEX cfab_owner_at_index ON current_fungible_asset_balances (owner_address, asset_type);
+
+CREATE TABLE current_table_items (
+    table_handle character varying(66) NOT NULL,
+    key_hash character varying(64) NOT NULL,
+    key text NOT NULL,
+    decoded_key jsonb NOT NULL,
+    decoded_value jsonb,
+    is_deleted boolean NOT NULL,
+    last_transaction_version bigint NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE current_unified_fungible_asset_balances (
+    storage_id character varying(66) NOT NULL,
+    owner_address character varying(66) NOT NULL,
+    asset_type character varying(66) NOT NULL,
+    coin_type character varying(1000),
+    is_primary boolean,
+    is_frozen boolean NOT NULL,
+    amount_v1 numeric,
+    amount_v2 numeric,
+    amount numeric GENERATED ALWAYS AS ((COALESCE(amount_v1, (0)::numeric) + COALESCE(amount_v2, (0)::numeric))) STORED,
+    last_transaction_version_v1 bigint,
+    last_transaction_version_v2 bigint,
+    last_transaction_version bigint GENERATED ALWAYS AS (GREATEST(last_transaction_version_v1, last_transaction_version_v2)) STORED,
+    last_transaction_timestamp_v1 timestamp without time zone,
+    last_transaction_timestamp_v2 timestamp without time zone,
+    last_transaction_timestamp timestamp without time zone GENERATED ALWAYS AS (GREATEST(last_transaction_timestamp_v1, last_transaction_timestamp_v2)) STORED,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL
+);
+CREATE INDEX cufab_owner_at_index ON current_unified_fungible_asset_balances (owner_address, asset_type);
+
+CREATE TABLE events (
+    sequence_number bigint NOT NULL,
+    creation_number bigint NOT NULL,
+    account_address character varying(66) NOT NULL,
+    transaction_version bigint NOT NULL,
+    transaction_block_height bigint NOT NULL,
+    type text NOT NULL,
+    data jsonb NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    event_index bigint NOT NULL,
+    indexed_type character varying(300) DEFAULT ''::character varying NOT NULL
+);
+CREATE INDEX ev_addr_type_index ON events (account_address);
+CREATE INDEX ev_itype_index ON events (indexed_type);
+
+CREATE TABLE user_transactions (
+    version bigint NOT NULL,
+    block_height bigint NOT NULL,
+    parent_signature_type character varying(50) NOT NULL,
+    sender character varying(66) NOT NULL,
+    sequence_number bigint NOT NULL,
+    max_gas_amount numeric NOT NULL,
+    expiration_timestamp_secs timestamp without time zone NOT NULL,
+    gas_unit_price numeric NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    entry_function_id_str character varying(1000) NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    epoch bigint NOT NULL
+);
+CREATE INDEX ut_epoch_index ON user_transactions (epoch);
+CREATE INDEX ut_sender_seq_index ON user_transactions (sender, sequence_number);
