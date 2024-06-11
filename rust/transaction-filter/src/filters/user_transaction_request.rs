@@ -1,4 +1,4 @@
-use crate::{filters::PositionalFilter, traits::Filterable};
+use crate::{errors::FilterError, filters::PositionalFilter, traits::Filterable};
 use anyhow::{anyhow, Error};
 use aptos_protos::transaction::v1::{
     multisig_transaction_payload, transaction_payload, EntryFunctionId, EntryFunctionPayload,
@@ -19,9 +19,9 @@ pub struct UserTransactionRequestFilter {
 
 impl Filterable<UserTransactionRequest> for UserTransactionRequestFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.sender.is_none() && self.payload.is_none() {
-            return Err(Error::msg("At least one of sender or payload must be set"));
+            return Err(Error::msg("At least one of sender or payload must be set").into());
         };
         self.payload.is_valid()?;
         Ok(())
@@ -66,11 +66,9 @@ pub struct EntryFunctionFilter {
 
 impl Filterable<EntryFunctionId> for EntryFunctionFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.address.is_none() && self.module.is_none() && self.function.is_none() {
-            return Err(anyhow!(
-                "At least one of address, name or function must be set"
-            ));
+            return Err(anyhow!("At least one of address, name or function must be set").into());
         };
         Ok(())
     }
@@ -109,11 +107,9 @@ pub struct UserTransactionPayloadFilter {
 
 impl Filterable<EntryFunctionPayload> for UserTransactionPayloadFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.function.is_none() && self.arguments.is_none() {
-            return Err(Error::msg(
-                "At least one of function or arguments must be set",
-            ));
+            return Err(Error::msg("At least one of function or arguments must be set").into());
         };
         self.function.is_valid()?;
         self.arguments.is_valid()?;

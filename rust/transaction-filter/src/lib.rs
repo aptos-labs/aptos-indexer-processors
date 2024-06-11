@@ -4,6 +4,7 @@ pub mod filters;
 pub mod json_search;
 pub mod traits;
 
+mod errors;
 #[cfg(test)]
 pub mod test_lib;
 

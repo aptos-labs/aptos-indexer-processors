@@ -1,11 +1,11 @@
 // use crate::traits::Filterable;
 use crate::{
+    errors::FilterError,
     filters::{
         EventFilter, TransactionRootFilter, UserTransactionRequestFilter, WriteSetChangeFilter,
     },
     traits::Filterable,
 };
-use anyhow::Error;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -26,13 +26,15 @@ pub struct PublicOrApiFilter {
 }
 
 impl Filterable<Transaction> for PublicOrApiFilter {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.root_filter.is_none()
             && self.user_transaction_filter.is_none()
             && self.event_filter.is_none()
             && self.write_set_change_filter.is_none()
         {
-            return Err(Error::msg("At least one of root_filter, user_transaction_filter, event_filter or write_set_change_filter must be set"));
+            return Err(anyhow::anyhow!(
+                        "At least one of root_filter, user_transaction_filter, event_filter, or write_set_change_filter must be set"
+                ).into());
         };
 
         self.root_filter.is_valid()?;

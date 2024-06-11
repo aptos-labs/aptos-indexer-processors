@@ -1,4 +1,7 @@
-use crate::{filters::MoveStructTagFilter, json_search::JsonSearchTerm, traits::Filterable};
+use crate::{
+    errors::FilterError, filters::MoveStructTagFilter, json_search::JsonSearchTerm,
+    traits::Filterable,
+};
 use anyhow::Error;
 use aptos_protos::transaction::v1::{move_type::Content, Event};
 use serde::{Deserialize, Serialize};
@@ -15,11 +18,9 @@ pub struct EventFilter {
 
 impl Filterable<Event> for EventFilter {
     #[inline]
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.data.is_none() && self.struct_type.is_none() {
-            return Err(Error::msg(
-                "At least one of data or struct_type must be set",
-            ));
+            return Err(Error::msg("At least one of data or struct_type must be set").into());
         };
 
         self.data.is_valid()?;

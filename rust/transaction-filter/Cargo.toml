@@ -15,7 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-protos = { workspace = true }
-
 # SIMD for string search. TODO: benchmark this on various real inputs to see if it's worth it
 memchr = { workspace = true }
 

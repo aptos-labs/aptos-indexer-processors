@@ -1,5 +1,4 @@
-use crate::traits::Filterable;
-use anyhow::Error;
+use crate::{errors::FilterError, traits::Filterable};
 use memchr::memmem::Finder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -157,7 +156,7 @@ impl JsonSearchTerm {
 }
 
 impl Filterable<String> for JsonSearchTerm {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         // Validation is performed elsewhere
         Ok(())
     }
@@ -176,7 +175,7 @@ pub enum JsonOrStringSearch {
 }
 
 impl Filterable<String> for JsonOrStringSearch {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         match self {
             JsonOrStringSearch::Json(json) => json.is_valid(),
             JsonOrStringSearch::String(_) => Ok(()),

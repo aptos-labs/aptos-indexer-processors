@@ -1,4 +1,4 @@
-use crate::traits::Filterable;
+use crate::{errors::FilterError, traits::Filterable};
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -16,9 +16,9 @@ where
 
 impl<T> Filterable<Vec<T>> for PositionalFilter<T>
 where
-    T: PartialEq + Debug,
+    T: PartialEq + Debug + Serialize,
 {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         Ok(())
     }
 
@@ -29,13 +29,11 @@ where
 
 impl<T> Filterable<Vec<T>> for Vec<PositionalFilter<T>>
 where
-    T: PartialEq + Debug,
+    T: PartialEq + Debug + Serialize,
 {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         if self.is_empty() {
-            return Err(Error::msg(
-                "PositionalFilter must have at least one element",
-            ));
+            return Err(Error::msg("PositionalFilter must have at least one element").into());
         }
         Ok(())
     }

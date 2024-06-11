@@ -1,11 +1,10 @@
-// use crate::traits::Filterable;
 use crate::{
+    errors::FilterError,
     filters::{
         EventFilter, TransactionRootFilter, UserTransactionRequestFilter, WriteSetChangeFilter,
     },
     traits::Filterable,
 };
-use anyhow::Error;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -22,7 +21,7 @@ pub enum APIFilter {
 }
 
 impl Filterable<Transaction> for APIFilter {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         match self {
             APIFilter::TransactionRootFilter(filter) => filter.is_valid(),
             APIFilter::UserTransactionRequestFilter(filter) => filter.is_valid(),
@@ -97,7 +96,7 @@ impl FilterOperator {
 }
 
 impl Filterable<Transaction> for FilterOperator {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         match self {
             FilterOperator::And(and) => and.is_valid(),
             FilterOperator::Or(or) => or.is_valid(),
@@ -122,7 +121,7 @@ pub struct LogicalAnd {
 }
 
 impl Filterable<Transaction> for LogicalAnd {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         for filter in &self.and {
             filter.is_valid()?;
         }
@@ -140,7 +139,7 @@ pub struct LogicalOr {
 }
 
 impl Filterable<Transaction> for LogicalOr {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         for filter in &self.or {
             filter.is_valid()?;
         }
@@ -158,7 +157,7 @@ pub struct LogicalNot {
 }
 
 impl Filterable<Transaction> for LogicalNot {
-    fn validate_state(&self) -> Result<(), Error> {
+    fn validate_state(&self) -> Result<(), FilterError> {
         for filter in &self.not {
             filter.is_valid()?;
         }
