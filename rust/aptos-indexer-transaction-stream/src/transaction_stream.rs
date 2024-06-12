@@ -359,7 +359,7 @@ impl TransactionStream {
         }
     }
 
-    async fn init_stream(&mut self) {
+    pub async fn init_stream(&mut self) {
         info!(
             processor_name = self.processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
@@ -627,7 +627,7 @@ impl TransactionStream {
         }
     }
 
-    async fn reconnect_to_grpc(&mut self) {
+    pub async fn reconnect_to_grpc(&mut self) {
         // Sleep for 100ms between reconnect tries
         // TODO: Turn this into exponential backoff
         tokio::time::sleep(Duration::from_millis(100)).await;
