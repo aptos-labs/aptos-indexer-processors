@@ -67,4 +67,4 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 - Check our [indexer processors](https://github.com/aptos-labs/aptos-indexer-processors)!
 
 ### Manually running diesel-cli
-- `cd` into the database folder under `src/db/`, then run it.
+- `cd` into the database folder you use under `src/db/` (e.g. `src/db/postgres`), then run it.
