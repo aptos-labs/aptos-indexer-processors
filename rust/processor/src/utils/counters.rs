@@ -167,26 +167,6 @@ pub static NUM_TRANSACTIONS_PROCESSED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| 
     .unwrap()
 });
 
-/// Count of transactions filtered out
-pub static NUM_TRANSACTIONS_FILTERED_OUT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "indexer_processor_num_transactions_filtered_out_count",
-        "Number of transactions filtered out",
-        &["processor_name"]
-    )
-    .unwrap()
-});
-
-/// Size of the channel containing transactions fetched from GRPC, waiting to be processed
-pub static FETCHER_THREAD_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_processor_fetcher_thread_channel_size",
-        "Size of the fetcher thread channel",
-        &["processor_name"]
-    )
-    .unwrap()
-});
-
 /// Overall processing time for a single batch of transactions (per task)
 pub static SINGLE_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
@@ -229,9 +209,11 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
 
 /// Data gap warnings
 pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!("indexer_processor_data_gap_count", "Data gap count", &[
-        "processor_name"
-    ])
+    register_int_gauge_vec!(
+        "indexer_processor_data_gap_count",
+        "Data gap count",
+        &["processor_name"]
+    )
     .unwrap()
 });
 

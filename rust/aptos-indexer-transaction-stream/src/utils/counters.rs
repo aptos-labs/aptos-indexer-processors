@@ -39,10 +39,14 @@ impl ProcessorStep {
     }
 }
 
+/// These metrics are temporary (suffixed with _temp to avoid conflict with metrics in processor crate)
+/// They're only defined in this crate for backwards compatibility before we migrate over to
+/// using the instrumentation provided by SDK
+
 /// Max version processed
 pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "indexer_processor_latest_version",
+        "indexer_processor_latest_version_temp",
         "Latest version a processor has fully consumed",
         &["processor_name", "step", "message", "task_index"]
     )
@@ -52,7 +56,7 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
 /// Count of bytes processed.
 pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "indexer_processor_processed_bytes_count",
+        "indexer_processor_processed_bytes_count_temp",
         "Count of bytes processed",
         &["processor_name", "step", "message", "task_index"]
     )
@@ -62,8 +66,18 @@ pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Count of transactions processed.
 pub static NUM_TRANSACTIONS_PROCESSED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "indexer_processor_num_transactions_processed_count",
+        "indexer_processor_num_transactions_processed_count_temp",
         "Number of transactions processed",
+        &["processor_name", "step", "message", "task_index"]
+    )
+    .unwrap()
+});
+
+/// Transaction timestamp in unixtime
+pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
+    register_gauge_vec!(
+        "indexer_processor_transaction_unix_timestamp_temp",
+        "Transaction timestamp in unixtime",
         &["processor_name", "step", "message", "task_index"]
     )
     .unwrap()
@@ -85,16 +99,6 @@ pub static FETCHER_THREAD_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
         "indexer_processor_fetcher_thread_channel_size",
         "Size of the fetcher thread channel",
         &["processor_name"]
-    )
-    .unwrap()
-});
-
-/// Transaction timestamp in unixtime
-pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
-        "indexer_processor_transaction_unix_timestamp",
-        "Transaction timestamp in unixtime",
-        &["processor_name", "step", "message", "task_index"]
     )
     .unwrap()
 });

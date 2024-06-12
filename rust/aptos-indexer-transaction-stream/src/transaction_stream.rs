@@ -300,7 +300,6 @@ pub async fn get_chain_id(
 }
 
 pub struct TransactionStream {
-    txn_sender: AsyncSender<TransactionsPBResponse>,
     indexer_grpc_data_service_address: Url,
     indexer_grpc_http2_ping_interval: Duration,
     indexer_grpc_http2_ping_timeout: Duration,
@@ -314,17 +313,19 @@ pub struct TransactionStream {
     pb_channel_txn_chunk_size: usize,
     resp_stream: Option<Streaming<TransactionsResponse>>,
     connection_id: Option<String>,
-    grpc_channel_recv_latency: std::time::Instant,
     next_version_to_fetch: u64,
     reconnection_retries: u64,
     last_fetched_version: i64,
     fetch_ma: MovingAverage,
-    send_ma: MovingAverage,
+}
+
+pub struct TransactionStreamOutput {
+    pub transactions: Vec<TransactionsPBResponse>,
+    pub should_continue_fetching: bool,
 }
 
 impl TransactionStream {
     pub fn new(
-        txn_sender: AsyncSender<TransactionsPBResponse>,
         indexer_grpc_data_service_address: Url,
         indexer_grpc_http2_ping_interval: Duration,
         indexer_grpc_http2_ping_timeout: Duration,
@@ -338,7 +339,6 @@ impl TransactionStream {
         pb_channel_txn_chunk_size: usize,
     ) -> Self {
         Self {
-            txn_sender,
             indexer_grpc_data_service_address,
             indexer_grpc_http2_ping_interval,
             indexer_grpc_http2_ping_timeout,
@@ -352,12 +352,10 @@ impl TransactionStream {
             pb_channel_txn_chunk_size,
             resp_stream: None,
             connection_id: None,
-            grpc_channel_recv_latency: std::time::Instant::now(),
             next_version_to_fetch: starting_version,
             reconnection_retries: 0,
             last_fetched_version: starting_version as i64 - 1,
             fetch_ma: MovingAverage::new(3000),
-            send_ma: MovingAverage::new(3000),
         }
     }
 
@@ -408,7 +406,10 @@ impl TransactionStream {
     /// Returns
     /// - true if should continue fetching
     /// - false if we reached the end of the stream or there is an error and the loop should stop
-    pub async fn get_next_transaction_batch(&mut self) -> bool {
+    pub async fn get_next_transaction_batch(&mut self) -> TransactionStreamOutput {
+        let grpc_channel_recv_latency = std::time::Instant::now();
+        let mut transaction_pb_response = vec![];
+
         let is_success = match tokio::time::timeout(
             self.indexer_grpc_response_item_timeout_secs,
             self.resp_stream
@@ -435,11 +436,8 @@ impl TransactionStream {
                         let size_in_bytes = r.encoded_len() as u64;
                         let chain_id: u64 = r.chain_id.expect("[Parser] Chain Id doesn't exist.");
                         let num_txns = r.transactions.len();
-                        let duration_in_secs =
-                            self.grpc_channel_recv_latency.elapsed().as_secs_f64();
+                        let duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64();
                         self.fetch_ma.tick_now(num_txns as u64);
-
-                        let num_txns = r.transactions.len();
 
                         // Filter out the txns we don't care about
                         r.transactions
@@ -467,7 +465,6 @@ impl TransactionStream {
                                 .unwrap_or_default(),
                             num_of_transactions = end_version - start_version + 1,
                             num_filtered_txns,
-                            channel_size = self.txn_sender.len(),
                             size_in_bytes,
                             duration_in_secs,
                             tps = self.fetch_ma.avg().ceil() as u64,
@@ -506,8 +503,6 @@ impl TransactionStream {
                             .with_label_values(&[&self.processor_name, step, label, "-"])
                             .inc_by(end_version - start_version + 1);
 
-                        let txn_channel_send_latency = std::time::Instant::now();
-
                         //potentially break txn_pb into many `TransactionsPBResponse` that are each `pb_channel_txn_chunk_size` txns max in size
                         if num_txn_post_filter < self.pb_channel_txn_chunk_size {
                             // We only need to send one; avoid the chunk/clone
@@ -520,20 +515,7 @@ impl TransactionStream {
                                 end_txn_timestamp,
                                 size_in_bytes,
                             };
-
-                            match self.txn_sender.send(txn_pb).await {
-                                Ok(()) => {},
-                                Err(e) => {
-                                    error!(
-                                        processor_name = self.processor_name,
-                                        stream_address = self.indexer_grpc_data_service_address.to_string(),
-                                        connection_id = self.connection_id,
-                                        error = ?e,
-                                        "[Parser] Error sending GRPC response to channel."
-                                    );
-                                    panic!("[Parser] Error sending GRPC response to channel.")
-                                },
-                            }
+                            transaction_pb_response.push(txn_pb);
                         } else {
                             // We are breaking down a big batch into small batches; this involves an iterator
                             let average_size_in_bytes = size_in_bytes / num_txns as u64;
@@ -557,48 +539,9 @@ impl TransactionStream {
                                     end_txn_timestamp: end_txn_timestamp.clone(),
                                     size_in_bytes,
                                 };
-
-                                match self.txn_sender.send(txn_pb).await {
-                                    Ok(()) => {},
-                                    Err(e) => {
-                                        error!(
-                                            processor_name = self.processor_name,
-                                            stream_address = self.indexer_grpc_data_service_address.to_string(),
-                                            connection_id = self.connection_id,
-                                            error = ?e,
-                                            "[Parser] Error sending GRPC response to channel."
-                                        );
-                                        panic!("[Parser] Error sending GRPC response to channel.")
-                                    },
-                                }
+                                transaction_pb_response.push(txn_pb);
                             }
                         }
-
-                        let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-                        self.send_ma.tick_now(num_txns as u64);
-                        let tps = self.send_ma.avg().ceil() as u64;
-                        let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
-
-                        let channel_size = self.txn_sender.len();
-                        debug!(
-                            processor_name = self.processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
-                            connection_id = self.connection_id,
-                            start_version,
-                            end_version,
-                            channel_size,
-                            size_in_bytes,
-                            duration_in_secs,
-                            bytes_per_sec,
-                            tps,
-                            num_filtered_txns,
-                            "[Parser] Successfully sent transactions to channel."
-                        );
-                        FETCHER_THREAD_CHANNEL_SIZE
-                            .with_label_values(&[&self.processor_name])
-                            .set(channel_size as i64);
-                        self.grpc_channel_recv_latency = std::time::Instant::now();
 
                         NUM_TRANSACTIONS_FILTERED_OUT_COUNT
                             .with_label_values(&[&self.processor_name])
@@ -655,6 +598,7 @@ impl TransactionStream {
         } else {
             false
         };
+
         if is_end {
             info!(
                 processor_name = self.processor_name,
@@ -665,39 +609,21 @@ impl TransactionStream {
                 next_version_to_fetch = self.next_version_to_fetch,
                 "[Parser] Reached ending version.",
             );
-            // Wait for the fetched transactions to finish processing before closing the channel
-            loop {
-                let channel_size = self.txn_sender.len();
-                info!(
-                    processor_name = self.processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    stream_address = self.indexer_grpc_data_service_address.to_string(),
-                    connection_id = self.connection_id,
-                    channel_size,
-                    "[Parser] Waiting for channel to be empty"
-                );
-                if channel_size.is_zero() {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
-            info!(
-                processor_name = self.processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = self.indexer_grpc_data_service_address.to_string(),
-                connection_id = self.connection_id,
-                "[Parser] Transaction fetcher send channel is closed."
-            );
 
-            // If we're at the end of the stream, return false to signal that the fetcher should stop looping
-            false
+            TransactionStreamOutput {
+                transactions: transaction_pb_response,
+                should_continue_fetching: false,
+            }
         } else {
             // The rest is to see if we need to reconnect
             if !is_success {
                 self.reconnect_to_grpc().await;
             }
 
-            true
+            TransactionStreamOutput {
+                transactions: transaction_pb_response,
+                should_continue_fetching: true,
+            }
         }
     }
 
@@ -783,8 +709,7 @@ pub async fn create_fetcher_loop(
     pb_channel_txn_chunk_size: usize,
 ) {
     let mut transaction_stream = TransactionStream::new(
-        txn_sender,
-        indexer_grpc_data_service_address,
+        indexer_grpc_data_service_address.clone(),
         indexer_grpc_http2_ping_interval,
         indexer_grpc_http2_ping_timeout,
         indexer_grpc_reconnection_timeout_secs,
@@ -792,16 +717,101 @@ pub async fn create_fetcher_loop(
         starting_version,
         request_ending_version,
         auth_token,
-        processor_name,
+        processor_name.clone(),
         transaction_filter,
         pb_channel_txn_chunk_size,
     );
 
     transaction_stream.init_stream().await;
+    let mut send_ma = MovingAverage::new(3000);
 
     loop {
-        let should_continue_fetching = transaction_stream.get_next_transaction_batch().await;
-        if !should_continue_fetching {
+        let transactions_output = transaction_stream.get_next_transaction_batch().await;
+        let start_version = transactions_output
+            .transactions
+            .first()
+            .unwrap()
+            .transactions
+            .first()
+            .unwrap()
+            .version;
+        let end_version = transactions_output
+            .transactions
+            .last()
+            .unwrap()
+            .transactions
+            .last()
+            .unwrap()
+            .version;
+        let size_in_bytes = transactions_output
+            .transactions
+            .iter()
+            .map(|txn_pb| txn_pb.size_in_bytes)
+            .sum::<u64>();
+
+        let txn_channel_send_latency = std::time::Instant::now();
+        for txn_pb in transactions_output.transactions {
+            match txn_sender.send(txn_pb).await {
+                Ok(()) => {},
+                Err(e) => {
+                    error!(
+                        processor_name = processor_name,
+                        stream_address = indexer_grpc_data_service_address.to_string(),
+                        error = ?e,
+                        "[Parser] Error sending GRPC response to channel."
+                    );
+                    panic!("[Parser] Error sending GRPC response to channel.")
+                },
+            }
+        }
+
+        // Log channel send metrics
+        let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
+        let num_txns = end_version - start_version + 1;
+
+        send_ma.tick_now(num_txns as u64);
+        let tps = send_ma.avg().ceil() as u64;
+        let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
+        let channel_size = txn_sender.len();
+        debug!(
+            processor_name.service_type = PROCESSOR_SERVICE_TYPE,
+            stream_address = indexer_grpc_data_service_address.to_string(),
+            start_version,
+            end_version,
+            channel_size,
+            size_in_bytes,
+            duration_in_secs,
+            bytes_per_sec,
+            tps,
+            "[Parser] Successfully sent transactions to channel."
+        );
+        FETCHER_THREAD_CHANNEL_SIZE
+            .with_label_values(&[&processor_name])
+            .set(channel_size as i64);
+
+        // Handle reaching end of stream
+        if !transactions_output.should_continue_fetching {
+            // Wait for the fetched transactions to finish processing before closing the channel
+            loop {
+                let channel_size = txn_sender.len();
+                info!(
+                    processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
+                    stream_address = indexer_grpc_data_service_address.to_string(),
+                    channel_size,
+                    "[Parser] Waiting for channel to be empty"
+                );
+                if channel_size.is_zero() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            info!(
+                processor_name,
+                service_type = PROCESSOR_SERVICE_TYPE,
+                stream_address = indexer_grpc_data_service_address.to_string(),
+                "[Parser] Transaction fetcher send channel is closed."
+            );
             break;
         }
     }
