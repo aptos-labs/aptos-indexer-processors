@@ -51,15 +51,10 @@ pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
-    pub struct TableFlags: u32 {
+    pub struct TableFlags: u64 {
         const TRANSACTIONS = 1;
-        const BLOCK_METADATA_TRANSACTIONS = 2;
-        const WRITE_SET_CHANGES = 4;
-        const MOVE_MODULES = 8;
-        const MOVE_RESOURCES = 16;
-        const TABLE_ITEMS = 32;
-        const CURRENT_TABLE_ITEMS = 64;
-        const TABLE_METADATA = 128;
+        const WRITE_SET_CHANGES = 2;
+        const MOVE_RESOURCES = 4;
     }
 }
 

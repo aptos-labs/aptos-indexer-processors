@@ -4,9 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::transactions::Transaction;
-use crate::{
-    db::common::models::TableName, schema::move_resources, utils::util::standardize_address,
-};
+use crate::{schema::move_resources, utils::util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
     DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,
@@ -39,12 +37,6 @@ pub struct MoveStructTag {
     pub module: String,
     pub name: String,
     pub generic_type_params: Option<serde_json::Value>,
-}
-
-impl TableName for MoveResource {
-    fn table_name() -> &'static str {
-        "move_resources"
-    }
 }
 
 impl MoveResource {

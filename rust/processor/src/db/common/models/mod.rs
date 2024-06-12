@@ -16,7 +16,3 @@ pub mod token_models;
 pub mod token_v2_models;
 pub mod transaction_metadata_model;
 pub mod user_transactions_models;
-
-pub trait TableName {
-    fn table_name() -> &'static str;
-}

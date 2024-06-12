@@ -3,18 +3,13 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::{
-        default_models::{
-            block_metadata_transactions::{
-                BlockMetadataTransaction, BlockMetadataTransactionModel,
-            },
-            move_modules::MoveModule,
-            move_resources::MoveResource,
-            move_tables::{CurrentTableItem, TableItem, TableMetadata},
-            transactions::TransactionModel,
-            write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
-        },
-        TableName,
+    db::common::models::default_models::{
+        block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
+        move_modules::MoveModule,
+        move_resources::MoveResource,
+        move_tables::{CurrentTableItem, TableItem, TableMetadata},
+        transactions::TransactionModel,
+        write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
@@ -29,7 +24,7 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use std::{collections::HashSet, fmt::Debug};
+use std::fmt::Debug;
 use tokio::join;
 use tracing::error;
 
@@ -92,10 +87,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_transactions_query,
         txns,
-        get_config_table_chunk_size::<TransactionModel>(
-            TransactionModel::table_name(),
-            per_table_chunk_sizes,
-        ),
+        get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
     );
 
     let bmt_res = execute_in_chunks(
@@ -103,7 +95,7 @@ async fn insert_to_db(
         insert_block_metadata_transactions_query,
         block_metadata_transactions,
         get_config_table_chunk_size::<BlockMetadataTransactionModel>(
-            BlockMetadataTransaction::table_name(),
+            "block_metadata_transactions",
             per_table_chunk_sizes,
         ),
     );
@@ -113,7 +105,7 @@ async fn insert_to_db(
         insert_write_set_changes_query,
         wscs,
         get_config_table_chunk_size::<WriteSetChangeModel>(
-            WriteSetChangeModel::table_name(),
+            "write_set_changes",
             per_table_chunk_sizes,
         ),
     );
@@ -122,24 +114,21 @@ async fn insert_to_db(
         conn.clone(),
         insert_move_modules_query,
         move_modules,
-        get_config_table_chunk_size::<MoveModule>(MoveModule::table_name(), per_table_chunk_sizes),
+        get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
     );
 
     let mr_res = execute_in_chunks(
         conn.clone(),
         insert_move_resources_query,
         move_resources,
-        get_config_table_chunk_size::<MoveResource>(
-            MoveResource::table_name(),
-            per_table_chunk_sizes,
-        ),
+        get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
     );
 
     let ti_res = execute_in_chunks(
         conn.clone(),
         insert_table_items_query,
         table_items,
-        get_config_table_chunk_size::<TableItem>(TableItem::table_name(), per_table_chunk_sizes),
+        get_config_table_chunk_size::<TableItem>("table_items", per_table_chunk_sizes),
     );
 
     let cti_res = execute_in_chunks(
@@ -147,7 +136,7 @@ async fn insert_to_db(
         insert_current_table_items_query,
         current_table_items,
         get_config_table_chunk_size::<CurrentTableItem>(
-            CurrentTableItem::table_name(),
+            "current_table_items",
             per_table_chunk_sizes,
         ),
     );
@@ -156,10 +145,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_table_metadata_query,
         table_metadata,
-        get_config_table_chunk_size::<TableMetadata>(
-            TableMetadata::table_name(),
-            per_table_chunk_sizes,
-        ),
+        get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
     );
 
     let (txns_res, wst_res, mr_res, bmt_res, mm_res, ti_res, cti_res, tm_res) =
@@ -410,8 +396,8 @@ fn process_transactions(
         Vec<TableMetadata>,
     ),
 ) {
-    let (txns, block_metadata_txns, write_set_changes, wsc_details) =
-        TransactionModel::from_transactions(&transactions, &flags);
+    let (mut txns, block_metadata_txns, mut write_set_changes, wsc_details) =
+        TransactionModel::from_transactions(&transactions);
     let mut block_metadata_transactions = vec![];
     for block_metadata_txn in block_metadata_txns {
         block_metadata_transactions.push(block_metadata_txn.clone());
@@ -450,6 +436,16 @@ fn process_transactions(
     current_table_items
         .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
+    if flags.contains(TableFlags::MOVE_RESOURCES) {
+        move_resources.clear();
+    }
+    if flags.contains(TableFlags::TRANSACTIONS) {
+        txns.clear();
+    }
+    if flags.contains(TableFlags::WRITE_SET_CHANGES) {
+        write_set_changes.clear();
+    }
 
     (
         txns,
