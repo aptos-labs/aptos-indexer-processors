@@ -10,7 +10,7 @@ use super::{
     transactions::Transaction,
 };
 use crate::{
-    models::TableName, schema::write_set_changes, utils::util::standardize_address,
+    db::common::models::TableName, schema::write_set_changes, utils::util::standardize_address,
     worker::TableFlags,
 };
 use aptos_protos::transaction::v1::{

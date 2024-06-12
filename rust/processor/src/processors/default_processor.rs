@@ -3,13 +3,18 @@
 
 use super::{ProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::default_models::{
-        block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
-        move_modules::MoveModule,
-        move_resources::MoveResource,
-        move_tables::{CurrentTableItem, TableItem, TableMetadata},
-        transactions::TransactionModel,
-        write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
+    db::common::models::{
+        default_models::{
+            block_metadata_transactions::{
+                BlockMetadataTransaction, BlockMetadataTransactionModel,
+            },
+            move_modules::MoveModule,
+            move_resources::MoveResource,
+            move_tables::{CurrentTableItem, TableItem, TableMetadata},
+            transactions::TransactionModel,
+            write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
+        },
+        TableName,
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
@@ -24,8 +29,8 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use tokio::join;
 use std::{collections::HashSet, fmt::Debug};
+use tokio::join;
 use tracing::error;
 
 pub struct DefaultProcessor {

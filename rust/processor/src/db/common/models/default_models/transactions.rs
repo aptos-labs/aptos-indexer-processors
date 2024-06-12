@@ -10,7 +10,7 @@ use super::{
     write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
-    models::TableName,
+    db::common::models::TableName,
     schema::transactions,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,

@@ -5,7 +5,7 @@
 
 use super::transactions::Transaction;
 use crate::{
-    models::TableName,
+    db::common::models::TableName,
     schema::{current_table_items, table_items, table_metadatas},
     utils::util::{hash_str, standardize_address},
 };

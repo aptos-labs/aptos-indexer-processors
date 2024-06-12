@@ -4,7 +4,9 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::transactions::Transaction;
-use crate::{models::TableName, schema::move_modules, utils::util::standardize_address};
+use crate::{
+    db::common::models::TableName, schema::move_modules, utils::util::standardize_address,
+};
 use aptos_protos::transaction::v1::{
     DeleteModule, MoveModule as MoveModulePB, MoveModuleBytecode, WriteModule,
 };

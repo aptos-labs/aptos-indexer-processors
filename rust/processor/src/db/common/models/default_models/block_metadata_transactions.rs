@@ -7,7 +7,7 @@
 
 use super::transactions::Transaction;
 use crate::{
-    models::TableName,
+    db::common::models::TableName,
     schema::block_metadata_transactions,
     utils::util::{parse_timestamp, standardize_address},
 };
