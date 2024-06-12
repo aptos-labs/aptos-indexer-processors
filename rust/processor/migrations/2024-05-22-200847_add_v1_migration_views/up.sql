@@ -52,7 +52,7 @@ FROM public.fungible_asset_balances
 WHERE token_standard = 'v1';
 -- replace `coin_infos` with `fungible_asset_metadata`
 CREATE OR REPLACE VIEW legacy_migration_v1.coin_infos AS
-SELECT encode(sha256(asset_type::bytea), 'hex'),
+SELECT encode(sha256(asset_type::bytea), 'hex') as coin_type_hash,
     asset_type as coin_type,
     last_transaction_version as transaction_version_created,
     creator_address,
@@ -215,7 +215,7 @@ WHERE tdv.token_standard = 'v1';
 -- collections_v2 already has index on collection_id and transaction version
 -- replace `current_token_datas` with `current_token_datas_v2`
 CREATE OR REPLACE VIEW legacy_migration_v1.current_token_datas AS
-SELECT token_data_id AS token_data_id_hash,
+SELECT ctdv.token_data_id AS token_data_id_hash,
     creator_address,
     collection_name,
     token_name AS "name",
@@ -240,6 +240,7 @@ SELECT token_data_id AS token_data_id_hash,
     ctdv."description" AS "description"
 FROM current_token_datas_v2 ctdv
     JOIN current_collections_v2 ccv ON ctdv.collection_id = ccv.collection_id
+    LEFT JOIN current_token_royalty_v1 ctrv on ctdv.token_data_id = ctrv.token_data_id 
 WHERE ctdv.token_standard = 'v1';
 -- current_collections_v2 already has index on collection_id
 -- current_collections_v2 already has an index on (creator_address, collection_name)
