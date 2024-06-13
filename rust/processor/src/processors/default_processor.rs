@@ -148,11 +148,11 @@ async fn insert_to_db(
         get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
     );
 
-    let (txns_res, wst_res, mr_res, bmt_res, mm_res, ti_res, cti_res, tm_res) =
-        join!(txns_res, wst_res, mr_res, bmt_res, mm_res, ti_res, cti_res, tm_res);
+    let (txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
+        join!(txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res);
 
     for res in [
-        txns_res, bmt_res, mm_res, ti_res, cti_res, tm_res, wst_res, mr_res,
+        txns_res, bmt_res, wst_res, mm_res, mr_res, ti_res, cti_res, tm_res,
     ] {
         res?;
     }
