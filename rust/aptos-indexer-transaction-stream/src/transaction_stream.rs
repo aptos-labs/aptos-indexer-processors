@@ -1,12 +1,12 @@
 use crate::config::TransactionStreamConfig;
 use crate::utils::{
     counters::{
-        ProcessorStep, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_FILTERED_OUT_COUNT,
-        NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
+        ProcessorStep, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_PROCESSED_COUNT,
+        PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
     util::{timestamp_to_iso, timestamp_to_unixtime},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
@@ -20,7 +20,6 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
 use tracing::{error, info};
-use transaction_filter::transaction_filter::TransactionFilter;
 
 /// GRPC request metadata key for the token ID.
 const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
@@ -311,8 +310,6 @@ pub async fn get_chain_id(
 pub struct TransactionStream {
     transaction_stream_config: TransactionStreamConfig,
     processor_name: String,
-    transaction_filter: TransactionFilter,
-    pb_channel_txn_chunk_size: usize,
     resp_stream: Option<Streaming<TransactionsResponse>>,
     connection_id: Option<String>,
     next_version_to_fetch: u64,
@@ -322,7 +319,7 @@ pub struct TransactionStream {
 }
 
 pub struct TransactionStreamOutput {
-    pub transactions: Vec<TransactionsPBResponse>,
+    pub transactions: TransactionsPBResponse,
     pub should_continue_fetching: bool,
 }
 
@@ -330,14 +327,10 @@ impl TransactionStream {
     pub async fn new(
         transaction_stream_config: TransactionStreamConfig,
         processor_name: String,
-        transaction_filter: TransactionFilter,
-        pb_channel_txn_chunk_size: usize,
     ) -> Result<Self> {
         let mut transaction_stream = Self {
             transaction_stream_config: transaction_stream_config.clone(),
             processor_name,
-            transaction_filter,
-            pb_channel_txn_chunk_size,
             resp_stream: None,
             connection_id: None,
             next_version_to_fetch: transaction_stream_config.starting_version,
@@ -397,11 +390,12 @@ impl TransactionStream {
     /// Returns
     /// - true if should continue fetching
     /// - false if we reached the end of the stream or there is an error and the loop should stop
-    pub async fn get_next_transaction_batch(&mut self) -> TransactionStreamOutput {
+    pub async fn get_next_transaction_batch_with_reconnect(
+        &mut self,
+    ) -> Result<TransactionsPBResponse> {
         let grpc_channel_recv_latency = std::time::Instant::now();
-        let mut transaction_pb_response = vec![];
 
-        let is_success = match tokio::time::timeout(
+        let txn_pb_res = match tokio::time::timeout(
             self.transaction_stream_config
                 .indexer_grpc_response_item_timeout(),
             self.resp_stream
@@ -432,11 +426,11 @@ impl TransactionStream {
                         self.fetch_ma.tick_now(num_txns as u64);
 
                         // Filter out the txns we don't care about
-                        r.transactions
-                            .retain(|txn| self.transaction_filter.include(txn));
+                        // r.transactions
+                        //     .retain(|txn| self.transaction_filter.include(txn));
 
-                        let num_txn_post_filter = r.transactions.len();
-                        let num_filtered_txns = num_txns - num_txn_post_filter;
+                        // let num_txn_post_filter = r.transactions.len();
+                        // let num_filtered_txns = num_txns - num_txn_post_filter;
                         let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
                         let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
 
@@ -459,7 +453,7 @@ impl TransactionStream {
                                 .map(timestamp_to_iso)
                                 .unwrap_or_default(),
                             num_of_transactions = end_version - start_version + 1,
-                            num_filtered_txns,
+                            // num_filtered_txns,
                             size_in_bytes,
                             duration_in_secs,
                             tps = self.fetch_ma.avg().ceil() as u64,
@@ -498,50 +492,17 @@ impl TransactionStream {
                             .with_label_values(&[&self.processor_name, step, label, "-"])
                             .inc_by(end_version - start_version + 1);
 
-                        //potentially break txn_pb into many `TransactionsPBResponse` that are each `pb_channel_txn_chunk_size` txns max in size
-                        if num_txn_post_filter < self.pb_channel_txn_chunk_size {
-                            // We only need to send one; avoid the chunk/clone
-                            let txn_pb = TransactionsPBResponse {
-                                transactions: r.transactions,
-                                chain_id,
-                                start_version,
-                                end_version,
-                                start_txn_timestamp,
-                                end_txn_timestamp,
-                                size_in_bytes,
-                            };
-                            transaction_pb_response.push(txn_pb);
-                        } else {
-                            // We are breaking down a big batch into small batches; this involves an iterator
-                            let average_size_in_bytes = size_in_bytes / num_txns as u64;
+                        let txn_pb = TransactionsPBResponse {
+                            transactions: r.transactions,
+                            chain_id,
+                            start_version,
+                            end_version,
+                            start_txn_timestamp,
+                            end_txn_timestamp,
+                            size_in_bytes,
+                        };
 
-                            let pb_txn_chunks: Vec<Vec<Transaction>> = r
-                                .transactions
-                                .into_iter()
-                                .chunks(self.pb_channel_txn_chunk_size)
-                                .into_iter()
-                                .map(|chunk| chunk.collect())
-                                .collect();
-                            for txns in pb_txn_chunks {
-                                let size_in_bytes = average_size_in_bytes * txns.len() as u64;
-                                let txn_pb = TransactionsPBResponse {
-                                    transactions: txns,
-                                    chain_id,
-                                    start_version,
-                                    end_version,
-                                    // TODO: this is only for gap checker + filtered txns, but this is wrong
-                                    start_txn_timestamp: start_txn_timestamp.clone(),
-                                    end_txn_timestamp: end_txn_timestamp.clone(),
-                                    size_in_bytes,
-                                };
-                                transaction_pb_response.push(txn_pb);
-                            }
-                        }
-
-                        NUM_TRANSACTIONS_FILTERED_OUT_COUNT
-                            .with_label_values(&[&self.processor_name])
-                            .inc_by(num_filtered_txns as u64);
-                        true
+                        Ok(txn_pb)
                     },
                     // Error receiving datastream response
                     Some(Err(rpc_error)) => {
@@ -555,7 +516,7 @@ impl TransactionStream {
                             error = ?rpc_error,
                             "[Parser] Error receiving datastream response."
                         );
-                        false
+                        Err(anyhow!("Error receiving datastream response"))
                     },
                     // Stream is finished
                     None => {
@@ -571,7 +532,7 @@ impl TransactionStream {
                             end_version = self.transaction_stream_config.request_ending_version,
                             "[Parser] Stream ended."
                         );
-                        false
+                        Err(anyhow!("Stream ended"))
                     },
                 }
             },
@@ -587,45 +548,18 @@ impl TransactionStream {
                     error = ?e,
                     "[Parser] Timeout receiving datastream response."
                 );
-                false
+                Err(anyhow!("Timeout receiving datastream response"))
             },
         };
-        // Check if we're at the end of the stream
-        let is_end =
-            if let Some(ending_version) = self.transaction_stream_config.request_ending_version {
-                self.next_version_to_fetch > ending_version
-            } else {
-                false
-            };
+        txn_pb_res
+    }
 
-        if is_end {
-            info!(
-                processor_name = self.processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = self
-                    .transaction_stream_config
-                    .indexer_grpc_data_service_address
-                    .to_string(),
-                connection_id = self.connection_id,
-                ending_version = self.transaction_stream_config.request_ending_version,
-                next_version_to_fetch = self.next_version_to_fetch,
-                "[Parser] Reached ending version.",
-            );
-
-            TransactionStreamOutput {
-                transactions: transaction_pb_response,
-                should_continue_fetching: false,
-            }
+    /// Helper function to signal that we've fetched all the transactions up to the ending version that was requested.
+    pub fn is_end_of_stream(&self) -> bool {
+        if let Some(ending_version) = self.transaction_stream_config.request_ending_version {
+            self.next_version_to_fetch > ending_version
         } else {
-            // The rest is to see if we need to reconnect
-            if !is_success {
-                self.reconnect_to_grpc().await;
-            }
-
-            TransactionStreamOutput {
-                transactions: transaction_pb_response,
-                should_continue_fetching: true,
-            }
+            false
         }
     }
 

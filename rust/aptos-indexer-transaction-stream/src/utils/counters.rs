@@ -93,16 +93,3 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-/// Count of transactions filtered out
-pub static NUM_TRANSACTIONS_FILTERED_OUT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        format!(
-            "{}_num_transactions_filtered_out_count",
-            TRANSACTION_STREAM_METRICS_PREFIX
-        ),
-        "Number of transactions filtered out",
-        &["processor_name"]
-    )
-    .unwrap()
-});
