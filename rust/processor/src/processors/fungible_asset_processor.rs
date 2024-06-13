@@ -266,18 +266,17 @@ fn insert_current_unified_fungible_asset_balances_v1_query(
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
 ) {
-    use schema::current_unified_fungible_asset_balances::dsl::*;
+    use schema::current_unified_fungible_asset_balances_to_be_renamed::dsl::*;
 
     (
-        diesel::insert_into(schema::current_unified_fungible_asset_balances::table)
+        diesel::insert_into(schema::current_unified_fungible_asset_balances_to_be_renamed::table)
             .values(items_to_insert)
             .on_conflict(storage_id)
             .do_update()
             .set(
                 (
                     owner_address.eq(excluded(owner_address)),
-                    asset_type.eq(excluded(asset_type)),
-                    coin_type.eq(excluded(coin_type)),
+                    asset_type_v1.eq(excluded(asset_type_v1)),
                     is_frozen.eq(excluded(is_frozen)),
                     amount_v1.eq(excluded(amount_v1)),
                     last_transaction_timestamp_v1.eq(excluded(last_transaction_timestamp_v1)),
@@ -285,7 +284,7 @@ fn insert_current_unified_fungible_asset_balances_v1_query(
                     inserted_at.eq(excluded(inserted_at)),
                 )
             ),
-        Some(" WHERE current_unified_fungible_asset_balances.last_transaction_version_v1 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v1 <= excluded.last_transaction_version_v1"),
+        Some(" WHERE current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v1 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v1 <= excluded.last_transaction_version_v1"),
     )
 }
 
@@ -295,16 +294,16 @@ fn insert_current_unified_fungible_asset_balances_v2_query(
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
 ) {
-    use schema::current_unified_fungible_asset_balances::dsl::*;
+    use schema::current_unified_fungible_asset_balances_to_be_renamed::dsl::*;
     (
-        diesel::insert_into(schema::current_unified_fungible_asset_balances::table)
+        diesel::insert_into(schema::current_unified_fungible_asset_balances_to_be_renamed::table)
             .values(items_to_insert)
             .on_conflict(storage_id)
             .do_update()
             .set(
                 (
                     owner_address.eq(excluded(owner_address)),
-                    asset_type.eq(excluded(asset_type)),
+                    asset_type_v2.eq(excluded(asset_type_v2)),
                     is_primary.eq(excluded(is_primary)),
                     is_frozen.eq(excluded(is_frozen)),
                     amount_v2.eq(excluded(amount_v2)),
@@ -313,7 +312,7 @@ fn insert_current_unified_fungible_asset_balances_v2_query(
                     inserted_at.eq(excluded(inserted_at)),
                 )
             ),
-        Some(" WHERE current_unified_fungible_asset_balances.last_transaction_version_v2 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v2 <= excluded.last_transaction_version_v2 "),
+        Some(" WHERE current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v2 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v2 <= excluded.last_transaction_version_v2 "),
     )
 }
 
