@@ -451,6 +451,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        untransferrable -> Bool,
     }
 }
 
@@ -916,6 +917,7 @@ diesel::table! {
         allow_ungated_transfer -> Bool,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
+        untransferrable -> Bool,
     }
 }
 
@@ -994,6 +996,14 @@ diesel::table! {
         handle -> Varchar,
         key_type -> Text,
         value_type -> Text,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    test (token_data_id) {
+        #[max_length = 66]
+        token_data_id -> Varchar,
         inserted_at -> Timestamp,
     }
 }
@@ -1328,6 +1338,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     spam_assets,
     table_items,
     table_metadatas,
+    test,
     token_activities,
     token_activities_v2,
     token_datas,

@@ -31,6 +31,7 @@ pub struct Object {
     pub guid_creation_num: BigDecimal,
     pub allow_ungated_transfer: bool,
     pub is_deleted: bool,
+    pub untransferrable: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -44,6 +45,7 @@ pub struct CurrentObject {
     pub last_guid_creation_num: BigDecimal,
     pub last_transaction_version: i64,
     pub is_deleted: bool,
+    pub untransferrable: bool,
 }
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
@@ -58,6 +60,7 @@ pub struct CurrentObjectQuery {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
     pub inserted_at: chrono::NaiveDateTime,
+    pub untransferrable: bool,
 }
 
 impl Object {
@@ -72,6 +75,12 @@ impl Object {
             // do something
             let object_with_metadata = object_aggregated_metadata.object.clone();
             let object_core = object_with_metadata.object_core;
+
+            let untransferrable = if object_aggregated_metadata.untransferable.as_ref().is_some() {
+                true
+            } else {
+                !object_core.allow_ungated_transfer
+            };
             Ok(Some((
                 Self {
                     transaction_version: txn_version,
@@ -82,6 +91,7 @@ impl Object {
                     guid_creation_num: object_core.guid_creation_num.clone(),
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     is_deleted: false,
+                    untransferrable,
                 },
                 CurrentObject {
                     object_address: address,
@@ -91,6 +101,7 @@ impl Object {
                     last_guid_creation_num: object_core.guid_creation_num.clone(),
                     last_transaction_version: txn_version,
                     is_deleted: false,
+                    untransferrable,
                 },
             )))
         } else {
@@ -150,6 +161,7 @@ impl Object {
                     guid_creation_num: previous_object.last_guid_creation_num.clone(),
                     allow_ungated_transfer: previous_object.allow_ungated_transfer,
                     is_deleted: true,
+                    untransferrable: previous_object.untransferrable,
                 },
                 CurrentObject {
                     object_address: resource.address,
@@ -159,6 +171,7 @@ impl Object {
                     allow_ungated_transfer: previous_object.allow_ungated_transfer,
                     last_transaction_version: txn_version,
                     is_deleted: true,
+                    untransferrable: previous_object.untransferrable,
                 },
             )))
         } else {
@@ -187,6 +200,7 @@ impl Object {
                         last_guid_creation_num: res.last_guid_creation_num,
                         last_transaction_version: res.last_transaction_version,
                         is_deleted: res.is_deleted,
+                        untransferrable: res.untransferrable,
                     });
                 },
                 Err(_) => {

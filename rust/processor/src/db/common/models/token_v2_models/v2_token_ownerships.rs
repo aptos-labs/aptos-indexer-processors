@@ -123,7 +123,16 @@ impl TokenOwnershipV2 {
         let token_data_id = token_data.token_data_id.clone();
         let owner_address = object_core.get_owner_address();
         let storage_id = token_data_id.clone();
-        let is_soulbound = !object_core.allow_ungated_transfer;
+
+        // is_soulbound currently means if an object is completely untransferrable
+        // OR if only admin can transfer. Only the former is true soulbound but
+        // people might already be using it with the latter meaning so let's include both.
+        let is_soulbound = if object_data.untransferable.as_ref().is_some() {
+            true
+        } else {
+            !object_core.allow_ungated_transfer
+        };
+        let non_transferrable_by_owner = !object_core.allow_ungated_transfer;
 
         ownerships.push(Self {
             transaction_version: token_data.transaction_version,
@@ -139,7 +148,7 @@ impl TokenOwnershipV2 {
             token_standard: TokenStandard::V2.to_string(),
             is_fungible_v2: None,
             transaction_timestamp: token_data.transaction_timestamp,
-            non_transferrable_by_owner: Some(is_soulbound),
+            non_transferrable_by_owner: Some(non_transferrable_by_owner),
         });
         current_ownerships.insert(
             (
@@ -161,7 +170,7 @@ impl TokenOwnershipV2 {
                 is_fungible_v2: None,
                 last_transaction_version: token_data.transaction_version,
                 last_transaction_timestamp: token_data.transaction_timestamp,
-                non_transferrable_by_owner: Some(is_soulbound),
+                non_transferrable_by_owner: Some(non_transferrable_by_owner),
             },
         );
 
@@ -227,6 +236,7 @@ impl TokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
+        object_metadatas: &ObjectAggregatedDataMapping,
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
@@ -242,7 +252,20 @@ impl TokenOwnershipV2 {
                 let object_core = &object.object_core;
                 let owner_address = object_core.get_owner_address();
                 let storage_id = token_data_id.clone();
-                let is_soulbound = !object_core.allow_ungated_transfer;
+
+                // is_soulbound currently means if an object is completely untransferrable
+                // OR if only admin can transfer. Only the former is true soulbound but
+                // people might already be using it with the latter meaning so let's include both.
+                let is_soulbound = if object_metadatas
+                    .get(&token_data_id)
+                    .map(|obj| obj.untransferable.as_ref())
+                    .is_some()
+                {
+                    true
+                } else {
+                    !object_core.allow_ungated_transfer
+                };
+                let non_transferrable_by_owner = !object_core.allow_ungated_transfer;
 
                 return Ok(Some((
                     Self {
@@ -259,7 +282,7 @@ impl TokenOwnershipV2 {
                         token_standard: TokenStandard::V2.to_string(),
                         is_fungible_v2: Some(false),
                         transaction_timestamp: txn_timestamp,
-                        non_transferrable_by_owner: Some(is_soulbound),
+                        non_transferrable_by_owner: Some(non_transferrable_by_owner),
                     },
                     CurrentTokenOwnershipV2 {
                         token_data_id,
@@ -274,7 +297,7 @@ impl TokenOwnershipV2 {
                         is_fungible_v2: Some(false),
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
-                        non_transferrable_by_owner: Some(is_soulbound),
+                        non_transferrable_by_owner: Some(non_transferrable_by_owner),
                     },
                 )));
             } else {

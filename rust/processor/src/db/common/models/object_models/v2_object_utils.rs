@@ -39,6 +39,8 @@ pub struct ObjectAggregatedData {
     pub object: ObjectWithMetadata,
     // There could be more than one transfers on the same transaction
     pub transfer_events: Vec<(EventIndex, TransferEvent)>,
+    // This would make transfers impossible
+    pub untransferable: Option<Untransferable>,
     // Fungible asset structs
     pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
     pub fungible_asset_supply: Option<FungibleAssetSupply>,
@@ -67,6 +69,7 @@ impl Default for ObjectAggregatedData {
                 state_key_hash: String::default(),
             },
             transfer_events: Vec::new(),
+            untransferable: None,
             fungible_asset_metadata: None,
             fungible_asset_supply: None,
             concurrent_fungible_asset_supply: None,
@@ -130,5 +133,34 @@ impl ObjectWithMetadata {
 
     pub fn get_state_key_hash(&self) -> String {
         standardize_address(&self.state_key_hash)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Untransferable {}
+
+impl Untransferable {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
+        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2TokenResource::Untransferable(inner) =
+            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
     }
 }
