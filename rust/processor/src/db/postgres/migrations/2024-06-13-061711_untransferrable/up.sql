@@ -1,0 +1,5 @@
+-- Your SQL goes here
+ALTER TABLE public.current_objects
+ADD COLUMN IF NOT EXISTS untransferrable BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.objects
+ADD COLUMN IF NOT EXISTS untransferrable BOOLEAN NOT NULL DEFAULT FALSE;
