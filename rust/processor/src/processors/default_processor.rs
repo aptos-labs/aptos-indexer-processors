@@ -13,6 +13,7 @@ use crate::{
     },
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -30,13 +31,19 @@ use tracing::error;
 pub struct DefaultProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl DefaultProcessor {
-    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: ArcDbPool,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
+    ) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -82,6 +89,7 @@ async fn insert_to_db(
         txns,
         get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
     );
+
     let bmt_res = execute_in_chunks(
         conn.clone(),
         insert_block_metadata_transactions_query,
@@ -91,6 +99,7 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
+
     let wst_res = execute_in_chunks(
         conn.clone(),
         insert_write_set_changes_query,
@@ -100,6 +109,7 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
+
     let mm_res = execute_in_chunks(
         conn.clone(),
         insert_move_modules_query,
@@ -313,15 +323,15 @@ impl ProcessorTrait for DefaultProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let flags = self.deprecated_tables;
         let (
             txns,
             block_metadata_transactions,
             write_set_changes,
             (move_modules, move_resources, table_items, current_table_items, table_metadata),
-        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+        ) = tokio::task::spawn_blocking(move || process_transactions(transactions, flags))
             .await
             .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
-
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -373,6 +383,7 @@ impl ProcessorTrait for DefaultProcessor {
 
 fn process_transactions(
     transactions: Vec<Transaction>,
+    flags: TableFlags,
 ) -> (
     Vec<crate::db::common::models::default_models::transactions::Transaction>,
     Vec<BlockMetadataTransaction>,
@@ -385,7 +396,7 @@ fn process_transactions(
         Vec<TableMetadata>,
     ),
 ) {
-    let (txns, block_metadata_txns, write_set_changes, wsc_details) =
+    let (mut txns, block_metadata_txns, mut write_set_changes, wsc_details) =
         TransactionModel::from_transactions(&transactions);
     let mut block_metadata_transactions = vec![];
     for block_metadata_txn in block_metadata_txns {
@@ -425,6 +436,16 @@ fn process_transactions(
     current_table_items
         .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+
+    if flags.contains(TableFlags::MOVE_RESOURCES) {
+        move_resources.clear();
+    }
+    if flags.contains(TableFlags::TRANSACTIONS) {
+        txns.clear();
+    }
+    if flags.contains(TableFlags::WRITE_SET_CHANGES) {
+        write_set_changes.clear();
+    }
 
     (
         txns,

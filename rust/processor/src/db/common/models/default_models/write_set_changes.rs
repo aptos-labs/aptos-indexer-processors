@@ -44,6 +44,7 @@ impl WriteSetChange {
             .change
             .as_ref()
             .expect("WriteSetChange must have a change");
+
         match change {
             WriteSetChangeEnum::WriteModule(inner) => (
                 Self {

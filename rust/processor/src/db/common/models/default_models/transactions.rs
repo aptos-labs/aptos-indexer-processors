@@ -186,13 +186,15 @@ impl Transaction {
             .timestamp
             .as_ref()
             .expect("Transaction timestamp doesn't exist!");
+
+        let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
+            &transaction_info.changes,
+            version,
+            block_height,
+        );
+
         match txn_data {
             TxnData::User(user_txn) => {
-                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
-                    &transaction_info.changes,
-                    version,
-                    block_height,
-                );
                 let payload = user_txn
                     .request
                     .as_ref()
@@ -202,7 +204,6 @@ impl Transaction {
                     .expect("Getting payload failed.");
                 let payload_cleaned = get_clean_payload(payload, version);
                 let payload_type = get_payload_type(payload);
-
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
@@ -220,11 +221,6 @@ impl Transaction {
                 )
             },
             TxnData::Genesis(genesis_txn) => {
-                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
-                    &transaction_info.changes,
-                    version,
-                    block_height,
-                );
                 let payload = genesis_txn.payload.as_ref().unwrap();
                 let payload_cleaned = get_clean_writeset(payload, version);
                 // It's genesis so no big deal
@@ -245,34 +241,27 @@ impl Transaction {
                     wsc_detail,
                 )
             },
-            TxnData::BlockMetadata(block_metadata_txn) => {
-                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
-                    &transaction_info.changes,
+            TxnData::BlockMetadata(block_metadata_txn) => (
+                Self::from_transaction_info_with_data(
+                    transaction_info,
+                    None,
+                    None,
+                    version,
+                    transaction_type,
+                    block_metadata_txn.events.len() as i64,
+                    block_height,
+                    epoch,
+                ),
+                Some(BlockMetadataTransaction::from_transaction(
+                    block_metadata_txn,
                     version,
                     block_height,
-                );
-                (
-                    Self::from_transaction_info_with_data(
-                        transaction_info,
-                        None,
-                        None,
-                        version,
-                        transaction_type,
-                        block_metadata_txn.events.len() as i64,
-                        block_height,
-                        epoch,
-                    ),
-                    Some(BlockMetadataTransaction::from_transaction(
-                        block_metadata_txn,
-                        version,
-                        block_height,
-                        epoch,
-                        timestamp,
-                    )),
-                    wsc,
-                    wsc_detail,
-                )
-            },
+                    epoch,
+                    timestamp,
+                )),
+                wsc,
+                wsc_detail,
+            ),
             TxnData::StateCheckpoint(_) => (
                 Self::from_transaction_info_with_data(
                     transaction_info,
