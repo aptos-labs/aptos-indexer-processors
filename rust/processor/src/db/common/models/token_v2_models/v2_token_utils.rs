@@ -8,7 +8,7 @@ use crate::{
     db::common::models::{
         coin_models::coin_utils::COIN_ADDR,
         default_models::move_resources::MoveResource,
-        object_models::v2_object_utils::{CurrentObjectPK, ObjectCore},
+        object_models::v2_object_utils::{CurrentObjectPK, ObjectCore, Untransferable},
         token_models::token_utils::{NAME_LENGTH, URI_LENGTH},
     },
     utils::util::{
@@ -498,6 +498,7 @@ pub enum V2TokenResource {
     FixedSupply(FixedSupply),
     ObjectCore(ObjectCore),
     UnlimitedSupply(UnlimitedSupply),
+    Untransferable(Untransferable),
     TokenV2(TokenV2),
     PropertyMapModel(PropertyMapModel),
     TokenIdentifiers(TokenIdentifiers),
@@ -507,6 +508,7 @@ impl V2TokenResource {
     pub fn is_resource_supported(data_type: &str) -> bool {
         [
             format!("{}::object::ObjectCore", COIN_ADDR),
+            format!("{}::object::Untransferable", COIN_ADDR),
             format!("{}::collection::Collection", TOKEN_V2_ADDR),
             format!("{}::collection::ConcurrentSupply", TOKEN_V2_ADDR),
             format!("{}::collection::FixedSupply", TOKEN_V2_ADDR),

@@ -165,6 +165,12 @@ impl FungibleAssetBalance {
                 let asset_type = inner.metadata.get_reference_address();
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);
 
+                // If store has the untransferable field then it must be frozen
+                let is_frozen = if object_data.untransferable.as_ref().is_some() {
+                    true
+                } else {
+                    inner.frozen
+                };
                 let concurrent_balance = object_data
                     .concurrent_fungible_asset_balance
                     .as_ref()
@@ -179,7 +185,7 @@ impl FungibleAssetBalance {
                     owner_address: owner_address.clone(),
                     asset_type: asset_type.clone(),
                     is_primary,
-                    is_frozen: inner.frozen,
+                    is_frozen,
                     amount: concurrent_balance
                         .clone()
                         .unwrap_or_else(|| inner.balance.clone()),
@@ -191,7 +197,7 @@ impl FungibleAssetBalance {
                     owner_address,
                     asset_type: asset_type.clone(),
                     is_primary,
-                    is_frozen: inner.frozen,
+                    is_frozen,
                     amount: concurrent_balance.unwrap_or_else(|| inner.balance.clone()),
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,

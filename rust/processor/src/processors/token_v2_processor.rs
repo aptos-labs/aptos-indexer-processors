@@ -6,7 +6,7 @@ use crate::{
     db::common::models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
         object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
         },
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
@@ -758,6 +758,11 @@ async fn parse_v2_token(
                         {
                             aggregated_data.token_identifier = Some(token_identifier);
                         }
+                        if let Some(untransferable) =
+                            Untransferable::from_write_resource(wr, txn_version).unwrap()
+                        {
+                            aggregated_data.untransferable = Some(untransferable);
+                        }
                     }
                 }
             }
@@ -1028,6 +1033,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
+                                &token_v2_metadata_helper,
                                 conn,
                                 query_retries,
                                 query_retry_delay_ms,
