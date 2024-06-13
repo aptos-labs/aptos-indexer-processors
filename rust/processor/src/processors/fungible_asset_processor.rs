@@ -284,7 +284,8 @@ fn insert_current_unified_fungible_asset_balances_v1_query(
                     inserted_at.eq(excluded(inserted_at)),
                 )
             ),
-        Some(" WHERE current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v1 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v1 <= excluded.last_transaction_version_v1"),
+        Some(" WHERE current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v1 IS NULL \
+        OR current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v1 <= excluded.last_transaction_version_v1"),
     )
 }
 
@@ -312,7 +313,8 @@ fn insert_current_unified_fungible_asset_balances_v2_query(
                     inserted_at.eq(excluded(inserted_at)),
                 )
             ),
-        Some(" WHERE current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v2 IS NULL OR current_unified_fungible_asset_balances.last_transaction_version_v2 <= excluded.last_transaction_version_v2 "),
+        Some(" WHERE current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v2 IS NULL \
+        OR current_unified_fungible_asset_balances_to_be_renamed.last_transaction_version_v2 <= excluded.last_transaction_version_v2 "),
     )
 }
 
