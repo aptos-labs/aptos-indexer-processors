@@ -15,7 +15,7 @@ use crate::{
         token_v2_models::v2_token_utils::{TokenStandard, V2_STANDARD},
     },
     schema::{
-        current_fungible_asset_balances, current_unified_fungible_asset_balances,
+        current_fungible_asset_balances, current_unified_fungible_asset_balances_to_be_renamed,
         fungible_asset_balances,
     },
     utils::util::{
@@ -68,14 +68,14 @@ pub struct CurrentFungibleAssetBalance {
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Default)]
 #[diesel(primary_key(storage_id))]
-#[diesel(table_name = current_unified_fungible_asset_balances)]
+#[diesel(table_name = current_unified_fungible_asset_balances_to_be_renamed)]
 #[diesel(treat_none_as_null = true)]
 pub struct CurrentUnifiedFungibleAssetBalance {
     pub storage_id: String,
     pub owner_address: String,
     // metadata address for (paired) Fungible Asset
-    pub asset_type: String,
-    pub coin_type: Option<String>,
+    pub asset_type_v1: Option<String>,
+    pub asset_type_v2: Option<String>,
     pub is_primary: Option<bool>,
     pub is_frozen: bool,
     pub amount_v1: Option<BigDecimal>,
@@ -113,8 +113,8 @@ impl From<&CurrentFungibleAssetBalance> for CurrentUnifiedFungibleAssetBalance {
             Self {
                 storage_id: cfab.storage_id.clone(),
                 owner_address: cfab.owner_address.clone(),
-                asset_type: cfab.asset_type.clone(),
-                coin_type: None,
+                asset_type_v2: Some(cfab.asset_type.clone()),
+                asset_type_v1: None,
                 is_primary: Some(cfab.is_primary),
                 is_frozen: cfab.is_frozen,
                 amount_v1: None,
@@ -131,8 +131,8 @@ impl From<&CurrentFungibleAssetBalance> for CurrentUnifiedFungibleAssetBalance {
             Self {
                 storage_id: pfs_addr,
                 owner_address: cfab.owner_address.clone(),
-                asset_type: metadata_addr,
-                coin_type: Some(cfab.asset_type.clone()),
+                asset_type_v2: None,
+                asset_type_v1: Some(cfab.asset_type.clone()),
                 is_primary: None,
                 is_frozen: cfab.is_frozen,
                 amount_v1: Some(cfab.amount.clone()),
