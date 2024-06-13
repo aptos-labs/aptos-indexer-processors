@@ -1,28 +1,26 @@
+use crate::config::TransactionStreamConfig;
 use crate::utils::{
     counters::{
-        ProcessorStep, FETCHER_THREAD_CHANNEL_SIZE, LATEST_PROCESSED_VERSION,
-        NUM_TRANSACTIONS_FILTERED_OUT_COUNT, NUM_TRANSACTIONS_PROCESSED_COUNT,
-        PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
+        ProcessorStep, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_FILTERED_OUT_COUNT,
+        NUM_TRANSACTIONS_PROCESSED_COUNT, PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
     },
     util::{timestamp_to_iso, timestamp_to_unixtime},
 };
+use anyhow::Result;
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
     util::timestamp::Timestamp,
 };
-use bigdecimal::Zero;
 use futures_util::StreamExt;
 use itertools::Itertools;
-use kanal::AsyncSender;
 use prost::Message;
 use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use transaction_filter::transaction_filter::TransactionFilter;
-use url::Url;
 
 /// GRPC request metadata key for the token ID.
 const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
@@ -74,35 +72,37 @@ pub fn grpc_request_builder(
 }
 
 pub async fn get_stream(
-    indexer_grpc_data_service_address: Url,
-    indexer_grpc_http2_ping_interval: Duration,
-    indexer_grpc_http2_ping_timeout: Duration,
-    indexer_grpc_reconnection_timeout_secs: Duration,
-    starting_version: u64,
-    ending_version: Option<u64>,
-    auth_token: String,
+    transaction_stream_config: TransactionStreamConfig,
     processor_name: String,
 ) -> Response<Streaming<TransactionsResponse>> {
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
-        start_version = starting_version,
-        end_version = ending_version,
+        stream_address = transaction_stream_config
+            .indexer_grpc_data_service_address
+            .to_string(),
+        start_version = transaction_stream_config.starting_version,
+        end_version = transaction_stream_config.request_ending_version,
         "[Parser] Setting up rpc channel"
     );
 
     let channel = tonic::transport::Channel::from_shared(
-        indexer_grpc_data_service_address.to_string(),
+        transaction_stream_config
+            .indexer_grpc_data_service_address
+            .to_string(),
     )
     .expect(
         "[Parser] Failed to build GRPC channel, perhaps because the data service URL is invalid",
     )
-    .http2_keep_alive_interval(indexer_grpc_http2_ping_interval)
-    .keep_alive_timeout(indexer_grpc_http2_ping_timeout);
+    .http2_keep_alive_interval(transaction_stream_config.indexer_grpc_http2_ping_interval())
+    .keep_alive_timeout(transaction_stream_config.indexer_grpc_http2_ping_timeout());
 
     // If the scheme is https, add a TLS config.
-    let channel = if indexer_grpc_data_service_address.scheme() == "https" {
+    let channel = if transaction_stream_config
+        .indexer_grpc_data_service_address
+        .scheme()
+        == "https"
+    {
         let config = tonic::transport::channel::ClientTlsConfig::new();
         channel
             .tls_config(config)
@@ -114,9 +114,11 @@ pub async fn get_stream(
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
-        start_version = starting_version,
-        end_version = ending_version,
+        stream_address = transaction_stream_config
+            .indexer_grpc_data_service_address
+            .to_string(),
+        start_version = transaction_stream_config.starting_version,
+        end_version = transaction_stream_config.request_ending_version,
         "[Parser] Setting up GRPC client"
     );
 
@@ -125,7 +127,7 @@ pub async fn get_stream(
     let mut connect_retries = 0;
     let connect_res = loop {
         let res = timeout(
-            indexer_grpc_reconnection_timeout_secs,
+            transaction_stream_config.indexer_grpc_reconnection_timeout(),
             RawDataClient::connect(channel.clone()),
         )
         .await;
@@ -135,9 +137,9 @@ pub async fn get_stream(
                 error!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
-                    stream_address = indexer_grpc_data_service_address.to_string(),
-                    start_version = starting_version,
-                    end_version = ending_version,
+                    stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
+                    start_version = transaction_stream_config.starting_version,
+                    end_version = transaction_stream_config.request_ending_version,
                     retries = connect_retries,
                     error = ?e,
                     "[Parser] Error connecting to GRPC client"
@@ -162,22 +164,24 @@ pub async fn get_stream(
             error!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                start_version = starting_version,
-                ending_version = ending_version,
+                stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
+                start_version = transaction_stream_config.starting_version,
+                ending_version = transaction_stream_config.request_ending_version,
                 error = ?e,
                 "[Parser] Error connecting to GRPC client"
             );
             panic!("[Parser] Error connecting to GRPC client");
         },
     };
-    let count = ending_version.map(|v| (v as i64 - starting_version as i64 + 1) as u64);
+    let count = transaction_stream_config
+        .request_ending_version
+        .map(|v| (v as i64 - transaction_stream_config.starting_version as i64 + 1) as u64);
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
-        start_version = starting_version,
-        end_version = ending_version,
+        stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
+        start_version = transaction_stream_config.starting_version,
+        end_version = transaction_stream_config.request_ending_version,
         num_of_transactions = ?count,
         "[Parser] Setting up GRPC stream",
     );
@@ -186,15 +190,18 @@ pub async fn get_stream(
     // Retry this connection a few times before giving up
     let mut connect_retries = 0;
     let stream_res = loop {
-        let timeout_res = timeout(indexer_grpc_reconnection_timeout_secs, async {
-            let request = grpc_request_builder(
-                starting_version,
-                count,
-                auth_token.clone(),
-                processor_name.clone(),
-            );
-            rpc_client.get_transactions(request).await
-        })
+        let timeout_res = timeout(
+            transaction_stream_config.indexer_grpc_reconnection_timeout(),
+            async {
+                let request = grpc_request_builder(
+                    transaction_stream_config.starting_version,
+                    count,
+                    transaction_stream_config.auth_token.clone(),
+                    processor_name.clone(),
+                );
+                rpc_client.get_transactions(request).await
+            },
+        )
         .await;
         match timeout_res {
             Ok(client) => break Ok(client),
@@ -202,9 +209,9 @@ pub async fn get_stream(
                 error!(
                     processor_name = processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
-                    stream_address = indexer_grpc_data_service_address.to_string(),
-                    start_version = starting_version,
-                    end_version = ending_version,
+                    stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
+                    start_version = transaction_stream_config.starting_version,
+                    end_version = transaction_stream_config.request_ending_version,
                     retries = connect_retries,
                     error = ?e,
                     "[Parser] Timeout making grpc request. Retrying...",
@@ -224,9 +231,9 @@ pub async fn get_stream(
             error!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                start_version = starting_version,
-                ending_version = ending_version,
+                stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
+                start_version = transaction_stream_config.starting_version,
+                ending_version = transaction_stream_config.request_ending_version,
                 error = ?e,
                 "[Parser] Failed to get grpc response. Is the server running?"
             );
@@ -236,27 +243,25 @@ pub async fn get_stream(
 }
 
 pub async fn get_chain_id(
-    indexer_grpc_data_service_address: Url,
-    indexer_grpc_http2_ping_interval: Duration,
-    indexer_grpc_http2_ping_timeout: Duration,
-    indexer_grpc_reconnection_timeout_secs: Duration,
-    auth_token: String,
+    transaction_stream_config: TransactionStreamConfig,
     processor_name: String,
 ) -> u64 {
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
+        stream_address = transaction_stream_config
+            .indexer_grpc_data_service_address
+            .to_string(),
         "[Parser] Connecting to GRPC stream to get chain id",
     );
+
+    let transaction_stream_config_for_chain_id = TransactionStreamConfig {
+        starting_version: 1,
+        request_ending_version: Some(2),
+        ..transaction_stream_config.clone()
+    };
     let response = get_stream(
-        indexer_grpc_data_service_address.clone(),
-        indexer_grpc_http2_ping_interval,
-        indexer_grpc_http2_ping_timeout,
-        indexer_grpc_reconnection_timeout_secs,
-        1,
-        Some(2),
-        auth_token.clone(),
+        transaction_stream_config_for_chain_id,
         processor_name.to_string(),
     )
     .await;
@@ -268,7 +273,9 @@ pub async fn get_chain_id(
     info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
-        stream_address = indexer_grpc_data_service_address.to_string(),
+        stream_address = transaction_stream_config
+            .indexer_grpc_data_service_address
+            .to_string(),
         connection_id,
         "[Parser] Successfully connected to GRPC stream to get chain id",
     );
@@ -279,7 +286,7 @@ pub async fn get_chain_id(
             error!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
+                stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
                 connection_id,
                 error = ?rpc_error,
                 "[Parser] Error receiving datastream response for chain id"
@@ -290,7 +297,9 @@ pub async fn get_chain_id(
             error!(
                 processor_name = processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
+                stream_address = transaction_stream_config
+                    .indexer_grpc_data_service_address
+                    .to_string(),
                 connection_id,
                 "[Parser] Stream ended before getting response fo for chain id"
             );
@@ -300,14 +309,7 @@ pub async fn get_chain_id(
 }
 
 pub struct TransactionStream {
-    indexer_grpc_data_service_address: Url,
-    indexer_grpc_http2_ping_interval: Duration,
-    indexer_grpc_http2_ping_timeout: Duration,
-    indexer_grpc_reconnection_timeout_secs: Duration,
-    indexer_grpc_response_item_timeout_secs: Duration,
-    starting_version: u64,
-    request_ending_version: Option<u64>,
-    auth_token: String,
+    transaction_stream_config: TransactionStreamConfig,
     processor_name: String,
     transaction_filter: TransactionFilter,
     pb_channel_txn_chunk_size: usize,
@@ -325,57 +327,43 @@ pub struct TransactionStreamOutput {
 }
 
 impl TransactionStream {
-    pub fn new(
-        indexer_grpc_data_service_address: Url,
-        indexer_grpc_http2_ping_interval: Duration,
-        indexer_grpc_http2_ping_timeout: Duration,
-        indexer_grpc_reconnection_timeout_secs: Duration,
-        indexer_grpc_response_item_timeout_secs: Duration,
-        starting_version: u64,
-        request_ending_version: Option<u64>,
-        auth_token: String,
+    pub async fn new(
+        transaction_stream_config: TransactionStreamConfig,
         processor_name: String,
         transaction_filter: TransactionFilter,
         pb_channel_txn_chunk_size: usize,
-    ) -> Self {
-        Self {
-            indexer_grpc_data_service_address,
-            indexer_grpc_http2_ping_interval,
-            indexer_grpc_http2_ping_timeout,
-            indexer_grpc_reconnection_timeout_secs,
-            indexer_grpc_response_item_timeout_secs,
-            starting_version,
-            request_ending_version,
-            auth_token,
+    ) -> Result<Self> {
+        let mut transaction_stream = Self {
+            transaction_stream_config: transaction_stream_config.clone(),
             processor_name,
             transaction_filter,
             pb_channel_txn_chunk_size,
             resp_stream: None,
             connection_id: None,
-            next_version_to_fetch: starting_version,
+            next_version_to_fetch: transaction_stream_config.starting_version,
             reconnection_retries: 0,
-            last_fetched_version: starting_version as i64 - 1,
+            last_fetched_version: transaction_stream_config.starting_version as i64 - 1,
             fetch_ma: MovingAverage::new(3000),
-        }
+        };
+
+        transaction_stream.init_stream().await;
+        Ok(transaction_stream)
     }
 
-    pub async fn init_stream(&mut self) {
+    async fn init_stream(&mut self) {
         info!(
             processor_name = self.processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
-            stream_address = self.indexer_grpc_data_service_address.to_string(),
-            start_version = self.starting_version,
-            end_version = self.request_ending_version,
+            stream_address = self
+                .transaction_stream_config
+                .indexer_grpc_data_service_address
+                .to_string(),
+            start_version = self.transaction_stream_config.starting_version,
+            end_version = self.transaction_stream_config.request_ending_version,
             "[Parser] Connecting to GRPC stream",
         );
         let response = get_stream(
-            self.indexer_grpc_data_service_address.clone(),
-            self.indexer_grpc_http2_ping_interval,
-            self.indexer_grpc_http2_ping_timeout,
-            self.indexer_grpc_reconnection_timeout_secs,
-            self.starting_version,
-            self.request_ending_version,
-            self.auth_token.clone(),
+            self.transaction_stream_config.clone(),
             self.processor_name.to_string(),
         )
         .await;
@@ -388,10 +376,13 @@ impl TransactionStream {
         info!(
             processor_name = self.processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
-            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            stream_address = self
+                .transaction_stream_config
+                .indexer_grpc_data_service_address
+                .to_string(),
             connection_id = self.connection_id,
-            start_version = self.starting_version,
-            end_version = self.request_ending_version,
+            start_version = self.transaction_stream_config.starting_version,
+            end_version = self.transaction_stream_config.request_ending_version,
             "[Parser] Successfully connected to GRPC stream",
         );
     }
@@ -411,7 +402,8 @@ impl TransactionStream {
         let mut transaction_pb_response = vec![];
 
         let is_success = match tokio::time::timeout(
-            self.indexer_grpc_response_item_timeout_secs,
+            self.transaction_stream_config
+                .indexer_grpc_response_item_timeout(),
             self.resp_stream
                 .as_mut()
                 .expect("[Parser] GRPC stream is not initialized. Did you call init_stream?")
@@ -451,7 +443,10 @@ impl TransactionStream {
                         info!(
                             processor_name = self.processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            stream_address = self
+                                .transaction_stream_config
+                                .indexer_grpc_data_service_address
+                                .to_string(),
                             connection_id = self.connection_id,
                             start_version,
                             end_version,
@@ -553,10 +548,10 @@ impl TransactionStream {
                         tracing::warn!(
                             processor_name = self.processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            stream_address = self.transaction_stream_config.indexer_grpc_data_service_address.to_string(),
                             self.connection_id,
-                            start_version = self.starting_version,
-                            end_version = self.request_ending_version,
+                            start_version = self.transaction_stream_config.starting_version,
+                            end_version = self.transaction_stream_config.request_ending_version,
                             error = ?rpc_error,
                             "[Parser] Error receiving datastream response."
                         );
@@ -567,10 +562,13 @@ impl TransactionStream {
                         tracing::warn!(
                             processor_name = self.processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
-                            stream_address = self.indexer_grpc_data_service_address.to_string(),
+                            stream_address = self
+                                .transaction_stream_config
+                                .indexer_grpc_data_service_address
+                                .to_string(),
                             connection_id = self.connection_id,
-                            start_version = self.starting_version,
-                            end_version = self.request_ending_version,
+                            start_version = self.transaction_stream_config.starting_version,
+                            end_version = self.transaction_stream_config.request_ending_version,
                             "[Parser] Stream ended."
                         );
                         false
@@ -582,10 +580,10 @@ impl TransactionStream {
                 tracing::warn!(
                     processor_name = self.processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
-                    stream_address = self.indexer_grpc_data_service_address.to_string(),
+                    stream_address = self.transaction_stream_config.indexer_grpc_data_service_address.to_string(),
                     connection_id = self.connection_id,
-                    start_version = self.starting_version,
-                    end_version = self.request_ending_version,
+                    start_version = self.transaction_stream_config.starting_version,
+                    end_version = self.transaction_stream_config.request_ending_version,
                     error = ?e,
                     "[Parser] Timeout receiving datastream response."
                 );
@@ -593,19 +591,23 @@ impl TransactionStream {
             },
         };
         // Check if we're at the end of the stream
-        let is_end = if let Some(ending_version) = self.request_ending_version {
-            self.next_version_to_fetch > ending_version
-        } else {
-            false
-        };
+        let is_end =
+            if let Some(ending_version) = self.transaction_stream_config.request_ending_version {
+                self.next_version_to_fetch > ending_version
+            } else {
+                false
+            };
 
         if is_end {
             info!(
                 processor_name = self.processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = self.indexer_grpc_data_service_address.to_string(),
+                stream_address = self
+                    .transaction_stream_config
+                    .indexer_grpc_data_service_address
+                    .to_string(),
                 connection_id = self.connection_id,
-                ending_version = self.request_ending_version,
+                ending_version = self.transaction_stream_config.request_ending_version,
                 next_version_to_fetch = self.next_version_to_fetch,
                 "[Parser] Reached ending version.",
             );
@@ -636,7 +638,10 @@ impl TransactionStream {
             error!(
                 processor_name = self.processor_name,
                 service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = self.indexer_grpc_data_service_address.to_string(),
+                stream_address = self
+                    .transaction_stream_config
+                    .indexer_grpc_data_service_address
+                    .to_string(),
                 "[Parser] Reconnected more than 100 times. Will not retry.",
             );
             panic!("[Parser] Reconnected more than 100 times. Will not retry.")
@@ -645,20 +650,17 @@ impl TransactionStream {
         info!(
             processor_name = self.processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
-            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            stream_address = self
+                .transaction_stream_config
+                .indexer_grpc_data_service_address
+                .to_string(),
             starting_version = self.next_version_to_fetch,
-            ending_version = self.request_ending_version,
+            ending_version = self.transaction_stream_config.request_ending_version,
             reconnection_retries = self.reconnection_retries,
             "[Parser] Reconnecting to GRPC stream"
         );
         let response = get_stream(
-            self.indexer_grpc_data_service_address.clone(),
-            self.indexer_grpc_http2_ping_interval,
-            self.indexer_grpc_http2_ping_timeout,
-            self.indexer_grpc_reconnection_timeout_secs,
-            self.next_version_to_fetch,
-            self.request_ending_version,
-            self.auth_token.clone(),
+            self.transaction_stream_config.clone(),
             self.processor_name.to_string(),
         )
         .await;
@@ -671,148 +673,19 @@ impl TransactionStream {
         info!(
             processor_name = self.processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
-            stream_address = self.indexer_grpc_data_service_address.to_string(),
+            stream_address = self
+                .transaction_stream_config
+                .indexer_grpc_data_service_address
+                .to_string(),
             connection_id = self.connection_id,
             starting_version = self.next_version_to_fetch,
-            ending_version = self.request_ending_version,
+            ending_version = self.transaction_stream_config.request_ending_version,
             reconnection_retries = self.reconnection_retries,
             "[Parser] Successfully reconnected to GRPC stream"
         );
     }
 
     pub async fn get_chain_id(self) -> u64 {
-        get_chain_id(
-            self.indexer_grpc_data_service_address,
-            self.indexer_grpc_http2_ping_interval,
-            self.indexer_grpc_http2_ping_timeout,
-            self.indexer_grpc_reconnection_timeout_secs,
-            self.auth_token,
-            self.processor_name,
-        )
-        .await
-    }
-}
-
-pub async fn create_fetcher_loop(
-    txn_sender: AsyncSender<TransactionsPBResponse>,
-    indexer_grpc_data_service_address: Url,
-    indexer_grpc_http2_ping_interval: Duration,
-    indexer_grpc_http2_ping_timeout: Duration,
-    indexer_grpc_reconnection_timeout_secs: Duration,
-    indexer_grpc_response_item_timeout_secs: Duration,
-    starting_version: u64,
-    request_ending_version: Option<u64>,
-    auth_token: String,
-    processor_name: String,
-    transaction_filter: TransactionFilter,
-    // The number of transactions per protobuf batch
-    pb_channel_txn_chunk_size: usize,
-) {
-    let mut transaction_stream = TransactionStream::new(
-        indexer_grpc_data_service_address.clone(),
-        indexer_grpc_http2_ping_interval,
-        indexer_grpc_http2_ping_timeout,
-        indexer_grpc_reconnection_timeout_secs,
-        indexer_grpc_response_item_timeout_secs,
-        starting_version,
-        request_ending_version,
-        auth_token,
-        processor_name.clone(),
-        transaction_filter,
-        pb_channel_txn_chunk_size,
-    );
-
-    transaction_stream.init_stream().await;
-    let mut send_ma = MovingAverage::new(3000);
-
-    loop {
-        let transactions_output = transaction_stream.get_next_transaction_batch().await;
-        let start_version = transactions_output
-            .transactions
-            .first()
-            .unwrap()
-            .transactions
-            .first()
-            .unwrap()
-            .version;
-        let end_version = transactions_output
-            .transactions
-            .last()
-            .unwrap()
-            .transactions
-            .last()
-            .unwrap()
-            .version;
-        let size_in_bytes = transactions_output
-            .transactions
-            .iter()
-            .map(|txn_pb| txn_pb.size_in_bytes)
-            .sum::<u64>();
-
-        let txn_channel_send_latency = std::time::Instant::now();
-        for txn_pb in transactions_output.transactions {
-            match txn_sender.send(txn_pb).await {
-                Ok(()) => {},
-                Err(e) => {
-                    error!(
-                        processor_name = processor_name,
-                        stream_address = indexer_grpc_data_service_address.to_string(),
-                        error = ?e,
-                        "[Parser] Error sending GRPC response to channel."
-                    );
-                    panic!("[Parser] Error sending GRPC response to channel.")
-                },
-            }
-        }
-
-        // Log channel send metrics
-        let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
-        let num_txns = end_version - start_version + 1;
-
-        send_ma.tick_now(num_txns as u64);
-        let tps = send_ma.avg().ceil() as u64;
-        let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
-        let channel_size = txn_sender.len();
-        debug!(
-            processor_name.service_type = PROCESSOR_SERVICE_TYPE,
-            stream_address = indexer_grpc_data_service_address.to_string(),
-            start_version,
-            end_version,
-            channel_size,
-            size_in_bytes,
-            duration_in_secs,
-            bytes_per_sec,
-            tps,
-            "[Parser] Successfully sent transactions to channel."
-        );
-        FETCHER_THREAD_CHANNEL_SIZE
-            .with_label_values(&[&processor_name])
-            .set(channel_size as i64);
-
-        // Handle reaching end of stream
-        if !transactions_output.should_continue_fetching {
-            // Wait for the fetched transactions to finish processing before closing the channel
-            loop {
-                let channel_size = txn_sender.len();
-                info!(
-                    processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    stream_address = indexer_grpc_data_service_address.to_string(),
-                    channel_size,
-                    "[Parser] Waiting for channel to be empty"
-                );
-                if channel_size.is_zero() {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
-            info!(
-                processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = indexer_grpc_data_service_address.to_string(),
-                "[Parser] Transaction fetcher send channel is closed."
-            );
-            break;
-        }
+        get_chain_id(self.transaction_stream_config, self.processor_name).await
     }
 }

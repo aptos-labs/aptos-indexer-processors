@@ -6,9 +6,9 @@ use crate::{
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
+use aptos_indexer_transaction_stream::TransactionStreamConfig;
 use serde::{Deserialize, Serialize};
 use server_framework::RunnableConfig;
-use std::time::Duration;
 use transaction_filter::transaction_filter::TransactionFilter;
 use url::Url;
 
@@ -44,7 +44,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     pub enable_verbose_logging: Option<bool>,
 
-    #[serde(default = "IndexerGrpcProcessorConfig::default_grpc_response_item_timeout_in_secs")]
+    #[serde(default = "TransactionStreamConfig::default_indexer_grpc_response_item_timeout")]
     pub grpc_response_item_timeout_in_secs: u64,
 
     #[serde(default)]
@@ -68,11 +68,6 @@ impl IndexerGrpcProcessorConfig {
     /// This prevents any unexpected changes in behavior
     pub const fn default_pb_channel_txn_chunk_size() -> usize {
         100_000
-    }
-
-    /// Default timeout for grpc response item in seconds. Defaults to 60 seconds.
-    pub const fn default_grpc_response_item_timeout_in_secs() -> u64 {
-        60
     }
 }
 
@@ -116,39 +111,17 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-#[serde(default)]
 pub struct IndexerGrpcHttp2Config {
     /// Indexer GRPC http2 ping interval in seconds. Defaults to 30.
     /// Tonic ref: https://docs.rs/tonic/latest/tonic/transport/channel/struct.Endpoint.html#method.http2_keep_alive_interval
-    indexer_grpc_http2_ping_interval_in_secs: u64,
+    #[serde(default = "TransactionStreamConfig::default_indexer_grpc_http2_ping_interval")]
+    pub indexer_grpc_http2_ping_interval_in_secs: u64,
 
     /// Indexer GRPC http2 ping timeout in seconds. Defaults to 10.
-    indexer_grpc_http2_ping_timeout_in_secs: u64,
+    #[serde(default = "TransactionStreamConfig::default_indexer_grpc_http2_ping_timeout")]
+    pub indexer_grpc_http2_ping_timeout_in_secs: u64,
 
     /// Seconds before timeout for grpc connection.
-    indexer_grpc_connection_timeout_secs: u64,
-}
-
-impl IndexerGrpcHttp2Config {
-    pub fn grpc_http2_ping_interval_in_secs(&self) -> Duration {
-        Duration::from_secs(self.indexer_grpc_http2_ping_interval_in_secs)
-    }
-
-    pub fn grpc_http2_ping_timeout_in_secs(&self) -> Duration {
-        Duration::from_secs(self.indexer_grpc_http2_ping_timeout_in_secs)
-    }
-
-    pub fn grpc_connection_timeout_secs(&self) -> Duration {
-        Duration::from_secs(self.indexer_grpc_connection_timeout_secs)
-    }
-}
-
-impl Default for IndexerGrpcHttp2Config {
-    fn default() -> Self {
-        Self {
-            indexer_grpc_http2_ping_interval_in_secs: 30,
-            indexer_grpc_http2_ping_timeout_in_secs: 10,
-            indexer_grpc_connection_timeout_secs: 5,
-        }
-    }
+    #[serde(default = "TransactionStreamConfig::default_indexer_grpc_reconnection_timeout")]
+    pub indexer_grpc_connection_timeout_secs: u64,
 }

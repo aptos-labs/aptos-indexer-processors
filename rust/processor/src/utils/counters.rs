@@ -236,3 +236,13 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Size of the channel containing transactions fetched from GRPC, waiting to be processed
+pub static FETCHER_THREAD_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_processor_fetcher_thread_channel_size",
+        "Size of the fetcher thread channel",
+        &["processor_name"]
+    )
+    .unwrap()
+});

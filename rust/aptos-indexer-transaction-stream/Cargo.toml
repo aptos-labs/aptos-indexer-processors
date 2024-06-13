@@ -13,6 +13,7 @@ rust-version = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
 bigdecimal = { workspace = true }
@@ -23,6 +24,7 @@ kanal = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
