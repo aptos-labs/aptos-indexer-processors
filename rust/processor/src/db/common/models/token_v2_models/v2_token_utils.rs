@@ -530,6 +530,9 @@ impl V2TokenResource {
             x if x == format!("{}::object::ObjectCore", COIN_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::ObjectCore(inner)))
             },
+            x if x == format!("{}::object::Untransferable", COIN_ADDR) => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::Untransferable(inner)))
+            },
             x if x == format!("{}::collection::Collection", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::Collection(inner)))
             },
