@@ -199,7 +199,8 @@ impl Worker {
             transaction_stream_config.clone(),
             processor_name.to_string(),
         )
-        .await;
+        .await
+        .expect("[Parser] Error getting chain id");
         self.check_or_update_chain_id(chain_id as i64)
             .await
             .unwrap();
@@ -618,6 +619,8 @@ impl Worker {
     }
 }
 
+/// Initializes a GRPC stream and runs fetching transactions from the stream in a loop.
+
 pub async fn fetch_transactions_from_transaction_stream(
     txn_sender: AsyncSender<TransactionsPBResponse>,
     transaction_stream_config: TransactionStreamConfig,
@@ -626,6 +629,7 @@ pub async fn fetch_transactions_from_transaction_stream(
     // The number of transactions per protobuf batch
     pb_channel_txn_chunk_size: usize,
 ) {
+    // Initialize the stream
     let transaction_stream_res =
         TransactionStream::new(transaction_stream_config.clone(), processor_name.clone()).await;
 
@@ -644,6 +648,11 @@ pub async fn fetch_transactions_from_transaction_stream(
 
     let mut send_ma = MovingAverage::new(3000);
 
+    // Fetch transactions in a loop
+    // There could be several special scenarios:
+    // 1. If we lose the connection, we will try reconnecting X times within Y seconds before crashing.
+    // 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
+    //    all existing transactions are processed.
     loop {
         let transactions_res = transaction_stream
             .get_next_transaction_batch_with_reconnect()
@@ -775,13 +784,37 @@ pub async fn fetch_transactions_from_transaction_stream(
                     break;
                 } else {
                     // If there was an error fetching transactions, try to reconnect
-                    transaction_stream.reconnect_to_grpc().await;
+                    match transaction_stream.reconnect_to_grpc().await {
+                        Ok(_) => {
+                            info!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                stream_address = transaction_stream_config
+                                    .indexer_grpc_data_service_address
+                                    .to_string(),
+                                "[Parser] Successfully reconnected to GRPC stream."
+                            );
+                        },
+                        Err(e) => {
+                            error!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                stream_address = transaction_stream_config
+                                    .indexer_grpc_data_service_address
+                                    .to_string(),
+                                error = ?e,
+                                "[Parser] Error reconnecting to GRPC stream."
+                            );
+                            panic!("[Parser] Error reconnecting to GRPC stream.")
+                        },
+                    }
                 }
             },
         }
     }
 }
 
+/// Fetches transactions from the channel and processes them.
 async fn fetch_transactions(
     processor_name: &str,
     stream_address: &str,
