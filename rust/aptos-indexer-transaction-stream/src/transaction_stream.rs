@@ -48,6 +48,7 @@ pub struct TransactionsPBResponse {
     pub size_in_bytes: u64,
 }
 
+/// Helper function to build a GRPC request for fetching transactions.
 pub fn grpc_request_builder(
     starting_version: u64,
     transactions_count: Option<u64>,
@@ -72,6 +73,8 @@ pub fn grpc_request_builder(
     request
 }
 
+/// Given a `TransactionStreamConfig`, this function will return a stream of transactions.
+/// It also handles timeouts and retries.
 pub async fn get_stream(
     transaction_stream_config: TransactionStreamConfig,
 ) -> Result<Response<Streaming<TransactionsResponse>>> {
@@ -234,6 +237,7 @@ pub async fn get_stream(
     }
 }
 
+/// Helper function to get the chain id from the stream.
 pub async fn get_chain_id(transaction_stream_config: TransactionStreamConfig) -> Result<u64> {
     info!(
         stream_address = transaction_stream_config
@@ -294,6 +298,13 @@ pub async fn get_chain_id(transaction_stream_config: TransactionStreamConfig) ->
     }
 }
 
+/// TransactionStream is a struct that holds the state of the stream and provides methods to fetch transactions
+/// from the stream.
+/// - init_stream: Initializes the stream and returns the stream and connection id
+/// - get_next_transaction_batch: Fetches the next batch of transactions from the stream
+/// - is_end_of_stream: Checks if we've reached the end of the stream. This is determined by the ending version set in `TransactionStreamConfig`
+/// - reconnect_to_grpc: Reconnects to the GRPC stream
+/// - get_chain_id: Fetches the chain id from the stream
 pub struct TransactionStream {
     transaction_stream_config: TransactionStreamConfig,
     processor_name: String,
@@ -361,9 +372,7 @@ impl TransactionStream {
     /// Returns
     /// - true if should continue fetching
     /// - false if we reached the end of the stream or there is an error and the loop should stop
-    pub async fn get_next_transaction_batch_with_reconnect(
-        &mut self,
-    ) -> Result<TransactionsPBResponse> {
+    pub async fn get_next_transaction_batch(&mut self) -> Result<TransactionsPBResponse> {
         let grpc_channel_recv_latency = std::time::Instant::now();
 
         let txn_pb_res = match tokio::time::timeout(
@@ -438,7 +447,7 @@ impl TransactionStream {
                                 current_fetched_version = start_version,
                                 "[Parser] Received batch with gap from GRPC stream"
                             );
-                            panic!("[Parser] Received batch with gap from GRPC stream");
+                            return Err(anyhow!("Received batch with gap from GRPC stream"));
                         }
                         self.last_fetched_version = end_version as i64;
 
@@ -531,24 +540,46 @@ impl TransactionStream {
         }
     }
 
-    pub async fn reconnect_to_grpc(&mut self) -> Result<()> {
-        // Sleep for 100ms between reconnect tries
-        // TODO: Turn this into exponential backoff
-        tokio::time::sleep(Duration::from_millis(100)).await;
+    pub async fn reconnect_to_grpc_with_retries(&mut self) -> Result<()> {
+        let mut reconnection_retries = 0;
 
-        if self.reconnection_retries >= RECONNECTION_MAX_RETRIES {
-            error!(
-                processor_name = self.processor_name,
-                service_type = PROCESSOR_SERVICE_TYPE,
-                stream_address = self
-                    .transaction_stream_config
-                    .indexer_grpc_data_service_address
-                    .to_string(),
-                "[Parser] Reconnected more than 100 times. Will not retry.",
-            );
-            panic!("[Parser] Reconnected more than 100 times. Will not retry.")
+        loop {
+            // Sleep for 100ms between reconnect tries
+            // TODO: Turn this into exponential backoff
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            reconnection_retries += 1;
+
+            if reconnection_retries >= RECONNECTION_MAX_RETRIES {
+                error!(
+                    stream_address = self
+                        .transaction_stream_config
+                        .indexer_grpc_data_service_address
+                        .to_string(),
+                    "[Parser] Reconnected more than 100 times. Will not retry.",
+                );
+                break Err(anyhow!("Reconnected more than 100 times. Will not retry."));
+            }
+
+            match self.reconnect_to_grpc().await {
+                Ok(_) => {
+                    break Ok(());
+                },
+                Err(e) => {
+                    error!(
+                        stream_address = self.transaction_stream_config
+                            .indexer_grpc_data_service_address
+                            .to_string(),
+                        error = ?e,
+                        "[Parser] Error reconnecting to GRPC stream. Retrying..."
+                    );
+                    continue;
+                },
+            }
         }
-        self.reconnection_retries += 1;
+    }
+
+    pub async fn reconnect_to_grpc(&mut self) -> Result<()> {
         info!(
             processor_name = self.processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,

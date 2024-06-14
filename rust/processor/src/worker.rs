@@ -654,9 +654,7 @@ pub async fn fetch_transactions_from_transaction_stream(
     // 2. If we specified an end version and we hit that, we will stop fetching, but we will make sure that
     //    all existing transactions are processed.
     loop {
-        let transactions_res = transaction_stream
-            .get_next_transaction_batch_with_reconnect()
-            .await;
+        let transactions_res = transaction_stream.get_next_transaction_batch().await;
 
         match transactions_res {
             Ok(mut txn_pb) => {
@@ -785,13 +783,14 @@ pub async fn fetch_transactions_from_transaction_stream(
                 } else {
                     error!(
                         processor_name = processor_name,
+                        service_type = PROCESSOR_SERVICE_TYPE,
                         stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
                         error = ?e,
                         "[Parser] Error fetching transactions."
                     );
 
                     // If there was an error fetching transactions, try to reconnect
-                    match transaction_stream.reconnect_to_grpc().await {
+                    match transaction_stream.reconnect_to_grpc_with_retries().await {
                         Ok(_) => {
                             info!(
                                 processor_name = processor_name,
@@ -799,7 +798,7 @@ pub async fn fetch_transactions_from_transaction_stream(
                                 stream_address = transaction_stream_config
                                     .indexer_grpc_data_service_address
                                     .to_string(),
-                                "[Parser] Successfully reconnected to GRPC stream."
+                                "[Parser] Successfully reconnected transaction stream."
                             );
                         },
                         Err(e) => {
@@ -810,9 +809,8 @@ pub async fn fetch_transactions_from_transaction_stream(
                                     .indexer_grpc_data_service_address
                                     .to_string(),
                                 error = ?e,
-                                "[Parser] Error reconnecting to GRPC stream."
+                                "[Parser] Error reconnecting transaction stream."
                             );
-                            panic!("[Parser] Error reconnecting to GRPC stream.")
                         },
                     }
                 }
