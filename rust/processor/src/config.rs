@@ -50,6 +50,7 @@ pub struct IndexerGrpcProcessorConfig {
     #[serde(default)]
     pub transaction_filter: TransactionFilter,
     // String vector for deprecated tables to skip db writes
+    #[serde(default)]
     pub deprecated_tables: HashSet<String>,
 }
 
