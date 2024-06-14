@@ -146,7 +146,7 @@ CREATE TABLE events (
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
     event_index bigint NOT NULL,
     indexed_type character varying(300) DEFAULT ''::character varying NOT NULL,
-    PRIMARY KEY (transaction_version, event_index)
+    PRIMARY KEY (transaction_version, event_index) USING HASH WITH (bucket_count = 16)
 );
 CREATE INDEX ev_addr_type_index ON events (account_address);
 -- CREATE INDEX ev_insat_index ON events (inserted_at);
@@ -182,7 +182,7 @@ CREATE TABLE fungible_asset_activities (
     transaction_timestamp timestamp without time zone NOT NULL,
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
     storage_refund_amount numeric DEFAULT 0 NOT NULL,
-    PRIMARY KEY (transaction_version, event_index)
+    PRIMARY KEY (transaction_version, event_index) USING HASH WITH (bucket_count = 16)
 );
 CREATE INDEX faa_at_index ON fungible_asset_activities (asset_type);
 CREATE INDEX faa_gfpa_index ON fungible_asset_activities (gas_fee_payer_address);
@@ -372,6 +372,7 @@ CREATE TABLE current_objects (
     last_transaction_version bigint NOT NULL,
     is_deleted boolean NOT NULL,
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    untransferrable BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (object_address)
 );
 -- CREATE INDEX co_insat_idx ON current_objects (inserted_at);
@@ -437,11 +438,11 @@ CREATE INDEX ctpc_from_am_index ON current_token_pending_claims (from_address, a
 CREATE INDEX ctpc_th_index ON current_token_pending_claims (table_handle);
 CREATE INDEX ctpc_to_am_index ON current_token_pending_claims (to_address, amount);
 
-CREATE TABLE current_unified_fungible_asset_balances (
+CREATE TABLE current_unified_fungible_asset_balances_to_be_renamed (
     storage_id character varying(66) NOT NULL,
     owner_address character varying(66) NOT NULL,
-    asset_type character varying(66) NOT NULL,
-    coin_type character varying(1000),
+    asset_type_v2 character varying(66),
+    asset_type_v1 character varying(1000),
     is_primary boolean,
     is_frozen boolean NOT NULL,
     amount_v1 numeric,
@@ -454,10 +455,11 @@ CREATE TABLE current_unified_fungible_asset_balances (
     last_transaction_timestamp_v2 timestamp without time zone,
     last_transaction_timestamp timestamp without time zone GENERATED ALWAYS AS (GREATEST(last_transaction_timestamp_v1, last_transaction_timestamp_v2)) STORED,
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    asset_type VARCHAR(1000) AS (COALESCE(asset_type_v2, asset_type_v1)) STORED,
     PRIMARY KEY (storage_id)
 );
--- CREATE INDEX cufab_insat_index ON current_unified_fungible_asset_balances (inserted_at);
-CREATE INDEX cufab_owner_at_index ON current_unified_fungible_asset_balances (owner_address, asset_type);
+-- CREATE INDEX cufab_insat_index ON current_unified_fungible_asset_balances_to_be_renamed (inserted_at);
+CREATE INDEX cufab_owner_at_index ON current_unified_fungible_asset_balances_to_be_renamed (owner_address, asset_type);
 
 CREATE TABLE delegated_staking_activities (
     transaction_version bigint NOT NULL,
@@ -631,7 +633,7 @@ CREATE TABLE fungible_asset_balances (
     transaction_timestamp timestamp without time zone NOT NULL,
     token_standard character varying(10) NOT NULL,
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (transaction_version, write_set_change_index)
+    PRIMARY KEY (transaction_version, write_set_change_index) USING HASH WITH (bucket_count = 16)
 );
 -- CREATE INDEX fab_insat_index ON fungible_asset_balances (inserted_at);
 CREATE INDEX fab_owner_at_index ON fungible_asset_balances (owner_address, asset_type);
@@ -822,7 +824,7 @@ CREATE TABLE coin_supply (
     transaction_timestamp timestamp without time zone NOT NULL,
     transaction_epoch bigint NOT NULL,
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (transaction_version, coin_type_hash)
+    PRIMARY KEY (transaction_version, coin_type_hash) USING HASH WITH (bucket_count = 16)
 );
 CREATE INDEX cs_ct_tv_index ON coin_supply (coin_type, transaction_version DESC);
 CREATE INDEX cs_epoch_index ON coin_supply (transaction_epoch);
@@ -1018,6 +1020,7 @@ CREATE TABLE objects (
     allow_ungated_transfer boolean NOT NULL,
     is_deleted boolean NOT NULL,
     inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    untransferrable BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (transaction_version, write_set_change_index)
 );
 -- CREATE INDEX o_insat_idx ON objects (inserted_at);
@@ -1299,22 +1302,19 @@ CREATE VIEW legacy_migration_v1.coin_activities AS
    FROM fungible_asset_activities
   WHERE ((fungible_asset_activities.token_standard)::text = 'v1'::text);
 
-/*
 CREATE VIEW legacy_migration_v1.coin_balances AS
  SELECT fungible_asset_balances.transaction_version,
     fungible_asset_balances.owner_address,
-    encode(sha256((fungible_asset_balances.asset_type)::bytea), 'hex'::text) AS coin_type_hash,
+    encode(sha256((fungible_asset_balances.asset_type)::bytea)::bytes, 'hex'::text) AS coin_type_hash,
     fungible_asset_balances.asset_type AS coin_type,
     fungible_asset_balances.amount,
     fungible_asset_balances.transaction_timestamp,
     fungible_asset_balances.inserted_at
    FROM fungible_asset_balances
   WHERE ((fungible_asset_balances.token_standard)::text = 'v1'::text);
-*/
 
-/*
 CREATE VIEW legacy_migration_v1.coin_infos AS
- SELECT encode(sha256((fungible_asset_metadata.asset_type)::bytea), 'hex'::text) AS coin_type_hash,
+ SELECT encode(sha256((fungible_asset_metadata.asset_type)::bytea)::bytes, 'hex'::text) AS coin_type_hash,
     fungible_asset_metadata.asset_type AS coin_type,
     fungible_asset_metadata.last_transaction_version AS transaction_version_created,
     fungible_asset_metadata.creator_address,
@@ -1326,9 +1326,8 @@ CREATE VIEW legacy_migration_v1.coin_infos AS
     fungible_asset_metadata.supply_aggregator_table_handle_v1 AS supply_aggregator_table_handle,
     fungible_asset_metadata.supply_aggregator_table_key_v1 AS supply_aggregator_table_key
    FROM fungible_asset_metadata
-  WHERE ((fungible_asset_metadata.token_standard)::text = 'v1'::text);*/
+  WHERE ((fungible_asset_metadata.token_standard)::text = 'v1'::text);
 
-/*
 CREATE VIEW legacy_migration_v1.collection_datas AS
  SELECT collections_v2.collection_id AS collection_data_id_hash,
     collections_v2.transaction_version,
@@ -1345,7 +1344,7 @@ CREATE VIEW legacy_migration_v1.collection_datas AS
     collections_v2.table_handle_v1 AS table_handle,
     collections_v2.transaction_timestamp
    FROM collections_v2
-  WHERE ((collections_v2.token_standard)::text = 'v1'::text);*/
+  WHERE ((collections_v2.token_standard)::text = 'v1'::text);
 
 CREATE VIEW legacy_migration_v1.current_ans_lookup AS
  SELECT current_ans_lookup_v2.domain,
@@ -1370,17 +1369,16 @@ CREATE VIEW legacy_migration_v1.current_ans_primary_name AS
    FROM current_ans_primary_name_v2
   WHERE ((current_ans_primary_name_v2.token_standard)::text = 'v1'::text);
 
-/*
 CREATE VIEW legacy_migration_v1.current_coin_balances AS
  SELECT current_fungible_asset_balances.owner_address,
-    encode(sha256((current_fungible_asset_balances.asset_type)::bytea), 'hex'::text) AS coin_type_hash,
+    encode(sha256((current_fungible_asset_balances.asset_type)::bytea)::bytes, 'hex'::text) AS coin_type_hash,
     current_fungible_asset_balances.asset_type AS coin_type,
     current_fungible_asset_balances.amount,
     current_fungible_asset_balances.last_transaction_version,
     current_fungible_asset_balances.last_transaction_timestamp,
     current_fungible_asset_balances.inserted_at
    FROM current_fungible_asset_balances
-  WHERE ((current_fungible_asset_balances.token_standard)::text = 'v1'::text);*/
+  WHERE ((current_fungible_asset_balances.token_standard)::text = 'v1'::text);
 
 CREATE VIEW legacy_migration_v1.current_token_datas AS
  SELECT ctdv.token_data_id AS token_data_id_hash,
@@ -1541,4 +1539,3 @@ CREATE TABLE nft_metadata_crawler.parsed_asset_uris (
 -- CREATE INDEX nft_inserted_at ON nft_metadata_crawler.parsed_asset_uris (inserted_at);
 CREATE INDEX nft_raw_animation_uri ON nft_metadata_crawler.parsed_asset_uris (raw_animation_uri);
 CREATE INDEX nft_raw_image_uri ON nft_metadata_crawler.parsed_asset_uris (raw_image_uri);
-
