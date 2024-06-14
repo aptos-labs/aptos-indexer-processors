@@ -9,6 +9,7 @@ pub struct TransactionStreamConfig {
     pub starting_version: u64,
     pub request_ending_version: Option<u64>,
     pub auth_token: String,
+    pub request_name_header: String,
     #[serde(default = "TransactionStreamConfig::default_indexer_grpc_http2_ping_interval")]
     pub indexer_grpc_http2_ping_interval_secs: u64,
     #[serde(default = "TransactionStreamConfig::default_indexer_grpc_http2_ping_timeout")]

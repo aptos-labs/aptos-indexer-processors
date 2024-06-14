@@ -3,4 +3,4 @@ pub mod transaction_stream;
 pub mod utils;
 
 pub use config::TransactionStreamConfig;
-pub use transaction_stream::{TransactionStream, TransactionStreamOutput, TransactionsPBResponse};
+pub use transaction_stream::{TransactionStream, TransactionsPBResponse};

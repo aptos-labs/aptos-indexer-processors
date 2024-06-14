@@ -182,6 +182,7 @@ impl Worker {
             starting_version,
             request_ending_version: self.ending_version,
             auth_token: self.auth_token.clone(),
+            request_name_header: processor_name.to_string(),
             indexer_grpc_http2_ping_interval_secs: self
                 .grpc_http2_config
                 .indexer_grpc_http2_ping_interval_in_secs,
@@ -197,7 +198,6 @@ impl Worker {
         // get the chain id
         let chain_id = aptos_indexer_transaction_stream::transaction_stream::get_chain_id(
             transaction_stream_config.clone(),
-            processor_name.to_string(),
         )
         .await
         .expect("[Parser] Error getting chain id");
@@ -690,7 +690,7 @@ pub async fn fetch_transactions_from_transaction_stream(
                     }
                 } else {
                     // We are breaking down a big batch into small batches; this involves an iterator
-                    let average_size_in_bytes = size_in_bytes / num_filtered_txns as u64;
+                    let average_size_in_bytes = size_in_bytes / num_filtered_txns;
 
                     let txn_pb_chunked: Vec<Vec<Transaction>> = txn_pb
                         .transactions
@@ -729,7 +729,7 @@ pub async fn fetch_transactions_from_transaction_stream(
                 // Log channel send metrics
                 let duration_in_secs = txn_channel_send_latency.elapsed().as_secs_f64();
 
-                send_ma.tick_now(num_txns as u64);
+                send_ma.tick_now(num_txns);
                 let tps = send_ma.avg().ceil() as u64;
                 let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
                 let channel_size = txn_sender.len();
@@ -752,7 +752,7 @@ pub async fn fetch_transactions_from_transaction_stream(
                     .set(channel_size as i64);
                 NUM_TRANSACTIONS_FILTERED_OUT_COUNT
                     .with_label_values(&[&processor_name])
-                    .inc_by(num_filtered_txns as u64);
+                    .inc_by(num_filtered_txns);
             },
             Err(e) => {
                 if transaction_stream.is_end_of_stream() {
@@ -783,6 +783,13 @@ pub async fn fetch_transactions_from_transaction_stream(
                     );
                     break;
                 } else {
+                    error!(
+                        processor_name = processor_name,
+                        stream_address = transaction_stream_config.indexer_grpc_data_service_address.to_string(),
+                        error = ?e,
+                        "[Parser] Error fetching transactions."
+                    );
+
                     // If there was an error fetching transactions, try to reconnect
                     match transaction_stream.reconnect_to_grpc().await {
                         Ok(_) => {
