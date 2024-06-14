@@ -9,7 +9,7 @@ use std::fmt::Debug;
 
 /// BooleanTransactionFilter is the top level filter
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum BooleanTransactionFilter {
     And(LogicalAnd),
@@ -95,7 +95,7 @@ impl Filterable<Transaction> for BooleanTransactionFilter {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LogicalAnd {
     and: Vec<BooleanTransactionFilter>,
 }
@@ -113,7 +113,7 @@ impl Filterable<Transaction> for LogicalAnd {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LogicalOr {
     or: Vec<BooleanTransactionFilter>,
 }
@@ -131,7 +131,7 @@ impl Filterable<Transaction> for LogicalOr {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LogicalNot {
     not: Box<BooleanTransactionFilter>,
 }
@@ -147,7 +147,7 @@ impl Filterable<Transaction> for LogicalNot {
 }
 
 /// These are filters we would expect to be exposed via API
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[serde(tag = "type")]
 pub enum APIFilter {

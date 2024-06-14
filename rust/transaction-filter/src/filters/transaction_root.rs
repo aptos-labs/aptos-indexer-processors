@@ -3,7 +3,7 @@ use anyhow::Error;
 use aptos_protos::transaction::v1::{transaction::TransactionType, Transaction};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 #[derive(derive_builder::Builder)]
 #[builder(setter(strip_option), default)]
