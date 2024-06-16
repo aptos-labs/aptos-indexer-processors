@@ -1,13 +1,4 @@
-use crate::{
-    config::TransactionStreamConfig,
-    utils::{
-        counters::{
-            ProcessorStep, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_PROCESSED_COUNT,
-            PROCESSED_BYTES_COUNT, TRANSACTION_UNIX_TIMESTAMP,
-        },
-        util::{timestamp_to_iso, timestamp_to_unixtime},
-    },
-};
+use crate::{config::TransactionStreamConfig, utils::util::timestamp_to_iso};
 use anyhow::{anyhow, Result};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
@@ -34,8 +25,8 @@ pub const RECONNECTION_MAX_RETRIES: u64 = 5;
 /// 256MB
 pub const MAX_RESPONSE_SIZE: usize = 1024 * 1024 * 256;
 
-const PROCESSOR_SERVICE_TYPE: &str = "processor";
-
+/// TransactionsPBResponse is a struct that holds the transactions fetched from the stream.
+/// It also includes some contextual information about the transactions.
 #[derive(Clone)]
 pub struct TransactionsPBResponse {
     pub transactions: Vec<Transaction>,
@@ -307,7 +298,6 @@ pub async fn get_chain_id(transaction_stream_config: TransactionStreamConfig) ->
 /// - get_chain_id: Fetches the chain id from the stream
 pub struct TransactionStream {
     transaction_stream_config: TransactionStreamConfig,
-    processor_name: String,
     stream: Streaming<TransactionsResponse>,
     connection_id: String,
     next_version_to_fetch: u64,
@@ -317,14 +307,10 @@ pub struct TransactionStream {
 }
 
 impl TransactionStream {
-    pub async fn new(
-        transaction_stream_config: TransactionStreamConfig,
-        processor_name: String,
-    ) -> Result<Self> {
+    pub async fn new(transaction_stream_config: TransactionStreamConfig) -> Result<Self> {
         let (stream, connection_id) = Self::init_stream(transaction_stream_config.clone()).await?;
         Ok(Self {
             transaction_stream_config: transaction_stream_config.clone(),
-            processor_name,
             stream,
             connection_id,
             next_version_to_fetch: transaction_stream_config.starting_version,
@@ -402,18 +388,7 @@ impl TransactionStream {
                         let duration_in_secs = grpc_channel_recv_latency.elapsed().as_secs_f64();
                         self.fetch_ma.tick_now(num_txns as u64);
 
-                        // Filter out the txns we don't care about
-                        // r.transactions
-                        //     .retain(|txn| self.transaction_filter.include(txn));
-
-                        // let num_txn_post_filter = r.transactions.len();
-                        // let num_filtered_txns = num_txns - num_txn_post_filter;
-                        let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
-                        let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
-
                         info!(
-                            processor_name = self.processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self
                                 .transaction_stream_config
                                 .indexer_grpc_data_service_address
@@ -435,9 +410,7 @@ impl TransactionStream {
                             duration_in_secs,
                             tps = self.fetch_ma.avg().ceil() as u64,
                             bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
-                            step,
-                            "{}",
-                            label,
+                            "Received transactions from GRPC.",
                         );
 
                         if self.last_fetched_version + 1 != start_version as i64 {
@@ -450,24 +423,6 @@ impl TransactionStream {
                             return Err(anyhow!("Received batch with gap from GRPC stream"));
                         }
                         self.last_fetched_version = end_version as i64;
-
-                        LATEST_PROCESSED_VERSION
-                            .with_label_values(&[&self.processor_name, step, label, "-"])
-                            .set(end_version as i64);
-                        TRANSACTION_UNIX_TIMESTAMP
-                            .with_label_values(&[&self.processor_name, step, label, "-"])
-                            .set(
-                                start_txn_timestamp
-                                    .as_ref()
-                                    .map(timestamp_to_unixtime)
-                                    .unwrap_or_default(),
-                            );
-                        PROCESSED_BYTES_COUNT
-                            .with_label_values(&[&self.processor_name, step, label, "-"])
-                            .inc_by(size_in_bytes);
-                        NUM_TRANSACTIONS_PROCESSED_COUNT
-                            .with_label_values(&[&self.processor_name, step, label, "-"])
-                            .inc_by(end_version - start_version + 1);
 
                         let txn_pb = TransactionsPBResponse {
                             transactions: r.transactions,
@@ -484,8 +439,6 @@ impl TransactionStream {
                     // Error receiving datastream response
                     Some(Err(rpc_error)) => {
                         tracing::warn!(
-                            processor_name = self.processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self.transaction_stream_config.indexer_grpc_data_service_address.to_string(),
                             self.connection_id,
                             start_version = self.transaction_stream_config.starting_version,
@@ -498,8 +451,6 @@ impl TransactionStream {
                     // Stream is finished
                     None => {
                         tracing::warn!(
-                            processor_name = self.processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
                             stream_address = self
                                 .transaction_stream_config
                                 .indexer_grpc_data_service_address
@@ -516,8 +467,6 @@ impl TransactionStream {
             // Timeout receiving datastream response
             Err(e) => {
                 tracing::warn!(
-                    processor_name = self.processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = self.transaction_stream_config.indexer_grpc_data_service_address.to_string(),
                     connection_id = self.connection_id,
                     start_version = self.transaction_stream_config.starting_version,
@@ -581,8 +530,6 @@ impl TransactionStream {
 
     pub async fn reconnect_to_grpc(&mut self) -> Result<()> {
         info!(
-            processor_name = self.processor_name,
-            service_type = PROCESSOR_SERVICE_TYPE,
             stream_address = self
                 .transaction_stream_config
                 .indexer_grpc_data_service_address
@@ -600,8 +547,6 @@ impl TransactionStream {
         self.connection_id = connection_id;
         self.stream = response.into_inner();
         info!(
-            processor_name = self.processor_name,
-            service_type = PROCESSOR_SERVICE_TYPE,
             stream_address = self
                 .transaction_stream_config
                 .indexer_grpc_data_service_address

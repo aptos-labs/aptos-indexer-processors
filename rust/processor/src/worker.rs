@@ -630,8 +630,7 @@ pub async fn fetch_transactions_from_transaction_stream(
     pb_channel_txn_chunk_size: usize,
 ) {
     // Initialize the stream
-    let transaction_stream_res =
-        TransactionStream::new(transaction_stream_config.clone(), processor_name.clone()).await;
+    let transaction_stream_res = TransactionStream::new(transaction_stream_config.clone()).await;
 
     let mut transaction_stream = match transaction_stream_res {
         Ok(stream) => stream,
@@ -662,6 +661,7 @@ pub async fn fetch_transactions_from_transaction_stream(
                 let end_version = txn_pb.transactions.last().unwrap().version;
                 let size_in_bytes = txn_pb.size_in_bytes;
                 let num_txns = end_version - start_version + 1;
+                let start_txn_timestamp = txn_pb.start_txn_timestamp.clone();
 
                 // Filter out the txns we don't care about
                 txn_pb
@@ -731,8 +731,12 @@ pub async fn fetch_transactions_from_transaction_stream(
                 let tps = send_ma.avg().ceil() as u64;
                 let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
                 let channel_size = txn_sender.len();
+
+                let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
+                let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
                 debug!(
-                    processor_name.service_type = PROCESSOR_SERVICE_TYPE,
+                    processor_name,
+                    service_type = PROCESSOR_SERVICE_TYPE,
                     stream_address = transaction_stream_config
                         .indexer_grpc_data_service_address
                         .to_string(),
@@ -745,6 +749,23 @@ pub async fn fetch_transactions_from_transaction_stream(
                     tps,
                     "[Parser] Successfully sent transactions to channel."
                 );
+                LATEST_PROCESSED_VERSION
+                    .with_label_values(&[&processor_name, step, label, "-"])
+                    .set(end_version as i64);
+                TRANSACTION_UNIX_TIMESTAMP
+                    .with_label_values(&[&processor_name, step, label, "-"])
+                    .set(
+                        start_txn_timestamp
+                            .as_ref()
+                            .map(timestamp_to_unixtime)
+                            .unwrap_or_default(),
+                    );
+                PROCESSED_BYTES_COUNT
+                    .with_label_values(&[&processor_name, step, label, "-"])
+                    .inc_by(size_in_bytes);
+                NUM_TRANSACTIONS_PROCESSED_COUNT
+                    .with_label_values(&[&processor_name, step, label, "-"])
+                    .inc_by(end_version - start_version + 1);
                 FETCHER_THREAD_CHANNEL_SIZE
                     .with_label_values(&[&processor_name])
                     .set(channel_size as i64);
