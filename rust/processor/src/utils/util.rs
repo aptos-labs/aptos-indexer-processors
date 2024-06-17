@@ -274,11 +274,13 @@ pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
     } else {
         ts.clone()
     };
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(final_ts.seconds, final_ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(
         std::cmp::min(ts, MAX_TIMESTAMP_SECS as u64) as i64,
         0,

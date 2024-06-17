@@ -1,0 +1,190 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+#![allow(clippy::extra_unused_lifetimes)]
+
+use crate::{
+    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable, SizeOf},
+    utils::util::standardize_address,
+};
+use anyhow::{Context, Result};
+use aptos_protos::transaction::v1::{
+    DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,
+};
+use field_count::FieldCount;
+use get_size::GetSize;
+use get_size_derive::GetSize;
+use parquet_derive::ParquetRecordWriter;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Deserialize, FieldCount, GetSize, Serialize, ParquetRecordWriter)]
+pub struct MoveResource {
+    pub txn_version: i64,
+    pub write_set_change_index: i64,
+    pub block_height: i64,
+    #[get_size(ignore)]
+    pub block_timestamp: chrono::NaiveDateTime,
+    pub resource_address: String,
+    pub resource_type: String,
+    pub module: String,
+    pub fun: String,
+    pub is_deleted: bool,
+    pub generic_type_params: Option<String>,
+    pub data: Option<String>,
+    pub state_key_hash: String,
+}
+
+impl NamedTable for MoveResource {
+    const TABLE_NAME: &'static str = "move_resources";
+}
+
+impl HasVersion for MoveResource {
+    fn version(&self) -> i64 {
+        self.txn_version
+    }
+}
+
+impl Default for MoveResource {
+    fn default() -> Self {
+        Self {
+            txn_version: 0,
+            write_set_change_index: 0,
+            block_height: 0,
+            #[allow(deprecated)]
+            block_timestamp: chrono::NaiveDateTime::from_timestamp(0, 0),
+            resource_address: "".to_string(),
+            resource_type: "".to_string(),
+            module: "".to_string(),
+            fun: "".to_string(),
+            is_deleted: false,
+            generic_type_params: None,
+            data: None,
+            state_key_hash: "".to_string(),
+        }
+    }
+}
+
+pub struct MoveStructTag {
+    resource_address: String,
+    pub module: String,
+    pub fun: String,
+    pub generic_type_params: Option<String>,
+}
+
+impl MoveResource {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        write_set_change_index: i64,
+        txn_version: i64,
+        block_height: i64,
+        block_timestamp: chrono::NaiveDateTime,
+    ) -> Self {
+        let parsed_data = Self::convert_move_struct_tag(
+            write_resource
+                .r#type
+                .as_ref()
+                .expect("MoveStructTag Not Exists."),
+        );
+        Self {
+            txn_version,
+            block_height,
+            write_set_change_index,
+            resource_type: write_resource.type_str.clone(),
+            fun: parsed_data.fun.clone(),
+            resource_address: standardize_address(&write_resource.address.to_string()),
+            module: parsed_data.module.clone(),
+            generic_type_params: parsed_data.generic_type_params,
+            data: Some(write_resource.data.clone()),
+            is_deleted: false,
+            state_key_hash: standardize_address(
+                hex::encode(write_resource.state_key_hash.as_slice()).as_str(),
+            ),
+            block_timestamp,
+        }
+    }
+
+    pub fn from_delete_resource(
+        delete_resource: &DeleteResource,
+        write_set_change_index: i64,
+        txn_version: i64,
+        block_height: i64,
+        block_timestamp: chrono::NaiveDateTime,
+    ) -> Self {
+        let parsed_data = Self::convert_move_struct_tag(
+            delete_resource
+                .r#type
+                .as_ref()
+                .expect("MoveStructTag Not Exists."),
+        );
+        Self {
+            txn_version,
+            block_height,
+            write_set_change_index,
+            resource_type: delete_resource.type_str.clone(),
+            fun: parsed_data.fun.clone(),
+            resource_address: standardize_address(&delete_resource.address.to_string()),
+            module: parsed_data.module.clone(),
+            generic_type_params: parsed_data.generic_type_params,
+            data: None,
+            is_deleted: true,
+            state_key_hash: standardize_address(
+                hex::encode(delete_resource.state_key_hash.as_slice()).as_str(),
+            ),
+            block_timestamp,
+        }
+    }
+
+    pub fn convert_move_struct_tag(struct_tag: &MoveStructTagPB) -> MoveStructTag {
+        MoveStructTag {
+            resource_address: standardize_address(struct_tag.address.as_str()),
+            module: struct_tag.module.to_string(),
+            fun: struct_tag.name.to_string(),
+            generic_type_params: struct_tag
+                .generic_type_params
+                .iter()
+                .map(|move_type| -> Result<Option<String>> {
+                    Ok(Some(
+                        serde_json::to_string(move_type).context("Failed to parse move type")?,
+                    ))
+                })
+                .collect::<Result<Option<String>>>()
+                .unwrap_or(None),
+        }
+    }
+
+    pub fn get_outer_type_from_resource(write_resource: &WriteResource) -> String {
+        let move_struct_tag =
+            Self::convert_move_struct_tag(write_resource.r#type.as_ref().unwrap());
+
+        format!(
+            "{}::{}::{}",
+            move_struct_tag.get_address(),
+            move_struct_tag.module,
+            move_struct_tag.fun,
+        )
+    }
+}
+
+impl MoveStructTag {
+    pub fn get_address(&self) -> String {
+        standardize_address(self.resource_address.as_str())
+    }
+}
+
+impl SizeOf for MoveResource {
+    fn size_of(&self) -> usize {
+        let base_size: usize = std::mem::size_of::<Self>();
+
+        let dynamic_size = self.fun.capacity()
+            + self.resource_type.capacity()
+            + self.resource_address.capacity()
+            + self.module.capacity()
+            + self.state_key_hash.capacity()
+            + self
+                .generic_type_params
+                .as_ref()
+                .map_or(0, |s| s.capacity())
+            + self.data.as_ref().map_or(0, |s| s.capacity());
+        base_size + dynamic_size
+    }
+}

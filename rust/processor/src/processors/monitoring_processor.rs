@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
+use crate::{gap_detectors::ProcessingResult, utils::database::PgDbPool};
 use crate::utils::database::ArcDbPool;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
@@ -41,13 +42,15 @@ impl ProcessorTrait for MonitoringProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        Ok(ProcessingResult {
-            start_version,
-            end_version,
-            processing_duration_in_secs: 0.0,
-            db_insertion_duration_in_secs: 0.0,
-            last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
-        })
+        Ok(ProcessingResult::DefaultProcessingResult(
+            DefaultProcessingResult {
+                start_version,
+                end_version,
+                processing_duration_in_secs: 0.0,
+                db_insertion_duration_in_secs: 0.0,
+                last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
+            },
+        ))
     }
 
     fn connection_pool(&self) -> &ArcDbPool {

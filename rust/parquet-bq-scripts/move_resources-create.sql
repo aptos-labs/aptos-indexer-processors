@@ -10,7 +10,7 @@ CREATE TABLE `{}`
   fun STRING,
   is_deleted BOOL,
   generic_type_params STRING,
-  data STRING, 
+  data STRING,
   state_key_hash STRING,
   
   bq_inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),

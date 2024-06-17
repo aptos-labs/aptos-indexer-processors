@@ -62,6 +62,18 @@ tokio-postgres = { workspace = true }
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
 
+# Parquet support
+parquet = { workspace = true }
+arrow = { workspace = true }
+num = { workspace = true }
+google-cloud-storage = { workspace = true }
+hyper = { workspace = true }
+lazy_static = { workspace = true }
+parquet_derive = { workspace = true }
+canonical_json = { workspace = true }
+get-size = { workspace = true }
+get-size-derive = { workspace = true }
+uuid = { workspace = true }
 [features]
 libpq = ["diesel/postgres"]
 # When using the default features we enable the diesel/postgres feature. We configure

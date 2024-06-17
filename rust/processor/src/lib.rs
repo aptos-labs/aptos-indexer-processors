@@ -11,13 +11,20 @@
 #[macro_use]
 extern crate diesel;
 
+// for parquet_derive
+extern crate canonical_json;
+extern crate parquet;
+extern crate parquet_derive;
+
 pub use config::IndexerGrpcProcessorConfig;
 
 mod config;
 mod db;
-pub mod gap_detector;
+pub mod gap_detectors;
 pub mod grpc_stream;
 pub mod processors;
+pub mod parquet_handler;
+pub mod parquet_processors;
 #[path = "db/postgres/schema.rs"]
 pub mod schema;
 pub mod transaction_filter;

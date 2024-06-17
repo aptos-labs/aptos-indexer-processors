@@ -13,6 +13,7 @@ pub mod fungible_asset_processor;
 pub mod monitoring_processor;
 pub mod nft_metadata_processor;
 pub mod objects_processor;
+pub mod parquet_default_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
@@ -29,6 +30,7 @@ use self::{
     monitoring_processor::MonitoringProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
     objects_processor::{ObjectsProcessor, ObjectsProcessorConfig},
+    parquet_default_processor::DefaultParquetProcessorConfig,
     stake_processor::{StakeProcessor, StakeProcessorConfig},
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
@@ -36,6 +38,8 @@ use self::{
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
+    gap_detectors::ProcessingResult,
+    processors::parquet_default_processor::DefaultParquetProcessor,
     db::common::models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
@@ -52,7 +56,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ProcessingResult {
+pub struct DefaultProcessingResult {
     pub start_version: u64,
     pub end_version: u64,
     pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
@@ -190,6 +194,7 @@ pub enum ProcessorConfig {
     TokenV2Processor(TokenV2ProcessorConfig),
     TransactionMetadataProcessor,
     UserTransactionProcessor,
+    DefaultParquetProcessor(DefaultParquetProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -232,6 +237,7 @@ pub enum Processor {
     TokenV2Processor,
     TransactionMetadataProcessor,
     UserTransactionProcessor,
+    DefaultParquetProcessor,
 }
 
 #[cfg(test)]
