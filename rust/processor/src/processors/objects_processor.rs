@@ -138,6 +138,7 @@ fn insert_current_objects_query(
                 last_transaction_version.eq(excluded(last_transaction_version)),
                 is_deleted.eq(excluded(is_deleted)),
                 inserted_at.eq(excluded(inserted_at)),
+                untransferrable.eq(excluded(untransferrable)),
             )),
         Some(
             " WHERE current_objects.last_transaction_version <= excluded.last_transaction_version ",
