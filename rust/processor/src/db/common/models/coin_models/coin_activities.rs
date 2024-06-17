@@ -124,6 +124,7 @@ impl CoinActivity {
             .as_ref()
             .expect("Transaction timestamp doesn't exist!")
             .seconds;
+        #[allow(deprecated)]
         let txn_timestamp =
             NaiveDateTime::from_timestamp_opt(txn_timestamp, 0).expect("Txn Timestamp is invalid!");
 
