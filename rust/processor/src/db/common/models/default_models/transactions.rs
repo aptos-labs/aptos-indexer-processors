@@ -292,7 +292,7 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
-            Txn::BlockEpilogue(_) => (
+            TxnData::BlockEpilogue(_) => (
                 Self::from_transaction_info_with_data(
                     transaction_info,
                     None,
