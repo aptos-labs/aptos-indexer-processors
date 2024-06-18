@@ -1,5 +1,5 @@
 {
-  "resource_version": 319,
+  "resource_version": 333,
   "metadata": {
     "version": 3,
     "sources": [
@@ -7,6 +7,29 @@
         "name": "indexer-v2",
         "kind": "postgres",
         "tables": [
+          {
+            "table": {
+              "name": "move_resources",
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "move_resources",
+              "custom_root_fields": {}
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": ["address", "transaction_version"],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                }
+              }
+            ]
+          },
           {
             "table": {
               "name": "parsed_asset_uris",
@@ -1453,6 +1476,50 @@
           },
           {
             "table": {
+              "name": "current_unified_fungible_asset_balances_to_be_renamed",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "asset_type": "asset_type"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "fungible_asset_metadata",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "asset_type",
+                    "is_frozen",
+                    "is_primary",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
+                    "owner_address",
+                    "storage_id"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "delegated_staking_activities",
               "schema": "public"
             },
@@ -1736,23 +1803,6 @@
                 "permission": {
                   "columns": ["chain_id"],
                   "filter": {}
-                }
-              }
-            ]
-          },
-          {
-            "table": {
-              "name": "move_resources",
-              "schema": "public"
-            },
-            "select_permissions": [
-              {
-                "role": "anonymous",
-                "permission": {
-                  "columns": ["address", "transaction_version"],
-                  "filter": {},
-                  "limit": 100,
-                  "allow_aggregations": true
                 }
               }
             ]
