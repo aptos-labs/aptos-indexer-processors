@@ -11,35 +11,37 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 - A running PostgreSQL instance, with a valid database. More tutorial can be
   found [here](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#postgres)
 
-- A config YAML file
-    - For example, `config.yaml`
+  - A config YAML file
+      - For example, `parser.yaml`
 
-      ```yaml
-      health_check_port: 8084
-      server_config:
-        processor_config:
-          type: default_processor
-        postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
-        indexer_grpc_data_service_address: 127.0.0.1:50051
-        indexer_grpc_http2_ping_interval_in_secs: 60
-        indexer_grpc_http2_ping_timeout_in_secs: 10
-        number_concurrent_processing_tasks: 10
-        auth_token: AUTH_TOKEN
-        starting_version: 0 # optional
-        ending_version: 0 # optional
-        transaction_filter:
-          # Only allow transactions from these contract addresses
-          # focus_contract_addresses:
-          #   - "0x0"
-          # Skip transactions from these sender addresses
-          skip_sender_addresses:
-            - "0x07"
-          # Skip all transactions that aren't user transactions
-          focus_user_transactions: false
-        deprecated_tables: [
-          "MOVE_RESOURCES",
-        ]
-      ```
+        ```yaml
+        health_check_port: 8084
+        server_config:
+          processor_config:
+            type: default_processor
+          postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
+          indexer_grpc_data_service_address: 127.0.0.1:50051
+          indexer_grpc_http2_ping_interval_in_secs: 60
+          indexer_grpc_http2_ping_timeout_in_secs: 10
+          number_concurrent_processing_tasks: 10
+          auth_token: AUTH_TOKEN
+          starting_version: 0 # optional
+          ending_version: 0 # optional
+          transaction_filter:
+            # Only allow transactions from these contract addresses
+            # focus_contract_addresses:
+            #   - "0x0"
+            # Skip transactions from these sender addresses
+            skip_sender_addresses:
+              - "0x07"
+            # Skip all transactions that aren't user transactions
+            focus_user_transactions: false
+          deprecated_tables: [               
+            "MOVE_RESOURCES",                                  
+            "WRITE_SET_CHANGES",                               
+            "TRANSACTIONS",                                    
+          ]
+        ```
 
 #### Config Explanation
 
@@ -52,6 +54,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 - `starting_version`: start processor at starting_version.
 - `ending_version`: stop processor after ending_version.
 - `number_concurrent_processing_tasks`: number of tasks to parse and insert; 1 means sequential processing, otherwise,
+- `deprecated_tables`: a list of tables to skip writing to alloyDB.
   transactions are splitted into tasks and inserted with random order.
 
 ### Use docker image for existing parsers(Only for **Unix/Linux**)
