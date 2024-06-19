@@ -3,8 +3,8 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::account_transaction_models::account_transactions::AccountTransaction,
+    gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };

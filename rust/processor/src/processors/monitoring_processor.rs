@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
-use crate::{gap_detectors::ProcessingResult, utils::database::PgDbPool};
-use crate::utils::database::ArcDbPool;
+use crate::{gap_detectors::ProcessingResult, utils::database::ArcDbPool};
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use std::fmt::Debug;

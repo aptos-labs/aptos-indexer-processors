@@ -3,11 +3,11 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::transaction_metadata_model::{
         event_size_info::EventSize, transaction_size_info::TransactionSize,
         write_set_size_info::WriteSetSize,
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };

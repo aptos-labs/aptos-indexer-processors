@@ -92,5 +92,4 @@ impl GapDetectorTrait for ParquetFileGapDetector {
     }
 }
 
-
 // TODO: add tests

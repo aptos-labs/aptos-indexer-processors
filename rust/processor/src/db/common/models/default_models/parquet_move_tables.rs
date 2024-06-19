@@ -3,18 +3,42 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::transactions::Transaction;
 use crate::{
-    schema::{current_table_items, table_items, table_metadatas},
+    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable},
     utils::util::{hash_str, standardize_address},
 };
+use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(table_handle, key_hash))]
-#[diesel(table_name = current_table_items)]
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
+)]
+pub struct TableItem {
+    pub txn_version: i64,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
+    pub write_set_change_index: i64,
+    pub transaction_block_height: i64,
+    pub table_key: String,
+    pub table_handle: String,
+    pub decoded_key: String,
+    pub decoded_value: Option<String>,
+    pub is_deleted: bool,
+}
+
+impl NamedTable for TableItem {
+    const TABLE_NAME: &'static str = "table_items";
+}
+
+impl HasVersion for TableItem {
+    fn version(&self) -> i64 {
+        self.txn_version
+    }
+}
+#[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct CurrentTableItem {
     pub table_handle: String,
     pub key_hash: String,
@@ -24,27 +48,7 @@ pub struct CurrentTableItem {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
 }
-
-#[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
-#[diesel(primary_key(transaction_version, write_set_change_index))]
-#[diesel(table_name = table_items)]
-pub struct TableItem {
-    pub transaction_version: i64,
-    pub write_set_change_index: i64,
-    pub transaction_block_height: i64,
-    pub key: String,
-    pub table_handle: String,
-    pub decoded_key: serde_json::Value,
-    pub decoded_value: Option<serde_json::Value>,
-    pub is_deleted: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(handle))]
-#[diesel(table_name = table_metadatas)]
+#[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct TableMetadata {
     pub handle: String,
     pub key_type: String,
@@ -55,25 +59,21 @@ impl TableItem {
     pub fn from_write_table_item(
         write_table_item: &WriteTableItem,
         write_set_change_index: i64,
-        transaction_version: i64,
+        txn_version: i64,
         transaction_block_height: i64,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> (Self, CurrentTableItem) {
         (
             Self {
-                transaction_version,
+                txn_version,
                 write_set_change_index,
                 transaction_block_height,
-                key: write_table_item.key.to_string(),
+                table_key: write_table_item.key.to_string(),
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
-                decoded_key: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
-                decoded_value: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().value.as_str(),
-                )
-                .unwrap(),
+                decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
+                decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
                 is_deleted: false,
+                block_timestamp,
             },
             CurrentTableItem {
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
@@ -87,7 +87,7 @@ impl TableItem {
                     write_table_item.data.as_ref().unwrap().value.as_str(),
                 )
                 .unwrap(),
-                last_transaction_version: transaction_version,
+                last_transaction_version: txn_version,
                 is_deleted: false,
             },
         )
@@ -96,23 +96,21 @@ impl TableItem {
     pub fn from_delete_table_item(
         delete_table_item: &DeleteTableItem,
         write_set_change_index: i64,
-        transaction_version: i64,
+        txn_version: i64,
         transaction_block_height: i64,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> (Self, CurrentTableItem) {
         (
             Self {
-                transaction_version,
+                txn_version,
                 write_set_change_index,
                 transaction_block_height,
-                key: delete_table_item.key.to_string(),
+                table_key: delete_table_item.key.to_string(),
                 table_handle: standardize_address(&delete_table_item.handle.to_string()),
-                decoded_key: serde_json::from_str(
-                    delete_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
-
+                decoded_key: delete_table_item.data.as_ref().unwrap().key.clone(),
                 decoded_value: None,
                 is_deleted: true,
+                block_timestamp,
             },
             CurrentTableItem {
                 table_handle: standardize_address(&delete_table_item.handle.to_string()),
@@ -123,7 +121,7 @@ impl TableItem {
                 )
                 .unwrap(),
                 decoded_value: None,
-                last_transaction_version: transaction_version,
+                last_transaction_version: txn_version,
                 is_deleted: true,
             },
         )

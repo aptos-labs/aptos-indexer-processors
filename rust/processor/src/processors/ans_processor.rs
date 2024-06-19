@@ -3,7 +3,6 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
         ans_lookup_v2::{
@@ -11,6 +10,7 @@ use crate::{
         },
         ans_utils::{RenewNameEvent, SubdomainExtV2},
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,

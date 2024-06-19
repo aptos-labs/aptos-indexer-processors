@@ -102,9 +102,7 @@ pub async fn upload_parquet_to_gcs(
         .map_err(|e| anyhow!("Failed to read file: {}", e))?;
 
     if buffer.is_empty() {
-        error!(
-            "The file is empty and has no data to upload.",
-        );
+        error!("The file is empty and has no data to upload.",);
         return Err(ParquetProcessorError::Other(
             "The file is empty and has no data to upload.".to_string(),
         ));

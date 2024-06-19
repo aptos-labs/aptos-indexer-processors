@@ -5,24 +5,23 @@
 
 use super::{
     move_modules::MoveModule,
-    move_tables::{CurrentTableItem, TableItem, TableMetadata},
     parquet_move_resources::MoveResource,
+    parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
 };
 use crate::{
-    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable, SizeOf},
+    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable},
     utils::util::standardize_address,
 };
+use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
     WriteSetChange as WriteSetChangePB,
 };
 use field_count::FieldCount;
-use get_size::GetSize;
-use get_size_derive::GetSize;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, FieldCount, GetSize, Serialize, ParquetRecordWriter)]
+#[derive(Allocative, Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter)]
 pub struct WriteSetChange {
     pub txn_version: i64,
     pub write_set_change_index: i64,
@@ -30,7 +29,7 @@ pub struct WriteSetChange {
     pub change_type: String,
     pub resource_address: String,
     pub block_height: i64,
-    #[get_size(ignore)]
+    #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
@@ -157,6 +156,7 @@ impl WriteSetChange {
                     write_set_change_index,
                     txn_version,
                     block_height,
+                    block_timestamp,
                 );
                 (
                     Self {
@@ -183,6 +183,7 @@ impl WriteSetChange {
                     write_set_change_index,
                     txn_version,
                     block_height,
+                    block_timestamp,
                 );
                 (
                     Self {
@@ -239,17 +240,6 @@ impl WriteSetChange {
                 panic!("WriteSetChange type must be specified.")
             },
         }
-    }
-}
-
-impl SizeOf for WriteSetChange {
-    fn size_of(&self) -> usize {
-        let base_size: usize = std::mem::size_of::<Self>();
-        let dynamic_size = self.state_key_hash.capacity()
-            + self.change_type.capacity()
-            + self.resource_address.capacity();
-
-        base_size + dynamic_size
     }
 }
 

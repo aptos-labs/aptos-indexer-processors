@@ -3,8 +3,8 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::events_models::events::EventModel,
+    gap_detectors::ProcessingResult,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,

@@ -3,7 +3,6 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
@@ -14,6 +13,7 @@ use crate::{
             v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
         },
     },
+    gap_detectors::ProcessingResult,
     utils::{
         database::{ArcDbPool, DbPoolConnection},
         util::{parse_timestamp, remove_null_bytes, standardize_address},

@@ -3,7 +3,6 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
@@ -17,6 +16,7 @@ use crate::{
         stake_utils::DelegationVoteGovernanceRecordsResource,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},

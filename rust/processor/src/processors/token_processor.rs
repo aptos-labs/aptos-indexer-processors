@@ -3,7 +3,6 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::token_models::{
         collection_datas::{CollectionData, CurrentCollectionData},
         nft_points::NftPoints,
@@ -16,6 +15,7 @@ use crate::{
             TokenDataIdHash,
         },
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
     IndexerGrpcProcessorConfig,

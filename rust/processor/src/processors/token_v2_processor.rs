@@ -3,7 +3,6 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    gap_detectors::ProcessingResult,
     db::common::models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
         object_models::v2_object_utils::{
@@ -27,6 +26,7 @@ use crate::{
             },
         },
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,

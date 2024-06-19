@@ -2,10 +2,11 @@ use super::ParquetProcessingResult;
 use crate::{
     gap_detectors::ProcessingResult,
     parquet_processors::upload_parquet_to_gcs,
+    utils::counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
 };
 use ahash::AHashMap;
+use allocative::Allocative;
 use anyhow::{anyhow, Result};
-use get_size::GetSize;
 use google_cloud_storage::client::Client as GCSClient;
 use parquet::{
     file::{properties::WriterProperties, writer::SerializedFileWriter},
@@ -19,9 +20,6 @@ use std::{
 };
 use tracing::{debug, error};
 use uuid::Uuid;
-use crate::utils::counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE};
-
-const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 
 #[derive(Debug, Default, Clone)]
 pub struct ParquetDataGeneric<ParquetType> {
@@ -44,10 +42,6 @@ pub trait HasParquetSchema {
     fn schema() -> Arc<parquet::schema::types::Type>;
 }
 
-pub trait SizeOf {
-    fn size_of(&self) -> usize;
-}
-
 /// Auto-implement this for all types that implement `Default` and `RecordWriter`
 impl<ParquetType> HasParquetSchema for ParquetType
 where
@@ -62,7 +56,7 @@ where
 
 pub struct ParquetHandler<ParquetType>
 where
-    ParquetType: NamedTable + HasVersion + HasParquetSchema + SizeOf + 'static + GetSize,
+    ParquetType: NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     pub schema: Arc<parquet::schema::types::Type>,
@@ -95,7 +89,7 @@ fn create_new_writer(
 
 impl<ParquetType> ParquetHandler<ParquetType>
 where
-    ParquetType: NamedTable + HasVersion + HasParquetSchema + SizeOf + 'static + GetSize,
+    ParquetType: NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     fn create_new_writer(&self) -> Result<SerializedFileWriter<File>> {
@@ -135,6 +129,7 @@ where
         &mut self,
         gcs_client: &GCSClient,
         changes: ParquetDataGeneric<ParquetType>,
+        max_buffer_size: usize,
     ) -> Result<()> {
         let last_transaction_timestamp = changes.last_transaction_timestamp;
         let parquet_structs = changes.data;
@@ -142,17 +137,16 @@ where
             .extend(changes.transaction_version_to_struct_count);
 
         for parquet_struct in parquet_structs {
-            let size_of_struct = parquet_struct.size_of();
+            let size_of_struct = allocative::size_of_unique(&parquet_struct);
             PARQUET_STRUCT_SIZE
                 .with_label_values(&[ParquetType::TABLE_NAME])
                 .set(size_of_struct as i64);
             self.buffer_size_bytes += size_of_struct;
             self.buffer.push(parquet_struct);
 
-            if self.buffer_size_bytes >= MAX_FILE_SIZE {
+            if self.buffer_size_bytes >= max_buffer_size {
                 let start_version = self.buffer.first().unwrap().version();
                 let end_version = self.buffer.last().unwrap().version();
-
 
                 let txn_version_to_struct_count = process_struct_count_map(
                     &self.buffer,
@@ -175,7 +169,6 @@ where
                     .unwrap();
                 row_group_writer.close()?;
                 self.close_writer()?;
-
 
                 debug!(
                     table_name = ParquetType::TABLE_NAME,
