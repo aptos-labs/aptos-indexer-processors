@@ -27,6 +27,7 @@ THEN
     decoded_key,
     decoded_value,
     is_deleted,
+    block_timestamp,
   )
   VALUES (
     staging.key,
