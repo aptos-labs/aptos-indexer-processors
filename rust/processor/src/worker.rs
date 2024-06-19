@@ -3,8 +3,8 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    gap_detectors::{create_gap_detector_status_tracker_loop, ProcessingResult},
     db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    gap_detectors::{create_gap_detector_status_tracker_loop, ProcessingResult},
     grpc_stream::TransactionsPBResponse,
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -39,8 +39,8 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
-use kanal::AsyncSender;
 use bitflags::bitflags;
+use kanal::AsyncSender;
 use std::collections::HashSet;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
@@ -294,6 +294,7 @@ impl Worker {
             let processor = build_processor(
                 &self.processor_config,
                 self.per_table_chunk_sizes.clone(),
+                self.deprecated_tables,
                 self.db_pool.clone(),
                 None,
             );

@@ -10,24 +10,23 @@ use super::{
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
-    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable, SizeOf},
+    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         util::{get_clean_payload, get_clean_writeset, get_payload_type, standardize_address},
     },
 };
 use ahash::AHashMap;
+use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
     Transaction as TransactionPB, TransactionInfo,
 };
 use field_count::FieldCount;
-use get_size::GetSize;
-use get_size_derive::GetSize;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, FieldCount, GetSize, Serialize, ParquetRecordWriter)]
+#[derive(Allocative, Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter)]
 pub struct Transaction {
     pub txn_version: i64,
     pub block_height: i64,
@@ -45,7 +44,7 @@ pub struct Transaction {
     pub event_root_hash: String,
     pub state_checkpoint_hash: Option<String>,
     pub accumulator_root_hash: String,
-    #[get_size(ignore)]
+    #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
@@ -59,26 +58,6 @@ impl HasVersion for Transaction {
     }
 }
 
-impl SizeOf for Transaction {
-    fn size_of(&self) -> usize {
-        let base_size: usize = std::mem::size_of::<Self>(); // This accounts for all static sizes, padding, and alignment
-
-        let dynamic_size = self.txn_hash.capacity()
-            + self.txn_type.capacity()
-            + self.state_change_hash.capacity()
-            + self.event_root_hash.capacity()
-            + self.vm_status.capacity()
-            + self.accumulator_root_hash.capacity()
-            + self.payload_type.as_ref().map_or(0, |s| s.capacity())
-            + self.payload.as_ref().map_or(0, |s| s.capacity())
-            + self
-                .state_checkpoint_hash
-                .as_ref()
-                .map_or(0, |s| s.capacity());
-
-        base_size + dynamic_size
-    }
-}
 impl Default for Transaction {
     fn default() -> Self {
         Self {

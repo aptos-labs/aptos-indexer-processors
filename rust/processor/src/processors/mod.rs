@@ -38,9 +38,9 @@ use self::{
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
+    db::common::models::processor_status::ProcessorStatus,
     gap_detectors::ProcessingResult,
     processors::parquet_default_processor::DefaultParquetProcessor,
-    db::common::models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},

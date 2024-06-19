@@ -267,11 +267,9 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Parquet struct size
 pub static PARQUET_STRUCT_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_parquet_struct_size",
-        "Parquet struct size",
-        &["parquet_type"]
-    )
+    register_int_gauge_vec!("indexer_parquet_struct_size", "Parquet struct size", &[
+        "parquet_type"
+    ])
     .unwrap()
 });
 

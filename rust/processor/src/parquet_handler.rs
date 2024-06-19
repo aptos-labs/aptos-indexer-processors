@@ -2,11 +2,11 @@ use crate::{
     gap_detectors::ProcessingResult,
     parquet_processors::generic_parquet_processor::{
         HasParquetSchema, HasVersion, NamedTable, ParquetDataGeneric,
-        ParquetHandler as GenericParquetHandler, SizeOf,
+        ParquetHandler as GenericParquetHandler,
     },
     worker::PROCESSOR_SERVICE_TYPE,
 };
-use get_size::GetSize;
+use allocative::Allocative;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use kanal::AsyncSender;
 use parquet::record::RecordWriter;
@@ -18,10 +18,10 @@ pub fn create_parquet_handler_loop<ParquetType>(
     processor_name: &str,
     bucket_name: String,
     parquet_handler_response_channel_size: usize,
+    max_buffer_size: usize,
 ) -> AsyncSender<ParquetDataGeneric<ParquetType>>
 where
-    ParquetType:
-        NamedTable + HasVersion + HasParquetSchema + Send + Sync + SizeOf + 'static + GetSize,
+    ParquetType: NamedTable + HasVersion + HasParquetSchema + Send + Sync + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     let processor_name = processor_name.to_owned();
@@ -53,7 +53,7 @@ where
         loop {
             let txn_pb_res = parquet_receiver.recv().await.unwrap(); // handle error properly
 
-            let result = parquet_manager.handle(&gcs_client, txn_pb_res).await;
+            let result = parquet_manager.handle(&gcs_client, txn_pb_res, max_buffer_size).await;
             match result {
                 Ok(_) => {
                     info!(

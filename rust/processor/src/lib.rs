@@ -22,9 +22,9 @@ mod config;
 mod db;
 pub mod gap_detectors;
 pub mod grpc_stream;
-pub mod processors;
 pub mod parquet_handler;
 pub mod parquet_processors;
+pub mod processors;
 #[path = "db/postgres/schema.rs"]
 pub mod schema;
 pub mod transaction_filter;
