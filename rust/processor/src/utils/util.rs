@@ -110,24 +110,26 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
 pub fn get_entry_function_from_user_request(
     user_request: &UserTransactionRequest,
 ) -> Option<String> {
-    let entry_function_id_str: String = match &user_request.payload.as_ref().unwrap().payload {
-        Some(PayloadType::EntryFunctionPayload(payload)) => payload.entry_function_id_str.clone(),
-        Some(PayloadType::MultisigPayload(payload)) => {
-            if let Some(payload) = payload.transaction_payload.as_ref() {
-                match payload.payload.as_ref().unwrap() {
-                    MultisigPayloadType::EntryFunctionPayload(payload) => {
-                        Some(payload.entry_function_id_str.clone())
-                    },
-                };
-            }
-            return None;
-        },
-        _ => return None,
-    };
-    Some(truncate_str(
-        &entry_function_id_str,
-        MAX_ENTRY_FUNCTION_LENGTH,
-    ))
+    let entry_function_id_str: Option<String> =
+        match &user_request.payload.as_ref().unwrap().payload {
+            Some(PayloadType::EntryFunctionPayload(payload)) => {
+                Some(payload.entry_function_id_str.clone())
+            },
+            Some(PayloadType::MultisigPayload(payload)) => {
+                if let Some(payload) = payload.transaction_payload.as_ref() {
+                    match payload.payload.as_ref().unwrap() {
+                        MultisigPayloadType::EntryFunctionPayload(payload) => {
+                            Some(payload.entry_function_id_str.clone())
+                        },
+                    }
+                } else {
+                    None
+                }
+            },
+            _ => return None,
+        };
+
+    entry_function_id_str.map(|s| truncate_str(&s, MAX_ENTRY_FUNCTION_LENGTH))
 }
 
 pub fn get_payload_type(payload: &TransactionPayload) -> String {
