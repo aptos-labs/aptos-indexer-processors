@@ -22,7 +22,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["address", "transaction_version"],
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -89,7 +92,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "coin_activities",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -134,7 +137,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "token_activities",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -159,7 +162,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["account_address", "transaction_version"],
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -220,7 +226,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "coin_activities",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -250,7 +256,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "token_activities",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -275,7 +281,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["account_address", "transaction_version"],
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -286,7 +295,13 @@
           {
             "table": {
               "name": "address_version_from_move_resources",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "address_version_from_move_resources",
+              "custom_root_fields": {}
             },
             "array_relationships": [
               {
@@ -299,7 +314,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "coin_activities",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -329,7 +344,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "token_activities",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -354,7 +369,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["address", "transaction_version"],
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -391,7 +409,13 @@
           {
             "table": {
               "name": "coin_activities",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "coin_activities",
+              "custom_root_fields": {}
             },
             "object_relationships": [
               {
@@ -404,7 +428,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "coin_infos",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -458,7 +482,13 @@
           {
             "table": {
               "name": "coin_balances",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "coin_balances",
+              "custom_root_fields": {}
             },
             "select_permissions": [
               {
@@ -481,7 +511,13 @@
           {
             "table": {
               "name": "coin_infos",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "coin_infos",
+              "custom_root_fields": {}
             },
             "select_permissions": [
               {
@@ -531,7 +567,13 @@
           {
             "table": {
               "name": "collection_datas",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "collection_datas",
+              "custom_root_fields": {}
             },
             "select_permissions": [
               {
@@ -561,7 +603,13 @@
           {
             "table": {
               "name": "current_ans_lookup",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_ans_lookup",
+              "custom_root_fields": {}
             },
             "array_relationships": [
               {
@@ -574,7 +622,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "current_token_ownerships",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -678,7 +726,13 @@
           {
             "table": {
               "name": "current_coin_balances",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_coin_balances",
+              "custom_root_fields": {}
             },
             "object_relationships": [
               {
@@ -691,7 +745,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "coin_infos",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -1074,7 +1128,13 @@
           {
             "table": {
               "name": "current_token_datas",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_token_datas",
+              "custom_root_fields": {}
             },
             "object_relationships": [
               {
@@ -1225,7 +1285,13 @@
           {
             "table": {
               "name": "current_token_ownerships",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_token_ownerships",
+              "custom_root_fields": {}
             },
             "object_relationships": [
               {
@@ -1268,7 +1334,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "current_token_datas",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -1410,7 +1476,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "current_token_datas",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -1442,7 +1508,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "tokens",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -1644,7 +1710,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["delegator_address", "pool_address"],
+                  "columns": [
+                    "delegator_address",
+                    "pool_address"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1785,7 +1854,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["db", "is_indexer_up"],
+                  "columns": [
+                    "db",
+                    "is_indexer_up"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1801,7 +1873,9 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["chain_id"],
+                  "columns": [
+                    "chain_id"
+                  ],
                   "filter": {}
                 }
               }
@@ -1816,7 +1890,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["num_active_delegator", "pool_address"],
+                  "columns": [
+                    "num_active_delegator",
+                    "pool_address"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1930,7 +2007,11 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["handle", "key_type", "value_type"],
+                  "columns": [
+                    "handle",
+                    "key_type",
+                    "value_type"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1940,7 +2021,13 @@
           {
             "table": {
               "name": "token_activities",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "token_activities",
+              "custom_root_fields": {}
             },
             "object_relationships": [
               {
@@ -1953,7 +2040,7 @@
                     "insertion_order": null,
                     "remote_table": {
                       "name": "current_token_datas",
-                      "schema": "public"
+                      "schema": "legacy_migration_v1"
                     }
                   }
                 }
@@ -2107,7 +2194,13 @@
           {
             "table": {
               "name": "token_datas",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "token_datas",
+              "custom_root_fields": {}
             },
             "select_permissions": [
               {
@@ -2145,7 +2238,13 @@
           {
             "table": {
               "name": "token_ownerships",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "token_ownerships",
+              "custom_root_fields": {}
             },
             "select_permissions": [
               {
@@ -2174,7 +2273,13 @@
           {
             "table": {
               "name": "tokens",
-              "schema": "public"
+              "schema": "legacy_migration_v1"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "tokens",
+              "custom_root_fields": {}
             },
             "select_permissions": [
               {
@@ -2267,7 +2372,9 @@
             "query_name": "Latest Processor Status"
           }
         },
-        "methods": ["GET"],
+        "methods": [
+          "GET"
+        ],
         "name": "Latest Processor Status",
         "url": "get_latest_processor_status"
       }
