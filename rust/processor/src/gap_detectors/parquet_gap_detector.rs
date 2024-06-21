@@ -2,17 +2,18 @@
 // // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    bq_analytics::ParquetProcessingResult,
     gap_detectors::{gap_detector::GapDetectorTrait, GapDetectorResult, ProcessingResult},
-    parquet_processors::ParquetProcessingResult,
 };
 use ahash::AHashMap;
+use std::cmp::max;
 use tracing::{debug, info};
 
 pub struct ParquetFileGapDetector {
     next_version_to_process: i64,
-    seen_versions: AHashMap<i64, ParquetProcessingResult>,
     last_success_batch: Option<ParquetProcessingResult>,
     version_counters: AHashMap<i64, i64>,
+    max_version: i64,
 }
 
 pub struct ParquetFileGapDetectorResult {
@@ -25,9 +26,9 @@ impl ParquetFileGapDetector {
     pub fn new(starting_version: u64) -> Self {
         Self {
             next_version_to_process: starting_version as i64,
-            seen_versions: AHashMap::new(),
             last_success_batch: None,
             version_counters: AHashMap::new(),
+            max_version: 0,
         }
     }
 }
@@ -43,12 +44,14 @@ impl GapDetectorTrait for ParquetFileGapDetector {
                 // info!("Inserting version {} with count {} into parquet gap detector", version, count);
                 self.version_counters.insert(*version, *count);
             }
+            self.max_version = max(self.max_version, *version);
 
             *self.version_counters.entry(*version).or_default() -= 1;
         }
 
         // Update next version to process and move forward
         let mut current_version = result.start_version;
+
         while current_version <= result.end_version {
             match self.version_counters.get_mut(&current_version) {
                 Some(count) => {
@@ -75,21 +78,12 @@ impl GapDetectorTrait for ParquetFileGapDetector {
             current_version += 1; // Move to the next version in sequence
         }
 
-        if current_version == result.end_version {
-            debug!("No gap detected");
-        } else {
-            self.seen_versions.insert(current_version, result);
-            debug!("Gap detected");
-        }
-
         Ok(GapDetectorResult::ParquetFileGapDetectorResult(
             ParquetFileGapDetectorResult {
                 next_version_to_process: self.next_version_to_process as u64,
-                num_gaps: self.seen_versions.len() as u64,
+                num_gaps: (self.max_version - self.next_version_to_process) as u64,
                 last_success_batch: self.last_success_batch.clone(),
             },
         ))
     }
 }
-
-// TODO: add tests

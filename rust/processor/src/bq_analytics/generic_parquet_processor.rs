@@ -1,7 +1,7 @@
 use super::ParquetProcessingResult;
 use crate::{
+    bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
-    parquet_processors::upload_parquet_to_gcs,
     utils::counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
 };
 use ahash::AHashMap;
@@ -143,72 +143,73 @@ where
                 .set(size_of_struct as i64);
             self.buffer_size_bytes += size_of_struct;
             self.buffer.push(parquet_struct);
+        }
 
-            if self.buffer_size_bytes >= max_buffer_size {
-                let start_version = self.buffer.first().unwrap().version();
-                let end_version = self.buffer.last().unwrap().version();
+        // for now, it's okay to go little above the buffer_size, given that we will keep max size as 200 MB
+        if self.buffer_size_bytes >= max_buffer_size {
+            let start_version = self.buffer.first().unwrap().version();
+            let end_version = self.buffer.last().unwrap().version();
 
-                let txn_version_to_struct_count = process_struct_count_map(
-                    &self.buffer,
-                    &self.transaction_version_to_struct_count,
-                );
+            let txn_version_to_struct_count = process_struct_count_map(
+                &self.buffer,
+                &mut self.transaction_version_to_struct_count,
+            );
 
-                let new_file_path: PathBuf = PathBuf::from(format!(
-                    "{}_{}.parquet",
-                    ParquetType::TABLE_NAME,
-                    Uuid::new_v4()
-                ));
-                rename(&self.file_path, &new_file_path)?; // this fixes an issue with concurrent file access issues
+            let new_file_path: PathBuf = PathBuf::from(format!(
+                "{}_{}.parquet",
+                ParquetType::TABLE_NAME,
+                Uuid::new_v4()
+            ));
+            rename(&self.file_path, &new_file_path)?; // this fixes an issue with concurrent file access issues
 
-                let struct_buffer = std::mem::take(&mut self.buffer);
+            let struct_buffer = std::mem::take(&mut self.buffer);
 
-                let mut row_group_writer = self.writer.next_row_group()?;
-                struct_buffer
-                    .as_slice()
-                    .write_to_row_group(&mut row_group_writer)
-                    .unwrap();
-                row_group_writer.close()?;
-                self.close_writer()?;
+            let mut row_group_writer = self.writer.next_row_group()?;
+            struct_buffer
+                .as_slice()
+                .write_to_row_group(&mut row_group_writer)
+                .unwrap();
+            row_group_writer.close()?;
+            self.close_writer()?;
 
-                debug!(
-                    table_name = ParquetType::TABLE_NAME,
-                    start_version = start_version,
-                    end_version = end_version,
-                    "Max buffer size reached, uploading to GCS."
-                );
-                let upload_result = upload_parquet_to_gcs(
-                    gcs_client,
-                    &new_file_path,
-                    ParquetType::TABLE_NAME,
-                    &self.bucket_name,
-                )
-                .await;
-                self.buffer_size_bytes = 0;
-                remove_file(&new_file_path)?;
+            debug!(
+                table_name = ParquetType::TABLE_NAME,
+                start_version = start_version,
+                end_version = end_version,
+                "Max buffer size reached, uploading to GCS."
+            );
+            let upload_result = upload_parquet_to_gcs(
+                gcs_client,
+                &new_file_path,
+                ParquetType::TABLE_NAME,
+                &self.bucket_name,
+            )
+            .await;
+            self.buffer_size_bytes = 0;
+            remove_file(&new_file_path)?;
 
-                return match upload_result {
-                    Ok(_) => {
-                        let parquet_processing_result = ParquetProcessingResult {
-                            start_version,
-                            end_version,
-                            last_transaction_timestamp: last_transaction_timestamp.clone(),
-                            txn_version_to_struct_count,
-                        };
+            return match upload_result {
+                Ok(_) => {
+                    let parquet_processing_result = ParquetProcessingResult {
+                        start_version,
+                        end_version,
+                        last_transaction_timestamp: last_transaction_timestamp.clone(),
+                        txn_version_to_struct_count,
+                    };
 
-                        self.gap_detector_sender
-                            .send(ProcessingResult::ParquetProcessingResult(
-                                parquet_processing_result,
-                            ))
-                            .await
-                            .expect("[Parser] Failed to send versions to gap detector");
-                        Ok(())
-                    },
-                    Err(e) => {
-                        error!("Failed to upload file to GCS: {}", e);
-                        Err(anyhow!("Failed to upload file to GCS: {}", e))
-                    },
-                };
-            }
+                    self.gap_detector_sender
+                        .send(ProcessingResult::ParquetProcessingResult(
+                            parquet_processing_result,
+                        ))
+                        .await
+                        .expect("[Parser] Failed to send versions to gap detector");
+                    Ok(())
+                },
+                Err(e) => {
+                    error!("Failed to upload file to GCS: {}", e);
+                    Err(anyhow!("Failed to upload file to GCS: {}", e))
+                },
+            };
         }
 
         PARQUET_HANDLER_BUFFER_SIZE
@@ -220,7 +221,7 @@ where
 
 fn process_struct_count_map<ParquetType: NamedTable + HasVersion>(
     buffer: &[ParquetType],
-    txn_version_to_struct_count: &AHashMap<i64, i64>,
+    txn_version_to_struct_count: &mut AHashMap<i64, i64>,
 ) -> AHashMap<i64, i64> {
     let mut txn_version_to_struct_count_for_gap_detector = AHashMap::new();
 
@@ -229,6 +230,7 @@ fn process_struct_count_map<ParquetType: NamedTable + HasVersion>(
 
         if let Some(count) = txn_version_to_struct_count.get(&(version)) {
             txn_version_to_struct_count_for_gap_detector.insert(version, *count);
+            txn_version_to_struct_count.remove(&(version));
         }
     }
     txn_version_to_struct_count_for_gap_detector

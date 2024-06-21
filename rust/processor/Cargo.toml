@@ -64,7 +64,6 @@ jemallocator = { workspace = true }
 
 # Parquet support
 parquet = { workspace = true }
-arrow = { workspace = true }
 num = { workspace = true }
 google-cloud-storage = { workspace = true }
 hyper = { workspace = true }
@@ -74,6 +73,7 @@ canonical_json = { workspace = true }
 allocative = { workspace = true }
 allocative_derive = { workspace = true }
 uuid = { workspace = true }
+
 [features]
 libpq = ["diesel/postgres"]
 # When using the default features we enable the diesel/postgres feature. We configure

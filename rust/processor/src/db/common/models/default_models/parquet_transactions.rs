@@ -10,7 +10,7 @@ use super::{
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
-    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable},
+    bq_analytics::generic_parquet_processor::{HasVersion, NamedTable},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         util::{get_clean_payload, get_clean_writeset, get_payload_type, standardize_address},
@@ -26,7 +26,9 @@ use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(Allocative, Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter)]
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
+)]
 pub struct Transaction {
     pub txn_version: i64,
     pub block_height: i64,
@@ -55,31 +57,6 @@ impl NamedTable for Transaction {
 impl HasVersion for Transaction {
     fn version(&self) -> i64 {
         self.txn_version
-    }
-}
-
-impl Default for Transaction {
-    fn default() -> Self {
-        Self {
-            txn_version: 0,
-            block_height: 0,
-            txn_hash: "".to_string(),
-            txn_type: "".to_string(),
-            payload: None,
-            state_change_hash: "".to_string(),
-            event_root_hash: "".to_string(),
-            state_checkpoint_hash: None,
-            gas_used: 0,
-            success: true,
-            vm_status: "".to_string(),
-            accumulator_root_hash: "".to_string(),
-            num_events: 0,
-            num_write_set_changes: 0,
-            epoch: 0,
-            payload_type: None,
-            #[allow(deprecated)]
-            block_timestamp: chrono::NaiveDateTime::from_timestamp(0, 0),
-        }
     }
 }
 
@@ -319,6 +296,22 @@ impl Transaction {
                 vec![],
             ),
             TxnData::Validator(_) => (
+                Self::from_transaction_info_with_data(
+                    transaction_info,
+                    None,
+                    None,
+                    txn_version,
+                    transaction_type,
+                    0,
+                    block_height,
+                    epoch,
+                    block_timestamp,
+                ),
+                None,
+                vec![],
+                vec![],
+            ),
+            TxnData::BlockEpilogue(_) => (
                 Self::from_transaction_info_with_data(
                     transaction_info,
                     None,

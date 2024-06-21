@@ -1,26 +1,10 @@
 # This is a template yaml for the indexer processor. It assumes you have a data service
 # running locally, for example as part of local testnet you ran with this command:
 # aptos node run-local-testnet
-  health_check_port: 8084
-  server_config:
-    processor_config:
-      type: default_parquet_processor
-      bucket_name: "aptos-indexer-data-etl-yuun"
-      parquet_handler_response_channel_size: 100
-    postgres_connection_string: postgresql://postgres:@localhost:5432/postgres
-    #    indexer_grpc_data_service_address: 127.0.0.1:50057
-    indexer_grpc_data_service_address: "https://grpc.testnet.aptoslabs.com:443"
-    indexer_grpc_http2_ping_interval_in_secs: 60
-    indexer_grpc_http2_ping_timeout_in_secs: 10
-    grpc_response_item_timeout_in_secs: 300
-    number_concurrent_processing_tasks: 10
-    pb_channel_txn_chunk_size: 1000000
-    auth_token: aptoslabs_L7pzPsqiShp_EwzUCbhb6ehTe8PSvFp6ZeUr3B3gBdGaX
-    starting_version: 2000000
-    is_parquet_processor: true
-#    deprecated_tables: [
-##      "MOVE_RESOURCES",
-##      "WRITE_SET_CHANGES",
-##      "TRANSACTIONS"
-#    ]
-
+health_check_port: 8084
+server_config:
+  processor_config:
+    type: default_processor
+  postgres_connection_string: postgresql://postgres:@localhost:5432/default_processor
+  indexer_grpc_data_service_address: http://127.0.0.1:50051
+  auth_token: AUTH_TOKEN

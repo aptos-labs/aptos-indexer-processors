@@ -9,7 +9,7 @@ use super::{
     parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
 };
 use crate::{
-    parquet_processors::generic_parquet_processor::{HasVersion, NamedTable},
+    bq_analytics::generic_parquet_processor::{HasVersion, NamedTable},
     utils::util::standardize_address,
 };
 use allocative_derive::Allocative;

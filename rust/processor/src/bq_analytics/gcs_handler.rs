@@ -1,91 +1,22 @@
-pub mod generic_parquet_processor;
-
-use ahash::AHashMap;
+use crate::bq_analytics::ParquetProcessorError;
 use anyhow::{anyhow, Result};
 use chrono::{Datelike, Timelike};
 use google_cloud_storage::{
     client::Client as GCSClient,
-    http::{
-        objects::upload::{Media, UploadObjectRequest, UploadType},
-        Error as StorageError,
-    },
+    http::objects::upload::{Media, UploadObjectRequest, UploadType},
 };
 use hyper::Body;
-use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{Debug, Display, Formatter, Result as FormatResult},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 use tokio::io::AsyncReadExt; // for read_to_end()
 use tokio::{
     fs::File as TokioFile,
-    io,
     time::{sleep, timeout, Duration},
 };
 use tracing::{debug, error, info};
-
-// TODO: make it configurable, write now there is no difference between running parquet for backfill and regular traffic
 const BUCKET_REGULAR_TRAFFIC: &str = "devnet-airflow-continue";
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ParquetProcessingResult {
-    pub start_version: i64,
-    pub end_version: i64,
-    pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
-    pub txn_version_to_struct_count: AHashMap<i64, i64>,
-}
-
-#[derive(Debug)]
-pub enum ParquetProcessorError {
-    ParquetError(parquet::errors::ParquetError),
-    StorageError(StorageError),
-    TimeoutError(tokio::time::error::Elapsed),
-    IoError(io::Error),
-    Other(String),
-}
-
-impl std::error::Error for ParquetProcessorError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match *self {
-            ParquetProcessorError::ParquetError(ref err) => Some(err),
-            ParquetProcessorError::StorageError(ref err) => Some(err),
-            ParquetProcessorError::TimeoutError(ref err) => Some(err),
-            ParquetProcessorError::IoError(ref err) => Some(err),
-            ParquetProcessorError::Other(_) => None,
-        }
-    }
-}
-
-impl Display for ParquetProcessorError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FormatResult {
-        match *self {
-            ParquetProcessorError::ParquetError(ref err) => write!(f, "Parquet error: {}", err),
-            ParquetProcessorError::StorageError(ref err) => write!(f, "Storage error: {}", err),
-            ParquetProcessorError::TimeoutError(ref err) => write!(f, "Timeout error: {}", err),
-            ParquetProcessorError::IoError(ref err) => write!(f, "IO error: {}", err),
-            ParquetProcessorError::Other(ref desc) => write!(f, "Error: {}", desc),
-        }
-    }
-}
-
-impl From<std::io::Error> for ParquetProcessorError {
-    fn from(err: std::io::Error) -> Self {
-        ParquetProcessorError::IoError(err)
-    }
-}
-
-impl From<anyhow::Error> for ParquetProcessorError {
-    fn from(err: anyhow::Error) -> Self {
-        ParquetProcessorError::Other(err.to_string())
-    }
-}
-
-impl From<parquet::errors::ParquetError> for ParquetProcessorError {
-    fn from(err: parquet::errors::ParquetError) -> Self {
-        ParquetProcessorError::ParquetError(err)
-    }
-}
-
+const MAX_RETRIES: usize = 3;
+const INITIAL_DELAY_MS: u64 = 500;
+const TIMEOUT_SECONDS: u64 = 300;
 pub async fn upload_parquet_to_gcs(
     client: &GCSClient,
     file_path: &PathBuf,
@@ -139,14 +70,13 @@ pub async fn upload_parquet_to_gcs(
         ..Default::default()
     };
 
-    let max_retries = 3;
     let mut retry_count = 0;
-    let mut delay = 500;
+    let mut delay = INITIAL_DELAY_MS;
 
     loop {
         let data = Body::from(buffer.clone());
         let upload_result = timeout(
-            Duration::from_secs(300),
+            Duration::from_secs(TIMEOUT_SECONDS),
             client.upload_object(&upload_request, data, &upload_type),
         )
         .await;
@@ -158,13 +88,13 @@ pub async fn upload_parquet_to_gcs(
             },
             Ok(Err(e)) => {
                 error!("Failed to upload file to GCS: {}", e);
-                if retry_count >= max_retries {
+                if retry_count >= MAX_RETRIES {
                     return Err(ParquetProcessorError::StorageError(e));
                 }
             },
             Err(e) => {
                 error!("Upload timed out: {}", e);
-                if retry_count >= max_retries {
+                if retry_count >= MAX_RETRIES {
                     return Err(ParquetProcessorError::TimeoutError(e));
                 }
             },

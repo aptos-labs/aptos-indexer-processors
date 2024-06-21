@@ -3,6 +3,10 @@
 
 use super::{ProcessorName, ProcessorTrait};
 use crate::{
+    bq_analytics::{
+        generic_parquet_processor::ParquetDataGeneric,
+        parquet_handler::create_parquet_handler_loop, ParquetProcessingResult,
+    },
     db::common::models::default_models::{
         parquet_move_resources::MoveResource,
         parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
@@ -10,8 +14,6 @@ use crate::{
         parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     gap_detectors::ProcessingResult,
-    parquet_handler::create_parquet_handler_loop,
-    parquet_processors::{generic_parquet_processor::ParquetDataGeneric, ParquetProcessingResult},
     utils::database::ArcDbPool,
 };
 use ahash::AHashMap;
@@ -22,7 +24,7 @@ use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter, Result};
 
-pub const RESOURCE_TYPES: [&str; 3] = ["transaction", "move_resource", "write_set_changes"];
+const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -50,7 +52,7 @@ impl DefaultParquetProcessor {
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
         if let Some(credentials) = config.google_application_credentials.clone() {
-            std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
+            std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
         }
 
         let transaction_sender = create_parquet_handler_loop::<ParquetTransaction>(

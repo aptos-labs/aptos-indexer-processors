@@ -1,9 +1,9 @@
 use crate::{
-    gap_detectors::ProcessingResult,
-    parquet_processors::generic_parquet_processor::{
+    bq_analytics::generic_parquet_processor::{
         HasParquetSchema, HasVersion, NamedTable, ParquetDataGeneric,
         ParquetHandler as GenericParquetHandler,
     },
+    gap_detectors::ProcessingResult,
     worker::PROCESSOR_SERVICE_TYPE,
 };
 use allocative::Allocative;
@@ -53,7 +53,9 @@ where
         loop {
             let txn_pb_res = parquet_receiver.recv().await.unwrap(); // handle error properly
 
-            let result = parquet_manager.handle(&gcs_client, txn_pb_res, max_buffer_size).await;
+            let result = parquet_manager
+                .handle(&gcs_client, txn_pb_res, max_buffer_size)
+                .await;
             match result {
                 Ok(_) => {
                     info!(

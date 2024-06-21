@@ -203,6 +203,13 @@ impl ProcessorConfig {
     pub fn name(&self) -> &'static str {
         self.into()
     }
+
+    pub fn is_parquet_processor(&self) -> bool {
+        match self {
+            ProcessorConfig::DefaultParquetProcessor(_) => true,
+            _ => false,
+        }
+    }
 }
 
 /// This enum contains all the processors defined in this crate. We use enum_dispatch

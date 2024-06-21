@@ -55,10 +55,6 @@ pub struct IndexerGrpcProcessorConfig {
     // String vector for deprecated tables to skip db writes
     #[serde(default)]
     pub deprecated_tables: HashSet<String>,
-
-    pub parquet_bucket_name: Option<String>,
-
-    pub is_parquet_processor: Option<bool>,
 }
 
 impl IndexerGrpcProcessorConfig {
@@ -107,7 +103,6 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.transaction_filter.clone(),
             self.grpc_response_item_timeout_in_secs,
             self.deprecated_tables.clone(),
-            self.is_parquet_processor,
         )
         .await
         .context("Failed to build worker")?;
