@@ -66,8 +66,11 @@ pub struct MultisigPayloadClean {
 }
 
 /// Standardizes all addresses and table handles to be length 66 (0x-64 length hash)
+#[inline]
 pub fn standardize_address(handle: &str) -> String {
-    if let Some(handle) = handle.strip_prefix("0x") {
+    if handle.len() == 66 {
+        handle.to_string()
+    } else if let Some(handle) = handle.strip_prefix("0x") {
         format!("0x{:0>64}", handle)
     } else {
         format!("0x{:0>64}", handle)
