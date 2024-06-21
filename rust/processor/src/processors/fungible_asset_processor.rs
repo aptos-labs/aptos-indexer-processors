@@ -130,7 +130,7 @@ async fn insert_to_db(
         insert_current_unified_fungible_asset_balances_v1_query,
         current_unified_fungible_asset_balances.0,
         get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
-            "current_united_fungible_asset_balances",
+            "current_unified_fungible_asset_balances",
             per_table_chunk_sizes,
         ),
     );
@@ -139,7 +139,7 @@ async fn insert_to_db(
         insert_current_unified_fungible_asset_balances_v2_query,
         current_unified_fungible_asset_balances.1,
         get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
-            "current_united_fungible_asset_balances",
+            "current_unified_fungible_asset_balances",
             per_table_chunk_sizes,
         ),
     );
