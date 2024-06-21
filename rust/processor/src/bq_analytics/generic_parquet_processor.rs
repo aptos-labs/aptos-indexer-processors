@@ -78,7 +78,11 @@ fn create_new_writer(
         .set_compression(parquet::basic::Compression::LZ4)
         .build();
     let props_arc = Arc::new(props);
-    let file: File = File::options().create(true).write(true).open(file_path)?;
+    let file: File = File::options()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(file_path)?;
 
     Ok(SerializedFileWriter::new(
         file.try_clone()?,

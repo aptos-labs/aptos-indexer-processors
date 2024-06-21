@@ -159,7 +159,10 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                         HASURA_API_LATEST_TRANSACTION_TIMESTAMP
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(
-                                processor.last_transaction_timestamp.and_utc().timestamp_micros() as f64
+                                processor
+                                    .last_transaction_timestamp
+                                    .and_utc()
+                                    .timestamp_micros() as f64
                                     * 1e-6,
                             );
                         let latency = system_time_now - processor.last_transaction_timestamp;

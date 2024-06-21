@@ -205,10 +205,7 @@ impl ProcessorConfig {
     }
 
     pub fn is_parquet_processor(&self) -> bool {
-        match self {
-            ProcessorConfig::DefaultParquetProcessor(_) => true,
-            _ => false,
-        }
+        matches!(self, ProcessorConfig::DefaultParquetProcessor(_))
     }
 }
 

@@ -514,14 +514,14 @@ mod tests {
             },
             1,
         );
-        assert_eq!(ts.timestamp(), 1649560602);
+        assert_eq!(ts.and_utc().timestamp(), 1649560602);
         assert_eq!(ts.year(), 2022);
 
         let ts2 = parse_timestamp_secs(600000000000000, 2);
         assert_eq!(ts2.year(), 9999);
 
         let ts3 = parse_timestamp_secs(1659386386, 2);
-        assert_eq!(ts3.timestamp(), 1659386386);
+        assert_eq!(ts3.and_utc().timestamp(), 1659386386);
     }
 
     #[test]
