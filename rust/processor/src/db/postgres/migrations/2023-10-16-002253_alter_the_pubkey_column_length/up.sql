@@ -1,0 +1,4 @@
+-- Your SQL goes here
+-- Secp256k1 public key, example:
+--   `0x40d0d634e843b61339473b028105930ace022980708b2855954b977da09df84a770c0b68c29c8ca1b5409a5085b0ec263be80e433c83fcf6debb82f3447e71edca`
+ALTER TABLE signatures ALTER COLUMN public_key TYPE VARCHAR(136);
