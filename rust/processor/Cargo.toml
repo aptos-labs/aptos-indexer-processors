@@ -1,0 +1,82 @@
+[package]
+name = "processor"
+description = "Indexer GRPC processor in Rust."
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+edition = "2021"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/aptos-labs/aptos-core"
+rust-version = { workspace = true }
+
+[dependencies]
+ahash = { workspace = true }
+anyhow = { workspace = true }
+aptos-moving-average = { workspace = true }
+aptos-protos = { workspace = true }
+async-trait = { workspace = true }
+bcs = { workspace = true }
+bigdecimal = { workspace = true }
+bitflags = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+diesel = { workspace = true }
+diesel-async = { workspace = true }
+diesel_migrations = { workspace = true }
+enum_dispatch = { workspace = true }
+field_count = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+google-cloud-googleapis = { workspace = true }
+google-cloud-pubsub = { workspace = true }
+hex = { workspace = true }
+itertools = { workspace = true }
+kanal = { workspace = true }
+lazy_static = { workspace = true }
+num_cpus = { workspace = true }
+once_cell = { workspace = true }
+prometheus = { workspace = true }
+prost = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+server-framework = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+strum = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+unescape = { workspace = true }
+url = { workspace = true }
+
+# Postgres SSL support
+native-tls = { workspace = true }
+postgres-native-tls = { workspace = true }
+tiny-keccak = { workspace = true }
+tokio-postgres = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
+
+# Parquet support
+parquet = { workspace = true }
+arrow = { workspace = true }
+num = { workspace = true }
+google-cloud-storage = { workspace = true }
+hyper = { workspace = true }
+lazy_static = { workspace = true }
+parquet_derive = { workspace = true }
+canonical_json = { workspace = true }
+allocative = { workspace = true }
+allocative_derive = { workspace = true }
+uuid = { workspace = true }
+[features]
+libpq = ["diesel/postgres"]
+# When using the default features we enable the diesel/postgres feature. We configure
+# it in a feature so the CLI can opt out, since it cannot tolerate the libpq dep.
+# Recall that features should always be additive.
+default = ["libpq"]
