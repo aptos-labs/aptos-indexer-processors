@@ -202,8 +202,8 @@ impl Transaction {
 
                 let (payload_cleaned, payload_type) = match request.payload.as_ref() {
                     Some(payload) => {
-                        let payload_cleaned = get_clean_payload(&payload, version);
-                        (payload_cleaned, Some(get_payload_type(&payload)))
+                        let payload_cleaned = get_clean_payload(payload, version);
+                        (payload_cleaned, Some(get_payload_type(payload)))
                     },
                     None => (None, None),
                 };
