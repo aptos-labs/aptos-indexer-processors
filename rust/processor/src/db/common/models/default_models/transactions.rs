@@ -200,28 +200,18 @@ impl Transaction {
                     .as_ref()
                     .expect("Getting user request failed.");
 
-                let mut payload_cleaned = None;
-                let (payload, payload_type) = match request.payload.as_ref() {
+                let (payload_cleaned, payload_type) = match request.payload.as_ref() {
                     Some(payload) => {
-                        payload_cleaned = get_clean_payload(&payload, version);
+                        let payload_cleaned = get_clean_payload(&payload, version);
                         (payload_cleaned, Some(get_payload_type(&payload)))
                     },
                     None => (None, None),
                 };
 
-                let (payload_cleaned, payload_type) = request
-                    .payload
-                    .as_ref()
-                    .map(|payload| {
-                        let cleaned = get_clean_payload(payload, version);
-                        (Some(cleaned), Some(get_payload_type(payload)))
-                    })
-                    .unwrap_or((None, None));
-
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
-                        payload,
+                        payload_cleaned,
                         payload_type,
                         version,
                         transaction_type,
