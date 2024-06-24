@@ -15,7 +15,7 @@ pub struct MovingAverage {
 
 impl MovingAverage {
     pub fn new(window_millis: u64) -> Self {
-        let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+        let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
         let mut queue = VecDeque::new();
         queue.push_back((now, 0));
         Self {
@@ -26,7 +26,7 @@ impl MovingAverage {
     }
 
     pub fn tick_now(&mut self, value: u64) {
-        let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+        let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
         self.tick(now, value);
     }
 

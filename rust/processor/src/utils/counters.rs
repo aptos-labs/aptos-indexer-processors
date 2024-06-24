@@ -235,6 +235,16 @@ pub static PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Data gap warnings for parquet
+pub static PARQUET_PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_parquet_processor_data_gap_count",
+        "Data gap count",
+        &["processor_name"]
+    )
+    .unwrap()
+});
+
 /// GRPC latency.
 pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
@@ -251,6 +261,24 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "indexer_processor_unknown_type_count",
         "Processor unknown type count, e.g., comptaibility issues",
         &["model_name"]
+    )
+    .unwrap()
+});
+
+/// Parquet struct size
+pub static PARQUET_STRUCT_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!("indexer_parquet_struct_size", "Parquet struct size", &[
+        "parquet_type"
+    ])
+    .unwrap()
+});
+
+/// Parquet handler buffer size
+pub static PARQUET_HANDLER_BUFFER_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_parquet_handler_buffer_size",
+        "Parquet handler buffer size",
+        &["parquet_type"] // TODO: add something like task_index
     )
     .unwrap()
 });

@@ -155,11 +155,14 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                             .set(processor.last_success_version as i64);
                         HASURA_API_LATEST_VERSION_TIMESTAMP
                             .with_label_values(&[&processor.processor, &chain_name])
-                            .set(processor.last_updated.timestamp_micros() as f64 * 1e-6);
+                            .set(processor.last_updated.and_utc().timestamp_micros() as f64 * 1e-6);
                         HASURA_API_LATEST_TRANSACTION_TIMESTAMP
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(
-                                processor.last_transaction_timestamp.timestamp_micros() as f64
+                                processor
+                                    .last_transaction_timestamp
+                                    .and_utc()
+                                    .timestamp_micros() as f64
                                     * 1e-6,
                             );
                         let latency = system_time_now - processor.last_transaction_timestamp;

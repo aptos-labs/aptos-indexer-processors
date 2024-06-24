@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::common::models::{
         object_models::v2_object_utils::{
@@ -13,6 +13,7 @@ use crate::{
             v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
         },
     },
+    gap_detectors::ProcessingResult,
     utils::{
         database::{ArcDbPool, DbPoolConnection},
         util::{parse_timestamp, remove_null_bytes, standardize_address},
@@ -177,13 +178,15 @@ impl ProcessorTrait for NftMetadataProcessor {
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
-        Ok(ProcessingResult {
-            start_version,
-            end_version,
-            processing_duration_in_secs,
-            db_insertion_duration_in_secs,
-            last_transaction_timestamp,
-        })
+        Ok(ProcessingResult::DefaultProcessingResult(
+            DefaultProcessingResult {
+                start_version,
+                end_version,
+                processing_duration_in_secs,
+                db_insertion_duration_in_secs,
+                last_transaction_timestamp,
+            },
+        ))
     }
 
     fn connection_pool(&self) -> &ArcDbPool {

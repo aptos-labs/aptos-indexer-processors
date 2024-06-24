@@ -57,7 +57,6 @@ futures-util = "0.3.21"
 gcloud-sdk = { version = "0.20.4", features = [
     "google-cloud-bigquery-storage-v1",
 ] }
-cloud-storage = { version = "0.11.1", features = ["global-client"] }
 google-cloud-googleapis = "0.10.0"
 google-cloud-pubsub = "0.18.0"
 hex = "0.4.3"
@@ -110,3 +109,14 @@ warp = { version = "0.3.5", features = ["tls"] }
 native-tls = "0.2.11"
 postgres-native-tls = "0.5.0"
 tokio-postgres = "0.7.10"
+
+# Parquet support
+parquet = { version = "52.0.0", default-features = false, features = ["async", "lz4"] }
+num = "0.4.0"
+google-cloud-storage = "0.13.0"
+hyper = { version = "0.14.18", features = ["full"] }
+parquet_derive = { version = "52.0.0" }
+canonical_json = "0.5.0"
+allocative = "0.3.3"
+allocative_derive = "0.3.3"
+uuid = { version = "1.8.0", features = ["v4"] }

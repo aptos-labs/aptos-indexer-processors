@@ -4,16 +4,18 @@
 use crate::{
     config::IndexerGrpcHttp2Config,
     db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    gap_detectors::{create_gap_detector_status_tracker_loop, ProcessingResult},
     grpc_stream::TransactionsPBResponse,
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
-        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
-        token_processor::TokenProcessor, token_v2_processor::TokenV2Processor,
+        objects_processor::ObjectsProcessor, parquet_default_processor::DefaultParquetProcessor,
+        stake_processor::StakeProcessor, token_processor::TokenProcessor,
+        token_v2_processor::TokenV2Processor,
         transaction_metadata_processor::TransactionMetadataProcessor,
-        user_transaction_processor::UserTransactionProcessor, ProcessingResult, Processor,
+        user_transaction_processor::UserTransactionProcessor, DefaultProcessingResult, Processor,
         ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
@@ -38,6 +40,7 @@ use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use bitflags::bitflags;
+use kanal::AsyncSender;
 use std::collections::HashSet;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
@@ -46,7 +49,9 @@ use url::Url;
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
-pub const BUFFER_SIZE: usize = 100;
+
+// TODO: Make this configurable
+pub const BUFFER_SIZE: usize = 300;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 bitflags! {
@@ -69,6 +74,7 @@ pub struct Worker {
     pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub gap_detection_batch_size: u64,
+    pub parquet_gap_detection_batch_size: u64,
     pub grpc_chain_id: Option<u64>,
     pub pb_channel_txn_chunk_size: usize,
     pub per_table_chunk_sizes: AHashMap<String, usize>,
@@ -91,6 +97,7 @@ impl Worker {
         number_concurrent_processing_tasks: Option<usize>,
         db_pool_size: Option<u32>,
         gap_detection_batch_size: u64,
+        parquet_gap_detection_batch_size: u64,
         // The number of transactions per protobuf batch
         pb_channel_txn_chunk_size: usize,
         per_table_chunk_sizes: AHashMap<String, usize>,
@@ -135,6 +142,7 @@ impl Worker {
             auth_token,
             number_concurrent_processing_tasks,
             gap_detection_batch_size,
+            parquet_gap_detection_batch_size,
             grpc_chain_id: None,
             pb_channel_txn_chunk_size,
             per_table_chunk_sizes,
@@ -258,15 +266,41 @@ impl Worker {
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
-        let gap_detection_batch_size = self.gap_detection_batch_size;
-        let processor = build_processor(
-            &self.processor_config,
-            self.per_table_chunk_sizes.clone(),
-            self.deprecated_tables,
-            self.db_pool.clone(),
-        );
+        let (processor, gap_detection_batch_size, gap_detector_sender) =
+            if self.processor_config.is_parquet_processor() {
+                let processor = build_processor(
+                    &self.processor_config,
+                    self.per_table_chunk_sizes.clone(),
+                    self.deprecated_tables,
+                    self.db_pool.clone(),
+                    Some(gap_detector_sender.clone()),
+                );
+                let gap_detection_batch_size: u64 = self.parquet_gap_detection_batch_size;
+
+                (
+                    processor,
+                    gap_detection_batch_size,
+                    Some(gap_detector_sender),
+                )
+            } else {
+                let processor = build_processor(
+                    &self.processor_config,
+                    self.per_table_chunk_sizes.clone(),
+                    self.deprecated_tables,
+                    self.db_pool.clone(),
+                    None,
+                );
+                let gap_detection_batch_size = self.gap_detection_batch_size;
+
+                (
+                    processor,
+                    gap_detection_batch_size,
+                    Some(gap_detector_sender),
+                )
+            };
+
         tokio::spawn(async move {
-            crate::gap_detector::create_gap_detector_status_tracker_loop(
+            create_gap_detector_status_tracker_loop(
                 gap_detector_receiver,
                 processor,
                 starting_version,
@@ -292,7 +326,7 @@ impl Worker {
 
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
-            let join_handle = self
+            let join_handle: JoinHandle<()> = self
                 .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
                 .await;
             processor_tasks.push(join_handle);
@@ -316,7 +350,7 @@ impl Worker {
         &self,
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
-        gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
+        gap_detector_sender: Option<AsyncSender<ProcessingResult>>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -329,6 +363,7 @@ impl Worker {
             self.per_table_chunk_sizes.clone(),
             self.deprecated_tables,
             self.db_pool.clone(),
+            gap_detector_sender.clone(),
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -336,6 +371,7 @@ impl Worker {
         let chain_id = self
             .grpc_chain_id
             .expect("GRPC chain ID has not been fetched yet!");
+
         tokio::spawn(async move {
             let task_index_str = task_index.to_string();
             let step = ProcessorStep::ProcessedBatch.get_step();
@@ -344,7 +380,6 @@ impl Worker {
 
             loop {
                 let txn_channel_fetch_latency = std::time::Instant::now();
-
                 match fetch_transactions(
                     processor_name,
                     &stream_address,
@@ -458,76 +493,105 @@ impl Worker {
                             },
                         };
 
-                        let processing_time = processing_time.elapsed().as_secs_f64();
+                        match processing_result {
+                            ProcessingResult::DefaultProcessingResult(processing_result) => {
+                                let processing_time = processing_time.elapsed().as_secs_f64();
 
-                        // We've processed things: do some data and metrics
+                                // We've processed things: do some data and metrics
+                                ma.tick_now((last_txn_version - first_txn_version) + 1);
+                                let tps = ma.avg().ceil() as u64;
 
-                        ma.tick_now((last_txn_version - first_txn_version) + 1);
-                        let tps = ma.avg().ceil() as u64;
+                                let num_processed = (last_txn_version - first_txn_version) + 1;
 
-                        let num_processed = (last_txn_version - first_txn_version) + 1;
+                                debug!(
+                                    processor_name = processor_name,
+                                    service_type = PROCESSOR_SERVICE_TYPE,
+                                    first_txn_version,
+                                    batch_first_txn_version,
+                                    last_txn_version,
+                                    batch_last_txn_version,
+                                    start_txn_timestamp_iso,
+                                    end_txn_timestamp_iso,
+                                    num_of_transactions = num_processed,
+                                    concurrent_tasks,
+                                    task_index,
+                                    size_in_bytes,
+                                    processing_duration_in_secs =
+                                        processing_result.processing_duration_in_secs,
+                                    db_insertion_duration_in_secs =
+                                        processing_result.db_insertion_duration_in_secs,
+                                    duration_in_secs = processing_time,
+                                    tps = tps,
+                                    bytes_per_sec = size_in_bytes / processing_time,
+                                    step = &step,
+                                    "{}",
+                                    label,
+                                );
 
-                        debug!(
-                            processor_name = processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            first_txn_version,
-                            batch_first_txn_version,
-                            last_txn_version,
-                            batch_last_txn_version,
-                            start_txn_timestamp_iso,
-                            end_txn_timestamp_iso,
-                            num_of_transactions = num_processed,
-                            concurrent_tasks,
-                            task_index,
-                            size_in_bytes,
-                            processing_duration_in_secs =
-                                processing_result.processing_duration_in_secs,
-                            db_insertion_duration_in_secs =
-                                processing_result.db_insertion_duration_in_secs,
-                            duration_in_secs = processing_time,
-                            tps = tps,
-                            bytes_per_sec = size_in_bytes / processing_time,
-                            step = &step,
-                            "{}",
-                            label,
-                        );
+                                // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
+                                GRPC_LATENCY_BY_PROCESSOR_IN_SECS
+                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .set(time_diff_since_pb_timestamp_in_secs(
+                                        end_txn_timestamp.as_ref().unwrap(),
+                                    ));
+                                LATEST_PROCESSED_VERSION
+                                    .with_label_values(&[
+                                        processor_name,
+                                        step,
+                                        label,
+                                        &task_index_str,
+                                    ])
+                                    .set(last_txn_version as i64);
+                                TRANSACTION_UNIX_TIMESTAMP
+                                    .with_label_values(&[
+                                        processor_name,
+                                        step,
+                                        label,
+                                        &task_index_str,
+                                    ])
+                                    .set(start_txn_timestamp_unix);
 
-                        // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
-                        GRPC_LATENCY_BY_PROCESSOR_IN_SECS
-                            .with_label_values(&[processor_name, &task_index_str])
-                            .set(time_diff_since_pb_timestamp_in_secs(
-                                end_txn_timestamp.as_ref().unwrap(),
-                            ));
-                        LATEST_PROCESSED_VERSION
-                            .with_label_values(&[processor_name, step, label, &task_index_str])
-                            .set(last_txn_version as i64);
-                        TRANSACTION_UNIX_TIMESTAMP
-                            .with_label_values(&[processor_name, step, label, &task_index_str])
-                            .set(start_txn_timestamp_unix);
+                                // Single batch metrics
+                                PROCESSED_BYTES_COUNT
+                                    .with_label_values(&[
+                                        processor_name,
+                                        step,
+                                        label,
+                                        &task_index_str,
+                                    ])
+                                    .inc_by(size_in_bytes as u64);
+                                NUM_TRANSACTIONS_PROCESSED_COUNT
+                                    .with_label_values(&[
+                                        processor_name,
+                                        step,
+                                        label,
+                                        &task_index_str,
+                                    ])
+                                    .inc_by(num_processed);
 
-                        // Single batch metrics
-                        PROCESSED_BYTES_COUNT
-                            .with_label_values(&[processor_name, step, label, &task_index_str])
-                            .inc_by(size_in_bytes as u64);
-                        NUM_TRANSACTIONS_PROCESSED_COUNT
-                            .with_label_values(&[processor_name, step, label, &task_index_str])
-                            .inc_by(num_processed);
+                                SINGLE_BATCH_PROCESSING_TIME_IN_SECS
+                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .set(processing_time);
+                                SINGLE_BATCH_PARSING_TIME_IN_SECS
+                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .set(processing_result.processing_duration_in_secs);
+                                SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
+                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .set(processing_result.db_insertion_duration_in_secs);
 
-                        SINGLE_BATCH_PROCESSING_TIME_IN_SECS
-                            .with_label_values(&[processor_name, &task_index_str])
-                            .set(processing_time);
-                        SINGLE_BATCH_PARSING_TIME_IN_SECS
-                            .with_label_values(&[processor_name, &task_index_str])
-                            .set(processing_result.processing_duration_in_secs);
-                        SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
-                            .with_label_values(&[processor_name, &task_index_str])
-                            .set(processing_result.db_insertion_duration_in_secs);
-
-                        // Send the result to the gap detector
-                        gap_detector_sender
-                            .send(processing_result)
-                            .await
-                            .expect("[Parser] Failed to send versions to gap detector");
+                                gap_detector_sender
+                                    .as_ref()
+                                    .unwrap()
+                                    .send(ProcessingResult::DefaultProcessingResult(
+                                        processing_result,
+                                    ))
+                                    .await
+                                    .expect("[Parser] Failed to send versions to gap detector");
+                            },
+                            ProcessingResult::ParquetProcessingResult(_) => {
+                                debug!("parquet processing result doesn't need to be handled here");
+                            },
+                        }
                     },
                     // Could not fetch transactions from channel. This happens when there are
                     // no more transactions to fetch and the channel is closed.
@@ -687,13 +751,15 @@ pub async fn do_processor(
 
     // Fake this as it's possible we have filtered out all of the txns in this batch
     if transactions_pb.transactions.is_empty() {
-        return Ok(ProcessingResult {
-            start_version,
-            end_version,
-            processing_duration_in_secs: 0.0,
-            db_insertion_duration_in_secs: 0.0,
-            last_transaction_timestamp: transactions_pb.end_txn_timestamp,
-        });
+        return Ok(ProcessingResult::DefaultProcessingResult(
+            DefaultProcessingResult {
+                start_version,
+                end_version,
+                processing_duration_in_secs: 0.0,
+                db_insertion_duration_in_secs: 0.0,
+                last_transaction_timestamp: transactions_pb.end_txn_timestamp,
+            },
+        ));
     }
 
     let txn_time = transactions_pb.start_txn_timestamp;
@@ -746,6 +812,7 @@ pub fn build_processor(
     per_table_chunk_sizes: AHashMap<String, usize>,
     deprecated_tables: TableFlags,
     db_pool: ArcDbPool,
+    gap_detector_sender: Option<AsyncSender<ProcessingResult>>, // Parquet only
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -800,5 +867,12 @@ pub fn build_processor(
         ProcessorConfig::UserTransactionProcessor => Processor::from(
             UserTransactionProcessor::new(db_pool, per_table_chunk_sizes),
         ),
+        ProcessorConfig::DefaultParquetProcessor(config) => {
+            Processor::from(DefaultParquetProcessor::new(
+                db_pool,
+                config.clone(),
+                gap_detector_sender.expect("Parquet processor requires a gap detector sender"),
+            ))
+        },
     }
 }

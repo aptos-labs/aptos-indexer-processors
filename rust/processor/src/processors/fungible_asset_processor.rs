@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::common::models::{
         coin_models::coin_supply::CoinSupply,
@@ -21,6 +21,7 @@ use crate::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
         },
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
@@ -382,13 +383,15 @@ impl ProcessorTrait for FungibleAssetProcessor {
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timestamp,
-            }),
+            Ok(_) => Ok(ProcessingResult::DefaultProcessingResult(
+                DefaultProcessingResult {
+                    start_version,
+                    end_version,
+                    processing_duration_in_secs,
+                    db_insertion_duration_in_secs,
+                    last_transaction_timestamp,
+                },
+            )),
             Err(err) => {
                 error!(
                     start_version = start_version,
@@ -449,6 +452,7 @@ async fn parse_v2_coin(
             .as_ref()
             .expect("Transaction timestamp doesn't exist!")
             .seconds;
+        #[allow(deprecated)]
         let txn_timestamp =
             NaiveDateTime::from_timestamp_opt(txn_timestamp, 0).expect("Txn Timestamp is invalid!");
         let txn_epoch = txn.epoch as i64;

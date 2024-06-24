@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gap_detector::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig,
+    gap_detectors::DEFAULT_GAP_DETECTION_BATCH_SIZE, processors::ProcessorConfig,
     transaction_filter::TransactionFilter, worker::Worker,
 };
 use ahash::AHashMap;
@@ -36,6 +36,9 @@ pub struct IndexerGrpcProcessorConfig {
     // Maximum number of batches "missing" before we assume we have an issue with gaps and abort
     #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
     pub gap_detection_batch_size: u64,
+    // Maximum number of batches "missing" before we assume we have an issue with gaps and abort
+    #[serde(default = "IndexerGrpcProcessorConfig::default_gap_detection_batch_size")]
+    pub parquet_gap_detection_batch_size: u64,
     // Number of protobuff transactions to send per chunk to the processor tasks
     #[serde(default = "IndexerGrpcProcessorConfig::default_pb_channel_txn_chunk_size")]
     pub pb_channel_txn_chunk_size: usize,
@@ -93,6 +96,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.number_concurrent_processing_tasks,
             self.db_pool_size,
             self.gap_detection_batch_size,
+            self.parquet_gap_detection_batch_size,
             self.pb_channel_txn_chunk_size,
             self.per_table_chunk_sizes.clone(),
             self.enable_verbose_logging,
