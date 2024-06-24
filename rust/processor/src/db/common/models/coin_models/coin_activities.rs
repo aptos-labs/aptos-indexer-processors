@@ -273,18 +273,10 @@ impl CoinActivity {
     ) -> Self {
         let aptos_coin_burned =
             BigDecimal::from(txn_info.gas_used * user_transaction_request.gas_unit_price);
-        let signature = user_transaction_request
-            .signature
-            .as_ref()
-            .unwrap_or_else(|| {
-                tracing::error!(
-                    transaction_version = transaction_version,
-                    "User transaction must have signature"
-                );
-                panic!("User transaction must have signature")
-            });
-        let gas_fee_payer_address =
-            Signature::get_fee_payer_address(signature, transaction_version);
+        let gas_fee_payer_address = match user_transaction_request.signature.as_ref() {
+            Some(signature) => Signature::get_fee_payer_address(signature, transaction_version),
+            None => None,
+        };
 
         Self {
             transaction_version,
