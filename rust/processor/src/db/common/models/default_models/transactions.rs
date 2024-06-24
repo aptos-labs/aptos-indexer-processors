@@ -195,20 +195,24 @@ impl Transaction {
 
         match txn_data {
             TxnData::User(user_txn) => {
-                let payload = user_txn
+                let request = &user_txn
                     .request
                     .as_ref()
-                    .expect("Getting user request failed.")
-                    .payload
-                    .as_ref()
-                    .expect("Getting payload failed.");
-                let payload_cleaned = get_clean_payload(payload, version);
-                let payload_type = get_payload_type(payload);
+                    .expect("Getting user request failed.");
+
+                let (payload_cleaned, payload_type) = match request.payload.as_ref() {
+                    Some(payload) => {
+                        let payload_cleaned = get_clean_payload(payload, version);
+                        (payload_cleaned, Some(get_payload_type(payload)))
+                    },
+                    None => (None, None),
+                };
+
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
                         payload_cleaned,
-                        Some(payload_type),
+                        payload_type,
                         version,
                         transaction_type,
                         user_txn.events.len() as i64,
@@ -221,8 +225,11 @@ impl Transaction {
                 )
             },
             TxnData::Genesis(genesis_txn) => {
-                let payload = genesis_txn.payload.as_ref().unwrap();
-                let payload_cleaned = get_clean_writeset(payload, version);
+                let payload_cleaned = genesis_txn
+                    .payload
+                    .as_ref()
+                    .map(|payload| get_clean_writeset(payload, version))
+                    .unwrap_or(None);
                 // It's genesis so no big deal
                 let payload_type = None;
                 (
