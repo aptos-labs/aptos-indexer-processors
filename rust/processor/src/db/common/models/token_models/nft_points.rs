@@ -70,10 +70,7 @@ impl NftPoints {
                 let payload = match user_request.payload.as_ref() {
                     Some(payload) => payload,
                     None => {
-                        tracing::warn!(
-                            transaction_version = version,
-                            "Payload is empty."
-                        );
+                        tracing::warn!(transaction_version = version, "Payload is empty.");
                         return None;
                     },
                 };
