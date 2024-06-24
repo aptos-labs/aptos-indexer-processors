@@ -60,6 +60,7 @@ bitflags! {
         const TRANSACTIONS = 1;
         const WRITE_SET_CHANGES = 2;
         const MOVE_RESOURCES = 4;
+        const TABLE_ITEMS = 8;
     }
 }
 

@@ -449,6 +449,9 @@ fn process_transactions(
     if flags.contains(TableFlags::WRITE_SET_CHANGES) {
         write_set_changes.clear();
     }
+    if flags.contains(TableFlags::TABLE_ITEMS) {
+        table_items.clear();
+    }
 
     (
         txns,
