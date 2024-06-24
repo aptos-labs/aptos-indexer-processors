@@ -110,8 +110,8 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
 pub fn get_entry_function_from_user_request(
     user_request: &UserTransactionRequest,
 ) -> Option<String> {
-    let entry_function_id_str: Option<String> =
-        match &user_request.payload.as_ref().unwrap().payload {
+    let entry_function_id_str: Option<String> = match &user_request.payload {
+        Some(txn_payload) => match &txn_payload.payload {
             Some(PayloadType::EntryFunctionPayload(payload)) => {
                 Some(payload.entry_function_id_str.clone())
             },
@@ -127,7 +127,9 @@ pub fn get_entry_function_from_user_request(
                 }
             },
             _ => return None,
-        };
+        },
+        None => return None,
+    };
 
     entry_function_id_str.map(|s| truncate_str(&s, MAX_ENTRY_FUNCTION_LENGTH))
 }
