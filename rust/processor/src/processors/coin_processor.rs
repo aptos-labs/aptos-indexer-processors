@@ -75,33 +75,34 @@ async fn insert_to_db(
         insert_coin_activities_query,
         coin_activities,
         get_config_table_chunk_size::<CoinActivity>("coin_activities", per_table_chunk_sizes),
-    );
-    let ci = execute_in_chunks(
-        conn.clone(),
-        insert_coin_infos_query,
-        coin_infos,
-        get_config_table_chunk_size::<CoinInfo>("coin_infos", per_table_chunk_sizes),
-    );
-    let cb = execute_in_chunks(
-        conn.clone(),
-        insert_coin_balances_query,
-        coin_balances,
-        get_config_table_chunk_size::<CoinBalance>("coin_balances", per_table_chunk_sizes),
-    );
-    let ccb = execute_in_chunks(
-        conn.clone(),
-        insert_current_coin_balances_query,
-        current_coin_balances,
-        get_config_table_chunk_size::<CurrentCoinBalance>(
-            "current_coin_balances",
-            per_table_chunk_sizes,
-        ),
-    );
+    )
+    .await?;
+    // let ci = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_coin_infos_query,
+    //     coin_infos,
+    //     get_config_table_chunk_size::<CoinInfo>("coin_infos", per_table_chunk_sizes),
+    // );
+    // let cb = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_coin_balances_query,
+    //     coin_balances,
+    //     get_config_table_chunk_size::<CoinBalance>("coin_balances", per_table_chunk_sizes),
+    // );
+    // let ccb = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_coin_balances_query,
+    //     current_coin_balances,
+    //     get_config_table_chunk_size::<CurrentCoinBalance>(
+    //         "current_coin_balances",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
 
-    let (ca_res, ci_res, cb_res, ccb_res) = tokio::join!(ca, ci, cb, ccb);
-    for res in [ca_res, ci_res, cb_res, ccb_res] {
-        res?;
-    }
+    // let (ca_res, ci_res, cb_res, ccb_res) = tokio::join!(ca, ci, cb, ccb);
+    // for res in [ca_res, ci_res, cb_res, ccb_res] {
+    //     res?;
+    // }
     Ok(())
 }
 

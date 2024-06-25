@@ -99,7 +99,7 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     )
-    .await;
+    .await?;
 
     // let fam = execute_in_chunks(
     //     conn.clone(),
