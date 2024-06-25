@@ -38,6 +38,7 @@ THEN
     staging.decoded_key,
     staging.decoded_value,
     staging.is_deleted,
+    staging.block_timestamp,
 
     CAST(FLOOR(staging.transaction_block_height / 1e6) AS INT64),
   );
