@@ -66,13 +66,14 @@ impl NftPoints {
                     .request
                     .as_ref()
                     .expect("Sends is not present in user txn");
-                let payload = user_txn
-                    .request
-                    .as_ref()
-                    .expect("Getting user request failed.")
-                    .payload
-                    .as_ref()
-                    .expect("Getting payload failed.");
+
+                let payload = match user_request.payload.as_ref() {
+                    Some(payload) => payload,
+                    None => {
+                        tracing::warn!(transaction_version = version, "Payload is empty.");
+                        return None;
+                    },
+                };
                 let entry_function_id_str =
                     get_entry_function_from_user_request(user_request).unwrap_or_default();
 
