@@ -102,7 +102,7 @@ fn insert_user_transactions_query(
             .on_conflict(version)
             .do_update()
             .set((
-                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+                entry_function_id_str.eq(excluded(entry_function_id_str)),
                 inserted_at.eq(excluded(inserted_at)),
             )),
         None,

@@ -173,7 +173,11 @@ fn insert_fungible_asset_activities_query(
         diesel::insert_into(schema::fungible_asset_activities::table)
             .values(items_to_insert)
             .on_conflict((transaction_version, event_index))
-            .do_nothing(),
+            .do_update()
+            .set((
+                entry_function_id_str.eq(excluded(entry_function_id_str)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
         None,
     )
 }

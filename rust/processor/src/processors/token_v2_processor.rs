@@ -465,7 +465,7 @@ fn insert_token_activities_v2_query(
             .on_conflict((transaction_version, event_index))
             .do_update()
             .set((
-                is_fungible_v2.eq(excluded(is_fungible_v2)),
+                entry_function_id_str.eq(excluded(entry_function_id_str)),
                 inserted_at.eq(excluded(inserted_at)),
             )),
         None,
