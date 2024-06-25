@@ -98,65 +98,67 @@ async fn insert_to_db(
             "fungible_asset_activities",
             per_table_chunk_sizes,
         ),
-    );
-    let fam = execute_in_chunks(
-        conn.clone(),
-        insert_fungible_asset_metadata_query,
-        fungible_asset_metadata,
-        get_config_table_chunk_size::<FungibleAssetMetadataModel>(
-            "fungible_asset_metadata",
-            per_table_chunk_sizes,
-        ),
-    );
-    let fab = execute_in_chunks(
-        conn.clone(),
-        insert_fungible_asset_balances_query,
-        fungible_asset_balances,
-        get_config_table_chunk_size::<FungibleAssetBalance>(
-            "fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cfab = execute_in_chunks(
-        conn.clone(),
-        insert_current_fungible_asset_balances_query,
-        current_fungible_asset_balances,
-        get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
-            "current_fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cufab_v1 = execute_in_chunks(
-        conn.clone(),
-        insert_current_unified_fungible_asset_balances_v1_query,
-        current_unified_fungible_asset_balances.0,
-        get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
-            "current_unified_fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cufab_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_unified_fungible_asset_balances_v2_query,
-        current_unified_fungible_asset_balances.1,
-        get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
-            "current_unified_fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cs = execute_in_chunks(
-        conn,
-        insert_coin_supply_query,
-        coin_supply,
-        get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
-    );
-    let (faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res) =
-        tokio::join!(faa, fam, fab, cfab, cufab_v1, cufab_v2, cs);
-    for res in [
-        faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res,
-    ] {
-        res?;
-    }
+    )
+    .await;
+
+    // let fam = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_fungible_asset_metadata_query,
+    //     fungible_asset_metadata,
+    //     get_config_table_chunk_size::<FungibleAssetMetadataModel>(
+    //         "fungible_asset_metadata",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let fab = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_fungible_asset_balances_query,
+    //     fungible_asset_balances,
+    //     get_config_table_chunk_size::<FungibleAssetBalance>(
+    //         "fungible_asset_balances",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cfab = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_fungible_asset_balances_query,
+    //     current_fungible_asset_balances,
+    //     get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
+    //         "current_fungible_asset_balances",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cufab_v1 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_unified_fungible_asset_balances_v1_query,
+    //     current_unified_fungible_asset_balances.0,
+    //     get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
+    //         "current_unified_fungible_asset_balances",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cufab_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_unified_fungible_asset_balances_v2_query,
+    //     current_unified_fungible_asset_balances.1,
+    //     get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
+    //         "current_unified_fungible_asset_balances",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cs = execute_in_chunks(
+    //     conn,
+    //     insert_coin_supply_query,
+    //     coin_supply,
+    //     get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
+    // );
+    // let (faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res) =
+    //     tokio::join!(faa, fam, fab, cfab, cufab_v1, cufab_v2, cs);
+    // for res in [
+    //     faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res,
+    // ] {
+    //     res?;
+    // }
 
     Ok(())
 }

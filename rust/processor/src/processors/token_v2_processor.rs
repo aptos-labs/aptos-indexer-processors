@@ -117,72 +117,72 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let coll_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_collections_v2_query,
-        collections_v2,
-        get_config_table_chunk_size::<CollectionV2>("collections_v2", per_table_chunk_sizes),
-    );
-    let td_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_datas_v2_query,
-        token_datas_v2,
-        get_config_table_chunk_size::<TokenDataV2>("token_datas_v2", per_table_chunk_sizes),
-    );
-    let to_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_ownerships_v2_query,
-        token_ownerships_v2,
-        get_config_table_chunk_size::<TokenOwnershipV2>(
-            "token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cc_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_collections_v2_query,
-        current_collections_v2,
-        get_config_table_chunk_size::<CurrentCollectionV2>(
-            "current_collections_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let ctd_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_datas_v2_query,
-        current_token_datas_v2,
-        get_config_table_chunk_size::<CurrentTokenDataV2>(
-            "current_token_datas_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cdtd_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_deleted_token_datas_v2_query,
-        current_deleted_token_datas_v2,
-        get_config_table_chunk_size::<CurrentTokenDataV2>(
-            "current_token_datas_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cto_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_ownerships_v2_query,
-        current_token_ownerships_v2,
-        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
-            "current_token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cdto_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_deleted_token_ownerships_v2_query,
-        current_deleted_token_ownerships_v2,
-        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
-            "current_token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
+    // let coll_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_collections_v2_query,
+    //     collections_v2,
+    //     get_config_table_chunk_size::<CollectionV2>("collections_v2", per_table_chunk_sizes),
+    // );
+    // let td_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_token_datas_v2_query,
+    //     token_datas_v2,
+    //     get_config_table_chunk_size::<TokenDataV2>("token_datas_v2", per_table_chunk_sizes),
+    // );
+    // let to_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_token_ownerships_v2_query,
+    //     token_ownerships_v2,
+    //     get_config_table_chunk_size::<TokenOwnershipV2>(
+    //         "token_ownerships_v2",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cc_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_collections_v2_query,
+    //     current_collections_v2,
+    //     get_config_table_chunk_size::<CurrentCollectionV2>(
+    //         "current_collections_v2",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let ctd_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_token_datas_v2_query,
+    //     current_token_datas_v2,
+    //     get_config_table_chunk_size::<CurrentTokenDataV2>(
+    //         "current_token_datas_v2",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cdtd_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_deleted_token_datas_v2_query,
+    //     current_deleted_token_datas_v2,
+    //     get_config_table_chunk_size::<CurrentTokenDataV2>(
+    //         "current_token_datas_v2",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cto_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_token_ownerships_v2_query,
+    //     current_token_ownerships_v2,
+    //     get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
+    //         "current_token_ownerships_v2",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let cdto_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_deleted_token_ownerships_v2_query,
+    //     current_deleted_token_ownerships_v2,
+    //     get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
+    //         "current_token_ownerships_v2",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
     let ta_v2 = execute_in_chunks(
         conn.clone(),
         insert_token_activities_v2_query,
@@ -191,57 +191,58 @@ async fn insert_to_db(
             "token_activities_v2",
             per_table_chunk_sizes,
         ),
-    );
-    let ct_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_v2_metadatas_query,
-        current_token_v2_metadata,
-        get_config_table_chunk_size::<CurrentTokenV2Metadata>(
-            "current_token_v2_metadata",
-            per_table_chunk_sizes,
-        ),
-    );
-    let ctr_v1 = execute_in_chunks(
-        conn,
-        insert_current_token_royalties_v1_query,
-        current_token_royalties_v1,
-        get_config_table_chunk_size::<CurrentTokenRoyaltyV1>(
-            "current_token_royalty_v1",
-            per_table_chunk_sizes,
-        ),
-    );
+    )
+    .await?;
+    // let ct_v2 = execute_in_chunks(
+    //     conn.clone(),
+    //     insert_current_token_v2_metadatas_query,
+    //     current_token_v2_metadata,
+    //     get_config_table_chunk_size::<CurrentTokenV2Metadata>(
+    //         "current_token_v2_metadata",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
+    // let ctr_v1 = execute_in_chunks(
+    //     conn,
+    //     insert_current_token_royalties_v1_query,
+    //     current_token_royalties_v1,
+    //     get_config_table_chunk_size::<CurrentTokenRoyaltyV1>(
+    //         "current_token_royalty_v1",
+    //         per_table_chunk_sizes,
+    //     ),
+    // );
 
-    let (
-        coll_v2_res,
-        td_v2_res,
-        to_v2_res,
-        cc_v2_res,
-        ctd_v2_res,
-        cdtd_v2_res,
-        cto_v2_res,
-        cdto_v2_res,
-        ta_v2_res,
-        ct_v2_res,
-        ctr_v1_res,
-    ) = tokio::join!(
-        coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, ctr_v1
-    );
+    // let (
+    //     coll_v2_res,
+    //     td_v2_res,
+    //     to_v2_res,
+    //     cc_v2_res,
+    //     ctd_v2_res,
+    //     cdtd_v2_res,
+    //     cto_v2_res,
+    //     cdto_v2_res,
+    //     ta_v2_res,
+    //     ct_v2_res,
+    //     ctr_v1_res,
+    // ) = tokio::join!(
+    //     coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, ctr_v1
+    // );
 
-    for res in [
-        coll_v2_res,
-        td_v2_res,
-        to_v2_res,
-        cc_v2_res,
-        ctd_v2_res,
-        cdtd_v2_res,
-        cto_v2_res,
-        cdto_v2_res,
-        ta_v2_res,
-        ct_v2_res,
-        ctr_v1_res,
-    ] {
-        res?;
-    }
+    // for res in [
+    //     coll_v2_res,
+    //     td_v2_res,
+    //     to_v2_res,
+    //     cc_v2_res,
+    //     ctd_v2_res,
+    //     cdtd_v2_res,
+    //     cto_v2_res,
+    //     cdto_v2_res,
+    //     ta_v2_res,
+    //     ct_v2_res,
+    //     ctr_v1_res,
+    // ] {
+    //     res?;
+    // }
 
     Ok(())
 }

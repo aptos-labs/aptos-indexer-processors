@@ -74,18 +74,19 @@ async fn insert_to_db(
             "user_transactions",
             per_table_chunk_sizes,
         ),
-    );
-    let is = execute_in_chunks(
-        conn,
-        insert_signatures_query,
-        signatures,
-        get_config_table_chunk_size::<Signature>("signatures", per_table_chunk_sizes),
-    );
+    )
+    .await?;
+    // let is = execute_in_chunks(
+    //     conn,
+    //     insert_signatures_query,
+    //     signatures,
+    //     get_config_table_chunk_size::<Signature>("signatures", per_table_chunk_sizes),
+    // );
 
-    let (ut_res, is_res) = futures::join!(ut, is);
-    for res in [ut_res, is_res] {
-        res?;
-    }
+    // let (ut_res, is_res) = futures::join!(ut, is);
+    // for res in [ut_res, is_res] {
+    //     res?;
+    // }
     Ok(())
 }
 
