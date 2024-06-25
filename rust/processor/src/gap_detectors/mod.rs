@@ -51,7 +51,7 @@ pub async fn create_gap_detector_status_tracker_loop(
 
     let mut default_gap_detector = DefaultGapDetector::new(starting_version);
     let mut parquet_gap_detector = ParquetFileGapDetector::new(starting_version);
-    let last_update_time = std::time::Instant::now();
+    let mut last_update_time = std::time::Instant::now();
     loop {
         match gap_detector_receiver.recv().await {
             Ok(ProcessingResult::DefaultProcessingResult(result)) => {
@@ -86,6 +86,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                             )
                                             .await
                                             .unwrap();
+                                        last_update_time = std::time::Instant::now();
                                     }
                                 }
                             },
@@ -145,6 +146,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                             )
                                             .await
                                             .unwrap();
+                                        last_update_time = std::time::Instant::now();
                                     } else {
                                         tracing::info!("Not Updating last processed version");
                                     }
