@@ -1,7 +1,7 @@
 use crate::{
     bq_analytics::ParquetProcessingResult,
     gap_detectors::{
-        gap_detector::{DefaultGapDetector, DefaultGapDetectorResult, GapDetectorTrait},
+        gap_detector::{DefaultGapDetector, DefaultGapDetectorResult},
         parquet_gap_detector::{ParquetFileGapDetector, ParquetFileGapDetectorResult},
     },
     processors::{DefaultProcessingResult, Processor, ProcessorTrait},
@@ -28,9 +28,17 @@ pub enum GapDetector {
 
 #[enum_dispatch(GapDetectorTrait)]
 pub enum GapDetectorResult {
-    DefaultGapDetectorResult,
-    ParquetFileGapDetectorResult,
+    DefaultGapDetectorResult(DefaultGapDetectorResult),
+    ParquetFileGapDetectorResult(ParquetFileGapDetectorResult),
 }
+
+pub trait GapDetectorTrait: Send {
+    fn process_versions(
+        &mut self,
+        result: ProcessingResult,
+    ) -> anyhow::Result<GapDetectorResult, Box<dyn std::error::Error + Send + Sync>>;
+}
+
 pub enum ProcessingResult {
     DefaultProcessingResult(DefaultProcessingResult),
     ParquetProcessingResult(ParquetProcessingResult),
@@ -41,6 +49,7 @@ pub async fn create_gap_detector_status_tracker_loop(
     processor: Processor,
     starting_version: u64,
     gap_detection_batch_size: u64,
+    is_parquet_processor: bool,
 ) {
     let processor_name = processor.name();
     info!(
@@ -49,13 +58,16 @@ pub async fn create_gap_detector_status_tracker_loop(
         "[Parser] Starting gap detector task",
     );
 
-    let mut default_gap_detector = DefaultGapDetector::new(starting_version);
-    let mut parquet_gap_detector = ParquetFileGapDetector::new(starting_version);
+    let mut gap_detector: Box<dyn GapDetectorTrait + Send> = if is_parquet_processor {
+        Box::new(ParquetFileGapDetector::new(starting_version))
+    } else {
+        Box::new(DefaultGapDetector::new(starting_version))
+    };
     let mut last_update_time = std::time::Instant::now();
     loop {
         match gap_detector_receiver.recv().await {
             Ok(ProcessingResult::DefaultProcessingResult(result)) => {
-                match default_gap_detector
+                match gap_detector
                     .process_versions(ProcessingResult::DefaultProcessingResult(result))
                 {
                     Ok(res) => {
@@ -112,7 +124,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                     service_type = PROCESSOR_SERVICE_TYPE,
                     "[ParquetGapDetector] received parquet gap detector task",
                 );
-                match parquet_gap_detector
+                match gap_detector
                     .process_versions(ProcessingResult::ParquetProcessingResult(result))
                 {
                     Ok(res) => {
@@ -132,24 +144,20 @@ pub async fn create_gap_detector_status_tracker_loop(
                                     // We don't panic as everything downstream will panic if it doesn't work/receive
                                 }
 
-                                if let Some(res_last_success_batch) = res.last_success_batch {
-                                    if last_update_time.elapsed().as_secs()
-                                        >= UPDATE_PROCESSOR_STATUS_SECS
-                                    {
-                                        tracing::info!("Updating last processed version");
-                                        processor
-                                            .update_last_processed_version(
-                                                res_last_success_batch.end_version as u64,
-                                                res_last_success_batch
-                                                    .last_transaction_timestamp
-                                                    .clone(),
-                                            )
-                                            .await
-                                            .unwrap();
-                                        last_update_time = std::time::Instant::now();
-                                    } else {
-                                        tracing::info!("Not Updating last processed version");
-                                    }
+                                if last_update_time.elapsed().as_secs()
+                                    >= UPDATE_PROCESSOR_STATUS_SECS
+                                {
+                                    tracing::info!("Updating last processed version");
+                                    processor
+                                        .update_last_processed_version(
+                                            res.start_version,
+                                            res.last_transaction_timestamp,
+                                        )
+                                        .await
+                                        .unwrap();
+                                    last_update_time = std::time::Instant::now();
+                                } else {
+                                    tracing::info!("Not Updating last processed version");
                                 }
                             },
                             _ => {
