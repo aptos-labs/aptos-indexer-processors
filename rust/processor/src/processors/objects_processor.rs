@@ -13,6 +13,7 @@ use crate::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::standardize_address,
     },
+    worker::TableFlags,
     IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
@@ -40,6 +41,7 @@ pub struct ObjectsProcessor {
     connection_pool: ArcDbPool,
     config: ObjectsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl ObjectsProcessor {
@@ -47,11 +49,13 @@ impl ObjectsProcessor {
         connection_pool: ArcDbPool,
         config: ObjectsProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
     ) -> Self {
         Self {
             connection_pool,
             config,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -264,6 +268,10 @@ impl ProcessorTrait for ObjectsProcessor {
             .into_values()
             .collect::<Vec<CurrentObject>>();
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
+
+        if self.deprecated_tables.contains(TableFlags::OBJECTS) {
+            all_objects.clear();
+        }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();

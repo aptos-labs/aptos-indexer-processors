@@ -50,17 +50,65 @@ use url::Url;
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
 
-// TODO: Make this configurable
 pub const BUFFER_SIZE: usize = 300;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
     pub struct TableFlags: u64 {
-        const TRANSACTIONS = 1;
-        const WRITE_SET_CHANGES = 2;
-        const MOVE_RESOURCES = 4;
-        const TABLE_ITEMS = 8;
+        // default processor
+        const TRANSACTIONS = 1 << 0;
+        const WRITE_SET_CHANGES = 1 << 1;
+        const MOVE_RESOURCES = 1 << 2;
+        const TABLE_ITEMS = 1 << 3;
+        const TABLE_METADATAS = 1 << 4;
+        const MOVE_MODULES = 1 << 5;
+
+        // fungible asset
+        const FUNGIBLE_ASSET_BALANCES = 1 << 6;
+        const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 7;
+
+        // transactions metadata
+        const EVENT_SIZE_INFO = 1 << 8;
+        const TRANSACTION_SIZE_INFO = 1 << 9;
+        const WRITE_SET_SIZE_INFO = 1 << 10;
+
+        // objects
+        const OBJECTS = 1 << 11;
+
+        // ans
+        const CURRENT_ANS_LOOKUP = 1 << 12;
+        const CURRENT_ANS_PRIMARY_NAME = 1 << 13;
+        const ANS_PRIMARY_NAME_V2 = 1 << 14;
+        const ANS_LOOKUP = 1 << 15;
+        const ANS_PRIMARY_NAME = 1 << 16;
+
+        // coin
+        const COIN_ACTIVITIES = 1 << 17;
+        const COIN_BALANCES = 1 << 18;
+        const CURRENT_COIN_BALANCES = 1 << 19;
+
+        // coin supply
+        const COIN_SUPPLY = 1 << 20;
+
+        // token
+        const TOKEN_ACTIVITIES = 1 << 21;
+        const TOKEN_OWNERSHIPS = 1 << 22;
+        const CURRENT_TOKEN_OWNERSHIPS = 1 << 23;
+        const TOKENS = 1 << 24;
+        const TOKEN_DATAS = 1 << 25;
+        const COLLECTION_DATAS = 1 << 26;
+        const CURRENT_TOKEN_DATAS = 1 << 27;
+        const NFT_POINTS = 1 << 28;
+
+        // token_v2 processor related flags
+        const TOKEN_OWNERSHIPS_V2 = 1 << 29;
+        const TOKEN_DATAS_V2 = 1 << 30;
+        const COLLECTIONS_V2 = 1 << 31;
+        const CURRENT_TOKEN_V2_METADATA = 1 << 32;
+
+        // User transaction processor
+        const SIGNATURES = 1 << 33;
     }
 }
 
@@ -823,10 +871,13 @@ pub fn build_processor(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
+            deprecated_tables,
         )),
-        ProcessorConfig::CoinProcessor => {
-            Processor::from(CoinProcessor::new(db_pool, per_table_chunk_sizes))
-        },
+        ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(
+            db_pool,
+            per_table_chunk_sizes,
+            deprecated_tables,
+        )),
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(
             db_pool,
             per_table_chunk_sizes,
@@ -835,9 +886,11 @@ pub fn build_processor(
         ProcessorConfig::EventsProcessor => {
             Processor::from(EventsProcessor::new(db_pool, per_table_chunk_sizes))
         },
-        ProcessorConfig::FungibleAssetProcessor => {
-            Processor::from(FungibleAssetProcessor::new(db_pool, per_table_chunk_sizes))
-        },
+        ProcessorConfig::FungibleAssetProcessor => Processor::from(FungibleAssetProcessor::new(
+            db_pool,
+            per_table_chunk_sizes,
+            deprecated_tables,
+        )),
         ProcessorConfig::MonitoringProcessor => Processor::from(MonitoringProcessor::new(db_pool)),
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
@@ -846,6 +899,7 @@ pub fn build_processor(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
+            deprecated_tables,
         )),
         ProcessorConfig::StakeProcessor(config) => Processor::from(StakeProcessor::new(
             db_pool,
@@ -856,17 +910,19 @@ pub fn build_processor(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
+            deprecated_tables,
         )),
         ProcessorConfig::TokenV2Processor(config) => Processor::from(TokenV2Processor::new(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
+            deprecated_tables,
         )),
         ProcessorConfig::TransactionMetadataProcessor => Processor::from(
-            TransactionMetadataProcessor::new(db_pool, per_table_chunk_sizes),
+            TransactionMetadataProcessor::new(db_pool, per_table_chunk_sizes, deprecated_tables),
         ),
         ProcessorConfig::UserTransactionProcessor => Processor::from(
-            UserTransactionProcessor::new(db_pool, per_table_chunk_sizes),
+            UserTransactionProcessor::new(db_pool, per_table_chunk_sizes, deprecated_tables),
         ),
         ProcessorConfig::DefaultParquetProcessor(config) => {
             Processor::from(DefaultParquetProcessor::new(

@@ -452,6 +452,12 @@ fn process_transactions(
     if flags.contains(TableFlags::TABLE_ITEMS) {
         table_items.clear();
     }
+    if flags.contains(TableFlags::TABLE_METADATAS) {
+        table_metadata.clear();
+    }
+    if flags.contains(TableFlags::MOVE_MODULES) {
+        move_modules.clear();
+    }
 
     (
         txns,

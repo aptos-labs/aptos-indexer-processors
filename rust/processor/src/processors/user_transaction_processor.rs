@@ -12,6 +12,7 @@ use crate::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
     },
+    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -28,13 +29,19 @@ use tracing::error;
 pub struct UserTransactionProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl UserTransactionProcessor {
-    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: ArcDbPool,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
+    ) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -175,6 +182,10 @@ impl ProcessorTrait for UserTransactionProcessor {
                 signatures.extend(sigs);
                 user_transactions.push(user_transaction);
             }
+        }
+
+        if self.deprecated_tables.contains(TableFlags::SIGNATURES) {
+            signatures.clear();
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();

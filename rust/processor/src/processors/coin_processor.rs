@@ -14,6 +14,7 @@ use crate::{
     gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::{bail, Context};
@@ -30,13 +31,19 @@ use tracing::error;
 pub struct CoinProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl CoinProcessor {
-    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: ArcDbPool,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
+    ) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -216,10 +223,10 @@ impl ProcessorTrait for CoinProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let (
-            all_coin_activities,
+            mut all_coin_activities,
             all_coin_infos,
-            all_coin_balances,
-            all_current_coin_balances,
+            mut all_coin_balances,
+            mut all_current_coin_balances,
         ) = tokio::task::spawn_blocking(move || {
             let mut all_coin_activities = vec![];
             let mut all_coin_balances = vec![];
@@ -258,6 +265,19 @@ impl ProcessorTrait for CoinProcessor {
         })
         .await
         .context("spawn_blocking for CoinProcessor thread failed")?;
+
+        if self.deprecated_tables.contains(TableFlags::COIN_ACTIVITIES) {
+            all_coin_activities.clear();
+        }
+        if self.deprecated_tables.contains(TableFlags::COIN_BALANCES) {
+            all_coin_balances.clear();
+        }
+        if self
+            .deprecated_tables
+            .contains(TableFlags::CURRENT_COIN_BALANCES)
+        {
+            all_current_coin_balances.clear();
+        }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
