@@ -1,6 +1,6 @@
 use crate::{
     bq_analytics::generic_parquet_processor::{
-        HasParquetSchema, HasVersion, NamedTable, ParquetDataGeneric,
+        GetTimeStamp, HasParquetSchema, HasVersion, NamedTable, ParquetDataGeneric,
         ParquetHandler as GenericParquetHandler,
     },
     gap_detectors::ProcessingResult,
@@ -17,11 +17,19 @@ pub fn create_parquet_handler_loop<ParquetType>(
     new_gap_detector_sender: AsyncSender<ProcessingResult>,
     processor_name: &str,
     bucket_name: String,
+    bucket_root: String,
     parquet_handler_response_channel_size: usize,
     max_buffer_size: usize,
 ) -> AsyncSender<ParquetDataGeneric<ParquetType>>
 where
-    ParquetType: NamedTable + HasVersion + HasParquetSchema + Send + Sync + 'static + Allocative,
+    ParquetType: NamedTable
+        + GetTimeStamp
+        + HasVersion
+        + HasParquetSchema
+        + Send
+        + Sync
+        + 'static
+        + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     let processor_name = processor_name.to_owned();
@@ -38,6 +46,7 @@ where
 
     let mut parquet_manager = GenericParquetHandler::new(
         bucket_name.clone(),
+        bucket_root.clone(),
         new_gap_detector_sender.clone(),
         ParquetType::schema(),
     )

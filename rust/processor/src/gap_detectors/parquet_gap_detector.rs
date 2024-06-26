@@ -1,17 +1,13 @@
 // // Copyright © Aptos Foundation
 // // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    bq_analytics::ParquetProcessingResult,
-    gap_detectors::{gap_detector::GapDetectorTrait, GapDetectorResult, ProcessingResult},
-};
+use crate::gap_detectors::{GapDetectorResult, GapDetectorTrait, ProcessingResult};
 use ahash::AHashMap;
 use std::cmp::max;
 use tracing::{debug, info};
 
 pub struct ParquetFileGapDetector {
     next_version_to_process: i64,
-    last_success_batch: Option<ParquetProcessingResult>,
     version_counters: AHashMap<i64, i64>,
     max_version: i64,
 }
@@ -19,21 +15,24 @@ pub struct ParquetFileGapDetector {
 pub struct ParquetFileGapDetectorResult {
     pub next_version_to_process: u64,
     pub num_gaps: u64,
-    pub last_success_batch: Option<ParquetProcessingResult>,
+    pub start_version: u64,
+    pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
 }
 
 impl ParquetFileGapDetector {
     pub fn new(starting_version: u64) -> Self {
         Self {
             next_version_to_process: starting_version as i64,
-            last_success_batch: None,
             version_counters: AHashMap::new(),
             max_version: 0,
         }
     }
 }
 impl GapDetectorTrait for ParquetFileGapDetector {
-    fn process_versions(&mut self, result: ProcessingResult) -> anyhow::Result<GapDetectorResult> {
+    fn process_versions(
+        &mut self,
+        result: ProcessingResult,
+    ) -> anyhow::Result<GapDetectorResult, Box<dyn std::error::Error + Send + Sync>> {
         // Update counts of structures for each transaction version
         let result = match result {
             ProcessingResult::ParquetProcessingResult(r) => r,
@@ -82,7 +81,8 @@ impl GapDetectorTrait for ParquetFileGapDetector {
             ParquetFileGapDetectorResult {
                 next_version_to_process: self.next_version_to_process as u64,
                 num_gaps: (self.max_version - self.next_version_to_process) as u64,
-                last_success_batch: self.last_success_batch.clone(),
+                start_version: result.start_version as u64,
+                last_transaction_timestamp: result.last_transaction_timestamp,
             },
         ))
     }

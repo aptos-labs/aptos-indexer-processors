@@ -15,6 +15,7 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
+use chrono::NaiveDateTime;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -264,6 +265,13 @@ fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayl
                 })
             })
             .collect(),
+    }
+}
+
+pub fn naive_datetime_to_timestamp(ndt: NaiveDateTime) -> Timestamp {
+    Timestamp {
+        seconds: ndt.and_utc().timestamp(),
+        nanos: ndt.and_utc().timestamp_subsec_nanos() as i32,
     }
 }
 

@@ -2,7 +2,10 @@ use super::ParquetProcessingResult;
 use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
-    utils::counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
+    utils::{
+        counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
+        util::naive_datetime_to_timestamp,
+    },
 };
 use ahash::AHashMap;
 use allocative::Allocative;
@@ -24,9 +27,6 @@ use uuid::Uuid;
 #[derive(Debug, Default, Clone)]
 pub struct ParquetDataGeneric<ParquetType> {
     pub data: Vec<ParquetType>,
-    pub first_txn_version: u64,
-    pub last_txn_version: u64,
-    pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
     pub transaction_version_to_struct_count: AHashMap<i64, i64>,
 }
 
@@ -40,6 +40,10 @@ pub trait HasVersion {
 
 pub trait HasParquetSchema {
     fn schema() -> Arc<parquet::schema::types::Type>;
+}
+
+pub trait GetTimeStamp {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime;
 }
 
 /// Auto-implement this for all types that implement `Default` and `RecordWriter`
@@ -56,7 +60,7 @@ where
 
 pub struct ParquetHandler<ParquetType>
 where
-    ParquetType: NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
+    ParquetType: NamedTable + NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     pub schema: Arc<parquet::schema::types::Type>,
@@ -66,6 +70,7 @@ where
 
     pub transaction_version_to_struct_count: AHashMap<i64, i64>,
     pub bucket_name: String,
+    pub bucket_root: String,
     pub gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
     pub file_path: String,
 }
@@ -93,7 +98,7 @@ fn create_new_writer(
 
 impl<ParquetType> ParquetHandler<ParquetType>
 where
-    ParquetType: NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
+    ParquetType: Allocative + GetTimeStamp + HasVersion + HasParquetSchema + 'static + NamedTable,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     fn create_new_writer(&self) -> Result<SerializedFileWriter<File>> {
@@ -110,6 +115,7 @@ where
 
     pub fn new(
         bucket_name: String,
+        bucket_root: String,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
         schema: Arc<parquet::schema::types::Type>,
     ) -> Result<Self> {
@@ -123,6 +129,7 @@ where
             buffer_size_bytes: 0,
             transaction_version_to_struct_count: AHashMap::new(),
             bucket_name,
+            bucket_root,
             gap_detector_sender,
             schema,
             file_path,
@@ -135,7 +142,6 @@ where
         changes: ParquetDataGeneric<ParquetType>,
         max_buffer_size: usize,
     ) -> Result<()> {
-        let last_transaction_timestamp = changes.last_transaction_timestamp;
         let parquet_structs = changes.data;
         self.transaction_version_to_struct_count
             .extend(changes.transaction_version_to_struct_count);
@@ -153,6 +159,8 @@ where
         if self.buffer_size_bytes >= max_buffer_size {
             let start_version = self.buffer.first().unwrap().version();
             let end_version = self.buffer.last().unwrap().version();
+            let last_transaction_timestamp =
+                naive_datetime_to_timestamp(self.buffer.last().unwrap().get_timestamp());
 
             let txn_version_to_struct_count = process_struct_count_map(
                 &self.buffer,
@@ -187,6 +195,7 @@ where
                 &new_file_path,
                 ParquetType::TABLE_NAME,
                 &self.bucket_name,
+                &self.bucket_root,
             )
             .await;
             self.buffer_size_bytes = 0;
@@ -197,7 +206,7 @@ where
                     let parquet_processing_result = ParquetProcessingResult {
                         start_version,
                         end_version,
-                        last_transaction_timestamp: last_transaction_timestamp.clone(),
+                        last_transaction_timestamp: Some(last_transaction_timestamp),
                         txn_version_to_struct_count,
                     };
 
