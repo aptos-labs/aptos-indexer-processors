@@ -10,7 +10,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-indexer-processors"
-rust-version = "1.75"
+rust-version = "1.78"
 
 [workspace.dependencies]
 processor = { path = "processor" }
@@ -20,6 +20,7 @@ aptos-moving-average = { path = "moving-average" }
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.62"
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "d76b5bb423b78b2b9affc72d3853f0d973d3f11f" }
+aptos-in-memory-cache = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "07952ba261dd8301581e449e26ce17bbbc1adc46" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"
@@ -30,6 +31,7 @@ bigdecimal = { version = "0.4.0", features = ["serde"] }
 bitflags = "2.5.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+dashmap = "5.2.0"
 # Do NOT enable the postgres feature here, it is conditionally enabled in a feature
 # block in the Cargo.toml file for the processor crate.
 # https://github.com/aptos-labs/aptos-indexer-processors/pull/325
@@ -54,6 +56,7 @@ field_count = "0.1.1"
 futures = "0.3.30"
 futures-core = "0.3.25"
 futures-util = "0.3.21"
+get-size = { version = "0.1.4", features = ["derive"] }
 gcloud-sdk = { version = "0.20.4", features = [
     "google-cloud-bigquery-storage-v1",
 ] }
@@ -73,6 +76,7 @@ pbjson = "0.5.1"
 prometheus = { version = "0.13.0", default-features = false }
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
+quick_cache = "0.4.1"
 regex = "1.5.5"
 reqwest = { version = "0.11.20", features = [
     "blocking",
@@ -91,6 +95,7 @@ toml = "0.7.4"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tokio = { version = "1.35.1", features = ["full"] }
+tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 tonic = { version = "0.11.0", features = [
     "tls",
     "tls-roots",
