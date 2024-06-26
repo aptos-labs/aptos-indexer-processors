@@ -12,6 +12,7 @@ use crate::{
         events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, parquet_default_processor::DefaultParquetProcessor,
+        parquet_transaction_metadata_processor::ParquetTransactionMetadataProcessor,
         stake_processor::StakeProcessor, token_processor::TokenProcessor,
         token_v2_processor::TokenV2Processor,
         transaction_metadata_processor::TransactionMetadataProcessor,
@@ -870,6 +871,13 @@ pub fn build_processor(
         ),
         ProcessorConfig::DefaultParquetProcessor(config) => {
             Processor::from(DefaultParquetProcessor::new(
+                db_pool,
+                config.clone(),
+                gap_detector_sender.expect("Parquet processor requires a gap detector sender"),
+            ))
+        },
+        ProcessorConfig::ParquetTransactionMetadataProcessor(config) => {
+            Processor::from(ParquetTransactionMetadataProcessor::new(
                 db_pool,
                 config.clone(),
                 gap_detector_sender.expect("Parquet processor requires a gap detector sender"),

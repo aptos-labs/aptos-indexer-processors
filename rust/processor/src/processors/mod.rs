@@ -13,12 +13,14 @@ pub mod fungible_asset_processor;
 pub mod monitoring_processor;
 pub mod nft_metadata_processor;
 pub mod objects_processor;
-pub mod parquet_default_processor;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
 pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
+// parquet processors
+pub mod parquet_default_processor;
+pub mod parquet_transaction_metadata_processor;
 
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
@@ -40,7 +42,12 @@ use self::{
 use crate::{
     db::common::models::processor_status::ProcessorStatus,
     gap_detectors::ProcessingResult,
-    processors::parquet_default_processor::DefaultParquetProcessor,
+    processors::{
+        parquet_default_processor::DefaultParquetProcessor,
+        parquet_transaction_metadata_processor::{
+            ParquetTransactionMetadataProcessor, ParquetTransactionMetadataProcessorConfig,
+        },
+    },
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
@@ -54,6 +61,8 @@ use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+
+pub const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DefaultProcessingResult {
@@ -194,7 +203,9 @@ pub enum ProcessorConfig {
     TokenV2Processor(TokenV2ProcessorConfig),
     TransactionMetadataProcessor,
     UserTransactionProcessor,
+    // parquet processors
     DefaultParquetProcessor(DefaultParquetProcessorConfig),
+    ParquetTransactionMetadataProcessor(ParquetTransactionMetadataProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -205,7 +216,11 @@ impl ProcessorConfig {
     }
 
     pub fn is_parquet_processor(&self) -> bool {
-        matches!(self, ProcessorConfig::DefaultParquetProcessor(_))
+        matches!(
+            self,
+            ProcessorConfig::DefaultParquetProcessor(_)
+                | ProcessorConfig::ParquetTransactionMetadataProcessor(_)
+        )
     }
 }
 
@@ -242,6 +257,7 @@ pub enum Processor {
     TransactionMetadataProcessor,
     UserTransactionProcessor,
     DefaultParquetProcessor,
+    ParquetTransactionMetadataProcessor,
 }
 
 #[cfg(test)]

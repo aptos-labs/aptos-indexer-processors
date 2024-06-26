@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessorName, ProcessorTrait};
+use super::{ProcessorName, ProcessorTrait, GOOGLE_APPLICATION_CREDENTIALS};
 use crate::{
     bq_analytics::{
         generic_parquet_processor::ParquetDataGeneric,
@@ -23,8 +23,6 @@ use async_trait::async_trait;
 use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter, Result};
-
-const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
