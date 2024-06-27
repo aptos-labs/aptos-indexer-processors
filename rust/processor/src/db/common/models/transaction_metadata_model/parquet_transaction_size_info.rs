@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct TransactionSize {
     pub txn_version: i64,
-    pub size_bytes: i64,
+    pub total_bytes: i64,
 }
 
 impl NamedTable for TransactionSize {
@@ -29,7 +29,7 @@ impl TransactionSize {
     pub fn from_transaction_info(info: &TransactionSizeInfo, txn_version: i64) -> Self {
         TransactionSize {
             txn_version,
-            size_bytes: info.transaction_bytes as i64,
+            total_bytes: info.transaction_bytes as i64,
         }
     }
 }

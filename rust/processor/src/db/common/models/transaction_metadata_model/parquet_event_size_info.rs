@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct EventSize {
     pub txn_version: i64,
-    pub index: i64,
+    pub event_index: i64,
     pub type_tag_bytes: i64,
     pub total_bytes: i64,
 }
@@ -31,10 +31,10 @@ impl HasVersion for EventSize {
 }
 
 impl EventSize {
-    pub fn from_event_size_info(info: &EventSizeInfo, txn_version: i64, index: i64) -> Self {
+    pub fn from_event_size_info(info: &EventSizeInfo, txn_version: i64, event_index: i64) -> Self {
         EventSize {
             txn_version,
-            index,
+            event_index,
             type_tag_bytes: info.type_tag_bytes as i64,
             total_bytes: info.total_bytes as i64,
         }

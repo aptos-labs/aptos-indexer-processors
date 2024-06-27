@@ -15,9 +15,10 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct WriteSetSize {
     pub txn_version: i64,
-    pub index: i64,
+    pub change_index: i64,
     pub key_bytes: i64,
     pub value_bytes: i64,
+    pub total_bytes: i64,
 }
 
 impl NamedTable for WriteSetSize {
@@ -31,12 +32,13 @@ impl HasVersion for WriteSetSize {
 }
 
 impl WriteSetSize {
-    pub fn from_transaction_info(info: &WriteOpSizeInfo, txn_version: i64, index: i64) -> Self {
+    pub fn from_transaction_info(info: &WriteOpSizeInfo, txn_version: i64, change_index: i64) -> Self {
         WriteSetSize {
             txn_version,
-            index,
+            change_index,
             key_bytes: info.key_bytes as i64,
             value_bytes: info.value_bytes as i64,
+            total_bytes: info.key_bytes as i64 + info.value_bytes as i64,
         }
     }
 }
