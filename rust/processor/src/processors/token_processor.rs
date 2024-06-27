@@ -7,13 +7,9 @@ use crate::{
         collection_datas::{CollectionData, CurrentCollectionData},
         nft_points::NftPoints,
         token_activities::TokenActivity,
-        token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
         token_ownerships::{CurrentTokenOwnership, TokenOwnership},
-        tokens::{
-            CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableMetadataForToken, Token,
-            TokenDataIdHash,
-        },
+        tokens::{CurrentTokenOwnershipPK, TableMetadataForToken, Token, TokenDataIdHash},
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -91,7 +87,6 @@ async fn insert_to_db(
         &[CurrentCollectionData],
     ),
     token_activities: &[TokenActivity],
-    current_token_claims: &[CurrentTokenPendingClaim],
     nft_points: &[NftPoints],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
@@ -161,15 +156,6 @@ async fn insert_to_db(
         get_config_table_chunk_size::<TokenActivity>("token_activities", per_table_chunk_sizes),
     );
 
-    let ctc = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_claims_query,
-        current_token_claims,
-        get_config_table_chunk_size::<CurrentTokenPendingClaim>(
-            "current_token_pending_claims",
-            per_table_chunk_sizes,
-        ),
-    );
     let np = execute_in_chunks(
         conn,
         insert_nft_points_query,
@@ -177,11 +163,11 @@ async fn insert_to_db(
         get_config_table_chunk_size::<NftPoints>("nft_points", per_table_chunk_sizes),
     );
 
-    let (t_res, to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, ctc_res, np) =
-        tokio::join!(t, to, td, cd, cto, ctd, ccd, ta, ctc, np);
+    let (t_res, to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, np) =
+        tokio::join!(t, to, td, cd, cto, ctd, ccd, ta, np);
 
     for res in [
-        t_res, to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, ctc_res, np,
+        t_res, to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, np,
     ] {
         res?;
     }
@@ -375,37 +361,6 @@ fn insert_token_activities_query(
     )
 }
 
-fn insert_current_token_claims_query(
-    items_to_insert: Vec<CurrentTokenPendingClaim>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_pending_claims::dsl::*;
-
-    (
-        diesel::insert_into(schema::current_token_pending_claims::table)
-            .values(items_to_insert)
-            .on_conflict((
-                token_data_id_hash, property_version, from_address, to_address
-            ))
-            .do_update()
-            .set((
-                collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-                creator_address.eq(excluded(creator_address)),
-                collection_name.eq(excluded(collection_name)),
-                name.eq(excluded(name)),
-                amount.eq(excluded(amount)),
-                table_handle.eq(excluded(table_handle)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-                token_data_id.eq(excluded(token_data_id)),
-                collection_id.eq(excluded(collection_id)),
-            )),
-        Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
-    )
-}
-
 fn insert_nft_points_query(
     items_to_insert: Vec<NftPoints>,
 ) -> (
@@ -464,10 +419,6 @@ impl ProcessorTrait for TokenProcessor {
             AHashMap::new();
         let mut all_current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
             AHashMap::new();
-        let mut all_current_token_claims: AHashMap<
-            CurrentTokenPendingClaimPK,
-            CurrentTokenPendingClaim,
-        > = AHashMap::new();
 
         // This is likely temporary
         let mut all_nft_points = vec![];
@@ -481,7 +432,6 @@ impl ProcessorTrait for TokenProcessor {
                 current_token_ownerships,
                 current_token_datas,
                 current_collection_datas,
-                current_token_claims,
             ) = Token::from_transaction(
                 txn,
                 &table_handle_to_owner,
@@ -503,9 +453,6 @@ impl ProcessorTrait for TokenProcessor {
             let mut activities = TokenActivity::from_transaction(txn);
             all_token_activities.append(&mut activities);
 
-            // claims
-            all_current_token_claims.extend(current_token_claims);
-
             // NFT points
             let nft_points_txn =
                 NftPoints::from_transaction(txn, self.config.nft_points_contract.clone());
@@ -524,9 +471,6 @@ impl ProcessorTrait for TokenProcessor {
         let mut all_current_collection_datas = all_current_collection_datas
             .into_values()
             .collect::<Vec<CurrentCollectionData>>();
-        let mut all_current_token_claims = all_current_token_claims
-            .into_values()
-            .collect::<Vec<CurrentTokenPendingClaim>>();
 
         // Sort by PK
         all_current_token_ownerships.sort_by(|a, b| {
@@ -539,20 +483,6 @@ impl ProcessorTrait for TokenProcessor {
         all_current_token_datas.sort_by(|a, b| a.token_data_id_hash.cmp(&b.token_data_id_hash));
         all_current_collection_datas
             .sort_by(|a, b| a.collection_data_id_hash.cmp(&b.collection_data_id_hash));
-        all_current_token_claims.sort_by(|a, b| {
-            (
-                &a.token_data_id_hash,
-                &a.property_version,
-                &a.from_address,
-                &a.to_address,
-            )
-                .cmp(&(
-                    &b.token_data_id_hash,
-                    &b.property_version,
-                    &b.from_address,
-                    &a.to_address,
-                ))
-        });
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -574,7 +504,6 @@ impl ProcessorTrait for TokenProcessor {
                 &all_current_collection_datas,
             ),
             &all_token_activities,
-            &all_current_token_claims,
             &all_nft_points,
             &self.per_table_chunk_sizes,
         )

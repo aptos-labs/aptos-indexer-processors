@@ -7,7 +7,6 @@
 
 use super::{
     collection_datas::{CollectionData, CurrentCollectionData},
-    token_claims::CurrentTokenPendingClaim,
     token_datas::{CurrentTokenData, TokenData},
     token_ownerships::{CurrentTokenOwnership, TokenOwnership},
     token_utils::{TokenResource, TokenWriteSet},
@@ -83,7 +82,6 @@ impl Token {
         AHashMap<CurrentTokenOwnershipPK, CurrentTokenOwnership>,
         AHashMap<TokenDataIdHash, CurrentTokenData>,
         AHashMap<TokenDataIdHash, CurrentCollectionData>,
-        AHashMap<CurrentTokenPendingClaimPK, CurrentTokenPendingClaim>,
     ) {
         let txn_data = match transaction.txn_data.as_ref() {
             Some(data) => data,
@@ -100,7 +98,6 @@ impl Token {
                     vec![],
                     vec![],
                     vec![],
-                    AHashMap::new(),
                     AHashMap::new(),
                     AHashMap::new(),
                     AHashMap::new(),
@@ -121,10 +118,6 @@ impl Token {
                 AHashMap::new();
             let mut current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
                 AHashMap::new();
-            let mut current_token_claims: AHashMap<
-                CurrentTokenPendingClaimPK,
-                CurrentTokenPendingClaim,
-            > = AHashMap::new();
 
             let txn_version = transaction.version as i64;
             let txn_timestamp =
@@ -177,28 +170,6 @@ impl Token {
                         ),
                         _ => (None, None, None),
                     };
-                // More advanced token contracts
-                let maybe_current_token_claim = match wsc.change.as_ref().unwrap() {
-                    WriteSetChangeEnum::WriteTableItem(write_table_item) => {
-                        CurrentTokenPendingClaim::from_write_table_item(
-                            write_table_item,
-                            txn_version,
-                            txn_timestamp,
-                            table_handle_to_owner,
-                        )
-                        .unwrap()
-                    },
-                    WriteSetChangeEnum::DeleteTableItem(delete_table_item) => {
-                        CurrentTokenPendingClaim::from_delete_table_item(
-                            delete_table_item,
-                            txn_version,
-                            txn_timestamp,
-                            table_handle_to_owner,
-                        )
-                        .unwrap()
-                    },
-                    _ => None,
-                };
 
                 if let Some((token, maybe_token_ownership, maybe_current_token_ownership)) =
                     maybe_token_w_ownership
@@ -238,17 +209,6 @@ impl Token {
                         current_collection_data,
                     );
                 }
-                if let Some(claim) = maybe_current_token_claim {
-                    current_token_claims.insert(
-                        (
-                            claim.token_data_id_hash.clone(),
-                            claim.property_version.clone(),
-                            claim.from_address.clone(),
-                            claim.to_address.clone(),
-                        ),
-                        claim,
-                    );
-                }
             }
             return (
                 tokens.into_values().collect(),
@@ -258,7 +218,6 @@ impl Token {
                 current_token_ownerships,
                 current_token_datas,
                 current_collection_datas,
-                current_token_claims,
             );
         }
         Default::default()

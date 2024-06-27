@@ -8,7 +8,10 @@ use crate::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
         },
-        token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
+        token_models::{
+            token_claims::CurrentTokenPendingClaim,
+            tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
+        },
         token_v2_models::{
             v1_token_royalty::CurrentTokenRoyaltyV1,
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
@@ -108,6 +111,7 @@ async fn insert_to_db(
     token_activities_v2: &[TokenActivityV2],
     current_token_v2_metadata: &[CurrentTokenV2Metadata],
     current_token_royalties_v1: &[CurrentTokenRoyaltyV1],
+    current_token_claims: &[CurrentTokenPendingClaim],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -202,11 +206,20 @@ async fn insert_to_db(
         ),
     );
     let ctr_v1 = execute_in_chunks(
-        conn,
+        conn.clone(),
         insert_current_token_royalties_v1_query,
         current_token_royalties_v1,
         get_config_table_chunk_size::<CurrentTokenRoyaltyV1>(
             "current_token_royalty_v1",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ctc_v1 = execute_in_chunks(
+        conn,
+        insert_current_token_claims_query,
+        current_token_claims,
+        get_config_table_chunk_size::<CurrentTokenPendingClaim>(
+            "current_token_pending_claims",
             per_table_chunk_sizes,
         ),
     );
@@ -223,8 +236,10 @@ async fn insert_to_db(
         ta_v2_res,
         ct_v2_res,
         ctr_v1_res,
+        ctc_v1_res,
     ) = tokio::join!(
-        coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, ctr_v1
+        coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, ctr_v1,
+        ctc_v1
     );
 
     for res in [
@@ -239,6 +254,7 @@ async fn insert_to_db(
         ta_v2_res,
         ct_v2_res,
         ctr_v1_res,
+        ctc_v1_res,
     ] {
         res?;
     }
@@ -519,6 +535,37 @@ fn insert_current_token_royalties_v1_query(
     )
 }
 
+fn insert_current_token_claims_query(
+    items_to_insert: Vec<CurrentTokenPendingClaim>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::current_token_pending_claims::dsl::*;
+
+    (
+        diesel::insert_into(schema::current_token_pending_claims::table)
+            .values(items_to_insert)
+            .on_conflict((
+                token_data_id_hash, property_version, from_address, to_address
+            ))
+            .do_update()
+            .set((
+                collection_data_id_hash.eq(excluded(collection_data_id_hash)),
+                creator_address.eq(excluded(creator_address)),
+                collection_name.eq(excluded(collection_name)),
+                name.eq(excluded(name)),
+                amount.eq(excluded(amount)),
+                table_handle.eq(excluded(table_handle)),
+                last_transaction_version.eq(excluded(last_transaction_version)),
+                inserted_at.eq(excluded(inserted_at)),
+                token_data_id.eq(excluded(token_data_id)),
+                collection_id.eq(excluded(collection_id)),
+            )),
+        Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
 #[async_trait]
 impl ProcessorTrait for TokenV2Processor {
     fn name(&self) -> &'static str {
@@ -542,6 +589,8 @@ impl ProcessorTrait for TokenV2Processor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
+        // get pending token
+
         let query_retries = self.config.query_retries;
         let query_retry_delay_ms = self.config.query_retry_delay_ms;
         // Token V2 processing which includes token v1
@@ -557,6 +606,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_activities_v2,
             current_token_v2_metadata,
             current_token_royalties_v1,
+            current_token_claims,
         ) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
@@ -586,6 +636,7 @@ impl ProcessorTrait for TokenV2Processor {
             &token_activities_v2,
             &current_token_v2_metadata,
             &current_token_royalties_v1,
+            &current_token_claims,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -637,6 +688,7 @@ async fn parse_v2_token(
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
     Vec<CurrentTokenRoyaltyV1>,
+    Vec<CurrentTokenPendingClaim>,
 ) {
     // Token V2 and V1 combined
     let mut collections_v2 = vec![];
@@ -666,6 +718,11 @@ async fn parse_v2_token(
         AHashMap::new();
     let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, CurrentTokenRoyaltyV1> =
         AHashMap::new();
+    // migrating this from v1 token model as we don't have any replacement table for this
+    let mut all_current_token_claims: AHashMap<
+        CurrentTokenPendingClaimPK,
+        CurrentTokenPendingClaim,
+    > = AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
     for txn in transactions {
@@ -917,6 +974,25 @@ async fn parse_v2_token(
                                 );
                             }
                         }
+                        if let Some(current_token_token_claim) =
+                            CurrentTokenPendingClaim::from_write_table_item(
+                                table_item,
+                                txn_version,
+                                txn_timestamp,
+                                table_handle_to_owner,
+                            )
+                            .unwrap()
+                        {
+                            all_current_token_claims.insert(
+                                (
+                                    current_token_token_claim.token_data_id_hash.clone(),
+                                    current_token_token_claim.property_version.clone(),
+                                    current_token_token_claim.from_address.clone(),
+                                    current_token_token_claim.to_address.clone(),
+                                ),
+                                current_token_token_claim,
+                            );
+                        }
                     },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
@@ -949,6 +1025,25 @@ async fn parse_v2_token(
                                     cto,
                                 );
                             }
+                        }
+                        if let Some(current_token_token_claim) =
+                            CurrentTokenPendingClaim::from_delete_table_item(
+                                table_item,
+                                txn_version,
+                                txn_timestamp,
+                                table_handle_to_owner,
+                            )
+                            .unwrap()
+                        {
+                            all_current_token_claims.insert(
+                                (
+                                    current_token_token_claim.token_data_id_hash.clone(),
+                                    current_token_token_claim.property_version.clone(),
+                                    current_token_token_claim.from_address.clone(),
+                                    current_token_token_claim.to_address.clone(),
+                                ),
+                                current_token_token_claim,
+                            );
                         }
                     },
                     Change::WriteResource(resource) => {
@@ -1161,7 +1256,9 @@ async fn parse_v2_token(
     let mut current_token_royalties_v1 = current_token_royalties_v1
         .into_values()
         .collect::<Vec<CurrentTokenRoyaltyV1>>();
-
+    let mut all_current_token_claims = all_current_token_claims
+        .into_values()
+        .collect::<Vec<CurrentTokenPendingClaim>>();
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
     current_deleted_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
@@ -1198,6 +1295,20 @@ async fn parse_v2_token(
             ))
     });
     current_token_royalties_v1.sort();
+    all_current_token_claims.sort_by(|a, b| {
+        (
+            &a.token_data_id_hash,
+            &a.property_version,
+            &a.from_address,
+            &a.to_address,
+        )
+            .cmp(&(
+                &b.token_data_id_hash,
+                &b.property_version,
+                &b.from_address,
+                &a.to_address,
+            ))
+    });
 
     (
         collections_v2,
@@ -1211,5 +1322,6 @@ async fn parse_v2_token(
         token_activities_v2,
         current_token_v2_metadata,
         current_token_royalties_v1,
+        all_current_token_claims,
     )
 }
