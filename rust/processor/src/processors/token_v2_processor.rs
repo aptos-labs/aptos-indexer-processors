@@ -91,6 +91,7 @@ impl Debug for TokenV2Processor {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_to_db(
     conn: ArcDbPool,
     name: &'static str,
