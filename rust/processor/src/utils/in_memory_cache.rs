@@ -148,9 +148,12 @@ impl InMemoryCache {
                 // If the last value in the cache has already been streamed, wait until the next value is inserted and return it
                 if current_transaction_version == last_transaction_version + 1 {
                     // Wait until the next value is inserted
-                    self.stream_notify.notified().await;
-                    let cached_events = self.get(&current_transaction_version).unwrap();
-                    return Some((cached_events, current_transaction_version + 1));
+                    loop {
+                        self.stream_notify.notified().await;
+                        if let Some(cached_events) = self.get(&current_transaction_version) {
+                            return Some((cached_events, current_transaction_version + 1));
+                        }
+                    }
                 }
                 // Stream is in cache bounds
                 // If the next value to stream is in the cache, return it
