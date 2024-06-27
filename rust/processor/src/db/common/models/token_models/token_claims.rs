@@ -12,7 +12,9 @@ use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
+)]
 #[diesel(primary_key(token_data_id_hash, property_version, from_address, to_address))]
 #[diesel(table_name = current_token_pending_claims)]
 pub struct CurrentTokenPendingClaim {
@@ -30,6 +32,22 @@ pub struct CurrentTokenPendingClaim {
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub token_data_id: String,
     pub collection_id: String,
+}
+
+impl Ord for CurrentTokenPendingClaim {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.token_data_id_hash
+            .cmp(&other.token_data_id_hash)
+            .then(self.property_version.cmp(&other.property_version))
+            .then(self.from_address.cmp(&other.from_address))
+            .then(self.to_address.cmp(&other.to_address))
+    }
+}
+
+impl PartialOrd for CurrentTokenPendingClaim {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl CurrentTokenPendingClaim {

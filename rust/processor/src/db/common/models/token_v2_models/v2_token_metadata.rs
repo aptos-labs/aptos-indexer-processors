@@ -25,7 +25,9 @@ use serde_json::Value;
 // PK of current_objects, i.e. object_address, resource_type
 pub type CurrentTokenV2MetadataPK = (String, String);
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
+)]
 #[diesel(primary_key(object_address, resource_type))]
 #[diesel(table_name = current_token_v2_metadata)]
 pub struct CurrentTokenV2Metadata {
@@ -34,6 +36,19 @@ pub struct CurrentTokenV2Metadata {
     pub data: Value,
     pub state_key_hash: String,
     pub last_transaction_version: i64,
+}
+
+impl Ord for CurrentTokenV2Metadata {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.object_address
+            .cmp(&other.object_address)
+            .then(self.resource_type.cmp(&other.resource_type))
+    }
+}
+impl PartialOrd for CurrentTokenV2Metadata {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl CurrentTokenV2Metadata {

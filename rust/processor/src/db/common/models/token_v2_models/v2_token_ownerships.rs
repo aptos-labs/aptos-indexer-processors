@@ -55,7 +55,9 @@ pub struct TokenOwnershipV2 {
     pub non_transferrable_by_owner: Option<bool>,
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
+)]
 #[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
 #[diesel(table_name = current_token_ownerships_v2)]
 pub struct CurrentTokenOwnershipV2 {
@@ -72,6 +74,22 @@ pub struct CurrentTokenOwnershipV2 {
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub non_transferrable_by_owner: Option<bool>,
+}
+
+impl Ord for CurrentTokenOwnershipV2 {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.token_data_id
+            .cmp(&other.token_data_id)
+            .then(self.property_version_v1.cmp(&other.property_version_v1))
+            .then(self.owner_address.cmp(&other.owner_address))
+            .then(self.storage_id.cmp(&other.storage_id))
+    }
+}
+
+impl PartialOrd for CurrentTokenOwnershipV2 {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 // Facilitate tracking when a token is burned

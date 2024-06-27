@@ -590,8 +590,6 @@ impl ProcessorTrait for TokenV2Processor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
-        // get pending token
-
         let query_retries = self.config.query_retries;
         let query_retry_delay_ms = self.config.query_retry_delay_ms;
         // Token V2 processing which includes token v1
@@ -1264,52 +1262,11 @@ async fn parse_v2_token(
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
     current_deleted_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
     current_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
-    current_token_ownerships_v2.sort_by(|a, b| {
-        (
-            &a.token_data_id,
-            &a.property_version_v1,
-            &a.owner_address,
-            &a.storage_id,
-        )
-            .cmp(&(
-                &b.token_data_id,
-                &b.property_version_v1,
-                &b.owner_address,
-                &b.storage_id,
-            ))
-    });
-    current_token_v2_metadata.sort_by(|a, b| {
-        (&a.object_address, &a.resource_type).cmp(&(&b.object_address, &b.resource_type))
-    });
-    current_deleted_token_ownerships_v2.sort_by(|a, b| {
-        (
-            &a.token_data_id,
-            &a.property_version_v1,
-            &a.owner_address,
-            &a.storage_id,
-        )
-            .cmp(&(
-                &b.token_data_id,
-                &b.property_version_v1,
-                &b.owner_address,
-                &b.storage_id,
-            ))
-    });
+    current_token_ownerships_v2.sort();
+    current_token_v2_metadata.sort();
+    current_deleted_token_ownerships_v2.sort();
     current_token_royalties_v1.sort();
-    all_current_token_claims.sort_by(|a, b| {
-        (
-            &a.token_data_id_hash,
-            &a.property_version,
-            &a.from_address,
-            &a.to_address,
-        )
-            .cmp(&(
-                &b.token_data_id_hash,
-                &b.property_version,
-                &b.from_address,
-                &a.to_address,
-            ))
-    });
+    all_current_token_claims.sort();
 
     (
         collections_v2,
