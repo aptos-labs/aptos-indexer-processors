@@ -78,7 +78,7 @@ impl Cache<i64, CachedEvents> for InMemoryCache {
 
             // Update tail and notify stream
             self.tail.store(tail + 1, Ordering::Relaxed);
-            self.stream_notify.notify_waiters();
+            self.stream_notify.notify_one();
         }
 
         // Notify eviction task if cache size exceeds trigger size
