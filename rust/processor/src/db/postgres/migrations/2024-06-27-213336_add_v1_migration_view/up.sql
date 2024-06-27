@@ -15,4 +15,7 @@ SELECT collection_id as collection_data_id_hash,
     table_handle_v1 as table_handle,
     last_transaction_timestamp
 FROM current_collections_v2
-WHERE token_standard = 'v1'
+WHERE token_standard = 'v1';
+
+-- If you would like to run these indices, please do it outside of diesel migration since it will be blocking processing
+-- CREATE INDEX CONCURRENTLY IF NOT EXISTS lm1_curr_cd_th_index ON public.current_collections_v2 USING btree (table_handle);
