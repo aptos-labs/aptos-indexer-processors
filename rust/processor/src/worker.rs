@@ -81,28 +81,29 @@ bitflags! {
         const COIN_ACTIVITIES = 1 << 14;
         const COIN_BALANCES = 1 << 15;
         const CURRENT_COIN_BALANCES = 1 << 16;
+        const COIN_INFOS = 1 << 17;
 
-        // Coin supply
-        const COIN_SUPPLY = 1 << 17;
+        // fungible asset
+        const COIN_SUPPLY = 1 << 18;
 
         // Token
-        const TOKEN_ACTIVITIES = 1 << 18;
-        const TOKEN_OWNERSHIPS = 1 << 19;
-        const CURRENT_TOKEN_OWNERSHIPS = 1 << 20;
-        const TOKENS = 1 << 21;
-        const TOKEN_DATAS = 1 << 22;
-        const COLLECTION_DATAS = 1 << 23;
-        const CURRENT_TOKEN_DATAS = 1 << 24;
-        const NFT_POINTS = 1 << 25;
+        const TOKEN_ACTIVITIES = 1 << 19;
+        const TOKEN_OWNERSHIPS = 1 << 20;
+        const CURRENT_TOKEN_OWNERSHIPS = 1 << 21;
+        const TOKENS = 1 << 22;
+        const TOKEN_DATAS = 1 << 23;
+        const COLLECTION_DATAS = 1 << 24;
+        const CURRENT_TOKEN_DATAS = 1 << 25;
+        const NFT_POINTS = 1 << 26;
 
         // Token_v2 processor related flags
-        const TOKEN_OWNERSHIPS_V2 = 1 << 26;
-        const TOKEN_DATAS_V2 = 1 << 27;
-        const COLLECTIONS_V2 = 1 << 28;
-        const CURRENT_TOKEN_V2_METADATA = 1 << 29;
+        const TOKEN_OWNERSHIPS_V2 = 1 << 27;
+        const TOKEN_DATAS_V2 = 1 << 28;
+        const COLLECTIONS_V2 = 1 << 29;
+        const CURRENT_TOKEN_V2_METADATA = 1 << 30;
 
         // User transaction processor
-        const SIGNATURES = 1 << 30;
+        const SIGNATURES = 1 << 31;
     }
 }
 

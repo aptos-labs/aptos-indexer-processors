@@ -224,7 +224,7 @@ impl ProcessorTrait for CoinProcessor {
 
         let (
             mut all_coin_activities,
-            all_coin_infos,
+            mut all_coin_infos,
             mut all_coin_balances,
             mut all_current_coin_balances,
         ) = tokio::task::spawn_blocking(move || {
@@ -277,6 +277,9 @@ impl ProcessorTrait for CoinProcessor {
             .contains(TableFlags::CURRENT_COIN_BALANCES)
         {
             all_current_coin_balances.clear();
+        }
+        if self.deprecated_tables.contains(TableFlags::COIN_INFOS) {
+            all_coin_infos.clear();
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
