@@ -10,7 +10,6 @@ use crate::{
     gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
-    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -23,19 +22,13 @@ use tracing::{error, warn};
 pub struct TransactionMetadataProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
-    deprecated_tables: TableFlags,
 }
 
 impl TransactionMetadataProcessor {
-    pub fn new(
-        connection_pool: ArcDbPool,
-        per_table_chunk_sizes: AHashMap<String, usize>,
-        deprecated_tables: TableFlags,
-    ) -> Self {
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
-            deprecated_tables,
         }
     }
 }
@@ -188,22 +181,6 @@ impl ProcessorTrait for TransactionMetadataProcessor {
                     index as i64,
                 ));
             }
-        }
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::TRANSACTION_SIZE_INFO)
-        {
-            transaction_sizes.clear();
-        }
-        if self.deprecated_tables.contains(TableFlags::EVENT_SIZE_INFO) {
-            event_sizes.clear();
-        }
-        if self
-            .deprecated_tables
-            .contains(TableFlags::WRITE_SET_SIZE_INFO)
-        {
-            write_set_sizes.clear();
         }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();

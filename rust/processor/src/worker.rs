@@ -56,7 +56,6 @@ pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 bitflags! {
     #[derive(Debug, Clone, Copy)]
     pub struct TableFlags: u64 {
-        // default processor
         const TRANSACTIONS = 1 << 0;
         const WRITE_SET_CHANGES = 1 << 1;
         const MOVE_RESOURCES = 1 << 2;
@@ -64,51 +63,46 @@ bitflags! {
         const TABLE_METADATAS = 1 << 4;
         const MOVE_MODULES = 1 << 5;
 
-        // fungible asset
+        // Fungible asset
         const FUNGIBLE_ASSET_BALANCES = 1 << 6;
         const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 7;
 
-        // transactions metadata
-        const EVENT_SIZE_INFO = 1 << 8;
-        const TRANSACTION_SIZE_INFO = 1 << 9;
-        const WRITE_SET_SIZE_INFO = 1 << 10;
+        // Objects
+        const OBJECTS = 1 << 8;
 
-        // objects
-        const OBJECTS = 1 << 11;
+        // Ans
+        const CURRENT_ANS_LOOKUP = 1 << 9;
+        const CURRENT_ANS_PRIMARY_NAME = 1 << 10;
+        const ANS_PRIMARY_NAME_V2 = 1 << 11;
+        const ANS_LOOKUP = 1 << 12;
+        const ANS_PRIMARY_NAME = 1 << 13;
 
-        // ans
-        const CURRENT_ANS_LOOKUP = 1 << 12;
-        const CURRENT_ANS_PRIMARY_NAME = 1 << 13;
-        const ANS_PRIMARY_NAME_V2 = 1 << 14;
-        const ANS_LOOKUP = 1 << 15;
-        const ANS_PRIMARY_NAME = 1 << 16;
+        // Coin
+        const COIN_ACTIVITIES = 1 << 14;
+        const COIN_BALANCES = 1 << 15;
+        const CURRENT_COIN_BALANCES = 1 << 16;
 
-        // coin
-        const COIN_ACTIVITIES = 1 << 17;
-        const COIN_BALANCES = 1 << 18;
-        const CURRENT_COIN_BALANCES = 1 << 19;
+        // Coin supply
+        const COIN_SUPPLY = 1 << 17;
 
-        // coin supply
-        const COIN_SUPPLY = 1 << 20;
+        // Token
+        const TOKEN_ACTIVITIES = 1 << 18;
+        const TOKEN_OWNERSHIPS = 1 << 19;
+        const CURRENT_TOKEN_OWNERSHIPS = 1 << 20;
+        const TOKENS = 1 << 21;
+        const TOKEN_DATAS = 1 << 22;
+        const COLLECTION_DATAS = 1 << 23;
+        const CURRENT_TOKEN_DATAS = 1 << 24;
+        const NFT_POINTS = 1 << 25;
 
-        // token
-        const TOKEN_ACTIVITIES = 1 << 21;
-        const TOKEN_OWNERSHIPS = 1 << 22;
-        const CURRENT_TOKEN_OWNERSHIPS = 1 << 23;
-        const TOKENS = 1 << 24;
-        const TOKEN_DATAS = 1 << 25;
-        const COLLECTION_DATAS = 1 << 26;
-        const CURRENT_TOKEN_DATAS = 1 << 27;
-        const NFT_POINTS = 1 << 28;
-
-        // token_v2 processor related flags
-        const TOKEN_OWNERSHIPS_V2 = 1 << 29;
-        const TOKEN_DATAS_V2 = 1 << 30;
-        const COLLECTIONS_V2 = 1 << 31;
-        const CURRENT_TOKEN_V2_METADATA = 1 << 32;
+        // Token_v2 processor related flags
+        const TOKEN_OWNERSHIPS_V2 = 1 << 26;
+        const TOKEN_DATAS_V2 = 1 << 27;
+        const COLLECTIONS_V2 = 1 << 28;
+        const CURRENT_TOKEN_V2_METADATA = 1 << 29;
 
         // User transaction processor
-        const SIGNATURES = 1 << 33;
+        const SIGNATURES = 1 << 30;
     }
 }
 
@@ -919,7 +913,7 @@ pub fn build_processor(
             deprecated_tables,
         )),
         ProcessorConfig::TransactionMetadataProcessor => Processor::from(
-            TransactionMetadataProcessor::new(db_pool, per_table_chunk_sizes, deprecated_tables),
+            TransactionMetadataProcessor::new(db_pool, per_table_chunk_sizes),
         ),
         ProcessorConfig::UserTransactionProcessor => Processor::from(
             UserTransactionProcessor::new(db_pool, per_table_chunk_sizes, deprecated_tables),
