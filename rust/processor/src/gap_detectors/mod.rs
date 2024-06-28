@@ -45,11 +45,10 @@ pub enum ProcessingResult {
 }
 
 pub async fn create_gap_detector_status_tracker_loop(
+    mut gap_detector: Box<dyn GapDetectorTrait + Send>,
     gap_detector_receiver: AsyncReceiver<ProcessingResult>,
     processor: Processor,
-    starting_version: u64,
     gap_detection_batch_size: u64,
-    is_parquet_processor: bool,
 ) {
     let processor_name = processor.name();
     info!(
@@ -58,11 +57,6 @@ pub async fn create_gap_detector_status_tracker_loop(
         "[Parser] Starting gap detector task",
     );
 
-    let mut gap_detector: Box<dyn GapDetectorTrait + Send> = if is_parquet_processor {
-        Box::new(ParquetFileGapDetector::new(starting_version))
-    } else {
-        Box::new(DefaultGapDetector::new(starting_version))
-    };
     let mut last_update_time = std::time::Instant::now();
     loop {
         match gap_detector_receiver.recv().await {

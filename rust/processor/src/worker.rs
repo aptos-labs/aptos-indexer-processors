@@ -45,6 +45,9 @@ use std::collections::HashSet;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
+use crate::gap_detectors::gap_detector::DefaultGapDetector;
+use crate::gap_detectors::GapDetectorTrait;
+use crate::gap_detectors::parquet_gap_detector::ParquetFileGapDetector;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
@@ -323,13 +326,18 @@ impl Worker {
             (processor, gap_detection_batch_size)
         };
 
+        let gap_detector: Box<dyn GapDetectorTrait + Send> = if is_parquet_processor {
+            Box::new(ParquetFileGapDetector::new(starting_version))
+        } else {
+            Box::new(DefaultGapDetector::new(starting_version))
+        };
+
         tokio::spawn(async move {
             create_gap_detector_status_tracker_loop(
+                gap_detector,
                 gap_detector_receiver,
                 processor,
-                starting_version,
                 gap_detection_batch_size,
-                is_parquet_processor,
             )
             .await;
         });
