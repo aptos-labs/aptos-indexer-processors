@@ -4,7 +4,10 @@
 use crate::{
     config::IndexerGrpcHttp2Config,
     db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
-    gap_detectors::{create_gap_detector_status_tracker_loop, ProcessingResult},
+    gap_detectors::{
+        create_gap_detector_status_tracker_loop, gap_detector::DefaultGapDetector,
+        parquet_gap_detector::ParquetFileGapDetector, GapDetectorTrait, ProcessingResult,
+    },
     grpc_stream::TransactionsPBResponse,
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -45,9 +48,6 @@ use std::collections::HashSet;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
-use crate::gap_detectors::gap_detector::DefaultGapDetector;
-use crate::gap_detectors::GapDetectorTrait;
-use crate::gap_detectors::parquet_gap_detector::ParquetFileGapDetector;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
