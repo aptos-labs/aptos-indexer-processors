@@ -54,8 +54,8 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 - `starting_version`: start processor at starting_version.
 - `ending_version`: stop processor after ending_version.
 - `number_concurrent_processing_tasks`: number of tasks to parse and insert; 1 means sequential processing, otherwise,
-- `deprecated_tables`: a list of tables to skip writing to alloyDB.
-  transactions are splitted into tasks and inserted with random order.
+- `deprecated_tables`: a list of tables to skip writing to alloyDB. you can find a full list of deprecated tables [here](https://aptoslabs.notion.site/Deprecated-Tables-33518cfcff0543378289b2bf06001576?pvs=4)  
+transactions are splitted into tasks and inserted with random order.
 
 ### Use docker image for existing parsers(Only for **Unix/Linux**)
 

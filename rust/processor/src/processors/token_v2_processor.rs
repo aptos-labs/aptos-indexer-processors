@@ -36,6 +36,7 @@ use crate::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool, DbPoolConnection},
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
+    worker::TableFlags,
     IndexerGrpcProcessorConfig,
 };
 use ahash::{AHashMap, AHashSet};
@@ -64,6 +65,7 @@ pub struct TokenV2Processor {
     connection_pool: ArcDbPool,
     config: TokenV2ProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl TokenV2Processor {
@@ -71,11 +73,13 @@ impl TokenV2Processor {
         connection_pool: ArcDbPool,
         config: TokenV2ProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
     ) -> Self {
         Self {
             connection_pool,
             config,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -594,16 +598,16 @@ impl ProcessorTrait for TokenV2Processor {
         let query_retry_delay_ms = self.config.query_retry_delay_ms;
         // Token V2 processing which includes token v1
         let (
-            collections_v2,
-            token_datas_v2,
-            token_ownerships_v2,
+            mut collections_v2,
+            mut token_datas_v2,
+            mut token_ownerships_v2,
             current_collections_v2,
             current_token_datas_v2,
             current_deleted_token_datas_v2,
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
             token_activities_v2,
-            current_token_v2_metadata,
+            mut current_token_v2_metadata,
             current_token_royalties_v1,
             current_token_claims,
         ) = parse_v2_token(
@@ -617,6 +621,25 @@ impl ProcessorTrait for TokenV2Processor {
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
+
+        if self
+            .deprecated_tables
+            .contains(TableFlags::TOKEN_OWNERSHIPS_V2)
+        {
+            token_ownerships_v2.clear();
+        }
+        if self.deprecated_tables.contains(TableFlags::TOKEN_DATAS_V2) {
+            token_datas_v2.clear();
+        }
+        if self.deprecated_tables.contains(TableFlags::COLLECTIONS_V2) {
+            collections_v2.clear();
+        }
+        if self
+            .deprecated_tables
+            .contains(TableFlags::CURRENT_TOKEN_V2_METADATA)
+        {
+            current_token_v2_metadata.clear();
+        }
 
         let tx_result = insert_to_db(
             self.get_pool(),

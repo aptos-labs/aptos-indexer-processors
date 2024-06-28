@@ -17,6 +17,7 @@ use crate::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::standardize_address,
     },
+    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -45,6 +46,7 @@ pub struct AnsProcessor {
     connection_pool: ArcDbPool,
     config: AnsProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl AnsProcessor {
@@ -52,6 +54,7 @@ impl AnsProcessor {
         connection_pool: ArcDbPool,
         config: AnsProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
     ) -> Self {
         tracing::info!(
             ans_v1_primary_names_table_handle = config.ans_v1_primary_names_table_handle,
@@ -63,6 +66,7 @@ impl AnsProcessor {
             connection_pool,
             config,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -372,14 +376,14 @@ impl ProcessorTrait for AnsProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let (
-            all_current_ans_lookups,
-            all_ans_lookups,
-            all_current_ans_primary_names,
-            all_ans_primary_names,
+            mut all_current_ans_lookups,
+            mut all_ans_lookups,
+            mut all_current_ans_primary_names,
+            mut all_ans_primary_names,
             all_current_ans_lookups_v2,
             all_ans_lookups_v2,
             all_current_ans_primary_names_v2,
-            all_ans_primary_names_v2,
+            mut all_ans_primary_names_v2,
         ) = parse_ans(
             &transactions,
             self.config.ans_v1_primary_names_table_handle.clone(),
@@ -389,6 +393,34 @@ impl ProcessorTrait for AnsProcessor {
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
+
+        if self
+            .deprecated_tables
+            .contains(TableFlags::ANS_PRIMARY_NAME)
+        {
+            all_ans_primary_names.clear();
+        }
+        if self
+            .deprecated_tables
+            .contains(TableFlags::ANS_PRIMARY_NAME_V2)
+        {
+            all_ans_primary_names_v2.clear();
+        }
+        if self.deprecated_tables.contains(TableFlags::ANS_LOOKUP) {
+            all_ans_lookups.clear();
+        }
+        if self
+            .deprecated_tables
+            .contains(TableFlags::CURRENT_ANS_LOOKUP)
+        {
+            all_current_ans_lookups.clear();
+        }
+        if self
+            .deprecated_tables
+            .contains(TableFlags::CURRENT_ANS_PRIMARY_NAME)
+        {
+            all_current_ans_primary_names.clear();
+        }
 
         // Insert values to db
         let tx_result = insert_to_db(

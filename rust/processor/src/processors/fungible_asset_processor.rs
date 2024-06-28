@@ -28,6 +28,7 @@ use crate::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
         util::{get_entry_function_from_user_request, standardize_address},
     },
+    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -45,13 +46,19 @@ use tracing::error;
 pub struct FungibleAssetProcessor {
     connection_pool: ArcDbPool,
     per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl FungibleAssetProcessor {
-    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+    pub fn new(
+        connection_pool: ArcDbPool,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
+    ) -> Self {
         Self {
             connection_pool,
             per_table_chunk_sizes,
+            deprecated_tables,
         }
     }
 }
@@ -355,10 +362,10 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let (
             fungible_asset_activities,
             fungible_asset_metadata,
-            fungible_asset_balances,
-            current_fungible_asset_balances,
+            mut fungible_asset_balances,
+            mut current_fungible_asset_balances,
             current_unified_fungible_asset_balances,
-            coin_supply,
+            mut coin_supply,
         ) = parse_v2_coin(&transactions).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
@@ -367,6 +374,25 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let (coin_balance, fa_balance): (Vec<_>, Vec<_>) = current_unified_fungible_asset_balances
             .into_iter()
             .partition(|x| x.is_primary.is_none());
+
+        if self
+            .deprecated_tables
+            .contains(TableFlags::FUNGIBLE_ASSET_BALANCES)
+        {
+            fungible_asset_balances.clear();
+        }
+
+        if self
+            .deprecated_tables
+            .contains(TableFlags::CURRENT_FUNGIBLE_ASSET_BALANCES)
+        {
+            current_fungible_asset_balances.clear();
+        }
+
+        if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
+            coin_supply.clear();
+        }
+
         let tx_result = insert_to_db(
             self.get_pool(),
             self.name(),
