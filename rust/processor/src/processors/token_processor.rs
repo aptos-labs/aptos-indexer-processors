@@ -14,7 +14,6 @@ use crate::{
     gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
-    worker::TableFlags,
     IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
@@ -44,7 +43,6 @@ pub struct TokenProcessor {
     connection_pool: ArcDbPool,
     config: TokenProcessorConfig,
     per_table_chunk_sizes: AHashMap<String, usize>,
-    deprecated_tables: TableFlags,
 }
 
 impl TokenProcessor {
@@ -52,13 +50,11 @@ impl TokenProcessor {
         connection_pool: ArcDbPool,
         config: TokenProcessorConfig,
         per_table_chunk_sizes: AHashMap<String, usize>,
-        deprecated_tables: TableFlags,
     ) -> Self {
         Self {
             connection_pool,
             config,
             per_table_chunk_sizes,
-            deprecated_tables,
         }
     }
 }
@@ -487,46 +483,6 @@ impl ProcessorTrait for TokenProcessor {
         all_current_token_datas.sort_by(|a, b| a.token_data_id_hash.cmp(&b.token_data_id_hash));
         all_current_collection_datas
             .sort_by(|a, b| a.collection_data_id_hash.cmp(&b.collection_data_id_hash));
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::TOKEN_ACTIVITIES)
-        {
-            all_token_activities.clear();
-        }
-        if self
-            .deprecated_tables
-            .contains(TableFlags::TOKEN_OWNERSHIPS)
-        {
-            all_token_ownerships.clear();
-        }
-        if self.deprecated_tables.contains(TableFlags::TOKENS) {
-            all_tokens.clear();
-        }
-        if self.deprecated_tables.contains(TableFlags::TOKEN_DATAS) {
-            all_token_datas.clear();
-        }
-        if self
-            .deprecated_tables
-            .contains(TableFlags::COLLECTION_DATAS)
-        {
-            all_collection_datas.clear();
-        }
-        if self
-            .deprecated_tables
-            .contains(TableFlags::CURRENT_TOKEN_OWNERSHIPS)
-        {
-            all_current_token_ownerships.clear();
-        }
-        if self
-            .deprecated_tables
-            .contains(TableFlags::CURRENT_TOKEN_DATAS)
-        {
-            all_current_token_datas.clear();
-        }
-        if self.deprecated_tables.contains(TableFlags::NFT_POINTS) {
-            all_nft_points.clear();
-        }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();

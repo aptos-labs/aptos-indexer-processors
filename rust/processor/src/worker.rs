@@ -66,44 +66,32 @@ bitflags! {
         // Fungible asset
         const FUNGIBLE_ASSET_BALANCES = 1 << 6;
         const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 7;
+        const COIN_SUPPLY = 1 << 8;
 
         // Objects
-        const OBJECTS = 1 << 8;
+        const OBJECTS = 1 << 9;
 
         // Ans
-        const CURRENT_ANS_LOOKUP = 1 << 9;
-        const CURRENT_ANS_PRIMARY_NAME = 1 << 10;
-        const ANS_PRIMARY_NAME_V2 = 1 << 11;
-        const ANS_LOOKUP = 1 << 12;
-        const ANS_PRIMARY_NAME = 1 << 13;
+        const CURRENT_ANS_LOOKUP = 1 << 10;
+        const CURRENT_ANS_PRIMARY_NAME = 1 << 11;
+        const ANS_PRIMARY_NAME_V2 = 1 << 12;
+        const ANS_LOOKUP = 1 << 13;
+        const ANS_PRIMARY_NAME = 1 << 14;
 
         // Coin
-        const COIN_ACTIVITIES = 1 << 14;
-        const COIN_BALANCES = 1 << 15;
-        const CURRENT_COIN_BALANCES = 1 << 16;
-        const COIN_INFOS = 1 << 17;
+        const COIN_ACTIVITIES = 1 << 15;
+        const COIN_BALANCES = 1 << 16;
+        const CURRENT_COIN_BALANCES = 1 << 17;
+        const COIN_INFOS = 1 << 18;
 
-        // fungible asset
-        const COIN_SUPPLY = 1 << 18;
+        // Token_v2 processor flags
+        const TOKEN_OWNERSHIPS_V2 = 1 << 19;
+        const TOKEN_DATAS_V2 = 1 << 20;
+        const COLLECTIONS_V2 = 1 << 21;
+        const CURRENT_TOKEN_V2_METADATA = 1 << 22;
 
-        // Token
-        const TOKEN_ACTIVITIES = 1 << 19;
-        const TOKEN_OWNERSHIPS = 1 << 20;
-        const CURRENT_TOKEN_OWNERSHIPS = 1 << 21;
-        const TOKENS = 1 << 22;
-        const TOKEN_DATAS = 1 << 23;
-        const COLLECTION_DATAS = 1 << 24;
-        const CURRENT_TOKEN_DATAS = 1 << 25;
-        const NFT_POINTS = 1 << 26;
-
-        // Token_v2 processor related flags
-        const TOKEN_OWNERSHIPS_V2 = 1 << 27;
-        const TOKEN_DATAS_V2 = 1 << 28;
-        const COLLECTIONS_V2 = 1 << 29;
-        const CURRENT_TOKEN_V2_METADATA = 1 << 30;
-
-        // User transaction processor
-        const SIGNATURES = 1 << 31;
+        // User transaction
+        const SIGNATURES = 1 << 23;
     }
 }
 
@@ -868,11 +856,9 @@ pub fn build_processor(
             per_table_chunk_sizes,
             deprecated_tables,
         )),
-        ProcessorConfig::CoinProcessor => Processor::from(CoinProcessor::new(
-            db_pool,
-            per_table_chunk_sizes,
-            deprecated_tables,
-        )),
+        ProcessorConfig::CoinProcessor => {
+            Processor::from(CoinProcessor::new(db_pool, per_table_chunk_sizes))
+        },
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(
             db_pool,
             per_table_chunk_sizes,
@@ -905,7 +891,6 @@ pub fn build_processor(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
-            deprecated_tables,
         )),
         ProcessorConfig::TokenV2Processor(config) => Processor::from(TokenV2Processor::new(
             db_pool,
