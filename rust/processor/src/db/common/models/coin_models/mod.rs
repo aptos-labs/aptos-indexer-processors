@@ -6,3 +6,6 @@ pub mod coin_balances;
 pub mod coin_infos;
 pub mod coin_supply;
 pub mod coin_utils;
+
+// parquet models
+pub mod parquet_coin_supply;
