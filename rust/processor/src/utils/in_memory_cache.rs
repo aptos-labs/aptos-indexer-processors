@@ -146,7 +146,7 @@ impl InMemoryCache {
 
                 // Stream is ahead of cache
                 // If the last value in the cache has already been streamed, wait until the next value is inserted and return it
-                if current_transaction_version == last_transaction_version + 1 {
+                if current_transaction_version > last_transaction_version {
                     // Wait until the next value is inserted
                     loop {
                         self.stream_notify.notified().await;
