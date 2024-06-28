@@ -3,4 +3,8 @@
 
 pub mod counters;
 pub mod database;
+pub mod filter;
+pub mod filter_editor;
+pub mod in_memory_cache;
+pub mod stream;
 pub mod util;

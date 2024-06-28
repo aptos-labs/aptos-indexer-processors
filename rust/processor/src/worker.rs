@@ -9,7 +9,8 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+        event_stream_processor::EventStreamProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor, parquet_default_processor::DefaultParquetProcessor,
         stake_processor::StakeProcessor, token_processor::TokenProcessor,
@@ -33,6 +34,10 @@ use crate::{
         database::{
             execute_with_better_error_conn, new_db_pool, run_pending_migrations, ArcDbPool,
         },
+        filter::EventFilter,
+        filter_editor::spawn_filter_editor,
+        in_memory_cache::InMemoryCache,
+        stream::spawn_stream,
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
@@ -40,11 +45,13 @@ use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use bitflags::bitflags;
+use futures::StreamExt;
 use kanal::AsyncSender;
-use std::collections::HashSet;
-use tokio::task::JoinHandle;
+use std::{collections::HashSet, sync::Arc};
+use tokio::{sync::Notify, task::JoinHandle};
 use tracing::{debug, error, info};
 use url::Url;
+use warp::Filter;
 
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
@@ -62,6 +69,28 @@ bitflags! {
         const MOVE_RESOURCES = 4;
         const TABLE_ITEMS = 8;
     }
+}
+
+/// Handles WebSocket connection from /filter endpoint
+async fn handle_websocket(
+    websocket: warp::ws::WebSocket,
+    query_params: AHashMap<String, String>,
+    cache: Arc<InMemoryCache>,
+) {
+    let (tx, rx) = websocket.split();
+    let filter = Arc::new(EventFilter::new());
+
+    let start: Option<i64> = query_params.get("start").map(|s| s.parse::<i64>().unwrap());
+
+    let filter_edit = filter.clone();
+    let filter_edit_notify = Arc::new(Notify::new());
+
+    let filter_edit_notify_clone = filter_edit_notify.clone();
+    tokio::spawn(
+        async move { spawn_filter_editor(rx, filter_edit, filter_edit_notify_clone).await },
+    );
+
+    spawn_stream(tx, filter.clone(), cache.clone(), start, filter_edit_notify).await;
 }
 
 pub struct Worker {
@@ -201,6 +230,8 @@ impl Worker {
             "[Parser] Building processor",
         );
 
+        let cache = InMemoryCache::with_capacity(3_300_000_000, 3_000_000_000, 1_000_000);
+
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
         // get the chain id
@@ -264,6 +295,8 @@ impl Worker {
             .await
         });
 
+        println!("1");
+
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
@@ -275,6 +308,7 @@ impl Worker {
                     self.deprecated_tables,
                     self.db_pool.clone(),
                     Some(gap_detector_sender.clone()),
+                    cache.clone(),
                 );
                 let gap_detection_batch_size: u64 = self.parquet_gap_detection_batch_size;
 
@@ -290,6 +324,7 @@ impl Worker {
                     self.deprecated_tables,
                     self.db_pool.clone(),
                     None,
+                    cache.clone(),
                 );
                 let gap_detection_batch_size = self.gap_detection_batch_size;
 
@@ -299,6 +334,7 @@ impl Worker {
                     Some(gap_detector_sender),
                 )
             };
+        println!("2");
 
         tokio::spawn(async move {
             create_gap_detector_status_tracker_loop(
@@ -309,6 +345,25 @@ impl Worker {
             )
             .await;
         });
+
+        println!("3");
+        if self.processor_config.name() == "event_stream_processor" {
+            println!("4");
+            // Create web server
+            let cache_arc = cache.clone();
+            let cache_ws = warp::any().map(move || cache_arc.clone());
+            tokio::spawn(async move {
+                let ws_route = warp::path("stream")
+                    .and(warp::ws())
+                    .and(warp::query::<AHashMap<String, String>>())
+                    .and(cache_ws)
+                    .map(|ws: warp::ws::Ws, query_params, cache| {
+                        ws.on_upgrade(move |socket| handle_websocket(socket, query_params, cache))
+                    });
+
+                warp::serve(ws_route).run(([0, 0, 0, 0], 12345)).await;
+            });
+        }
 
         // This is the consumer side of the channel. These are the major states:
         // 1. We're backfilling so we should expect many concurrent threads to process transactions
@@ -327,8 +382,13 @@ impl Worker {
 
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
-            let join_handle: JoinHandle<()> = self
-                .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
+            let join_handle = self
+                .launch_processor_task(
+                    task_index,
+                    receiver.clone(),
+                    gap_detector_sender.clone(),
+                    cache.clone(),
+                )
                 .await;
             processor_tasks.push(join_handle);
         }
@@ -352,6 +412,7 @@ impl Worker {
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: Option<AsyncSender<ProcessingResult>>,
+        cache: Arc<InMemoryCache>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -365,6 +426,7 @@ impl Worker {
             self.deprecated_tables,
             self.db_pool.clone(),
             gap_detector_sender.clone(),
+            cache.clone(),
         );
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
@@ -814,6 +876,7 @@ pub fn build_processor(
     deprecated_tables: TableFlags,
     db_pool: ArcDbPool,
     gap_detector_sender: Option<AsyncSender<ProcessingResult>>, // Parquet only
+    cache: Arc<InMemoryCache>,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -834,6 +897,9 @@ pub fn build_processor(
         )),
         ProcessorConfig::EventsProcessor => {
             Processor::from(EventsProcessor::new(db_pool, per_table_chunk_sizes))
+        },
+        ProcessorConfig::EventStreamProcessor => {
+            Processor::from(EventStreamProcessor::new(db_pool, cache))
         },
         ProcessorConfig::FungibleAssetProcessor => {
             Processor::from(FungibleAssetProcessor::new(db_pool, per_table_chunk_sizes))
