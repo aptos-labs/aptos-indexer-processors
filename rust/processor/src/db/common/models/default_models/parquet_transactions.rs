@@ -10,7 +10,7 @@ use super::{
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
-    bq_analytics::generic_parquet_processor::{HasVersion, NamedTable},
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         util::{get_clean_payload, get_clean_writeset, get_payload_type, standardize_address},
@@ -57,6 +57,12 @@ impl NamedTable for Transaction {
 impl HasVersion for Transaction {
     fn version(&self) -> i64 {
         self.txn_version
+    }
+}
+
+impl GetTimeStamp for Transaction {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
     }
 }
 

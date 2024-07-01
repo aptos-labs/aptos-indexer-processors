@@ -13,7 +13,6 @@ use tokio::{
     time::{sleep, timeout, Duration},
 };
 use tracing::{debug, error, info};
-const BUCKET_REGULAR_TRAFFIC: &str = "devnet-airflow-continue";
 const MAX_RETRIES: usize = 3;
 const INITIAL_DELAY_MS: u64 = 500;
 const TIMEOUT_SECONDS: u64 = 300;
@@ -22,6 +21,7 @@ pub async fn upload_parquet_to_gcs(
     file_path: &PathBuf,
     table_name: &str,
     bucket_name: &str,
+    bucket_root: &str,
 ) -> Result<(), ParquetProcessorError> {
     let mut file = TokioFile::open(&file_path)
         .await
@@ -54,13 +54,8 @@ pub async fn upload_parquet_to_gcs(
     let highwater_s = start_of_month.timestamp_millis();
     let highwater_ms = now.timestamp_millis();
     let counter = 0; // THIS NEED TO BE REPLACED OR REIMPLEMENTED WITH AN ACTUAL LOGIC TO ENSURE FILE UNIQUENESS.
-    let object_name: PathBuf = generate_parquet_file_path(
-        BUCKET_REGULAR_TRAFFIC,
-        table_name,
-        highwater_s,
-        highwater_ms,
-        counter,
-    );
+    let object_name: PathBuf =
+        generate_parquet_file_path(bucket_root, table_name, highwater_s, highwater_ms, counter);
 
     let file_name = object_name.to_str().unwrap().to_owned();
     let upload_type: UploadType = UploadType::Simple(Media::new(file_name.clone()));
