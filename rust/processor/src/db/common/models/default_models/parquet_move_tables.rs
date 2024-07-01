@@ -48,6 +48,7 @@ pub struct CurrentTableItem {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
 }
+
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct TableMetadata {
     pub handle: String,
