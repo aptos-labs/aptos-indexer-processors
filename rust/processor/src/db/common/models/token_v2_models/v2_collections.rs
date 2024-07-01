@@ -47,6 +47,7 @@ pub struct CollectionV2 {
     pub mutable_description: Option<bool>,
     pub mutable_uri: Option<bool>,
     pub table_handle_v1: Option<String>,
+    pub collection_properties: Option<serde_json::Value>,
     pub token_standard: String,
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
@@ -67,6 +68,7 @@ pub struct CurrentCollectionV2 {
     pub mutable_uri: Option<bool>,
     pub table_handle_v1: Option<String>,
     pub token_standard: String,
+    pub collection_properties: Option<serde_json::Value>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
@@ -104,6 +106,7 @@ impl CollectionV2 {
             let (mut current_supply, mut max_supply, mut total_minted_v2) =
                 (BigDecimal::zero(), None, None);
             let (mut mutable_description, mut mutable_uri) = (None, None);
+            let mut collection_properties = serde_json::Value::Null;
             if let Some(object_data) = object_metadatas.get(&resource.address) {
                 // Getting supply data (prefer fixed supply over unlimited supply although they should never appear at the same time anyway)
                 let fixed_supply = object_data.fixed_supply.as_ref();
@@ -143,6 +146,12 @@ impl CollectionV2 {
                     mutable_description = Some(collection.mutable_description);
                     mutable_uri = Some(collection.mutable_uri);
                 }
+
+                collection_properties = object_data
+                    .property_map
+                    .as_ref()
+                    .map(|m| m.inner.clone())
+                    .unwrap_or(collection_properties);
             } else {
                 // ObjectCore should not be missing, returning from entire function early
                 return Ok(None);
@@ -169,6 +178,7 @@ impl CollectionV2 {
                     mutable_description,
                     mutable_uri,
                     table_handle_v1: None,
+                    collection_properties: Some(collection_properties.clone()),
                     token_standard: TokenStandard::V2.to_string(),
                     transaction_timestamp: txn_timestamp,
                 },
@@ -185,6 +195,7 @@ impl CollectionV2 {
                     mutable_uri,
                     table_handle_v1: None,
                     token_standard: TokenStandard::V2.to_string(),
+                    collection_properties: Some(collection_properties),
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
                 },
@@ -282,6 +293,7 @@ impl CollectionV2 {
                     table_handle_v1: Some(table_handle.clone()),
                     token_standard: TokenStandard::V1.to_string(),
                     transaction_timestamp: txn_timestamp,
+                    collection_properties: Some(serde_json::Value::Null),
                 },
                 CurrentCollectionV2 {
                     collection_id,
@@ -296,6 +308,7 @@ impl CollectionV2 {
                     mutable_description: Some(collection_data.mutability_config.description),
                     table_handle_v1: Some(table_handle),
                     token_standard: TokenStandard::V1.to_string(),
+                    collection_properties: Some(serde_json::Value::Null),
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
                 },
