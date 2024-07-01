@@ -228,6 +228,7 @@ diesel::table! {
         token_standard -> Varchar,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        collection_properties -> Nullable<Jsonb>,
     }
 }
 
@@ -364,6 +365,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        collection_properties -> Nullable<Jsonb>,
     }
 }
 
