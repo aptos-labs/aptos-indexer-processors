@@ -4,8 +4,8 @@
 use super::{ProcessorName, ProcessorTrait};
 use crate::{
     bq_analytics::{
-        generic_parquet_processor::ParquetDataGeneric,
-        parquet_handler::create_parquet_handler_loop, ParquetProcessingResult,
+        create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
+        ParquetProcessingResult,
     },
     db::common::models::default_models::{
         parquet_move_resources::MoveResource,
@@ -22,21 +22,35 @@ use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter, Result};
+use std::{
+    fmt::{Debug, Formatter, Result},
+    time::Duration,
+};
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct DefaultParquetProcessorConfig {
+pub struct ParquetDefaultProcessorConfig {
     pub google_application_credentials: Option<String>,
     pub bucket_name: String,
     pub bucket_root: String,
     pub parquet_handler_response_channel_size: usize,
     pub max_buffer_size: usize,
+    pub parquet_upload_interval: u64,
 }
 
-pub struct DefaultParquetProcessor {
+pub trait UploadIntervalConfig {
+    fn parquet_upload_interval_in_secs(&self) -> Duration;
+}
+
+impl ParquetDefaultProcessorConfig {
+    pub fn parquet_upload_interval_in_secs(&self) -> Duration {
+        Duration::from_secs(self.parquet_upload_interval)
+    }
+}
+
+pub struct ParquetDefaultProcessor {
     connection_pool: ArcDbPool,
     transaction_sender: AsyncSender<ParquetDataGeneric<ParquetTransaction>>,
     move_resource_sender: AsyncSender<ParquetDataGeneric<MoveResource>>,
@@ -46,10 +60,10 @@ pub struct DefaultParquetProcessor {
 
 // TODO: Since each table item has different size allocated, the pace of being backfilled to PQ varies a lot.
 // Maybe we can have also have a way to configure different starting version for each table later.
-impl DefaultParquetProcessor {
+impl ParquetDefaultProcessor {
     pub fn new(
         connection_pool: ArcDbPool,
-        config: DefaultParquetProcessorConfig,
+        config: ParquetDefaultProcessorConfig,
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
         if let Some(credentials) = config.google_application_credentials.clone() {
@@ -58,38 +72,42 @@ impl DefaultParquetProcessor {
 
         let transaction_sender = create_parquet_handler_loop::<ParquetTransaction>(
             new_gap_detector_sender.clone(),
-            ProcessorName::DefaultParquetProcessor.into(),
+            ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
             config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
+            config.parquet_upload_interval_in_secs(),
         );
 
         let move_resource_sender = create_parquet_handler_loop::<MoveResource>(
             new_gap_detector_sender.clone(),
-            ProcessorName::DefaultParquetProcessor.into(),
+            ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
             config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
+            config.parquet_upload_interval_in_secs(),
         );
 
         let wsc_sender = create_parquet_handler_loop::<WriteSetChangeModel>(
             new_gap_detector_sender.clone(),
-            ProcessorName::DefaultParquetProcessor.into(),
+            ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
             config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
+            config.parquet_upload_interval_in_secs(),
         );
 
         let ti_sender = create_parquet_handler_loop::<TableItem>(
             new_gap_detector_sender.clone(),
-            ProcessorName::DefaultParquetProcessor.into(),
+            ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
             config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
+            config.parquet_upload_interval_in_secs(),
         );
 
         Self {
@@ -102,7 +120,7 @@ impl DefaultParquetProcessor {
     }
 }
 
-impl Debug for DefaultParquetProcessor {
+impl Debug for ParquetDefaultProcessor {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(
             f,
@@ -116,9 +134,9 @@ impl Debug for DefaultParquetProcessor {
 }
 
 #[async_trait]
-impl ProcessorTrait for DefaultParquetProcessor {
+impl ProcessorTrait for ParquetDefaultProcessor {
     fn name(&self) -> &'static str {
-        ProcessorName::DefaultParquetProcessor.into()
+        ProcessorName::ParquetDefaultProcessor.into()
     }
 
     async fn process_transactions(

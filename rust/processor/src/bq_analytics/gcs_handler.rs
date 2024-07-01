@@ -38,6 +38,7 @@ pub async fn upload_parquet_to_gcs(
             "The file is empty and has no data to upload.".to_string(),
         ));
     }
+    info!("The size of the file to upload: {} bytes", buffer.len());
 
     let now = chrono::Utc::now();
     let start_of_month = now
