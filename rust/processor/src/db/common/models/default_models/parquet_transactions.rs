@@ -187,24 +187,26 @@ impl Transaction {
                     block_height,
                     block_timestamp,
                 );
-                let payload = user_txn
+                let request = &user_txn
                     .request
                     .as_ref()
-                    .expect("Getting user request failed.")
-                    .payload
-                    .as_ref()
-                    .expect("Getting payload failed.");
-                let payload_cleaned = get_clean_payload(payload, txn_version);
-                let payload_type = get_payload_type(payload);
+                    .expect("Getting user request failed.");
 
-                // let serialized_payload = serde_json::to_string(&payload_cleaned).unwrap(); // Handle errors as needed)
+                let (payload_cleaned, payload_type) = match request.payload.as_ref() {
+                    Some(payload) => {
+                        let payload_cleaned = get_clean_payload(payload, txn_version);
+                        (payload_cleaned, Some(get_payload_type(payload)))
+                    },
+                    None => (None, None),
+                };
+
                 let serialized_payload =
                     payload_cleaned.map(|payload| canonical_json::to_string(&payload).unwrap());
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
                         serialized_payload,
-                        Some(payload_type),
+                        payload_type,
                         txn_version,
                         transaction_type,
                         user_txn.events.len() as i64,
