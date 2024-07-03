@@ -224,7 +224,7 @@ impl WriteSetChange {
         txn_version: i64,
         block_height: i64,
         timestamp: chrono::NaiveDateTime,
-        size_info: &Vec<WriteOpSizeInfo>,
+        size_info: &[WriteOpSizeInfo],
     ) -> (Vec<Self>, Vec<WriteSetChangeDetail>) {
         write_set_changes
             .iter()

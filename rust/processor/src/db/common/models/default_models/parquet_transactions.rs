@@ -11,7 +11,6 @@ use super::{
 };
 use crate::{
     bq_analytics::generic_parquet_processor::{HasVersion, NamedTable},
-    db::common::models::events_models::events::EventModel,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         util::{get_clean_payload, get_clean_writeset, get_payload_type, standardize_address},
@@ -27,9 +26,8 @@ use field_count::FieldCount;
 use once_cell::sync::Lazy;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
-static EMPTY_VEC: Lazy<Vec<WriteOpSizeInfo>> = Lazy::new(|| Vec::new());
+static EMPTY_VEC: Lazy<Vec<WriteOpSizeInfo>> = Lazy::new(Vec::new);
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,

@@ -7,8 +7,6 @@
 
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-pub type CurrentFungibleAssetBalancePK = String;
-
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct FungibleAssetBalance {
     pub txn_version: i64,

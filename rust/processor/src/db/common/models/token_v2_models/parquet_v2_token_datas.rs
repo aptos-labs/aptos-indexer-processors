@@ -8,9 +8,6 @@
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-// PK of current_token_datas_v2, i.e. token_data_id
-pub type CurrentTokenDataV2PK = String;
-
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct TokenDataV2 {
     pub txn_version: i64,

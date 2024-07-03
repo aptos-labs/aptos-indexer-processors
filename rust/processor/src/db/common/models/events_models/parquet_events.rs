@@ -71,7 +71,7 @@ impl Event {
         events: &[EventPB],
         txn_version: i64,
         block_height: i64,
-        event_size_info: &Vec<EventSizeInfo>,
+        event_size_info: &[EventSizeInfo],
     ) -> Vec<Self> {
         events
             .iter()

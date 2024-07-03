@@ -6,13 +6,11 @@
 #![allow(clippy::unused_unit)]
 
 use allocative_derive::Allocative;
-use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
-pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,

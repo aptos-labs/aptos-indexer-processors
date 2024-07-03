@@ -5,17 +5,6 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_object_utils::{CurrentObjectPK, ObjectAggregatedDataMapping};
-use crate::{
-    db::common::models::default_models::move_resources::MoveResource,
-    schema::current_objects,
-    utils::{database::DbPoolConnection, util::standardize_address},
-};
-use ahash::AHashMap;
-use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
-use bigdecimal::{BigDecimal, ToPrimitive};
-use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

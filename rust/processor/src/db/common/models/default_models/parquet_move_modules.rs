@@ -3,9 +3,7 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::bq_analytics::generic_parquet_processor::{HasVersion, NamedTable};
 use allocative_derive::Allocative;
-use aptos_protos::transaction::v1::{EventSizeInfo, WriteOpSizeInfo};
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};

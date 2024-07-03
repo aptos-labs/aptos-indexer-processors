@@ -10,9 +10,6 @@ use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-// PK of current_collections_v2, i.e. collection_id
-pub type CurrentCollectionV2PK = String;
-
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
 )]
