@@ -6,12 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use field_count::FieldCount;
-use std::borrow::Borrow;
-use parquet::data_type::{AsBytes, ByteArray, Decimal};
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{self, Visitor};
-use std::fmt;
-use futures_util::TryFutureExt;
+use serde::{Deserialize, Serialize};
 pub type CurrentFungibleAssetBalancePK = String;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
@@ -23,7 +18,7 @@ pub struct FungibleAssetBalance {
     pub asset_type: String,
     pub is_primary: bool,
     pub is_frozen: bool,
-    pub amount: Vec<u8>,
+    pub amount: String, // it is a string representation of the u128
     pub block_timestamp: chrono::NaiveDateTime,
     pub token_standard: String,
 }

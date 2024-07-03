@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
 pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
 
-#[derive(Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize)]
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
+)]
 pub struct TokenOwnershipV2 {
     pub txn_version: i64,
     pub write_set_change_index: i64,
@@ -22,12 +24,11 @@ pub struct TokenOwnershipV2 {
     pub property_version_v1: u64,
     pub owner_address: Option<String>,
     pub storage_id: String,
-    pub amount: Vec<u8>,
+    pub amount: String, // this is a string representation of a bigdecimal
     pub table_type_v1: Option<String>,
     pub token_properties_mutated_v1: Option<String>,
     pub is_soulbound_v2: Option<bool>,
     pub token_standard: String,
-    pub is_fungible_v2: Option<bool>,
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
     pub non_transferrable_by_owner: Option<bool>,

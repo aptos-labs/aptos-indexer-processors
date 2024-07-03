@@ -30,8 +30,7 @@ pub struct CoinSupply {
     pub txn_version: i64,
     pub coin_type_hash: String,
     pub coin_type: String,
-    #[allocative(skip)]
-    pub supply: Vec<u8>,
+    pub supply: String, // it is a string representation of the u128
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }

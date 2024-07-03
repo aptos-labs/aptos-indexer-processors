@@ -30,7 +30,6 @@ pub struct AnsPrimaryNameV2 {
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
-
 pub struct CurrentAnsPrimaryNameV2 {
     pub registered_address: String,
     pub token_standard: String,

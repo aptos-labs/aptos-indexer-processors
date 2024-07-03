@@ -20,7 +20,7 @@ pub struct TokenDataV2 {
     pub token_name: String,
     pub largest_property_version_v1: Option<u64>,
     pub token_uri: String,
-    pub token_properties: serde_json::Value,
+    pub token_properties: String,
     pub description: String,
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
