@@ -46,6 +46,7 @@ static REQUIRED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
         "0x1::aptos_governance",
         "0x1::delegation_pool",
         "0xf9254492a5bb97685bb1789834668f3f8f391336b11c063b74ac6f83c37f6ecf::tapos_game_2::SetTaskPoints",
+        "0xf9254492a5bb97685bb1789834668f3f8f391336b11c063b74ac6f83c37f6ecf::tapos_game_2::AddEquipment",
     ]
 });
 pub struct EventsProcessor {
