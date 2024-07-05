@@ -3,6 +3,7 @@
 
 use crate::gap_detectors::{GapDetectorResult, GapDetectorTrait, ProcessingResult};
 use ahash::AHashMap;
+use anyhow::Result;
 use std::cmp::max;
 use tracing::{debug, info};
 
@@ -29,10 +30,7 @@ impl ParquetFileGapDetector {
     }
 }
 impl GapDetectorTrait for ParquetFileGapDetector {
-    fn process_versions(
-        &mut self,
-        result: ProcessingResult,
-    ) -> anyhow::Result<GapDetectorResult, Box<dyn std::error::Error + Send + Sync>> {
+    fn process_versions(&mut self, result: ProcessingResult) -> Result<GapDetectorResult> {
         // Update counts of structures for each transaction version
         let result = match result {
             ProcessingResult::ParquetProcessingResult(r) => r,

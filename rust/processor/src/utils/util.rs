@@ -75,6 +75,18 @@ pub fn standardize_address(handle: &str) -> String {
     }
 }
 
+/// Standardizes all addresses and table handles to be length 66 (0x-64 length hash) that takes in a slice.
+pub fn standardize_address_from_bytes(bytes: &[u8]) -> String {
+    let encdoed_bytes = hex::encode(bytes);
+    // let encdoed_bytes = binding.as_str();
+
+    if let Some(handle) = &encdoed_bytes.strip_prefix("0x") {
+        format!("0x{:0>64}", handle)
+    } else {
+        format!("0x{:0>64}", encdoed_bytes)
+    }
+}
+
 pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }

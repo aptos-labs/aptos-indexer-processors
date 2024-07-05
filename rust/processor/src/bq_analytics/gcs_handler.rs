@@ -6,7 +6,7 @@ use google_cloud_storage::{
     http::objects::upload::{Media, UploadObjectRequest, UploadType},
 };
 use hyper::Body;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt; // for read_to_end()
 use tokio::{
     fs::File as TokioFile,
@@ -18,10 +18,10 @@ const INITIAL_DELAY_MS: u64 = 500;
 const TIMEOUT_SECONDS: u64 = 300;
 pub async fn upload_parquet_to_gcs(
     client: &GCSClient,
-    file_path: &PathBuf,
+    file_path: &Path,
     table_name: &str,
     bucket_name: &str,
-    bucket_root: &str,
+    bucket_root: &Path,
 ) -> Result<(), ParquetProcessorError> {
     let mut file = TokioFile::open(&file_path)
         .await
@@ -103,14 +103,14 @@ pub async fn upload_parquet_to_gcs(
 }
 
 fn generate_parquet_file_path(
-    gcs_bucket_root: &str,
+    gcs_bucket_root: &Path,
     table: &str,
     highwater_s: i64,
     highwater_ms: i64,
     counter: u32,
 ) -> PathBuf {
-    PathBuf::from(format!(
-        "{}/{}/{}/{}_{}.parquet",
-        gcs_bucket_root, table, highwater_s, highwater_ms, counter
+    gcs_bucket_root.join(format!(
+        "{}/{}/{}_{}.parquet",
+        table, highwater_s, highwater_ms, counter
     ))
 }

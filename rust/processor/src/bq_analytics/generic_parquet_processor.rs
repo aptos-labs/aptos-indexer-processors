@@ -117,7 +117,7 @@ where
         bucket_name: String,
         bucket_root: String,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
-        schema: Arc<parquet::schema::types::Type>,
+        schema: Arc<Type>,
     ) -> Result<Self> {
         // had to append unique id to avoid concurrent write issues
         let file_path = format!("{}_{}.parquet", ParquetType::TABLE_NAME, Uuid::new_v4());
@@ -158,9 +158,9 @@ where
         // for now, it's okay to go little above the buffer_size, given that we will keep max size as 200 MB
         if self.buffer_size_bytes >= max_buffer_size {
             let start_version = self.buffer.first().unwrap().version();
-            let end_version = self.buffer.last().unwrap().version();
-            let last_transaction_timestamp =
-                naive_datetime_to_timestamp(self.buffer.last().unwrap().get_timestamp());
+            let last = self.buffer.last().unwrap();
+            let end_version = last.version();
+            let last_transaction_timestamp = naive_datetime_to_timestamp(last.get_timestamp());
 
             let txn_version_to_struct_count = process_struct_count_map(
                 &self.buffer,
@@ -190,12 +190,13 @@ where
                 end_version = end_version,
                 "Max buffer size reached, uploading to GCS."
             );
+            let bucket_root = PathBuf::from(&self.bucket_root);
             let upload_result = upload_parquet_to_gcs(
                 gcs_client,
                 &new_file_path,
                 ParquetType::TABLE_NAME,
                 &self.bucket_name,
-                &self.bucket_root,
+                &bucket_root,
             )
             .await;
             self.buffer_size_bytes = 0;

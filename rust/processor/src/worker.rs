@@ -6,7 +6,7 @@ use crate::{
     db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     gap_detectors::{
         create_gap_detector_status_tracker_loop, gap_detector::DefaultGapDetector,
-        parquet_gap_detector::ParquetFileGapDetector, GapDetectorTrait, ProcessingResult,
+        parquet_gap_detector::ParquetFileGapDetector, GapDetector, ProcessingResult,
     },
     grpc_stream::TransactionsPBResponse,
     processors::{
@@ -301,35 +301,28 @@ impl Worker {
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
+
         let is_parquet_processor = self.processor_config.is_parquet_processor();
-        let (processor, gap_detection_batch_size) = if is_parquet_processor {
-            let processor = build_processor(
-                &self.processor_config,
-                self.per_table_chunk_sizes.clone(),
-                self.deprecated_tables,
-                self.db_pool.clone(),
-                Some(gap_detector_sender.clone()),
-            );
+        let (maybe_gap_detector_sender, gap_detection_batch_size) = if is_parquet_processor {
             let gap_detection_batch_size: u64 = self.parquet_gap_detection_batch_size;
-
-            (processor, gap_detection_batch_size)
+            (Some(gap_detector_sender.clone()), gap_detection_batch_size)
         } else {
-            let processor = build_processor(
-                &self.processor_config,
-                self.per_table_chunk_sizes.clone(),
-                self.deprecated_tables,
-                self.db_pool.clone(),
-                None,
-            );
             let gap_detection_batch_size = self.gap_detection_batch_size;
-
-            (processor, gap_detection_batch_size)
+            (None, gap_detection_batch_size)
         };
 
-        let gap_detector: Box<dyn GapDetectorTrait + Send> = if is_parquet_processor {
-            Box::new(ParquetFileGapDetector::new(starting_version))
+        let processor = build_processor(
+            &self.processor_config,
+            self.per_table_chunk_sizes.clone(),
+            self.deprecated_tables,
+            self.db_pool.clone(),
+            maybe_gap_detector_sender,
+        );
+
+        let gap_detector = if is_parquet_processor {
+            GapDetector::ParquetFileGapDetector(ParquetFileGapDetector::new(starting_version))
         } else {
-            Box::new(DefaultGapDetector::new(starting_version))
+            GapDetector::DefaultGapDetector(DefaultGapDetector::new(starting_version))
         };
 
         tokio::spawn(async move {

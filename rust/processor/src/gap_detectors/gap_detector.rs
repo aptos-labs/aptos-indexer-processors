@@ -6,6 +6,7 @@ use crate::{
     processors::DefaultProcessingResult,
 };
 use ahash::AHashMap;
+use anyhow::Result;
 
 pub struct DefaultGapDetector {
     next_version_to_process: u64,
@@ -20,10 +21,7 @@ pub struct DefaultGapDetectorResult {
 }
 
 impl GapDetectorTrait for DefaultGapDetector {
-    fn process_versions(
-        &mut self,
-        result: ProcessingResult,
-    ) -> anyhow::Result<GapDetectorResult, Box<dyn std::error::Error + Send + Sync>> {
+    fn process_versions(&mut self, result: ProcessingResult) -> Result<GapDetectorResult> {
         match result {
             ProcessingResult::DefaultProcessingResult(result) => {
                 // Check for gaps

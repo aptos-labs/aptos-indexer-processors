@@ -10,9 +10,10 @@ use super::{
 };
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    utils::util::standardize_address,
+    utils::util::{standardize_address, standardize_address_from_bytes},
 };
 use allocative_derive::Allocative;
+use anyhow::Context;
 use aptos_protos::transaction::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
     WriteSetChange as WriteSetChangePB,
@@ -78,48 +79,44 @@ impl WriteSetChange {
             .as_ref()
             .expect("WriteSetChange must have a change");
         match change {
-            WriteSetChangeEnum::WriteModule(inner) => {
-                return Ok(Some((
-                    Self {
-                        txn_version,
-                        state_key_hash: standardize_address(
-                            hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                        ),
-                        block_height,
-                        change_type,
-                        resource_address: standardize_address(&inner.address.to_string()),
-                        write_set_change_index,
-                        block_timestamp,
-                    },
-                    WriteSetChangeDetail::Module(MoveModule::from_write_module(
-                        inner,
-                        write_set_change_index,
-                        txn_version,
-                        block_height,
-                    )),
-                )));
-            },
-            WriteSetChangeEnum::DeleteModule(inner) => {
-                return Ok(Some((
-                    Self {
-                        txn_version,
-                        state_key_hash: standardize_address(
-                            hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                        ),
-                        block_height,
-                        change_type,
-                        resource_address: standardize_address(&inner.address.to_string()),
-                        write_set_change_index,
-                        block_timestamp,
-                    },
-                    WriteSetChangeDetail::Module(MoveModule::from_delete_module(
-                        inner,
-                        write_set_change_index,
-                        txn_version,
-                        block_height,
-                    )),
-                )));
-            },
+            WriteSetChangeEnum::WriteModule(inner) => Ok(Some((
+                Self {
+                    txn_version,
+                    state_key_hash: standardize_address(
+                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
+                    ),
+                    block_height,
+                    change_type,
+                    resource_address: standardize_address(&inner.address),
+                    write_set_change_index,
+                    block_timestamp,
+                },
+                WriteSetChangeDetail::Module(MoveModule::from_write_module(
+                    inner,
+                    write_set_change_index,
+                    txn_version,
+                    block_height,
+                )),
+            ))),
+            WriteSetChangeEnum::DeleteModule(inner) => Ok(Some((
+                Self {
+                    txn_version,
+                    state_key_hash: standardize_address(
+                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
+                    ),
+                    block_height,
+                    change_type,
+                    resource_address: standardize_address(&inner.address),
+                    write_set_change_index,
+                    block_timestamp,
+                },
+                WriteSetChangeDetail::Module(MoveModule::from_delete_module(
+                    inner,
+                    write_set_change_index,
+                    txn_version,
+                    block_height,
+                )),
+            ))),
             WriteSetChangeEnum::WriteResource(inner) => {
                 let resource_option = MoveResource::from_write_resource(
                     inner,
@@ -129,46 +126,48 @@ impl WriteSetChange {
                     block_timestamp,
                 );
 
-                if let Some(resource) = resource_option.unwrap() {
-                    return Ok(Some((
-                        Self {
-                            txn_version,
-                            state_key_hash: standardize_address(
-                                hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                            ),
-                            block_height,
-                            change_type,
-                            resource_address: standardize_address(&inner.address.to_string()),
-                            write_set_change_index,
-                            block_timestamp,
-                        },
-                        WriteSetChangeDetail::Resource(resource),
-                    )));
-                }
-                Ok(None)
+                resource_option
+                    .unwrap()
+                    .context(format!(
+                        "Failed to parse move resource, version {}",
+                        txn_version
+                    ))
+                    .map(|resource| Some((
+                            Self {
+                                txn_version,
+                                state_key_hash: standardize_address_from_bytes(
+                                    inner.state_key_hash.as_slice(),
+                                ),
+                                block_height,
+                                change_type,
+                                resource_address: standardize_address(&inner.address),
+                                write_set_change_index,
+                                block_timestamp,
+                            },
+                            WriteSetChangeDetail::Resource(resource),
+                        ))
+                    )
             },
-            WriteSetChangeEnum::DeleteResource(inner) => {
-                return Ok(Some((
-                    Self {
-                        txn_version,
-                        state_key_hash: standardize_address(
-                            hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                        ),
-                        block_height,
-                        change_type,
-                        resource_address: standardize_address(&inner.address.to_string()),
-                        write_set_change_index,
-                        block_timestamp,
-                    },
-                    WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
-                        inner,
-                        write_set_change_index,
-                        txn_version,
-                        block_height,
-                        block_timestamp,
-                    )),
-                )));
-            },
+            WriteSetChangeEnum::DeleteResource(inner) => Ok(Some((
+                Self {
+                    txn_version,
+                    state_key_hash: standardize_address(
+                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
+                    ),
+                    block_height,
+                    change_type,
+                    resource_address: standardize_address(&inner.address),
+                    write_set_change_index,
+                    block_timestamp,
+                },
+                WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
+                    inner,
+                    write_set_change_index,
+                    txn_version,
+                    block_height,
+                    block_timestamp,
+                )),
+            ))),
             WriteSetChangeEnum::WriteTableItem(inner) => {
                 let (ti, cti) = TableItem::from_write_table_item(
                     inner,
@@ -177,7 +176,7 @@ impl WriteSetChange {
                     block_height,
                     block_timestamp,
                 );
-                return Ok(Some((
+                Ok(Some((
                     Self {
                         txn_version,
                         state_key_hash: standardize_address(
@@ -194,7 +193,7 @@ impl WriteSetChange {
                         cti,
                         Some(TableMetadata::from_write_table_item(inner)),
                     ),
-                )));
+                )))
             },
             WriteSetChangeEnum::DeleteTableItem(inner) => {
                 let (ti, cti) = TableItem::from_delete_table_item(
@@ -204,7 +203,7 @@ impl WriteSetChange {
                     block_height,
                     block_timestamp,
                 );
-                return Ok(Some((
+                Ok(Some((
                     Self {
                         txn_version,
                         state_key_hash: standardize_address(
@@ -217,7 +216,7 @@ impl WriteSetChange {
                         block_timestamp,
                     },
                     WriteSetChangeDetail::Table(ti, cti, None),
-                )));
+                )))
             },
         }
     }
@@ -247,7 +246,7 @@ impl WriteSetChange {
                             write_set_change,
                             e
                         );
-                        None
+                        panic!("Failed to convert write set change.")
                     },
                 }
             })

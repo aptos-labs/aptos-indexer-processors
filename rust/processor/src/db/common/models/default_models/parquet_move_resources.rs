@@ -66,7 +66,7 @@ impl MoveResource {
         txn_version: i64,
         block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Result<Option<Self>> {
         let move_struct_tag = match write_resource.r#type.as_ref() {
             Some(t) => t,
             None => return Ok(None),

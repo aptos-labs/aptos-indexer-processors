@@ -8,10 +8,10 @@ use crate::{
     utils::counters::{PARQUET_PROCESSOR_DATA_GAP_COUNT, PROCESSOR_DATA_GAP_COUNT},
     worker::PROCESSOR_SERVICE_TYPE,
 };
+use anyhow::Result;
 use enum_dispatch::enum_dispatch;
 use kanal::AsyncReceiver;
 use tracing::{error, info};
-
 pub mod gap_detector;
 pub mod parquet_gap_detector;
 
@@ -26,17 +26,26 @@ pub enum GapDetector {
     ParquetFileGapDetector,
 }
 
-#[enum_dispatch(GapDetectorTrait)]
 pub enum GapDetectorResult {
     DefaultGapDetectorResult(DefaultGapDetectorResult),
     ParquetFileGapDetectorResult(ParquetFileGapDetectorResult),
 }
 
+/// Trait for gap detectors
+///
+/// This trait defines the interface for gap detectors used in the processors.
+/// Gap detectors are responsible for identifying gaps in data based on processed transactions.
+/// Implementations of this trait must provide the functionality to process versions
+/// and return a result indicating the presence of any gaps.
+///
+/// Implementations should:
+/// - Be thread-safe (hence the `Send` bound).
+/// - Define how to process versions and detect gaps.
+/// - Return a `GapDetectorResult` indicating the outcome of the processing.
+///
+#[enum_dispatch]
 pub trait GapDetectorTrait: Send {
-    fn process_versions(
-        &mut self,
-        result: ProcessingResult,
-    ) -> anyhow::Result<GapDetectorResult, Box<dyn std::error::Error + Send + Sync>>;
+    fn process_versions(&mut self, result: ProcessingResult) -> Result<GapDetectorResult>;
 }
 
 pub enum ProcessingResult {
@@ -45,7 +54,7 @@ pub enum ProcessingResult {
 }
 
 pub async fn create_gap_detector_status_tracker_loop(
-    mut gap_detector: Box<dyn GapDetectorTrait + Send>,
+    mut gap_detector: GapDetector,
     gap_detector_receiver: AsyncReceiver<ProcessingResult>,
     processor: Processor,
     gap_detection_batch_size: u64,
