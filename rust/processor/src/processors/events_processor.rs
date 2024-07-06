@@ -215,8 +215,8 @@ impl ProcessorTrait for EventsProcessor {
                 &inserted_at,
             );
             for txn_event in txn_events {
-                if REQUIRED_EVENTS.contains(&txn_event.type_.as_str())
-                // if !FILTERED_EVENTS.contains(&txn_event.type_.as_str())
+                // if REQUIRED_EVENTS.contains(&txn_event.type_.as_str())
+                if !FILTERED_EVENTS.contains(&txn_event.type_.as_str())
                 {
                     events.push(txn_event);
                 }
