@@ -1,0 +1,24 @@
+name: Deploy Indexer Mainnet to Indexer VM
+run-name: ${{ github.actor }} is deploying Indexer Mainnet to Indexer VM
+on:
+  push:
+    branches:
+      - "main_mainnet"
+jobs:
+  deploy:
+    runs-on: indexer_mainnet
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - run: |
+          docker stop indexer_mainnet
+          docker rm indexer_mainnet
+          docker rmi indexer_mainnet
+          docker builder prune --all -f
+          cd rust
+          echo "${{ secrets.ENV_FILE_INDEXER_MAINNET }}" >> config.yaml
+          docker build . -t indexer_mainnet
+          docker run --name indexer_mainnet -d --restart=always -it --mount type=bind,source=./config.yaml,target=/config.yaml indexer_mainnet -c /config.yaml
+          # Remove the last line from the config.yaml file (start_ver)
+          # sed -i '$ d' config.yaml
+          docker image prune -f

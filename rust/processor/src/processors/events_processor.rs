@@ -37,7 +37,11 @@ use tracing::log::info;
 static FILTERED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
     vec![
         "0x1::transaction_fee::FeeStatement",
-        "0x1::multisig_account::create_with_owners",
+        "0x1::randomness::RandomnessGeneratedEvent",
+        "0x1::block::NewBlock",
+        "0x1::dkg::DKGStartEvent",
+        "0x1::jwks::ObservedJWKsUpdated",
+        "0x1::reconfiguration::NewEpochEvent",
     ]
 });
 static REQUIRED_EVENTS: Lazy<Vec<&str>> = Lazy::new(|| {
@@ -212,6 +216,7 @@ impl ProcessorTrait for EventsProcessor {
             );
             for txn_event in txn_events {
                 if REQUIRED_EVENTS.contains(&txn_event.type_.as_str())
+                // if !FILTERED_EVENTS.contains(&txn_event.type_.as_str())
                 {
                     events.push(txn_event);
                 }

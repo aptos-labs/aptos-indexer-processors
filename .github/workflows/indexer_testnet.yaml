@@ -1,0 +1,24 @@
+name: Deploy Indexer Testnet to Indexer VM
+run-name: ${{ github.actor }} is deploying Indexer Testnet to Indexer VM
+on:
+  push:
+    branches:
+      - "main_testnet"
+jobs:
+  deploy:
+    runs-on: indexer_testnet # 1993872
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - run: |
+          docker stop indexer_testnet
+          docker rm indexer_testnet
+          docker rmi indexer_testnet
+          docker builder prune --all -f
+          cd rust
+          echo "${{ secrets.ENV_FILE_INDEXER_TESTNET }}" >> config.yaml
+          docker build . -t indexer_testnet
+          docker run --name indexer_testnet -d --restart=always -it --mount type=bind,source=./config.yaml,target=/config.yaml indexer_testnet -c /config.yaml
+          # Remove the last line from the config.yaml file (start_ver)
+          # sed -i '$ d' config.yaml
+          docker image prune -f
