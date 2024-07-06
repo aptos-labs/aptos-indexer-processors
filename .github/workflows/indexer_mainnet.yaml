@@ -6,7 +6,7 @@ on:
       - "main_mainnet"
 jobs:
   deploy:
-    runs-on: indexer_mainnet # 2007713
+    runs-on: indexer_mainnet # 2191580
     steps:
       - name: Checkout
         uses: actions/checkout@v3
