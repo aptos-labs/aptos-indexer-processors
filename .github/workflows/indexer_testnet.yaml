@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v3
       - run: |
           cd rust
-          # docker compose --project-name indexer_testnet -f docker-compose-indexer-testnet.yaml down || true
+          docker compose --project-name indexer_testnet -f docker-compose-indexer-testnet.yaml down || true
           docker rmi indexer_testnet || true
           docker builder prune --all -f
           echo "${{ secrets.ENV_FILE_INDEXER_TESTNET }}" >> config.yaml
