@@ -6,19 +6,17 @@ on:
       - "main_testnet"
 jobs:
   deploy:
-    runs-on: indexer_testnet # 2077489
+    runs-on: indexer_testnet # 2407945
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - run: |
-          docker stop indexer_testnet
-          docker rm indexer_testnet
-          docker rmi indexer_testnet
-          docker builder prune --all -f
           cd rust
+          docker compose -f docker-compose-indexer-testnet.yaml down || true
+          docker rmi indexer_testnet || true
+          # docker builder prune --all -f
           echo "${{ secrets.ENV_FILE_INDEXER_TESTNET }}" >> config.yaml
-          docker build . -t indexer_testnet
-          docker run --name indexer_testnet -d --restart=always -it --mount type=bind,source=./config.yaml,target=/config.yaml indexer_testnet -c /config.yaml
+          docker compose -f docker-compose-indexer-testnet.yaml up -d
           # Remove the last line from the config.yaml file (start_ver)
           sed -i '$ d' config.yaml
-          docker image prune -f
+          # docker image prune -f
