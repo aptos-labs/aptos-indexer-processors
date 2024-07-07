@@ -12,11 +12,11 @@ jobs:
         uses: actions/checkout@v3
       - run: |
           cd rust
-          docker compose -f docker-compose-indexer-testnet.yaml down || true
+          # docker compose -f docker-compose-indexer-testnet.yaml down || true
           docker rmi indexer_testnet || true
-          # docker builder prune --all -f
+          docker builder prune --all -f
           echo "${{ secrets.ENV_FILE_INDEXER_TESTNET }}" >> config.yaml
           docker compose -f docker-compose-indexer-testnet.yaml up -d
           # Remove the last line from the config.yaml file (start_ver)
           sed -i '$ d' config.yaml
-          # docker image prune -f
+          docker image prune -f

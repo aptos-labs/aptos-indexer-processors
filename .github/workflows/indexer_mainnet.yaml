@@ -14,9 +14,9 @@ jobs:
           cd rust
           # docker compose -f docker-compose-indexer-mainnet.yaml down || true
           docker rmi indexer_mainnet || true
-          # docker builder prune --all -f
+          docker builder prune --all -f
           echo "${{ secrets.ENV_FILE_INDEXER_MAINNET }}" >> config.yaml
           docker compose -f docker-compose-indexer-mainnet.yaml up -d
           # Remove the last line from the config.yaml file (start_ver)
           # sed -i '$ d' config.yaml
-          # docker image prune -f
+          docker image prune -f

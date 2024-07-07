@@ -8,7 +8,6 @@ services:
       dockerfile: Dockerfile
     image: indexer_testnet
     container_name: indexer_testnet
-    network_mode: host
     volumes:
       - ./config.yaml:/config.yaml
     command: -c ./config.yaml
