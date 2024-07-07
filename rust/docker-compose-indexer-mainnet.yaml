@@ -1,5 +1,6 @@
 # docker build . -t indexer-processor
 # docker run -it --network host --mount type=bind,source=/tmp/config.yaml,target=/config.yaml indexer-processor -c /config.yaml
+name: indexer_mainnet
 version: '3.8'
 services:
   processor:
