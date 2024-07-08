@@ -877,26 +877,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    move_resources (transaction_version, write_set_change_index) {
-        transaction_version -> Int8,
-        write_set_change_index -> Int8,
-        transaction_block_height -> Int8,
-        name -> Text,
-        #[max_length = 66]
-        address -> Varchar,
-        #[sql_name = "type"]
-        type_ -> Text,
-        module -> Text,
-        generic_type_params -> Nullable<Jsonb>,
-        data -> Nullable<Jsonb>,
-        is_deleted -> Bool,
-        inserted_at -> Timestamp,
-        #[max_length = 66]
-        state_key_hash -> Varchar,
-    }
-}
-
-diesel::table! {
     nft_points (transaction_version) {
         transaction_version -> Int8,
         #[max_length = 66]
@@ -1207,35 +1187,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    transactions (version) {
-        version -> Int8,
-        block_height -> Int8,
-        #[max_length = 66]
-        hash -> Varchar,
-        #[sql_name = "type"]
-        type_ -> Varchar,
-        payload -> Nullable<Jsonb>,
-        #[max_length = 66]
-        state_change_hash -> Varchar,
-        #[max_length = 66]
-        event_root_hash -> Varchar,
-        #[max_length = 66]
-        state_checkpoint_hash -> Nullable<Varchar>,
-        gas_used -> Numeric,
-        success -> Bool,
-        vm_status -> Text,
-        #[max_length = 66]
-        accumulator_root_hash -> Varchar,
-        num_events -> Int8,
-        num_write_set_changes -> Int8,
-        inserted_at -> Timestamp,
-        epoch -> Int8,
-        #[max_length = 50]
-        payload_type -> Nullable<Varchar>,
-    }
-}
-
-diesel::table! {
     user_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -1252,21 +1203,6 @@ diesel::table! {
         entry_function_id_str -> Varchar,
         inserted_at -> Timestamp,
         epoch -> Int8,
-    }
-}
-
-diesel::table! {
-    write_set_changes (transaction_version, index) {
-        transaction_version -> Int8,
-        index -> Int8,
-        #[max_length = 66]
-        hash -> Varchar,
-        transaction_block_height -> Int8,
-        #[sql_name = "type"]
-        type_ -> Text,
-        #[max_length = 66]
-        address -> Varchar,
-        inserted_at -> Timestamp,
     }
 }
 
@@ -1327,7 +1263,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     indexer_status,
     ledger_infos,
     move_modules,
-    move_resources,
     nft_points,
     objects,
     processor_status,
@@ -1344,8 +1279,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     token_ownerships_v2,
     tokens,
     transaction_size_info,
-    transactions,
     user_transactions,
-    write_set_changes,
     write_set_size_info,
 );
