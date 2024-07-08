@@ -2,6 +2,7 @@ use super::ParquetProcessingResult;
 use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
+    processors::parquet_processors::ParquetProcessingState,
     utils::{
         counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
         util::naive_datetime_to_timestamp,
@@ -21,6 +22,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+use tokio::time::Duration;
 use tracing::{debug, error};
 use uuid::Uuid;
 
@@ -63,7 +65,7 @@ where
     ParquetType: NamedTable + NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
-    pub schema: Arc<parquet::schema::types::Type>,
+    pub schema: Arc<Type>,
     pub writer: SerializedFileWriter<File>,
     pub buffer: Vec<ParquetType>,
     pub buffer_size_bytes: usize,
@@ -73,8 +75,9 @@ where
     pub bucket_root: String,
     pub gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
     pub file_path: String,
+    pub upload_interval: Duration,
+    pub max_buffer_size: usize,
 }
-
 fn create_new_writer(
     file_path: &str,
     schema: Arc<parquet::schema::types::Type>,
@@ -118,6 +121,8 @@ where
         bucket_root: String,
         gap_detector_sender: kanal::AsyncSender<ProcessingResult>,
         schema: Arc<Type>,
+        upload_interval: Duration,
+        max_buffer_size: usize,
     ) -> Result<Self> {
         // had to append unique id to avoid concurrent write issues
         let file_path = format!("{}_{}.parquet", ParquetType::TABLE_NAME, Uuid::new_v4());
@@ -133,6 +138,8 @@ where
             gap_detector_sender,
             schema,
             file_path,
+            upload_interval,
+            max_buffer_size,
         })
     }
 
@@ -140,8 +147,9 @@ where
         &mut self,
         gcs_client: &GCSClient,
         changes: ParquetDataGeneric<ParquetType>,
-        max_buffer_size: usize,
-    ) -> Result<()> {
+    ) -> Result<ParquetProcessingState> {
+        let mut state = ParquetProcessingState::Buffered;
+
         let parquet_structs = changes.data;
         self.transaction_version_to_struct_count
             .extend(changes.transaction_version_to_struct_count);
@@ -153,82 +161,91 @@ where
                 .set(size_of_struct as i64);
             self.buffer_size_bytes += size_of_struct;
             self.buffer.push(parquet_struct);
-        }
 
-        // for now, it's okay to go little above the buffer_size, given that we will keep max size as 200 MB
-        if self.buffer_size_bytes >= max_buffer_size {
-            let start_version = self.buffer.first().unwrap().version();
-            let last = self.buffer.last().unwrap();
-            let end_version = last.version();
-            let last_transaction_timestamp = naive_datetime_to_timestamp(last.get_timestamp());
-
-            let txn_version_to_struct_count = process_struct_count_map(
-                &self.buffer,
-                &mut self.transaction_version_to_struct_count,
-            );
-
-            let new_file_path: PathBuf = PathBuf::from(format!(
-                "{}_{}.parquet",
-                ParquetType::TABLE_NAME,
-                Uuid::new_v4()
-            ));
-            rename(&self.file_path, &new_file_path)?; // this fixes an issue with concurrent file access issues
-
-            let struct_buffer = std::mem::take(&mut self.buffer);
-
-            let mut row_group_writer = self.writer.next_row_group()?;
-            struct_buffer
-                .as_slice()
-                .write_to_row_group(&mut row_group_writer)
-                .unwrap();
-            row_group_writer.close()?;
-            self.close_writer()?;
-
-            debug!(
-                table_name = ParquetType::TABLE_NAME,
-                start_version = start_version,
-                end_version = end_version,
-                "Max buffer size reached, uploading to GCS."
-            );
-            let bucket_root = PathBuf::from(&self.bucket_root);
-            let upload_result = upload_parquet_to_gcs(
-                gcs_client,
-                &new_file_path,
-                ParquetType::TABLE_NAME,
-                &self.bucket_name,
-                &bucket_root,
-            )
-            .await;
-            self.buffer_size_bytes = 0;
-            remove_file(&new_file_path)?;
-
-            return match upload_result {
-                Ok(_) => {
-                    let parquet_processing_result = ParquetProcessingResult {
-                        start_version,
-                        end_version,
-                        last_transaction_timestamp: Some(last_transaction_timestamp),
-                        txn_version_to_struct_count,
-                    };
-
-                    self.gap_detector_sender
-                        .send(ProcessingResult::ParquetProcessingResult(
-                            parquet_processing_result,
-                        ))
-                        .await
-                        .expect("[Parser] Failed to send versions to gap detector");
-                    Ok(())
-                },
-                Err(e) => {
-                    error!("Failed to upload file to GCS: {}", e);
-                    Err(anyhow!("Failed to upload file to GCS: {}", e))
-                },
-            };
+            if self.buffer_size_bytes >= self.max_buffer_size {
+                if let Err(e) = self.upload_buffer(gcs_client).await {
+                    error!("Failed to upload buffer: {}", e);
+                    return Err(e);
+                }
+                state = ParquetProcessingState::Uploaded;
+            }
         }
 
         PARQUET_HANDLER_BUFFER_SIZE
             .with_label_values(&[ParquetType::TABLE_NAME])
             .set(self.buffer.len() as i64);
+        Ok(state)
+    }
+
+    pub async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+        let start_version = self.buffer.first().unwrap().version();
+        let last = self.buffer.last().unwrap();
+        let end_version = last.version();
+        let last_transaction_timestamp = naive_datetime_to_timestamp(last.get_timestamp());
+
+        let txn_version_to_struct_count =
+            process_struct_count_map(&self.buffer, &mut self.transaction_version_to_struct_count);
+
+        let new_file_path: PathBuf = PathBuf::from(format!(
+            "{}_{}.parquet",
+            ParquetType::TABLE_NAME,
+            Uuid::new_v4()
+        ));
+        rename(&self.file_path, &new_file_path)?; // this fixes an issue with concurrent file access issues
+
+        let struct_buffer = std::mem::take(&mut self.buffer);
+
+        let mut row_group_writer = self.writer.next_row_group()?;
+        struct_buffer
+            .as_slice()
+            .write_to_row_group(&mut row_group_writer)
+            .unwrap();
+        row_group_writer.close()?;
+        self.close_writer()?;
+
+        debug!(
+            table_name = ParquetType::TABLE_NAME,
+            start_version = start_version,
+            end_version = end_version,
+            "Max buffer size reached, uploading to GCS."
+        );
+        let bucket_root = PathBuf::from(&self.bucket_root);
+        let upload_result = upload_parquet_to_gcs(
+            gcs_client,
+            &new_file_path,
+            ParquetType::TABLE_NAME,
+            &self.bucket_name,
+            &bucket_root,
+        )
+        .await;
+        self.buffer_size_bytes = 0;
+        remove_file(&new_file_path)?;
+
+        match upload_result {
+            Ok(_) => {
+                let parquet_processing_result = ParquetProcessingResult {
+                    start_version,
+                    end_version,
+                    last_transaction_timestamp: Some(last_transaction_timestamp),
+                    txn_version_to_struct_count,
+                };
+
+                self.gap_detector_sender
+                    .send(ProcessingResult::ParquetProcessingResult(
+                        parquet_processing_result,
+                    ))
+                    .await
+                    .expect("[Parser] Failed to send versions to gap detector");
+            },
+            Err(e) => {
+                error!("Failed to upload file to GCS: {}", e);
+                return Err(anyhow!("Failed to upload file to GCS: {}", e));
+            },
+        };
+
         Ok(())
     }
 }
