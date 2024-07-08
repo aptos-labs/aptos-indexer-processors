@@ -278,7 +278,11 @@ fn insert_collections_v2_query(
         diesel::insert_into(schema::collections_v2::table)
             .values(items_to_insert)
             .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .do_update()
+            .set((
+                collection_properties.eq(excluded(collection_properties)),
+                inserted_at.eq(excluded(inserted_at)),
+            )),
         None,
     )
 }
@@ -354,6 +358,7 @@ fn insert_current_collections_v2_query(
                 table_handle_v1.eq(excluded(table_handle_v1)),
                 token_standard.eq(excluded(token_standard)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
+                collection_properties.eq(excluded(collection_properties)),
                 last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                 inserted_at.eq(excluded(inserted_at)),
             )),
