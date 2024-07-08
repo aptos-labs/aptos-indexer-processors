@@ -99,14 +99,13 @@ impl MoveResource {
         txn_version: i64,
         block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
-    ) -> Self {
-        let parsed_data = convert_move_struct_tag(
-            delete_resource
-                .r#type
-                .as_ref()
-                .expect("MoveStructTag Not Exists."),
-        );
-        Self {
+    ) -> Result<Option<Self>> {
+        let move_struct_tag = match delete_resource.r#type.as_ref() {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+        let parsed_data = convert_move_struct_tag(move_struct_tag);
+        let move_resource = Self {
             txn_version,
             block_height,
             write_set_change_index,
@@ -121,7 +120,8 @@ impl MoveResource {
                 hex::encode(delete_resource.state_key_hash.as_slice()).as_str(),
             ),
             block_timestamp,
-        }
+        };
+        Ok(Some(move_resource))
     }
 }
 

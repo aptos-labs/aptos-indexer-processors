@@ -132,7 +132,8 @@ impl WriteSetChange {
                         "Failed to parse move resource, version {}",
                         txn_version
                     ))
-                    .map(|resource| Some((
+                    .map(|resource| {
+                        Some((
                             Self {
                                 txn_version,
                                 state_key_hash: standardize_address_from_bytes(
@@ -146,28 +147,40 @@ impl WriteSetChange {
                             },
                             WriteSetChangeDetail::Resource(resource),
                         ))
-                    )
+                    })
             },
-            WriteSetChangeEnum::DeleteResource(inner) => Ok(Some((
-                Self {
-                    txn_version,
-                    state_key_hash: standardize_address(
-                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                    ),
-                    block_height,
-                    change_type,
-                    resource_address: standardize_address(&inner.address),
-                    write_set_change_index,
-                    block_timestamp,
-                },
-                WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
+            WriteSetChangeEnum::DeleteResource(inner) => {
+                let resource_option = MoveResource::from_delete_resource(
                     inner,
                     write_set_change_index,
                     txn_version,
                     block_height,
                     block_timestamp,
-                )),
-            ))),
+                );
+
+                resource_option
+                    .unwrap()
+                    .context(format!(
+                        "Failed to parse move resource, version {}",
+                        txn_version
+                    ))
+                    .map(|resource| {
+                        Some((
+                            Self {
+                                txn_version,
+                                state_key_hash: standardize_address_from_bytes(
+                                    inner.state_key_hash.as_slice(),
+                                ),
+                                block_height,
+                                change_type,
+                                resource_address: standardize_address(&inner.address),
+                                write_set_change_index,
+                                block_timestamp,
+                            },
+                            WriteSetChangeDetail::Resource(resource),
+                        ))
+                    })
+            },
             WriteSetChangeEnum::WriteTableItem(inner) => {
                 let (ti, cti) = TableItem::from_write_table_item(
                     inner,
