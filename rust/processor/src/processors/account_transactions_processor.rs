@@ -1,28 +1,32 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::account_transaction_models::account_transactions::AccountTransaction,
+    db::common::models::account_transaction_models::account_transactions::AccountTransaction,
+    gap_detectors::ProcessingResult,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
 pub struct AccountTransactionsProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl AccountTransactionsProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -38,11 +42,12 @@ impl Debug for AccountTransactionsProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    account_transactions: Vec<AccountTransaction>,
+    account_transactions: &[AccountTransaction],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -54,7 +59,10 @@ async fn insert_to_db(
         conn.clone(),
         insert_account_transactions_query,
         account_transactions,
-        AccountTransaction::field_count(),
+        get_config_table_chunk_size::<AccountTransaction>(
+            "account_transactions",
+            per_table_chunk_sizes,
+        ),
     )
     .await?;
     Ok(())
@@ -88,9 +96,11 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-        _: Option<u64>,
+        _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut account_transactions = AHashMap::new();
 
         for txn in &transactions {
@@ -113,19 +123,22 @@ impl ProcessorTrait for AccountTransactionsProcessor {
             self.name(),
             start_version,
             end_version,
-            account_transactions,
+            &account_transactions,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
-            }),
+            Ok(_) => Ok(ProcessingResult::DefaultProcessingResult(
+                DefaultProcessingResult {
+                    start_version,
+                    end_version,
+                    processing_duration_in_secs,
+                    db_insertion_duration_in_secs,
+                    last_transaction_timestamp,
+                },
+            )),
             Err(err) => {
                 error!(
                     start_version = start_version,
@@ -139,7 +152,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

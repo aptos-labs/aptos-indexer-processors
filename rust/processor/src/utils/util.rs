@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    models::property_map::{PropertyMap, TokenObjectPropertyMap},
+    db::common::models::property_map::{PropertyMap, TokenObjectPropertyMap},
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
 use aptos_protos::{
@@ -15,16 +15,29 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use sha2::Digest;
 use std::str::FromStr;
+use tiny_keccak::{Hasher, Sha3};
 
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 // Max length of entry function id string to ensure that db doesn't explode
 pub const MAX_ENTRY_FUNCTION_LENGTH: usize = 1000;
 
+pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+
+lazy_static! {
+    pub static ref APT_METADATA_ADDRESS_RAW: [u8; 32] = {
+        let mut addr = [0u8; 32];
+        addr[31] = 10u8;
+        addr
+    };
+    pub static ref APT_METADATA_ADDRESS_HEX: String =
+        format!("0x{}", hex::encode(*APT_METADATA_ADDRESS_RAW));
+}
 // Supporting structs to get clean payload without escaped strings
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryFunctionPayloadClean {
@@ -65,6 +78,14 @@ pub fn hash_str(val: &str) -> String {
     hex::encode(sha2::Sha256::digest(val.as_bytes()))
 }
 
+pub fn sha3_256(buffer: &[u8]) -> [u8; 32] {
+    let mut output = [0; 32];
+    let mut sha3 = Sha3::v256();
+    sha3.update(buffer);
+    sha3.finalize(&mut output);
+    output
+}
+
 pub fn truncate_str(val: &str, max_chars: usize) -> String {
     let mut trunc = val.to_string();
     trunc.truncate(max_chars);
@@ -89,24 +110,28 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
 pub fn get_entry_function_from_user_request(
     user_request: &UserTransactionRequest,
 ) -> Option<String> {
-    let entry_function_id_str: String = match &user_request.payload.as_ref().unwrap().payload {
-        Some(PayloadType::EntryFunctionPayload(payload)) => payload.entry_function_id_str.clone(),
-        Some(PayloadType::MultisigPayload(payload)) => {
-            if let Some(payload) = payload.transaction_payload.as_ref() {
-                match payload.payload.as_ref().unwrap() {
-                    MultisigPayloadType::EntryFunctionPayload(payload) => {
-                        Some(payload.entry_function_id_str.clone())
-                    },
-                };
-            }
-            return None;
+    let entry_function_id_str: Option<String> = match &user_request.payload {
+        Some(txn_payload) => match &txn_payload.payload {
+            Some(PayloadType::EntryFunctionPayload(payload)) => {
+                Some(payload.entry_function_id_str.clone())
+            },
+            Some(PayloadType::MultisigPayload(payload)) => {
+                if let Some(payload) = payload.transaction_payload.as_ref() {
+                    match payload.payload.as_ref().unwrap() {
+                        MultisigPayloadType::EntryFunctionPayload(payload) => {
+                            Some(payload.entry_function_id_str.clone())
+                        },
+                    }
+                } else {
+                    None
+                }
+            },
+            _ => return None,
         },
-        _ => return None,
+        None => return None,
     };
-    Some(truncate_str(
-        &entry_function_id_str,
-        MAX_ENTRY_FUNCTION_LENGTH,
-    ))
+
+    entry_function_id_str.map(|s| truncate_str(&s, MAX_ENTRY_FUNCTION_LENGTH))
 }
 
 pub fn get_payload_type(payload: &TransactionPayload) -> String {
@@ -251,11 +276,13 @@ pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
     } else {
         ts.clone()
     };
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(final_ts.seconds, final_ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
+    #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(
         std::cmp::min(ts, MAX_TIMESTAMP_SECS as u64) as i64,
         0,
@@ -328,7 +355,7 @@ where
     D: Deserializer<'de>,
 {
     let s = <String>::deserialize(deserializer)?;
-    Ok(convert_hex(s.clone()).unwrap_or(s))
+    Ok(String::from_utf8(hex_to_raw_bytes(&s).unwrap()).unwrap_or(s))
 }
 
 /// Convert the bcs serialized vector<u8> to its original string format
@@ -388,10 +415,9 @@ pub fn convert_bcs_token_object_propertymap(s: Value) -> Option<Value> {
     }
 }
 
-/// Convert the vector<u8> that is directly generated from b"xxx"
-pub fn convert_hex(val: String) -> Option<String> {
-    let decoded = hex::decode(val.strip_prefix("0x").unwrap_or(&*val)).ok()?;
-    String::from_utf8(decoded).ok()
+/// Convert from hex string to raw byte string
+pub fn hex_to_raw_bytes(val: &str) -> anyhow::Result<Vec<u8>> {
+    Ok(hex::decode(val.strip_prefix("0x").unwrap_or(val))?)
 }
 
 /// Deserialize from string to type T
@@ -437,7 +463,7 @@ pub fn get_name_from_unnested_move_type(move_type: &str) -> &str {
 
 /* COMMON STRUCTS */
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AggregatorU64 {
+pub struct Aggregator {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub value: BigDecimal,
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -445,7 +471,7 @@ pub struct AggregatorU64 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AggregatorSnapshotU64 {
+pub struct AggregatorSnapshot {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub value: BigDecimal,
 }
@@ -490,14 +516,14 @@ mod tests {
             },
             1,
         );
-        assert_eq!(ts.timestamp(), 1649560602);
+        assert_eq!(ts.and_utc().timestamp(), 1649560602);
         assert_eq!(ts.year(), 2022);
 
         let ts2 = parse_timestamp_secs(600000000000000, 2);
         assert_eq!(ts2.year(), 9999);
 
         let ts3 = parse_timestamp_secs(1659386386, 2);
-        assert_eq!(ts3.timestamp(), 1659386386);
+        assert_eq!(ts3.and_utc().timestamp(), 1659386386);
     }
 
     #[test]

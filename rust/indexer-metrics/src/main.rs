@@ -10,7 +10,7 @@ use indexer_metrics::{
         HASURA_API_LATEST_VERSION, HASURA_API_LATEST_VERSION_TIMESTAMP, PFN_LEDGER_TIMESTAMP,
         PFN_LEDGER_VERSION, TASK_FAILURE_COUNT,
     },
-    util::{deserialize_from_string, fetch_url_with_timeout},
+    util::{deserialize_from_string, fetch_processor_status_with_timeout, get_url_with_timeout},
 };
 use serde::{Deserialize, Serialize};
 use server_framework::{RunnableConfig, ServerArgs};
@@ -39,14 +39,19 @@ struct ProcessorStatus {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct ProcessorsResponse {
+struct ProcessorsResponseInner {
     processor_status: Vec<ProcessorStatus>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ProcessorsResponse {
+    data: ProcessorsResponseInner,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PostProcessorConfig {
-    pub hasura_rest_api_endpoint: Option<String>,
+    pub hasura_graphql_endpoint: Option<String>,
     pub fullnode_rest_api_endpoint: Option<String>,
     pub chain_name: String,
 }
@@ -55,13 +60,13 @@ pub struct PostProcessorConfig {
 impl RunnableConfig for PostProcessorConfig {
     async fn run(&self) -> Result<()> {
         let mut tasks = vec![];
-        let hasura_rest_api_endpoint = self.hasura_rest_api_endpoint.clone();
+        let hasura_graphql_endpoint = self.hasura_graphql_endpoint.clone();
         let fullnode_rest_api_endpoint = self.fullnode_rest_api_endpoint.clone();
         let chain_name = self.chain_name.clone();
 
-        if let Some(hasura) = hasura_rest_api_endpoint {
+        if let Some(endpoint) = hasura_graphql_endpoint {
             tasks.push(tokio::spawn(start_processor_status_fetch(
-                hasura,
+                endpoint,
                 chain_name.clone(),
             )));
         }
@@ -87,7 +92,7 @@ async fn main() -> Result<()> {
 
 async fn start_fn_fetch(url: String, chain_name: String) {
     loop {
-        let result = fetch_url_with_timeout(&url, QUERY_TIMEOUT_MS).await;
+        let result = get_url_with_timeout(&url, QUERY_TIMEOUT_MS).await;
         let time_now = tokio::time::Instant::now();
 
         // Handle the result
@@ -134,7 +139,7 @@ async fn start_fn_fetch(url: String, chain_name: String) {
 
 async fn start_processor_status_fetch(url: String, chain_name: String) {
     loop {
-        let result = fetch_url_with_timeout(&url, QUERY_TIMEOUT_MS).await;
+        let result = fetch_processor_status_with_timeout(&url, QUERY_TIMEOUT_MS).await;
         let time_now = tokio::time::Instant::now();
 
         // Handle the result
@@ -144,17 +149,20 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                     tracing::info!(url = &url, response = ?resp, "Request succeeded");
                     // Process the data as needed
                     let system_time_now = chrono::Utc::now().naive_utc();
-                    for processor in resp.processor_status {
+                    for processor in resp.data.processor_status {
                         HASURA_API_LATEST_VERSION
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(processor.last_success_version as i64);
                         HASURA_API_LATEST_VERSION_TIMESTAMP
                             .with_label_values(&[&processor.processor, &chain_name])
-                            .set(processor.last_updated.timestamp_micros() as f64 * 1e-6);
+                            .set(processor.last_updated.and_utc().timestamp_micros() as f64 * 1e-6);
                         HASURA_API_LATEST_TRANSACTION_TIMESTAMP
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(
-                                processor.last_transaction_timestamp.timestamp_micros() as f64
+                                processor
+                                    .last_transaction_timestamp
+                                    .and_utc()
+                                    .timestamp_micros() as f64
                                     * 1e-6,
                             );
                         let latency = system_time_now - processor.last_transaction_timestamp;

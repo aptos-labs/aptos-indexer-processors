@@ -1,22 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::token_models::{
+    db::common::models::token_models::{
         collection_datas::{CollectionData, CurrentCollectionData},
         nft_points::NftPoints,
         token_activities::TokenActivity,
-        token_claims::CurrentTokenPendingClaim,
         token_datas::{CurrentTokenData, TokenData},
         token_ownerships::{CurrentTokenOwnership, TokenOwnership},
-        tokens::{
-            CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableMetadataForToken, Token,
-            TokenDataIdHash,
-        },
+        tokens::{CurrentTokenOwnershipPK, TableMetadataForToken, Token, TokenDataIdHash},
     },
+    gap_detectors::ProcessingResult,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -27,7 +25,6 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
@@ -36,18 +33,28 @@ use tracing::error;
 #[serde(deny_unknown_fields)]
 pub struct TokenProcessorConfig {
     pub nft_points_contract: Option<String>,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
+    pub query_retries: u32,
+    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
+    pub query_retry_delay_ms: u64,
 }
 
 pub struct TokenProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
     config: TokenProcessorConfig,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl TokenProcessor {
-    pub fn new(connection_pool: PgDbPool, config: TokenProcessorConfig) -> Self {
+    pub fn new(
+        connection_pool: ArcDbPool,
+        config: TokenProcessorConfig,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+    ) -> Self {
         Self {
             connection_pool,
             config,
+            per_table_chunk_sizes,
         }
     }
 }
@@ -64,24 +71,24 @@ impl Debug for TokenProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
     (tokens, token_ownerships, token_datas, collection_datas): (
-        Vec<Token>,
-        Vec<TokenOwnership>,
-        Vec<TokenData>,
-        Vec<CollectionData>,
+        &[Token],
+        &[TokenOwnership],
+        &[TokenData],
+        &[CollectionData],
     ),
     (current_token_ownerships, current_token_datas, current_collection_datas): (
-        Vec<CurrentTokenOwnership>,
-        Vec<CurrentTokenData>,
-        Vec<CurrentCollectionData>,
+        &[CurrentTokenOwnership],
+        &[CurrentTokenData],
+        &[CurrentCollectionData],
     ),
-    token_activities: Vec<TokenActivity>,
-    current_token_claims: Vec<CurrentTokenPendingClaim>,
-    nft_points: Vec<NftPoints>,
+    token_activities: &[TokenActivity],
+    nft_points: &[NftPoints],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -90,77 +97,80 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let t = execute_in_chunks(
         conn.clone(),
         insert_tokens_query,
         tokens,
-        Token::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<Token>("tokens", per_table_chunk_sizes),
+    );
+    let to = execute_in_chunks(
         conn.clone(),
         insert_token_ownerships_query,
         token_ownerships,
-        TokenOwnership::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TokenOwnership>("token_ownerships", per_table_chunk_sizes),
+    );
+    let td = execute_in_chunks(
         conn.clone(),
         insert_token_datas_query,
         token_datas,
-        TokenData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TokenData>("token_datas", per_table_chunk_sizes),
+    );
+    let cd = execute_in_chunks(
         conn.clone(),
         insert_collection_datas_query,
         collection_datas,
-        CollectionData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CollectionData>("collection_datas", per_table_chunk_sizes),
+    );
+    let cto = execute_in_chunks(
         conn.clone(),
         insert_current_token_ownerships_query,
         current_token_ownerships,
-        CurrentTokenOwnership::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentTokenOwnership>(
+            "current_token_ownerships",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ctd = execute_in_chunks(
         conn.clone(),
         insert_current_token_datas_query,
         current_token_datas,
-        CurrentTokenData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentTokenData>(
+            "current_token_datas",
+            per_table_chunk_sizes,
+        ),
+    );
+    let ccd = execute_in_chunks(
         conn.clone(),
         insert_current_collection_datas_query,
         current_collection_datas,
-        CurrentCollectionData::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CurrentCollectionData>(
+            "current_collection_datas",
+            per_table_chunk_sizes,
+        ),
+    );
+
+    let ta = execute_in_chunks(
         conn.clone(),
         insert_token_activities_query,
         token_activities,
-        TokenActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
-        insert_current_token_claims_query,
-        current_token_claims,
-        CurrentTokenPendingClaim::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<TokenActivity>("token_activities", per_table_chunk_sizes),
+    );
+
+    let np = execute_in_chunks(
         conn,
         insert_nft_points_query,
         nft_points,
-        NftPoints::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<NftPoints>("nft_points", per_table_chunk_sizes),
+    );
 
+    let (t_res, to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, np) =
+        tokio::join!(t, to, td, cd, cto, ctd, ccd, ta, np);
+
+    for res in [
+        t_res, to_res, td_res, cd_res, cto_res, ctd_res, ccd_res, ta_res, np,
+    ] {
+        res?;
+    }
     Ok(())
 }
 
@@ -351,36 +361,6 @@ fn insert_token_activities_query(
     )
 }
 
-fn insert_current_token_claims_query(
-    items_to_insert: Vec<CurrentTokenPendingClaim>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_pending_claims::dsl::*;
-
-    (diesel::insert_into(schema::current_token_pending_claims::table)
-         .values(items_to_insert)
-         .on_conflict((
-             token_data_id_hash, property_version, from_address, to_address
-         ))
-         .do_update()
-         .set((
-             collection_data_id_hash.eq(excluded(collection_data_id_hash)),
-             creator_address.eq(excluded(creator_address)),
-             collection_name.eq(excluded(collection_name)),
-             name.eq(excluded(name)),
-             amount.eq(excluded(amount)),
-             table_handle.eq(excluded(table_handle)),
-             last_transaction_version.eq(excluded(last_transaction_version)),
-             inserted_at.eq(excluded(inserted_at)),
-             token_data_id.eq(excluded(token_data_id)),
-             collection_id.eq(excluded(collection_id)),
-         )),
-     Some(" WHERE current_token_pending_claims.last_transaction_version <= excluded.last_transaction_version "),
-    )
-}
-
 fn insert_nft_points_query(
     items_to_insert: Vec<NftPoints>,
 ) -> (
@@ -412,7 +392,11 @@ impl ProcessorTrait for TokenProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut conn = self.get_conn().await;
+        let query_retries = self.config.query_retries;
+        let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -435,10 +419,6 @@ impl ProcessorTrait for TokenProcessor {
             AHashMap::new();
         let mut all_current_collection_datas: AHashMap<TokenDataIdHash, CurrentCollectionData> =
             AHashMap::new();
-        let mut all_current_token_claims: AHashMap<
-            CurrentTokenPendingClaimPK,
-            CurrentTokenPendingClaim,
-        > = AHashMap::new();
 
         // This is likely temporary
         let mut all_nft_points = vec![];
@@ -452,8 +432,14 @@ impl ProcessorTrait for TokenProcessor {
                 current_token_ownerships,
                 current_token_datas,
                 current_collection_datas,
-                current_token_claims,
-            ) = Token::from_transaction(txn, &table_handle_to_owner, &mut conn).await;
+            ) = Token::from_transaction(
+                txn,
+                &table_handle_to_owner,
+                &mut conn,
+                query_retries,
+                query_retry_delay_ms,
+            )
+            .await;
             all_tokens.append(&mut tokens);
             all_token_ownerships.append(&mut token_ownerships);
             all_token_datas.append(&mut token_datas);
@@ -466,9 +452,6 @@ impl ProcessorTrait for TokenProcessor {
             // Track token activities
             let mut activities = TokenActivity::from_transaction(txn);
             all_token_activities.append(&mut activities);
-
-            // claims
-            all_current_token_claims.extend(current_token_claims);
 
             // NFT points
             let nft_points_txn =
@@ -488,9 +471,6 @@ impl ProcessorTrait for TokenProcessor {
         let mut all_current_collection_datas = all_current_collection_datas
             .into_values()
             .collect::<Vec<CurrentCollectionData>>();
-        let mut all_current_token_claims = all_current_token_claims
-            .into_values()
-            .collect::<Vec<CurrentTokenPendingClaim>>();
 
         // Sort by PK
         all_current_token_ownerships.sort_by(|a, b| {
@@ -503,20 +483,6 @@ impl ProcessorTrait for TokenProcessor {
         all_current_token_datas.sort_by(|a, b| a.token_data_id_hash.cmp(&b.token_data_id_hash));
         all_current_collection_datas
             .sort_by(|a, b| a.collection_data_id_hash.cmp(&b.collection_data_id_hash));
-        all_current_token_claims.sort_by(|a, b| {
-            (
-                &a.token_data_id_hash,
-                &a.property_version,
-                &a.from_address,
-                &a.to_address,
-            )
-                .cmp(&(
-                    &b.token_data_id_hash,
-                    &b.property_version,
-                    &b.from_address,
-                    &a.to_address,
-                ))
-        });
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -527,31 +493,33 @@ impl ProcessorTrait for TokenProcessor {
             start_version,
             end_version,
             (
-                all_tokens,
-                all_token_ownerships,
-                all_token_datas,
-                all_collection_datas,
+                &all_tokens,
+                &all_token_ownerships,
+                &all_token_datas,
+                &all_collection_datas,
             ),
             (
-                all_current_token_ownerships,
-                all_current_token_datas,
-                all_current_collection_datas,
+                &all_current_token_ownerships,
+                &all_current_token_datas,
+                &all_current_collection_datas,
             ),
-            all_token_activities,
-            all_current_token_claims,
-            all_nft_points,
+            &all_token_activities,
+            &all_nft_points,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
-            }),
+            Ok(_) => Ok(ProcessingResult::DefaultProcessingResult(
+                DefaultProcessingResult {
+                    start_version,
+                    end_version,
+                    processing_duration_in_secs,
+                    db_insertion_duration_in_secs,
+                    last_transaction_timestamp,
+                },
+            )),
             Err(e) => {
                 error!(
                     start_version = start_version,
@@ -565,7 +533,7 @@ impl ProcessorTrait for TokenProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

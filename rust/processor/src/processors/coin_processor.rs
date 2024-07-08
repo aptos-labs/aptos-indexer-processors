@@ -1,22 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::{
+    db::common::models::{
         coin_models::{
             coin_activities::CoinActivity,
             coin_balances::{CoinBalance, CurrentCoinBalance},
             coin_infos::CoinInfo,
-            coin_supply::CoinSupply,
         },
         fungible_asset_models::v2_fungible_asset_activities::CurrentCoinBalancePK,
     },
+    gap_detectors::ProcessingResult,
     schema,
-    utils::database::{execute_in_chunks, PgDbPool},
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
-use anyhow::bail;
+use anyhow::{bail, Context};
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{
@@ -24,19 +24,20 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
-pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
-
 pub struct CoinProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl CoinProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+        }
     }
 }
 
@@ -52,15 +53,15 @@ impl Debug for CoinProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    coin_activities: Vec<CoinActivity>,
-    coin_infos: Vec<CoinInfo>,
-    coin_balances: Vec<CoinBalance>,
-    current_coin_balances: Vec<CurrentCoinBalance>,
-    coin_supply: Vec<CoinSupply>,
+    coin_activities: &[CoinActivity],
+    coin_infos: &[CoinInfo],
+    coin_balances: &[CoinBalance],
+    current_coin_balances: &[CurrentCoinBalance],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -69,42 +70,38 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let ca = execute_in_chunks(
         conn.clone(),
         insert_coin_activities_query,
         coin_activities,
-        CoinActivity::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CoinActivity>("coin_activities", per_table_chunk_sizes),
+    );
+    let ci = execute_in_chunks(
         conn.clone(),
         insert_coin_infos_query,
         coin_infos,
-        CoinInfo::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CoinInfo>("coin_infos", per_table_chunk_sizes),
+    );
+    let cb = execute_in_chunks(
         conn.clone(),
         insert_coin_balances_query,
         coin_balances,
-        CoinBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
+        get_config_table_chunk_size::<CoinBalance>("coin_balances", per_table_chunk_sizes),
+    );
+    let ccb = execute_in_chunks(
         conn.clone(),
         insert_current_coin_balances_query,
         current_coin_balances,
-        CurrentCoinBalance::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
-        inset_coin_supply_query,
-        coin_supply,
-        CoinSupply::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<CurrentCoinBalance>(
+            "current_coin_balances",
+            per_table_chunk_sizes,
+        ),
+    );
 
+    let (ca_res, ci_res, cb_res, ccb_res) = tokio::join!(ca, ci, cb, ccb);
+    for res in [ca_res, ci_res, cb_res, ccb_res] {
+        res?;
+    }
     Ok(())
 }
 
@@ -202,23 +199,6 @@ fn insert_current_coin_balances_query(
     )
 }
 
-fn inset_coin_supply_query(
-    items_to_insert: Vec<CoinSupply>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::coin_supply::dsl::*;
-
-    (
-        diesel::insert_into(schema::coin_supply::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, coin_type_hash))
-            .do_nothing(),
-        None,
-    )
-}
-
 #[async_trait]
 impl ProcessorTrait for CoinProcessor {
     fn name(&self) -> &'static str {
@@ -233,41 +213,51 @@ impl ProcessorTrait for CoinProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let mut all_coin_activities = vec![];
-        let mut all_coin_balances = vec![];
-        let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
-        let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
-            AHashMap::new();
-        let mut all_coin_supply = vec![];
+        let (
+            all_coin_activities,
+            all_coin_infos,
+            all_coin_balances,
+            all_current_coin_balances,
+        ) = tokio::task::spawn_blocking(move || {
+            let mut all_coin_activities = vec![];
+            let mut all_coin_balances = vec![];
+            let mut all_coin_infos: AHashMap<String, CoinInfo> = AHashMap::new();
+            let mut all_current_coin_balances: AHashMap<CurrentCoinBalancePK, CurrentCoinBalance> =
+                AHashMap::new();
 
-        for txn in &transactions {
-            let (
-                mut coin_activities,
-                mut coin_balances,
-                coin_infos,
-                current_coin_balances,
-                mut coin_supply,
-            ) = CoinActivity::from_transaction(txn);
-            all_coin_activities.append(&mut coin_activities);
-            all_coin_balances.append(&mut coin_balances);
-            all_coin_supply.append(&mut coin_supply);
-            // For coin infos, we only want to keep the first version, so insert only if key is not present already
-            for (key, value) in coin_infos {
-                all_coin_infos.entry(key).or_insert(value);
+            for txn in &transactions {
+                let (mut coin_activities, mut coin_balances, coin_infos, current_coin_balances) =
+                    CoinActivity::from_transaction(txn);
+                all_coin_activities.append(&mut coin_activities);
+                all_coin_balances.append(&mut coin_balances);
+                // For coin infos, we only want to keep the first version, so insert only if key is not present already
+                for (key, value) in coin_infos {
+                    all_coin_infos.entry(key).or_insert(value);
+                }
+                all_current_coin_balances.extend(current_coin_balances);
             }
-            all_current_coin_balances.extend(current_coin_balances);
-        }
-        let mut all_coin_infos = all_coin_infos.into_values().collect::<Vec<CoinInfo>>();
-        let mut all_current_coin_balances = all_current_coin_balances
-            .into_values()
-            .collect::<Vec<CurrentCoinBalance>>();
+            let mut all_coin_infos = all_coin_infos.into_values().collect::<Vec<CoinInfo>>();
+            let mut all_current_coin_balances = all_current_coin_balances
+                .into_values()
+                .collect::<Vec<CurrentCoinBalance>>();
 
-        // Sort by PK
-        all_coin_infos.sort_by(|a, b| a.coin_type.cmp(&b.coin_type));
-        all_current_coin_balances.sort_by(|a, b| {
-            (&a.owner_address, &a.coin_type).cmp(&(&b.owner_address, &b.coin_type))
-        });
+            // Sort by PK
+            all_coin_infos.sort_by(|a, b| a.coin_type.cmp(&b.coin_type));
+            all_current_coin_balances.sort_by(|a, b| {
+                (&a.owner_address, &a.coin_type).cmp(&(&b.owner_address, &b.coin_type))
+            });
+
+            (
+                all_coin_activities,
+                all_coin_infos,
+                all_coin_balances,
+                all_current_coin_balances,
+            )
+        })
+        .await
+        .context("spawn_blocking for CoinProcessor thread failed")?;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -277,24 +267,26 @@ impl ProcessorTrait for CoinProcessor {
             self.name(),
             start_version,
             end_version,
-            all_coin_activities,
-            all_coin_infos,
-            all_coin_balances,
-            all_current_coin_balances,
-            all_coin_supply,
+            &all_coin_activities,
+            &all_coin_infos,
+            &all_coin_balances,
+            &all_current_coin_balances,
+            &self.per_table_chunk_sizes,
         )
         .await;
 
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
 
         match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
-            }),
+            Ok(_) => Ok(ProcessingResult::DefaultProcessingResult(
+                DefaultProcessingResult {
+                    start_version,
+                    end_version,
+                    processing_duration_in_secs,
+                    db_insertion_duration_in_secs,
+                    last_transaction_timestamp,
+                },
+            )),
             Err(err) => {
                 error!(
                     start_version = start_version,
@@ -308,7 +300,7 @@ impl ProcessorTrait for CoinProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

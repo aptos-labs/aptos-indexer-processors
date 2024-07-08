@@ -1,17 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{ProcessingResult, ProcessorName, ProcessorTrait};
+use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    models::user_transactions_models::{
+    db::common::models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
+    gap_detectors::ProcessingResult,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, PgDbPool},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
     },
+    worker::TableFlags,
 };
+use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
@@ -20,17 +23,26 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use field_count::FieldCount;
 use std::fmt::Debug;
 use tracing::error;
 
 pub struct UserTransactionProcessor {
-    connection_pool: PgDbPool,
+    connection_pool: ArcDbPool,
+    per_table_chunk_sizes: AHashMap<String, usize>,
+    deprecated_tables: TableFlags,
 }
 
 impl UserTransactionProcessor {
-    pub fn new(connection_pool: PgDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(
+        connection_pool: ArcDbPool,
+        per_table_chunk_sizes: AHashMap<String, usize>,
+        deprecated_tables: TableFlags,
+    ) -> Self {
+        Self {
+            connection_pool,
+            per_table_chunk_sizes,
+            deprecated_tables,
+        }
     }
 }
 
@@ -46,12 +58,13 @@ impl Debug for UserTransactionProcessor {
 }
 
 async fn insert_to_db(
-    conn: PgDbPool,
+    conn: ArcDbPool,
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    user_transactions: Vec<UserTransactionModel>,
-    signatures: Vec<Signature>,
+    user_transactions: &[UserTransactionModel],
+    signatures: &[Signature],
+    per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -60,21 +73,26 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    execute_in_chunks(
+    let ut = execute_in_chunks(
         conn.clone(),
         insert_user_transactions_query,
         user_transactions,
-        UserTransactionModel::field_count(),
-    )
-    .await?;
-    execute_in_chunks(
-        conn.clone(),
+        get_config_table_chunk_size::<UserTransactionModel>(
+            "user_transactions",
+            per_table_chunk_sizes,
+        ),
+    );
+    let is = execute_in_chunks(
+        conn,
         insert_signatures_query,
         signatures,
-        Signature::field_count(),
-    )
-    .await?;
+        get_config_table_chunk_size::<Signature>("signatures", per_table_chunk_sizes),
+    );
 
+    let (ut_res, is_res) = futures::join!(ut, is);
+    for res in [ut_res, is_res] {
+        res?;
+    }
     Ok(())
 }
 
@@ -133,6 +151,8 @@ impl ProcessorTrait for UserTransactionProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+
         let mut signatures = vec![];
         let mut user_transactions = vec![];
         for txn in &transactions {
@@ -164,6 +184,10 @@ impl ProcessorTrait for UserTransactionProcessor {
             }
         }
 
+        if self.deprecated_tables.contains(TableFlags::SIGNATURES) {
+            signatures.clear();
+        }
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -172,19 +196,22 @@ impl ProcessorTrait for UserTransactionProcessor {
             self.name(),
             start_version,
             end_version,
-            user_transactions,
-            signatures,
+            &user_transactions,
+            &signatures,
+            &self.per_table_chunk_sizes,
         )
         .await;
         let db_insertion_duration_in_secs = db_insertion_start.elapsed().as_secs_f64();
         match tx_result {
-            Ok(_) => Ok(ProcessingResult {
-                start_version,
-                end_version,
-                processing_duration_in_secs,
-                db_insertion_duration_in_secs,
-                last_transaction_timstamp: transactions.last().unwrap().timestamp.clone(),
-            }),
+            Ok(_) => Ok(ProcessingResult::DefaultProcessingResult(
+                DefaultProcessingResult {
+                    start_version,
+                    end_version,
+                    processing_duration_in_secs,
+                    db_insertion_duration_in_secs,
+                    last_transaction_timestamp,
+                },
+            )),
             Err(e) => {
                 error!(
                     start_version = start_version,
@@ -198,7 +225,7 @@ impl ProcessorTrait for UserTransactionProcessor {
         }
     }
 
-    fn connection_pool(&self) -> &PgDbPool {
+    fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
 }

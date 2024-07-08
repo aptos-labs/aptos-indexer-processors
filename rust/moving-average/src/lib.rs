@@ -15,7 +15,7 @@ pub struct MovingAverage {
 
 impl MovingAverage {
     pub fn new(window_millis: u64) -> Self {
-        let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+        let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
         let mut queue = VecDeque::new();
         queue.push_back((now, 0));
         Self {
@@ -26,7 +26,7 @@ impl MovingAverage {
     }
 
     pub fn tick_now(&mut self, value: u64) {
-        let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+        let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
         self.tick(now, value);
     }
 
@@ -49,16 +49,36 @@ impl MovingAverage {
         self.avg()
     }
 
+    // Only be called after tick_now/tick is called.
     pub fn avg(&self) -> f64 {
         if self.values.len() < 2 {
             0.0
         } else {
             let elapsed = self.values.back().unwrap().0 - self.values.front().unwrap().0;
-            self.sum as f64 / elapsed as f64
+            (self.sum * 1000) as f64 / elapsed as f64
         }
     }
 
     pub fn sum(&self) -> u64 {
         self.sum
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_moving_average() {
+        // 10 Second window.
+        let mut ma = MovingAverage::new(10_000);
+        // 9 seconds spent at 100 TPS.
+        for _ in 0..9 {
+            ma.tick_now(100);
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        // No matter what algorithm we use, the average should be 99 at least.
+        let avg = ma.avg();
+        assert!(avg >= 99.0, "Average is too low: {}", avg);
     }
 }
