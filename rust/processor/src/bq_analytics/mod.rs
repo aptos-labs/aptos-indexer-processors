@@ -7,7 +7,6 @@ use crate::{
         ParquetHandler as GenericParquetHandler,
     },
     gap_detectors::ProcessingResult,
-    processors::parquet_processors::ParquetProcessingState,
     worker::PROCESSOR_SERVICE_TYPE,
 };
 use ahash::AHashMap;
@@ -139,18 +138,11 @@ where
                     let result = parquet_manager.handle(&gcs_client, txn_pb_res).await;
 
                     match result {
-                        Ok(ParquetProcessingState::Buffered) => {
+                        Ok(_) => {
                             info!(
                                 processor_name = processor_name.clone(),
                                 service_type = PROCESSOR_SERVICE_TYPE,
                                 "[Parquet Handler] Successfully processed structs to buffer",
-                            );
-                        },
-                        Ok(ParquetProcessingState::Uploaded) => {
-                            info!(
-                                processor_name = processor_name.clone(),
-                                service_type = PROCESSOR_SERVICE_TYPE,
-                                "[Parquet Handler] Successfully processed structs to buffer and uploaded",
                             );
                         },
                         Err(e) => {

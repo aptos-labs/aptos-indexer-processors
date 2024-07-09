@@ -2,7 +2,6 @@ use super::ParquetProcessingResult;
 use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
-    processors::parquet_processors::ParquetProcessingState,
     utils::{
         counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
         util::naive_datetime_to_timestamp,
@@ -150,9 +149,7 @@ where
         &mut self,
         gcs_client: &GCSClient,
         changes: ParquetDataGeneric<ParquetType>,
-    ) -> Result<ParquetProcessingState> {
-        let mut state = ParquetProcessingState::Buffered;
-
+    ) -> Result<()> {
         let parquet_structs = changes.data;
         self.transaction_version_to_struct_count
             .extend(changes.transaction_version_to_struct_count);
@@ -166,29 +163,31 @@ where
             self.buffer.push(parquet_struct);
 
             if self.buffer_size_bytes >= self.max_buffer_size {
+                info!("Max buffer size reached, uploading to GCS.");
                 if let Err(e) = self.upload_buffer(gcs_client).await {
                     error!("Failed to upload buffer: {}", e);
                     return Err(e);
                 }
                 self.last_upload_time = Instant::now();
-                state = ParquetProcessingState::Uploaded;
             }
 
             if self.last_upload_time.elapsed() >= self.upload_interval {
-                info!("Time has elamped more since last update.");
+                info!(
+                    "Time has elapsed more than {} since last upload.",
+                    self.upload_interval.as_secs()
+                );
                 if let Err(e) = self.upload_buffer(gcs_client).await {
                     error!("Failed to upload buffer: {}", e);
                     return Err(e);
                 }
                 self.last_upload_time = Instant::now();
-                state = ParquetProcessingState::Uploaded;
             }
         }
 
         PARQUET_HANDLER_BUFFER_SIZE
             .with_label_values(&[ParquetType::TABLE_NAME])
             .set(self.buffer.len() as i64);
-        Ok(state)
+        Ok(())
     }
 
     pub async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
