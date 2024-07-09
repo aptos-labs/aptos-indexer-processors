@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter, Result as FormatResult},
     sync::Arc,
-    time::Instant,
 };
 use tokio::{io, time::Duration};
 use tracing::{debug, error, info};
@@ -134,29 +133,7 @@ where
             .expect("Failed to create GCS client config");
         let gcs_client = Arc::new(GCSClient::new(gcs_config));
 
-        let mut last_upload_time = Instant::now();
-
         loop {
-            let now = Instant::now();
-            // Check if the interval has elapsed
-            if now.duration_since(last_upload_time) >= upload_interval {
-                info!("Time has elamped more since last update.");
-                match parquet_manager.upload_buffer(&gcs_client).await {
-                    Ok(_) => {
-                        info!(
-                            processor_name = processor_name.clone(),
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            "[Parquet Handler] Successfully uploaded buffer",
-                        );
-                        last_upload_time = Instant::now();
-                    },
-                    Err(e) => {
-                        error!("Failed to upload buffer: {}", e);
-                        panic!("Error processing parquet files: {:?}", e);
-                    },
-                }
-            }
-
             match parquet_receiver.recv().await {
                 Ok(txn_pb_res) => {
                     let result = parquet_manager.handle(&gcs_client, txn_pb_res).await;
@@ -175,7 +152,6 @@ where
                                 service_type = PROCESSOR_SERVICE_TYPE,
                                 "[Parquet Handler] Successfully processed structs to buffer and uploaded",
                             );
-                            last_upload_time = Instant::now();
                         },
                         Err(e) => {
                             error!(

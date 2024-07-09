@@ -21,9 +21,10 @@ use std::{
     fs::{remove_file, rename, File},
     path::PathBuf,
     sync::Arc,
+    time::Instant,
 };
 use tokio::time::Duration;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 #[derive(Debug, Default, Clone)]
@@ -77,6 +78,7 @@ where
     pub file_path: String,
     pub upload_interval: Duration,
     pub max_buffer_size: usize,
+    pub last_upload_time: Instant,
 }
 fn create_new_writer(
     file_path: &str,
@@ -140,6 +142,7 @@ where
             file_path,
             upload_interval,
             max_buffer_size,
+            last_upload_time: Instant::now(),
         })
     }
 
@@ -167,6 +170,17 @@ where
                     error!("Failed to upload buffer: {}", e);
                     return Err(e);
                 }
+                self.last_upload_time = Instant::now();
+                state = ParquetProcessingState::Uploaded;
+            }
+
+            if self.last_upload_time.elapsed() >= self.upload_interval {
+                info!("Time has elamped more since last update.");
+                if let Err(e) = self.upload_buffer(gcs_client).await {
+                    error!("Failed to upload buffer: {}", e);
+                    return Err(e);
+                }
+                self.last_upload_time = Instant::now();
                 state = ParquetProcessingState::Uploaded;
             }
         }
