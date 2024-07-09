@@ -15,6 +15,7 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
+use chrono::NaiveDateTime;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -71,6 +72,18 @@ pub fn standardize_address(handle: &str) -> String {
         format!("0x{:0>64}", handle)
     } else {
         format!("0x{:0>64}", handle)
+    }
+}
+
+/// Standardizes all addresses and table handles to be length 66 (0x-64 length hash) that takes in a slice.
+pub fn standardize_address_from_bytes(bytes: &[u8]) -> String {
+    let encdoed_bytes = hex::encode(bytes);
+    // let encdoed_bytes = binding.as_str();
+
+    if let Some(handle) = &encdoed_bytes.strip_prefix("0x") {
+        format!("0x{:0>64}", handle)
+    } else {
+        format!("0x{:0>64}", encdoed_bytes)
     }
 }
 
@@ -264,6 +277,13 @@ fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayl
                 })
             })
             .collect(),
+    }
+}
+
+pub fn naive_datetime_to_timestamp(ndt: NaiveDateTime) -> Timestamp {
+    Timestamp {
+        seconds: ndt.and_utc().timestamp(),
+        nanos: ndt.and_utc().timestamp_subsec_nanos() as i32,
     }
 }
 

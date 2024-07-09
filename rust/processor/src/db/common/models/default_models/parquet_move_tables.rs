@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{HasVersion, NamedTable},
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     utils::util::{hash_str, standardize_address},
 };
 use allocative_derive::Allocative;
@@ -38,6 +38,13 @@ impl HasVersion for TableItem {
         self.txn_version
     }
 }
+
+impl GetTimeStamp for TableItem {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct CurrentTableItem {
     pub table_handle: String,

@@ -165,6 +165,7 @@ impl FungibleAssetBalance {
                 let asset_type = inner.metadata.get_reference_address();
                 let is_primary = Self::is_primary(&owner_address, &asset_type, &storage_id);
 
+                #[allow(clippy::useless_asref)]
                 let concurrent_balance = object_data
                     .concurrent_fungible_asset_balance
                     .as_ref()

@@ -31,6 +31,7 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 pub struct DefaultParquetProcessorConfig {
     pub google_application_credentials: Option<String>,
     pub bucket_name: String,
+    pub bucket_root: String,
     pub parquet_handler_response_channel_size: usize,
     pub max_buffer_size: usize,
 }
@@ -59,6 +60,7 @@ impl DefaultParquetProcessor {
             new_gap_detector_sender.clone(),
             ProcessorName::DefaultParquetProcessor.into(),
             config.bucket_name.clone(),
+            config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
         );
@@ -67,6 +69,7 @@ impl DefaultParquetProcessor {
             new_gap_detector_sender.clone(),
             ProcessorName::DefaultParquetProcessor.into(),
             config.bucket_name.clone(),
+            config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
         );
@@ -75,6 +78,7 @@ impl DefaultParquetProcessor {
             new_gap_detector_sender.clone(),
             ProcessorName::DefaultParquetProcessor.into(),
             config.bucket_name.clone(),
+            config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
         );
@@ -83,6 +87,7 @@ impl DefaultParquetProcessor {
             new_gap_detector_sender.clone(),
             ProcessorName::DefaultParquetProcessor.into(),
             config.bucket_name.clone(),
+            config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
         );
@@ -132,10 +137,7 @@ impl ProcessorTrait for DefaultParquetProcessor {
 
         let mr_parquet_data = ParquetDataGeneric {
             data: mr,
-            last_transaction_timestamp: last_transaction_timestamp.clone(),
             transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
-            first_txn_version: start_version,
-            last_txn_version: end_version,
         };
 
         self.move_resource_sender
@@ -145,10 +147,7 @@ impl ProcessorTrait for DefaultParquetProcessor {
 
         let wsc_parquet_data = ParquetDataGeneric {
             data: wsc,
-            last_transaction_timestamp: last_transaction_timestamp.clone(),
             transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
-            first_txn_version: start_version,
-            last_txn_version: end_version,
         };
         self.wsc_sender
             .send(wsc_parquet_data)
@@ -157,10 +156,7 @@ impl ProcessorTrait for DefaultParquetProcessor {
 
         let t_parquet_data = ParquetDataGeneric {
             data: t,
-            last_transaction_timestamp: last_transaction_timestamp.clone(),
             transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
-            first_txn_version: start_version,
-            last_txn_version: end_version,
         };
         self.transaction_sender
             .send(t_parquet_data)
@@ -169,10 +165,7 @@ impl ProcessorTrait for DefaultParquetProcessor {
 
         let ti_parquet_data = ParquetDataGeneric {
             data: ti,
-            last_transaction_timestamp: last_transaction_timestamp.clone(),
             transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
-            first_txn_version: start_version,
-            last_txn_version: end_version,
         };
 
         self.ti_sender

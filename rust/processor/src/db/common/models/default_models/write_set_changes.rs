@@ -9,7 +9,10 @@ use super::{
     move_tables::{CurrentTableItem, TableItem, TableMetadata},
     transactions::Transaction,
 };
-use crate::{schema::write_set_changes, utils::util::standardize_address};
+use crate::{
+    schema::write_set_changes,
+    utils::util::{standardize_address, standardize_address_from_bytes},
+};
 use aptos_protos::transaction::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
     WriteSetChange as WriteSetChangePB,
@@ -49,12 +52,10 @@ impl WriteSetChange {
             WriteSetChangeEnum::WriteModule(inner) => (
                 Self {
                     transaction_version,
-                    hash: standardize_address(
-                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                    ),
+                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
                     transaction_block_height,
                     type_,
-                    address: standardize_address(&inner.address.to_string()),
+                    address: standardize_address(&inner.address),
                     index,
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_write_module(
@@ -67,12 +68,10 @@ impl WriteSetChange {
             WriteSetChangeEnum::DeleteModule(inner) => (
                 Self {
                     transaction_version,
-                    hash: standardize_address(
-                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                    ),
+                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
                     transaction_block_height,
                     type_,
-                    address: standardize_address(&inner.address.to_string()),
+                    address: standardize_address(&inner.address),
                     index,
                 },
                 WriteSetChangeDetail::Module(MoveModule::from_delete_module(
@@ -85,12 +84,10 @@ impl WriteSetChange {
             WriteSetChangeEnum::WriteResource(inner) => (
                 Self {
                     transaction_version,
-                    hash: standardize_address(
-                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                    ),
+                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
                     transaction_block_height,
                     type_,
-                    address: standardize_address(&inner.address.to_string()),
+                    address: standardize_address(&inner.address),
                     index,
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
@@ -103,12 +100,10 @@ impl WriteSetChange {
             WriteSetChangeEnum::DeleteResource(inner) => (
                 Self {
                     transaction_version,
-                    hash: standardize_address(
-                        hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                    ),
+                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
                     transaction_block_height,
                     type_,
-                    address: standardize_address(&inner.address.to_string()),
+                    address: standardize_address(&inner.address),
                     index,
                 },
                 WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
@@ -128,9 +123,7 @@ impl WriteSetChange {
                 (
                     Self {
                         transaction_version,
-                        hash: standardize_address(
-                            hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                        ),
+                        hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
                         transaction_block_height,
                         type_,
                         address: String::default(),
@@ -153,9 +146,7 @@ impl WriteSetChange {
                 (
                     Self {
                         transaction_version,
-                        hash: standardize_address(
-                            hex::encode(inner.state_key_hash.as_slice()).as_str(),
-                        ),
+                        hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
                         transaction_block_height,
                         type_,
                         address: String::default(),

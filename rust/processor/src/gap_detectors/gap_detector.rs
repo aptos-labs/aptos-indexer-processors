@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gap_detectors::{GapDetectorResult, ProcessingResult},
+    gap_detectors::{GapDetectorResult, GapDetectorTrait, ProcessingResult},
     processors::DefaultProcessingResult,
 };
 use ahash::AHashMap;
-
-pub trait GapDetectorTrait {
-    fn process_versions(&mut self, result: ProcessingResult) -> anyhow::Result<GapDetectorResult>;
-}
+use anyhow::Result;
 
 pub struct DefaultGapDetector {
     next_version_to_process: u64,
@@ -24,7 +21,7 @@ pub struct DefaultGapDetectorResult {
 }
 
 impl GapDetectorTrait for DefaultGapDetector {
-    fn process_versions(&mut self, result: ProcessingResult) -> anyhow::Result<GapDetectorResult> {
+    fn process_versions(&mut self, result: ProcessingResult) -> Result<GapDetectorResult> {
         match result {
             ProcessingResult::DefaultProcessingResult(result) => {
                 // Check for gaps

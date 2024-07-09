@@ -4,7 +4,10 @@
 use crate::{
     config::IndexerGrpcHttp2Config,
     db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
-    gap_detectors::{create_gap_detector_status_tracker_loop, ProcessingResult},
+    gap_detectors::{
+        create_gap_detector_status_tracker_loop, gap_detector::DefaultGapDetector,
+        parquet_gap_detector::ParquetFileGapDetector, GapDetector, ProcessingResult,
+    },
     grpc_stream::TransactionsPBResponse,
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
@@ -298,44 +301,35 @@ impl Worker {
         // Create a gap detector task that will panic if there is a gap in the processing
         let (gap_detector_sender, gap_detector_receiver) =
             kanal::bounded_async::<ProcessingResult>(BUFFER_SIZE);
-        let (processor, gap_detection_batch_size, gap_detector_sender) =
-            if self.processor_config.is_parquet_processor() {
-                let processor = build_processor(
-                    &self.processor_config,
-                    self.per_table_chunk_sizes.clone(),
-                    self.deprecated_tables,
-                    self.db_pool.clone(),
-                    Some(gap_detector_sender.clone()),
-                );
-                let gap_detection_batch_size: u64 = self.parquet_gap_detection_batch_size;
 
-                (
-                    processor,
-                    gap_detection_batch_size,
-                    Some(gap_detector_sender),
-                )
-            } else {
-                let processor = build_processor(
-                    &self.processor_config,
-                    self.per_table_chunk_sizes.clone(),
-                    self.deprecated_tables,
-                    self.db_pool.clone(),
-                    None,
-                );
-                let gap_detection_batch_size = self.gap_detection_batch_size;
+        let is_parquet_processor = self.processor_config.is_parquet_processor();
+        let (maybe_gap_detector_sender, gap_detection_batch_size) = if is_parquet_processor {
+            let gap_detection_batch_size: u64 = self.parquet_gap_detection_batch_size;
+            (Some(gap_detector_sender.clone()), gap_detection_batch_size)
+        } else {
+            let gap_detection_batch_size = self.gap_detection_batch_size;
+            (None, gap_detection_batch_size)
+        };
 
-                (
-                    processor,
-                    gap_detection_batch_size,
-                    Some(gap_detector_sender),
-                )
-            };
+        let processor = build_processor(
+            &self.processor_config,
+            self.per_table_chunk_sizes.clone(),
+            self.deprecated_tables,
+            self.db_pool.clone(),
+            maybe_gap_detector_sender,
+        );
+
+        let gap_detector = if is_parquet_processor {
+            GapDetector::ParquetFileGapDetector(ParquetFileGapDetector::new(starting_version))
+        } else {
+            GapDetector::DefaultGapDetector(DefaultGapDetector::new(starting_version))
+        };
 
         tokio::spawn(async move {
             create_gap_detector_status_tracker_loop(
+                gap_detector,
                 gap_detector_receiver,
                 processor,
-                starting_version,
                 gap_detection_batch_size,
             )
             .await;
@@ -382,7 +376,7 @@ impl Worker {
         &self,
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
-        gap_detector_sender: Option<AsyncSender<ProcessingResult>>,
+        gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -390,13 +384,23 @@ impl Worker {
         let auth_token = self.auth_token.clone();
 
         // Build the processor based on the config.
-        let processor = build_processor(
-            &self.processor_config,
-            self.per_table_chunk_sizes.clone(),
-            self.deprecated_tables,
-            self.db_pool.clone(),
-            gap_detector_sender.clone(),
-        );
+        let processor = if self.processor_config.is_parquet_processor() {
+            build_processor(
+                &self.processor_config,
+                self.per_table_chunk_sizes.clone(),
+                self.deprecated_tables,
+                self.db_pool.clone(),
+                Some(gap_detector_sender.clone()),
+            )
+        } else {
+            build_processor(
+                &self.processor_config,
+                self.per_table_chunk_sizes.clone(),
+                self.deprecated_tables,
+                self.db_pool.clone(),
+                None,
+            )
+        };
 
         let concurrent_tasks = self.number_concurrent_processing_tasks;
 
@@ -612,8 +616,6 @@ impl Worker {
                                     .set(processing_result.db_insertion_duration_in_secs);
 
                                 gap_detector_sender
-                                    .as_ref()
-                                    .unwrap()
                                     .send(ProcessingResult::DefaultProcessingResult(
                                         processing_result,
                                     ))

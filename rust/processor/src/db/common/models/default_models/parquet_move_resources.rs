@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{HasVersion, NamedTable},
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     utils::util::standardize_address,
 };
 use allocative_derive::Allocative;
@@ -45,7 +45,14 @@ impl HasVersion for MoveResource {
     }
 }
 
+impl GetTimeStamp for MoveResource {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
+}
+
 pub struct MoveStructTag {
+    #[allow(dead_code)]
     resource_address: String,
     pub module: String,
     pub fun: String,
@@ -59,14 +66,15 @@ impl MoveResource {
         txn_version: i64,
         block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
-    ) -> Self {
-        let parsed_data = Self::convert_move_struct_tag(
-            write_resource
-                .r#type
-                .as_ref()
-                .expect("MoveStructTag Not Exists."),
-        );
-        Self {
+    ) -> Result<Option<Self>> {
+        let move_struct_tag = match write_resource.r#type.as_ref() {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+
+        let parsed_data = convert_move_struct_tag(move_struct_tag);
+
+        let move_resource = Self {
             txn_version,
             block_height,
             write_set_change_index,
@@ -81,7 +89,8 @@ impl MoveResource {
                 hex::encode(write_resource.state_key_hash.as_slice()).as_str(),
             ),
             block_timestamp,
-        }
+        };
+        Ok(Some(move_resource))
     }
 
     pub fn from_delete_resource(
@@ -90,14 +99,13 @@ impl MoveResource {
         txn_version: i64,
         block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
-    ) -> Self {
-        let parsed_data = Self::convert_move_struct_tag(
-            delete_resource
-                .r#type
-                .as_ref()
-                .expect("MoveStructTag Not Exists."),
-        );
-        Self {
+    ) -> Result<Option<Self>> {
+        let move_struct_tag = match delete_resource.r#type.as_ref() {
+            Some(t) => t,
+            None => return Ok(None),
+        };
+        let parsed_data = convert_move_struct_tag(move_struct_tag);
+        let move_resource = Self {
             txn_version,
             block_height,
             write_set_change_index,
@@ -112,42 +120,25 @@ impl MoveResource {
                 hex::encode(delete_resource.state_key_hash.as_slice()).as_str(),
             ),
             block_timestamp,
-        }
-    }
-
-    pub fn convert_move_struct_tag(struct_tag: &MoveStructTagPB) -> MoveStructTag {
-        MoveStructTag {
-            resource_address: standardize_address(struct_tag.address.as_str()),
-            module: struct_tag.module.to_string(),
-            fun: struct_tag.name.to_string(),
-            generic_type_params: struct_tag
-                .generic_type_params
-                .iter()
-                .map(|move_type| -> Result<Option<String>> {
-                    Ok(Some(
-                        serde_json::to_string(move_type).context("Failed to parse move type")?,
-                    ))
-                })
-                .collect::<Result<Option<String>>>()
-                .unwrap_or(None),
-        }
-    }
-
-    pub fn get_outer_type_from_resource(write_resource: &WriteResource) -> String {
-        let move_struct_tag =
-            Self::convert_move_struct_tag(write_resource.r#type.as_ref().unwrap());
-
-        format!(
-            "{}::{}::{}",
-            move_struct_tag.get_address(),
-            move_struct_tag.module,
-            move_struct_tag.fun,
-        )
+        };
+        Ok(Some(move_resource))
     }
 }
 
-impl MoveStructTag {
-    pub fn get_address(&self) -> String {
-        standardize_address(self.resource_address.as_str())
+pub fn convert_move_struct_tag(struct_tag: &MoveStructTagPB) -> MoveStructTag {
+    MoveStructTag {
+        resource_address: standardize_address(struct_tag.address.as_str()),
+        module: struct_tag.module.to_string(),
+        fun: struct_tag.name.to_string(),
+        generic_type_params: struct_tag
+            .generic_type_params
+            .iter()
+            .map(|move_type| -> Result<Option<String>> {
+                Ok(Some(
+                    serde_json::to_string(move_type).context("Failed to parse move type")?,
+                ))
+            })
+            .collect::<Result<Option<String>>>()
+            .unwrap_or(None),
     }
 }
