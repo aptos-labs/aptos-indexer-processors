@@ -1,5 +1,5 @@
 use crate::bq_analytics::ParquetProcessorError;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use chrono::{Datelike, Timelike};
 use google_cloud_storage::{
     client::Client as GCSClient,
@@ -7,31 +7,18 @@ use google_cloud_storage::{
 };
 use hyper::Body;
 use std::path::{Path, PathBuf};
-use tokio::io::AsyncReadExt; // for read_to_end()
-use tokio::{
-    fs::File as TokioFile,
-    time::{sleep, timeout, Duration},
-};
+use tokio::time::{sleep, timeout, Duration};
 use tracing::{debug, error, info};
 const MAX_RETRIES: usize = 3;
 const INITIAL_DELAY_MS: u64 = 500;
 const TIMEOUT_SECONDS: u64 = 300;
 pub async fn upload_parquet_to_gcs(
     client: &GCSClient,
-    file_path: &Path,
+    buffer: Vec<u8>,
     table_name: &str,
     bucket_name: &str,
     bucket_root: &Path,
 ) -> Result<(), ParquetProcessorError> {
-    let mut file = TokioFile::open(&file_path)
-        .await
-        .map_err(|e| anyhow!("Failed to open file for reading: {}", e))?;
-
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .await
-        .map_err(|e| anyhow!("Failed to read file: {}", e))?;
-
     if buffer.is_empty() {
         error!("The file is empty and has no data to upload.",);
         return Err(ParquetProcessorError::Other(

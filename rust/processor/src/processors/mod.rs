@@ -13,7 +13,7 @@ pub mod fungible_asset_processor;
 pub mod monitoring_processor;
 pub mod nft_metadata_processor;
 pub mod objects_processor;
-pub mod parquet_default_processor;
+pub mod parquet_processors;
 pub mod stake_processor;
 pub mod token_processor;
 pub mod token_v2_processor;
@@ -30,7 +30,6 @@ use self::{
     monitoring_processor::MonitoringProcessor,
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
     objects_processor::{ObjectsProcessor, ObjectsProcessorConfig},
-    parquet_default_processor::DefaultParquetProcessorConfig,
     stake_processor::{StakeProcessor, StakeProcessorConfig},
     token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
@@ -40,7 +39,9 @@ use self::{
 use crate::{
     db::common::models::processor_status::ProcessorStatus,
     gap_detectors::ProcessingResult,
-    processors::parquet_default_processor::DefaultParquetProcessor,
+    processors::parquet_processors::parquet_default_processor::{
+        ParquetDefaultProcessor, ParquetDefaultProcessorConfig,
+    },
     schema::processor_status,
     utils::{
         counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
@@ -194,7 +195,7 @@ pub enum ProcessorConfig {
     TokenV2Processor(TokenV2ProcessorConfig),
     TransactionMetadataProcessor,
     UserTransactionProcessor,
-    DefaultParquetProcessor(DefaultParquetProcessorConfig),
+    ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -205,7 +206,7 @@ impl ProcessorConfig {
     }
 
     pub fn is_parquet_processor(&self) -> bool {
-        matches!(self, ProcessorConfig::DefaultParquetProcessor(_))
+        matches!(self, ProcessorConfig::ParquetDefaultProcessor(_))
     }
 }
 
@@ -241,7 +242,7 @@ pub enum Processor {
     TokenV2Processor,
     TransactionMetadataProcessor,
     UserTransactionProcessor,
-    DefaultParquetProcessor,
+    ParquetDefaultProcessor,
 }
 
 #[cfg(test)]
