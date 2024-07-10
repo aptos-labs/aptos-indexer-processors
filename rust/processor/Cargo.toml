@@ -72,7 +72,6 @@ parquet_derive = { workspace = true }
 canonical_json = { workspace = true }
 allocative = { workspace = true }
 allocative_derive = { workspace = true }
-uuid = { workspace = true }
 
 [features]
 libpq = ["diesel/postgres"]
