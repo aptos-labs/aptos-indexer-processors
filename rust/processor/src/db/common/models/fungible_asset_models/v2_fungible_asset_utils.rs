@@ -275,6 +275,26 @@ pub struct FrozenEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositEventV2 {
+    pub store: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawEventV2 {
+    pub store: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FrozenEventV2 {
+    pub store: String,
+    pub frozen: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2FungibleAssetResource {
     FungibleAssetMetadata(FungibleAssetMetadata),
     FungibleAssetStore(FungibleAssetStore),
@@ -338,6 +358,9 @@ pub enum FungibleAssetEvent {
     DepositEvent(DepositEvent),
     WithdrawEvent(WithdrawEvent),
     FrozenEvent(FrozenEvent),
+    DepositEventV2(DepositEventV2),
+    WithdrawEventV2(WithdrawEventV2),
+    FrozenEventV2(FrozenEventV2),
 }
 
 impl FungibleAssetEvent {
@@ -351,6 +374,15 @@ impl FungibleAssetEvent {
             },
             "0x1::fungible_asset::FrozenEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::FrozenEvent(inner)))
+            },
+            "0x1::fungible_asset::Deposit" => {
+                serde_json::from_str(data).map(|inner| Some(Self::DepositEventV2(inner)))
+            },
+            "0x1::fungible_asset::Withdraw" => {
+                serde_json::from_str(data).map(|inner| Some(Self::WithdrawEventV2(inner)))
+            },
+            "0x1::fungible_asset::Frozen" => {
+                serde_json::from_str(data).map(|inner| Some(Self::FrozenEventV2(inner)))
             },
             _ => Ok(None),
         }
