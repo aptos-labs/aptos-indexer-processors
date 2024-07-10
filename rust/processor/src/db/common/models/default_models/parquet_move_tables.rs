@@ -55,11 +55,31 @@ pub struct CurrentTableItem {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
 }
-#[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
+
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
+)]
 pub struct TableMetadata {
     pub handle: String,
     pub key_type: String,
     pub value_type: String,
+}
+
+impl NamedTable for TableMetadata {
+    const TABLE_NAME: &'static str = "table_metadatas";
+}
+
+impl HasVersion for TableMetadata {
+    fn version(&self) -> i64 {
+        0 // This is a placeholder value to avoid a compile error
+    }
+}
+
+impl GetTimeStamp for TableMetadata {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        #[warn(deprecated)]
+        chrono::NaiveDateTime::default()
+    }
 }
 
 impl TableItem {

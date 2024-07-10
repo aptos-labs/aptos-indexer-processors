@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use super::{
-    move_modules::MoveModule,
+    parquet_move_modules::MoveModule,
     parquet_move_resources::MoveResource,
     parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
 };
@@ -16,13 +16,16 @@ use allocative_derive::Allocative;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{
     write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
-    WriteSetChange as WriteSetChangePB,
+    WriteOpSizeInfo, WriteSetChange as WriteSetChangePB,
 };
 use field_count::FieldCount;
+use itertools::Itertools;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(Allocative, Clone, Debug, Deserialize, FieldCount, Serialize, ParquetRecordWriter)]
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
+)]
 pub struct WriteSetChange {
     pub txn_version: i64,
     pub write_set_change_index: i64,
@@ -30,6 +33,9 @@ pub struct WriteSetChange {
     pub change_type: String,
     pub resource_address: String,
     pub block_height: i64,
+    pub key_bytes: i64,
+    pub value_bytes: i64,
+    pub total_bytes: i64,
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }
@@ -41,21 +47,6 @@ impl NamedTable for WriteSetChange {
 impl HasVersion for WriteSetChange {
     fn version(&self) -> i64 {
         self.txn_version
-    }
-}
-
-impl Default for WriteSetChange {
-    fn default() -> Self {
-        Self {
-            txn_version: 0,
-            write_set_change_index: 0,
-            state_key_hash: "".to_string(),
-            change_type: "".to_string(),
-            resource_address: "".to_string(),
-            block_height: 0,
-            #[allow(deprecated)]
-            block_timestamp: chrono::NaiveDateTime::from_timestamp(0, 0),
-        }
     }
 }
 
@@ -72,6 +63,7 @@ impl WriteSetChange {
         txn_version: i64,
         block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
+        write_set_size_info: &WriteOpSizeInfo,
     ) -> anyhow::Result<Option<(Self, WriteSetChangeDetail)>> {
         let change_type = Self::get_write_set_change_type(write_set_change);
         let change = write_set_change
@@ -86,6 +78,10 @@ impl WriteSetChange {
                         hex::encode(inner.state_key_hash.as_slice()).as_str(),
                     ),
                     block_height,
+                    key_bytes: write_set_size_info.key_bytes as i64,
+                    value_bytes: write_set_size_info.value_bytes as i64,
+                    total_bytes: write_set_size_info.key_bytes as i64
+                        + write_set_size_info.value_bytes as i64,
                     change_type,
                     resource_address: standardize_address(&inner.address),
                     write_set_change_index,
@@ -96,6 +92,7 @@ impl WriteSetChange {
                     write_set_change_index,
                     txn_version,
                     block_height,
+                    block_timestamp,
                 )),
             ))),
             WriteSetChangeEnum::DeleteModule(inner) => Ok(Some((
@@ -105,6 +102,10 @@ impl WriteSetChange {
                         hex::encode(inner.state_key_hash.as_slice()).as_str(),
                     ),
                     block_height,
+                    key_bytes: write_set_size_info.key_bytes as i64,
+                    value_bytes: write_set_size_info.value_bytes as i64,
+                    total_bytes: write_set_size_info.key_bytes as i64
+                        + write_set_size_info.value_bytes as i64,
                     change_type,
                     resource_address: standardize_address(&inner.address),
                     write_set_change_index,
@@ -115,6 +116,7 @@ impl WriteSetChange {
                     write_set_change_index,
                     txn_version,
                     block_height,
+                    block_timestamp,
                 )),
             ))),
             WriteSetChangeEnum::WriteResource(inner) => {
@@ -140,6 +142,10 @@ impl WriteSetChange {
                                     inner.state_key_hash.as_slice(),
                                 ),
                                 block_height,
+                                key_bytes: write_set_size_info.key_bytes as i64,
+                                value_bytes: write_set_size_info.value_bytes as i64,
+                                total_bytes: write_set_size_info.key_bytes as i64
+                                    + write_set_size_info.value_bytes as i64,
                                 change_type,
                                 resource_address: standardize_address(&inner.address),
                                 write_set_change_index,
@@ -172,6 +178,10 @@ impl WriteSetChange {
                                     inner.state_key_hash.as_slice(),
                                 ),
                                 block_height,
+                                key_bytes: write_set_size_info.key_bytes as i64,
+                                value_bytes: write_set_size_info.value_bytes as i64,
+                                total_bytes: write_set_size_info.key_bytes as i64
+                                    + write_set_size_info.value_bytes as i64,
                                 change_type,
                                 resource_address: standardize_address(&inner.address),
                                 write_set_change_index,
@@ -196,6 +206,10 @@ impl WriteSetChange {
                             hex::encode(inner.state_key_hash.as_slice()).as_str(),
                         ),
                         block_height,
+                        key_bytes: write_set_size_info.key_bytes as i64,
+                        value_bytes: write_set_size_info.value_bytes as i64,
+                        total_bytes: write_set_size_info.key_bytes as i64
+                            + write_set_size_info.value_bytes as i64,
                         change_type,
                         resource_address: String::default(),
                         write_set_change_index,
@@ -223,6 +237,10 @@ impl WriteSetChange {
                             hex::encode(inner.state_key_hash.as_slice()).as_str(),
                         ),
                         block_height,
+                        key_bytes: write_set_size_info.key_bytes as i64,
+                        value_bytes: write_set_size_info.value_bytes as i64,
+                        total_bytes: write_set_size_info.key_bytes as i64
+                            + write_set_size_info.value_bytes as i64,
                         change_type,
                         resource_address: String::default(),
                         write_set_change_index,
@@ -239,30 +257,35 @@ impl WriteSetChange {
         txn_version: i64,
         block_height: i64,
         timestamp: chrono::NaiveDateTime,
+        size_info: &[WriteOpSizeInfo],
     ) -> (Vec<Self>, Vec<WriteSetChangeDetail>) {
         let results: Vec<(Self, WriteSetChangeDetail)> = write_set_changes
             .iter()
+            .zip_eq(size_info.iter())
             .enumerate()
-            .filter_map(|(write_set_change_index, write_set_change)| {
-                match Self::from_write_set_change(
-                    write_set_change,
-                    write_set_change_index as i64,
-                    txn_version,
-                    block_height,
-                    timestamp,
-                ) {
-                    Ok(Some((change, detail))) => Some((change, detail)),
-                    Ok(None) => None,
-                    Err(e) => {
-                        tracing::error!(
-                            "Failed to convert write set change: {:?} with error: {:?}",
-                            write_set_change,
-                            e
-                        );
-                        panic!("Failed to convert write set change.")
-                    },
-                }
-            })
+            .filter_map(
+                |(write_set_change_index, (write_set_change, write_set_size_info))| {
+                    match Self::from_write_set_change(
+                        write_set_change,
+                        write_set_change_index as i64,
+                        txn_version,
+                        block_height,
+                        timestamp,
+                        write_set_size_info,
+                    ) {
+                        Ok(Some((change, detail))) => Some((change, detail)),
+                        Ok(None) => None,
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to convert write set change: {:?} with error: {:?}",
+                                write_set_change,
+                                e
+                            );
+                            panic!("Failed to convert write set change.")
+                        },
+                    }
+                },
+            )
             .collect::<Vec<(Self, WriteSetChangeDetail)>>();
 
         results.into_iter().unzip()
