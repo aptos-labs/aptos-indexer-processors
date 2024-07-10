@@ -226,8 +226,7 @@ fn insert_proposal_votes_query(
     (
         diesel::insert_into(schema::proposal_votes::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, proposal_id, voter_address))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -243,8 +242,7 @@ fn insert_delegator_activities_query(
     (
         diesel::insert_into(schema::delegated_staking_activities::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, event_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -260,8 +258,7 @@ fn insert_delegator_balances_query(
     (
         diesel::insert_into(schema::delegator_balances::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -323,8 +320,7 @@ fn insert_delegator_pool_balances_query(
     (
         diesel::insert_into(schema::delegated_staking_pool_balances::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, staking_pool_address))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }

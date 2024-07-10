@@ -126,13 +126,7 @@ fn insert_signatures_query(
     (
         diesel::insert_into(schema::signatures::table)
             .values(items_to_insert)
-            .on_conflict((
-                transaction_version,
-                multi_agent_index,
-                multi_sig_index,
-                is_sender_primary,
-            ))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }

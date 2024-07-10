@@ -79,8 +79,7 @@ fn insert_account_transactions_query(
     (
         diesel::insert_into(schema::account_transactions::table)
             .values(item_to_insert)
-            .on_conflict((transaction_version, account_address))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }

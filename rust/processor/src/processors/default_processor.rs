@@ -193,8 +193,7 @@ fn insert_block_metadata_transactions_query(
     (
         diesel::insert_into(schema::block_metadata_transactions::table)
             .values(items_to_insert)
-            .on_conflict(version)
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -210,8 +209,7 @@ fn insert_write_set_changes_query(
     (
         diesel::insert_into(schema::write_set_changes::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -227,8 +225,7 @@ fn insert_move_modules_query(
     (
         diesel::insert_into(schema::move_modules::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -244,8 +241,7 @@ fn insert_move_resources_query(
     (
         diesel::insert_into(schema::move_resources::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -261,8 +257,7 @@ fn insert_table_items_query(
     (
         diesel::insert_into(schema::table_items::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -303,8 +298,7 @@ fn insert_table_metadata_query(
     (
         diesel::insert_into(schema::table_metadatas::table)
             .values(items_to_insert)
-            .on_conflict(handle)
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
