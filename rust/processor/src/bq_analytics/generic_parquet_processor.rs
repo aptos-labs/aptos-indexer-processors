@@ -9,7 +9,7 @@ use crate::{
 };
 use ahash::AHashMap;
 use allocative::Allocative;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use google_cloud_storage::client::Client as GCSClient;
 use parquet::{
     file::{properties::WriterProperties, writer::SerializedFileWriter},
@@ -190,7 +190,7 @@ where
         Ok(())
     }
 
-    pub async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
+    async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
         if self.buffer.is_empty() {
             return Ok(());
         }
@@ -226,38 +226,31 @@ where
             "Max buffer size reached, uploading to GCS."
         );
         let bucket_root = PathBuf::from(&self.bucket_root);
-        let upload_result = upload_parquet_to_gcs(
+        upload_parquet_to_gcs(
             gcs_client,
             &new_file_path,
             ParquetType::TABLE_NAME,
             &self.bucket_name,
             &bucket_root,
         )
-        .await;
+        .await?;
+
         self.buffer_size_bytes = 0;
         remove_file(&new_file_path)?;
 
-        match upload_result {
-            Ok(_) => {
-                let parquet_processing_result = ParquetProcessingResult {
-                    start_version,
-                    end_version,
-                    last_transaction_timestamp: Some(last_transaction_timestamp),
-                    txn_version_to_struct_count,
-                };
-
-                self.gap_detector_sender
-                    .send(ProcessingResult::ParquetProcessingResult(
-                        parquet_processing_result,
-                    ))
-                    .await
-                    .expect("[Parser] Failed to send versions to gap detector");
-            },
-            Err(e) => {
-                error!("Failed to upload file to GCS: {}", e);
-                return Err(anyhow!("Failed to upload file to GCS: {}", e));
-            },
+        let parquet_processing_result = ParquetProcessingResult {
+            start_version,
+            end_version,
+            last_transaction_timestamp: Some(last_transaction_timestamp),
+            txn_version_to_struct_count,
         };
+
+        self.gap_detector_sender
+            .send(ProcessingResult::ParquetProcessingResult(
+                parquet_processing_result,
+            ))
+            .await
+            .expect("[Parser] Failed to send versions to gap detector");
 
         Ok(())
     }
