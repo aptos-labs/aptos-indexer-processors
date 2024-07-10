@@ -775,7 +775,7 @@ diesel::table! {
         #[max_length = 66]
         storage_id -> Varchar,
         #[max_length = 1000]
-        asset_type -> Varchar,
+        asset_type -> Nullable<Varchar>,
         is_frozen -> Nullable<Bool>,
         amount -> Nullable<Numeric>,
         #[sql_name = "type"]

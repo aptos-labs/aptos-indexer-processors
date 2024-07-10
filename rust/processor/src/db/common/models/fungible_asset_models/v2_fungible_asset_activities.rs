@@ -44,7 +44,7 @@ pub struct FungibleAssetActivity {
     pub event_index: i64,
     pub owner_address: String,
     pub storage_id: String,
-    pub asset_type: String,
+    pub asset_type: Option<String>,
     pub is_frozen: Option<bool>,
     pub amount: Option<BigDecimal>,
     pub type_: String,
@@ -107,15 +107,17 @@ impl FungibleAssetActivity {
             // the metadata
             if let Some(object_metadata) = object_aggregated_data_mapping.get(&storage_id) {
                 let object_core = &object_metadata.object.object_core;
-                let fungible_asset = object_metadata.fungible_asset_store.as_ref().unwrap();
-                let asset_type = fungible_asset.metadata.get_reference_address();
+                // The FungibleStore might not exist in the transaction if it's a secondary store that got burnt
+                let maybe_fungible_asset = object_metadata.fungible_asset_store.as_ref();
+                let maybe_asset_type =
+                    maybe_fungible_asset.map(|fa| fa.metadata.get_reference_address());
 
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     event_index,
                     owner_address: object_core.get_owner_address(),
                     storage_id: storage_id.clone(),
-                    asset_type: asset_type.clone(),
+                    asset_type: maybe_asset_type,
                     is_frozen,
                     amount,
                     type_: event_type.clone(),
@@ -187,7 +189,7 @@ impl FungibleAssetActivity {
                 event_index,
                 owner_address,
                 storage_id,
-                asset_type: coin_type,
+                asset_type: Some(coin_type),
                 is_frozen: None,
                 amount: Some(amount),
                 type_: event.type_str.clone(),
@@ -234,7 +236,7 @@ impl FungibleAssetActivity {
             event_index: v1_activity.event_index.unwrap(),
             owner_address: v1_activity.owner_address,
             storage_id,
-            asset_type: v1_activity.coin_type,
+            asset_type: Some(v1_activity.coin_type),
             is_frozen: None,
             amount: Some(v1_activity.amount),
             type_: v1_activity.activity_type,
