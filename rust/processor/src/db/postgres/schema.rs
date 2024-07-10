@@ -771,7 +771,7 @@ diesel::table! {
         transaction_version -> Int8,
         event_index -> Int8,
         #[max_length = 66]
-        owner_address -> Varchar,
+        owner_address -> Nullable<Varchar>,
         #[max_length = 66]
         storage_id -> Varchar,
         #[max_length = 1000]
