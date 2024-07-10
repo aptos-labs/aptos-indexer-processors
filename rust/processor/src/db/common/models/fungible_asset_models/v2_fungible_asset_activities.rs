@@ -72,36 +72,7 @@ impl FungibleAssetActivity {
         if let Some(fa_event) =
             &FungibleAssetEvent::from_event(event_type.as_str(), &event.data, txn_version)?
         {
-            let (storage_id, is_frozen, amount) = match fa_event {
-                FungibleAssetEvent::WithdrawEvent(inner) => (
-                    standardize_address(&event.key.as_ref().unwrap().account_address),
-                    None,
-                    Some(inner.amount.clone()),
-                ),
-                FungibleAssetEvent::DepositEvent(inner) => (
-                    standardize_address(&event.key.as_ref().unwrap().account_address),
-                    None,
-                    Some(inner.amount.clone()),
-                ),
-                FungibleAssetEvent::FrozenEvent(inner) => (
-                    standardize_address(&event.key.as_ref().unwrap().account_address),
-                    Some(inner.frozen),
-                    None,
-                ),
-                FungibleAssetEvent::WithdrawEventV2(inner) => (
-                    standardize_address(&inner.store),
-                    None,
-                    Some(inner.amount.clone()),
-                ),
-                FungibleAssetEvent::DepositEventV2(inner) => (
-                    standardize_address(&inner.store),
-                    None,
-                    Some(inner.amount.clone()),
-                ),
-                FungibleAssetEvent::FrozenEventV2(inner) => {
-                    (standardize_address(&inner.store), Some(inner.frozen), None)
-                },
-            };
+            let storage_id = standardize_address(&event.key.as_ref().unwrap().account_address);
 
             // The event account address will also help us find fungible store which tells us where to find
             // the metadata
@@ -109,6 +80,12 @@ impl FungibleAssetActivity {
                 let object_core = &object_metadata.object.object_core;
                 let fungible_asset = object_metadata.fungible_asset_store.as_ref().unwrap();
                 let asset_type = fungible_asset.metadata.get_reference_address();
+
+                let (is_frozen, amount) = match fa_event {
+                    FungibleAssetEvent::WithdrawEvent(inner) => (None, Some(inner.amount.clone())),
+                    FungibleAssetEvent::DepositEvent(inner) => (None, Some(inner.amount.clone())),
+                    FungibleAssetEvent::FrozenEvent(inner) => (Some(inner.frozen), None),
+                };
 
                 return Ok(Some(Self {
                     transaction_version: txn_version,
@@ -145,47 +122,33 @@ impl FungibleAssetActivity {
         if let Some(inner) =
             CoinEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
         {
-            let (owner_address, amount, coin_type_option) = match inner {
-                CoinEvent::WithdrawCoinEvent(inner) => (
-                    standardize_address(&event.key.as_ref().unwrap().account_address),
-                    inner.amount.clone(),
-                    None,
-                ),
-                CoinEvent::DepositCoinEvent(inner) => (
-                    standardize_address(&event.key.as_ref().unwrap().account_address),
-                    inner.amount.clone(),
-                    None,
-                ),
+            let amount = match inner {
+                CoinEvent::WithdrawCoinEvent(inner) => inner.amount,
+                CoinEvent::DepositCoinEvent(inner) => inner.amount,
             };
-            let coin_type = if let Some(coin_type) = coin_type_option {
-                coin_type
-            } else {
-                let event_key = event.key.as_ref().context("event must have a key")?;
-                let event_move_guid = EventGuidResource {
-                    addr: standardize_address(event_key.account_address.as_str()),
-                    creation_num: event_key.creation_number as i64,
-                };
-                // Given this mapping only contains coin type < 1000 length, we should not assume that the mapping exists.
-                // If it doesn't exist, skip.
-                match event_to_coin_type.get(&event_move_guid) {
-                    Some(coin_type) => coin_type.clone(),
-                    None => {
-                        tracing::warn!(
+            let event_key = event.key.as_ref().context("event must have a key")?;
+            let event_move_guid = EventGuidResource {
+                addr: standardize_address(event_key.account_address.as_str()),
+                creation_num: event_key.creation_number as i64,
+            };
+            // Given this mapping only contains coin type < 1000 length, we should not assume that the mapping exists.
+            // If it doesn't exist, skip.
+            let coin_type = match event_to_coin_type.get(&event_move_guid) {
+                Some(coin_type) => coin_type.clone(),
+                None => {
+                    tracing::warn!(
                         "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
                         txn_version, event_move_guid, event_to_coin_type
                     );
-                        return Ok(None);
-                    },
-                }
+                    return Ok(None);
+                },
             };
-
             let storage_id =
-                CoinInfoType::get_storage_id(coin_type.as_str(), owner_address.as_str());
-
+                CoinInfoType::get_storage_id(coin_type.as_str(), event_move_guid.addr.as_str());
             Ok(Some(Self {
                 transaction_version: txn_version,
                 event_index,
-                owner_address,
+                owner_address: event_move_guid.addr,
                 storage_id,
                 asset_type: coin_type,
                 is_frozen: None,
