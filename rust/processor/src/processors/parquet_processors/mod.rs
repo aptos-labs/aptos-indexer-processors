@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 
 pub mod parquet_fungible_asset_processor;
