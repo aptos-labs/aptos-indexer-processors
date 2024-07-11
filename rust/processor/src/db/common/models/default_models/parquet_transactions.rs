@@ -20,14 +20,12 @@ use ahash::AHashMap;
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{
     transaction::{TransactionType, TxnData},
-    Transaction as TransactionPB, TransactionInfo, TransactionSizeInfo, WriteOpSizeInfo,
+    Transaction as TransactionPB, TransactionInfo, TransactionSizeInfo,
 };
 use field_count::FieldCount;
-use once_cell::sync::Lazy;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-static EMPTY_VEC: Lazy<Vec<WriteOpSizeInfo>> = Lazy::new(Vec::new);
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
@@ -194,11 +192,10 @@ impl Transaction {
             .expect("Txn Timestamp is invalid!");
 
         let txn_size_info = transaction.size_info.as_ref();
-        let write_set_size_info: &Vec<WriteOpSizeInfo> = if let Some(size_info) = txn_size_info {
-            size_info.write_op_size_info.as_ref()
-        } else {
-            &EMPTY_VEC
-        };
+        let empty_vec = Vec::new();
+        let write_set_size_info = txn_size_info
+            .as_ref()
+            .map_or(&empty_vec, |size_info| &size_info.write_op_size_info);
 
         match txn_data {
             TxnData::User(user_txn) => {
