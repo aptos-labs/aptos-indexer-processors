@@ -71,6 +71,7 @@ impl AccountTransaction {
             ),
             TxnData::Genesis(inner) => (&inner.events, vec![]),
             TxnData::BlockMetadata(inner) => (&inner.events, vec![]),
+            TxnData::Validator(inner) => (&inner.events, vec![]),
             _ => {
                 return AHashMap::new();
             },
