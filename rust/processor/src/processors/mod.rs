@@ -39,8 +39,11 @@ use self::{
 use crate::{
     db::common::models::processor_status::ProcessorStatus,
     gap_detectors::ProcessingResult,
-    processors::parquet_processors::parquet_default_processor::{
-        ParquetDefaultProcessor, ParquetDefaultProcessorConfig,
+    processors::parquet_processors::{
+        parquet_default_processor::{ParquetDefaultProcessor, ParquetDefaultProcessorConfig},
+        parquet_fungible_asset_processor::{
+            ParquetFungibleAssetProcessor, ParquetFungibleAssetProcessorConfig,
+        },
     },
     schema::processor_status,
     utils::{
@@ -196,6 +199,7 @@ pub enum ProcessorConfig {
     TransactionMetadataProcessor,
     UserTransactionProcessor,
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+    ParquetFungibleAssetProcessor(ParquetFungibleAssetProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -206,7 +210,11 @@ impl ProcessorConfig {
     }
 
     pub fn is_parquet_processor(&self) -> bool {
-        matches!(self, ProcessorConfig::ParquetDefaultProcessor(_))
+        matches!(
+            self,
+            ProcessorConfig::ParquetDefaultProcessor(_)
+                | ProcessorConfig::ParquetFungibleAssetProcessor(_)
+        )
     }
 }
 
@@ -243,6 +251,7 @@ pub enum Processor {
     TransactionMetadataProcessor,
     UserTransactionProcessor,
     ParquetDefaultProcessor,
+    ParquetFungibleAssetProcessor,
 }
 
 #[cfg(test)]

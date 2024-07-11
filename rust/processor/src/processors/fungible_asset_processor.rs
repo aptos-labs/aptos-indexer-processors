@@ -365,7 +365,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             mut fungible_asset_balances,
             mut current_fungible_asset_balances,
             current_unified_fungible_asset_balances,
-            mut coin_supply,
+            coin_supply,
         ) = parse_v2_coin(&transactions).await;
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
@@ -387,10 +387,6 @@ impl ProcessorTrait for FungibleAssetProcessor {
             .contains(TableFlags::CURRENT_FUNGIBLE_ASSET_BALANCES)
         {
             current_fungible_asset_balances.clear();
-        }
-
-        if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
-            coin_supply.clear();
         }
 
         let tx_result = insert_to_db(
