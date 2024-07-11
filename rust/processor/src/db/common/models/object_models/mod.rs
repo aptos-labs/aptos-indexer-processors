@@ -3,3 +3,6 @@
 
 pub mod v2_object_utils;
 pub mod v2_objects;
+
+// parquet models
+pub mod parquet_v2_objects;
