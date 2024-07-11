@@ -77,7 +77,6 @@ impl PartialOrd for CurrentAnsPrimaryNameV2 {
 }
 
 impl CurrentAnsPrimaryNameV2 {
-
     pub fn get_v2_from_v1(
         v1_current_primary_name: CurrentAnsPrimaryName,
         v1_primary_name: AnsPrimaryName,
