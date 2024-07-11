@@ -321,23 +321,31 @@ impl Transaction {
                 vec![],
                 vec![],
             ),
-            TxnData::Validator(_) => (
-                Self::from_transaction_info_with_data(
-                    transaction_info,
-                    None,
-                    None,
+            TxnData::Validator(inner) => {
+                let (wsc, wsc_detail) = WriteSetChangeModel::from_write_set_changes(
+                    &transaction_info.changes,
                     txn_version,
-                    transaction_type,
-                    0,
                     block_height,
-                    epoch,
                     block_timestamp,
                     txn_size_info,
-                ),
-                None,
-                vec![],
-                vec![],
-            ),
+                );
+                (
+                    Self::from_transaction_info_with_data(
+                        transaction_info,
+                        None,
+                        None,
+                        txn_version,
+                        transaction_type,
+                        inner.events.len() as i64,
+                        block_height,
+                        epoch,
+                        block_timestamp,
+                    ),
+                    None,
+                    wsc,
+                    wsc_detail,
+                )
+            },
             TxnData::BlockEpilogue(_) => (
                 Self::from_transaction_info_with_data(
                     transaction_info,

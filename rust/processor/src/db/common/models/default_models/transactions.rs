@@ -296,8 +296,8 @@ impl Transaction {
                     epoch,
                 ),
                 None,
-                vec![],
-                vec![],
+                wsc,
+                wsc_detail,
             ),
             TxnData::BlockEpilogue(_) => (
                 Self::from_transaction_info_with_data(
