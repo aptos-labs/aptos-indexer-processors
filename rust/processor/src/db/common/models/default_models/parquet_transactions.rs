@@ -327,7 +327,7 @@ impl Transaction {
                     txn_version,
                     block_height,
                     block_timestamp,
-                    txn_size_info,
+                    write_set_size_info,
                 );
                 (
                     Self::from_transaction_info_with_data(
@@ -340,6 +340,7 @@ impl Transaction {
                         block_height,
                         epoch,
                         block_timestamp,
+                        txn_size_info,
                     ),
                     None,
                     wsc,
