@@ -22,8 +22,7 @@ use crate::{
         parquet_processors::{
             parquet_default_processor::ParquetDefaultProcessor,
             parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
-                        parquet_objects_processor::ParquetObjectsProcessor,
-
+            parquet_objects_processor::ParquetObjectsProcessor,
         },
         stake_processor::StakeProcessor,
         token_processor::TokenProcessor,
