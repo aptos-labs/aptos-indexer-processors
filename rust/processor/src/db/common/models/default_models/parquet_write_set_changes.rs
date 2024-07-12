@@ -259,6 +259,12 @@ impl WriteSetChange {
         timestamp: chrono::NaiveDateTime,
         size_info: &[WriteOpSizeInfo],
     ) -> (Vec<Self>, Vec<WriteSetChangeDetail>) {
+        tracing::info!(
+            "Converting {} write set changes with the {} size_info provided for version {}.",
+            write_set_changes.len(),
+            size_info.len(),
+            txn_version
+        );
         let results: Vec<(Self, WriteSetChangeDetail)> = write_set_changes
             .iter()
             .zip_eq(size_info.iter())
