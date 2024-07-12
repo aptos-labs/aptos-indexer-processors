@@ -50,6 +50,7 @@ impl DelegatedStakingActivity {
         let events = match txn_data {
             TxnData::User(txn) => &txn.events,
             TxnData::BlockMetadata(txn) => &txn.events,
+            TxnData::Validator(txn) => &txn.events,
             _ => return Ok(delegator_activities),
         };
         for (index, event) in events.iter().enumerate() {

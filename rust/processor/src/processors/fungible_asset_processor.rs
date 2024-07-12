@@ -482,6 +482,7 @@ async fn parse_v2_coin(
         let default = vec![];
         let (events, user_request, entry_function_id_str) = match txn_data {
             TxnData::BlockMetadata(tx_inner) => (&tx_inner.events, None, None),
+            TxnData::Validator(tx_inner) => (&tx_inner.events, None, None),
             TxnData::Genesis(tx_inner) => (&tx_inner.events, None, None),
             TxnData::User(tx_inner) => {
                 let user_request = tx_inner

@@ -130,6 +130,7 @@ impl ProcessorTrait for EventsProcessor {
                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
                 TxnData::Genesis(tx_inner) => &tx_inner.events,
                 TxnData::User(tx_inner) => &tx_inner.events,
+                TxnData::Validator(tx_inner) => &tx_inner.events,
                 _ => &default,
             };
 
