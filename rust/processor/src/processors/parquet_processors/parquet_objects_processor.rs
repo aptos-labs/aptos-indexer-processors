@@ -144,21 +144,7 @@ impl ProcessorTrait for ParquetObjectsProcessor {
                         // Object core is the first struct that we need to get
                         object_metadata_helper.insert(address.clone(), ObjectAggregatedData {
                             object: object_with_metadata,
-                            token: None,
-                            fungible_asset_store: None,
-                            // The following structs are unused in this processor
-                            fungible_asset_metadata: None,
-                            aptos_collection: None,
-                            fixed_supply: None,
-                            unlimited_supply: None,
-                            concurrent_supply: None,
-                            property_map: None,
-                            transfer_events: vec![],
-                            untransferable: None,
-                            fungible_asset_supply: None,
-                            concurrent_fungible_asset_supply: None,
-                            concurrent_fungible_asset_balance: None,
-                            token_identifier: None,
+                            ..ObjectAggregatedData::default()
                         });
                     }
                 }
@@ -219,7 +205,7 @@ impl ProcessorTrait for ParquetObjectsProcessor {
 
         let objects_parquet_data = ParquetDataGeneric {
             data: all_objects,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
+            transaction_version_to_struct_count,
         };
 
         self.objects_sender

@@ -67,22 +67,22 @@ impl Object {
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
         let address = standardize_address(&write_resource.address.to_string());
         if let Some(object_aggregated_metadata) = object_metadata_mapping.get(&address) {
-            // do something
-            let object_with_metadata = object_aggregated_metadata.object.clone();
-            let object_core = object_with_metadata.object_core;
+            let object_with_metadata = &object_aggregated_metadata.object;
+            let object_core = &object_with_metadata.object_core;
 
             let untransferrable = if object_aggregated_metadata.untransferable.as_ref().is_some() {
                 true
             } else {
                 !object_core.allow_ungated_transfer
             };
+            let state_key_hash = &object_with_metadata.state_key_hash;
             Ok(Some((
                 Self {
                     txn_version,
                     write_set_change_index,
                     object_address: address.clone(),
                     owner_address: object_core.get_owner_address(),
-                    state_key_hash: object_with_metadata.state_key_hash.clone(),
+                    state_key_hash: state_key_hash.clone(),
                     guid_creation_num: object_core.guid_creation_num.clone().to_u64().unwrap(),
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     is_deleted: false,
@@ -92,7 +92,7 @@ impl Object {
                 CurrentObject {
                     object_address: address,
                     owner_address: object_core.get_owner_address(),
-                    state_key_hash: object_with_metadata.state_key_hash,
+                    state_key_hash: state_key_hash.clone(),
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     last_guid_creation_num: object_core.guid_creation_num.clone(),
                     last_transaction_version: txn_version,
