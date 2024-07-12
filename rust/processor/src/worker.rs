@@ -10,17 +10,25 @@ use crate::{
     },
     grpc_stream::TransactionsPBResponse,
     processors::{
-        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor, default_processor::DefaultProcessor,
-        events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
+        account_transactions_processor::AccountTransactionsProcessor,
+        ans_processor::AnsProcessor,
+        coin_processor::CoinProcessor,
+        default_processor::DefaultProcessor,
+        events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
+        monitoring_processor::MonitoringProcessor,
+        nft_metadata_processor::NftMetadataProcessor,
         objects_processor::ObjectsProcessor,
-        parquet_processors::parquet_default_processor::ParquetDefaultProcessor,
-        stake_processor::StakeProcessor, token_processor::TokenProcessor,
+        parquet_processors::{
+            parquet_default_processor::ParquetDefaultProcessor,
+            parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
+        },
+        stake_processor::StakeProcessor,
+        token_processor::TokenProcessor,
         token_v2_processor::TokenV2Processor,
         transaction_metadata_processor::TransactionMetadataProcessor,
-        user_transaction_processor::UserTransactionProcessor, DefaultProcessingResult, Processor,
-        ProcessorConfig, ProcessorTrait,
+        user_transaction_processor::UserTransactionProcessor,
+        DefaultProcessingResult, Processor, ProcessorConfig, ProcessorTrait,
     },
     schema::ledger_infos,
     transaction_filter::TransactionFilter,
@@ -909,6 +917,13 @@ pub fn build_processor(
         ),
         ProcessorConfig::ParquetDefaultProcessor(config) => {
             Processor::from(ParquetDefaultProcessor::new(
+                db_pool,
+                config.clone(),
+                gap_detector_sender.expect("Parquet processor requires a gap detector sender"),
+            ))
+        },
+        ProcessorConfig::ParquetFungibleAssetProcessor(config) => {
+            Processor::from(ParquetFungibleAssetProcessor::new(
                 db_pool,
                 config.clone(),
                 gap_detector_sender.expect("Parquet processor requires a gap detector sender"),
