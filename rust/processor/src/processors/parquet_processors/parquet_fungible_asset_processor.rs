@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{UploadIntervalConfig, GOOGLE_APPLICATION_CREDENTIALS};
+use super::ParquetProcessorTrait;
 use crate::{
     bq_analytics::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
@@ -40,7 +40,7 @@ pub struct ParquetFungibleAssetProcessorConfig {
     pub parquet_upload_interval: u64,
 }
 
-impl UploadIntervalConfig for ParquetFungibleAssetProcessorConfig {
+impl ParquetProcessorTrait for ParquetFungibleAssetProcessorConfig {
     fn parquet_upload_interval_in_secs(&self) -> Duration {
         Duration::from_secs(self.parquet_upload_interval)
     }
@@ -58,9 +58,7 @@ impl ParquetFungibleAssetProcessor {
         config: ParquetFungibleAssetProcessorConfig,
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
-        if let Some(credentials) = config.google_application_credentials.clone() {
-            std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
-        }
+        config.set_google_credentials(config.google_application_credentials.clone());
 
         let coin_supply_sender = create_parquet_handler_loop::<CoinSupply>(
             new_gap_detector_sender.clone(),

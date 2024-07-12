@@ -8,19 +8,17 @@ use crate::{
     },
     db::common::models::events_models::parquet_events::{Event, ParquetEventModel},
     gap_detectors::ProcessingResult,
-    processors::{parquet_processors::UploadIntervalConfig, ProcessorName, ProcessorTrait},
+    processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool},
 };
 use ahash::AHashMap;
-use anyhow::anyhow;
+use anyhow::Context;
 use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, time::Duration};
 use tracing::warn;
-
-const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ParquetEventsProcessorConfig {
@@ -32,7 +30,7 @@ pub struct ParquetEventsProcessorConfig {
     pub parquet_upload_interval: u64,
 }
 
-impl UploadIntervalConfig for ParquetEventsProcessorConfig {
+impl ParquetProcessorTrait for ParquetEventsProcessorConfig {
     fn parquet_upload_interval_in_secs(&self) -> Duration {
         Duration::from_secs(self.parquet_upload_interval)
     }
@@ -49,9 +47,7 @@ impl ParquetEventsProcessor {
         config: ParquetEventsProcessorConfig,
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
-        if let Some(credentials) = config.google_application_credentials.clone() {
-            std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
-        }
+        config.set_google_credentials(config.google_application_credentials.clone());
 
         let event_sender = create_parquet_handler_loop::<Event>(
             new_gap_detector_sender.clone(),
@@ -150,7 +146,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
         self.event_sender
             .send(event_parquet_data)
             .await
-            .map_err(|e| anyhow!("Failed to send to parquet manager: {}", e))?;
+            .context("Failed to send to parquet manager")?;
 
         Ok(ProcessingResult::ParquetProcessingResult(
             ParquetProcessingResult {
