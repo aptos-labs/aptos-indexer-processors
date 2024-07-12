@@ -117,6 +117,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
                     PROCESSOR_UNKNOWN_TYPE_COUNT
                         .with_label_values(&["ParquetEventsProcessor"])
                         .inc();
+
                     continue;
                 },
             };
@@ -125,6 +126,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
                 TxnData::Genesis(tx_inner) => &tx_inner.events,
                 TxnData::User(tx_inner) => &tx_inner.events,
+                TxnData::Validator(txn) => &txn.events,
                 _ => &default,
             };
 
