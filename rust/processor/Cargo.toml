@@ -79,3 +79,6 @@ libpq = ["diesel/postgres"]
 # it in a feature so the CLI can opt out, since it cannot tolerate the libpq dep.
 # Recall that features should always be additive.
 default = ["libpq"]
+
+[profile.release]
+debug = true
