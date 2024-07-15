@@ -40,6 +40,9 @@ use crate::{
         parquet_fungible_asset_processor::{
             ParquetFungibleAssetProcessor, ParquetFungibleAssetProcessorConfig,
         },
+        parquet_transaction_metadata_processor::{
+            ParquetTransactionMetadataProcessor, ParquetTransactionMetadataProcessorConfig,
+        },
     },
     schema::processor_status,
     utils::{
@@ -194,6 +197,7 @@ pub enum ProcessorConfig {
     UserTransactionProcessor,
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetFungibleAssetProcessor(ParquetFungibleAssetProcessorConfig),
+    ParquetTransactionMetadataProcessor(ParquetTransactionMetadataProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -208,6 +212,7 @@ impl ProcessorConfig {
             self,
             ProcessorConfig::ParquetDefaultProcessor(_)
                 | ProcessorConfig::ParquetFungibleAssetProcessor(_)
+                | ProcessorConfig::ParquetTransactionMetadataProcessor(_)
         )
     }
 }
@@ -244,6 +249,7 @@ pub enum Processor {
     UserTransactionProcessor,
     ParquetDefaultProcessor,
     ParquetFungibleAssetProcessor,
+    ParquetTransactionMetadataProcessor,
 }
 
 #[cfg(test)]
