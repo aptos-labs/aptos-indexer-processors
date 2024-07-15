@@ -38,7 +38,6 @@ pub struct ParquetDefaultProcessorConfig {
     pub max_buffer_size: usize,
     pub parquet_upload_interval: u64,
 }
-
 impl ParquetProcessorTrait for ParquetDefaultProcessorConfig {
     fn parquet_upload_interval_in_secs(&self) -> Duration {
         Duration::from_secs(self.parquet_upload_interval)
