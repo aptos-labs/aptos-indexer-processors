@@ -191,10 +191,6 @@ impl Transaction {
             .expect("Txn Timestamp is invalid!");
 
         let txn_size_info = transaction.size_info.as_ref();
-        let empty_vec = Vec::new();
-        let write_set_size_info = txn_size_info
-            .as_ref()
-            .map_or(&empty_vec, |size_info| &size_info.write_op_size_info);
 
         match txn_data {
             TxnData::User(user_txn) => {
@@ -203,7 +199,6 @@ impl Transaction {
                     txn_version,
                     block_height,
                     block_timestamp,
-                    write_set_size_info,
                 );
                 let request = &user_txn
                     .request
@@ -244,7 +239,6 @@ impl Transaction {
                     txn_version,
                     block_height,
                     block_timestamp,
-                    write_set_size_info,
                 );
                 let payload = genesis_txn.payload.as_ref().unwrap();
                 let payload_cleaned = get_clean_writeset(payload, txn_version);
@@ -278,7 +272,6 @@ impl Transaction {
                     txn_version,
                     block_height,
                     block_timestamp,
-                    write_set_size_info,
                 );
                 (
                     Self::from_transaction_info_with_data(
@@ -327,7 +320,6 @@ impl Transaction {
                     txn_version,
                     block_height,
                     block_timestamp,
-                    write_set_size_info,
                 );
                 (
                     Self::from_transaction_info_with_data(
