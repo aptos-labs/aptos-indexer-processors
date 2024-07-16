@@ -25,7 +25,7 @@ use crate::{
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{ArcDbPool},
+        database::ArcDbPool,
         util::{parse_timestamp, standardize_address},
     },
 };
@@ -120,6 +120,7 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
@@ -127,12 +128,13 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         let (token_datas_v2, token_ownerships_v2) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
+            &mut transaction_version_to_struct_count,
         )
         .await;
 
         let token_data_v2_parquet_data = ParquetDataGeneric {
             data: token_datas_v2,
-            transaction_version_to_struct_count: AHashMap::new(),
+            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.v2_token_datas_sender
@@ -142,7 +144,7 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 
         let token_ownerships_v2_parquet_data = ParquetDataGeneric {
             data: token_ownerships_v2,
-            transaction_version_to_struct_count: AHashMap::new(),
+            transaction_version_to_struct_count,
         };
 
         self.v2_token_ownerships_sender
@@ -168,11 +170,8 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-) -> (
-    // Vec<CollectionV2>,
-    Vec<TokenDataV2>,
-    Vec<TokenOwnershipV2>,
-) {
+    transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
+) -> (Vec<TokenDataV2>, Vec<TokenOwnershipV2>) {
     // Token V2 and V1 combined
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
@@ -310,6 +309,10 @@ async fn parse_v2_token(
                         .unwrap()
                         {
                             token_datas_v2.push(token_data);
+                            transaction_version_to_struct_count
+                                .entry(txn_version)
+                                .and_modify(|e| *e += 1)
+                                .or_insert(1);
                         }
                         if let Some(token_ownership) =
                             TokenOwnershipV2::get_v1_from_write_table_item(
@@ -322,6 +325,10 @@ async fn parse_v2_token(
                             .unwrap()
                         {
                             token_ownerships_v2.push(token_ownership);
+                            transaction_version_to_struct_count
+                                .entry(txn_version)
+                                .and_modify(|e| *e += 1)
+                                .or_insert(1);
                         }
                     },
                     Change::DeleteTableItem(table_item) => {
@@ -336,6 +343,10 @@ async fn parse_v2_token(
                             .unwrap()
                         {
                             token_ownerships_v2.push(token_ownership);
+                            transaction_version_to_struct_count
+                                .entry(txn_version)
+                                .and_modify(|e| *e += 1)
+                                .or_insert(1);
                         }
                     },
                     Change::WriteResource(resource) => {
@@ -356,6 +367,10 @@ async fn parse_v2_token(
                             .unwrap();
                             token_ownerships_v2.append(&mut ownerships);
                             token_datas_v2.push(token_data);
+                            transaction_version_to_struct_count
+                                .entry(txn_version)
+                                .and_modify(|e| *e += ownerships.len() as i64 + 1)
+                                .or_insert(1);
                         }
                     },
                     _ => {},
