@@ -55,7 +55,7 @@ impl Event {
         event_index: i64,
         size_info: &EventSizeInfo,
     ) -> Self {
-        let t: &str = event.type_str.as_ref();
+        let event_type: &str = event.type_str.as_ref();
         Event {
             account_address: standardize_address(
                 event.key.as_ref().unwrap().account_address.as_str(),
@@ -64,10 +64,10 @@ impl Event {
             sequence_number: event.sequence_number as i64,
             txn_version,
             block_height,
-            event_type: t.to_string(),
+            event_type: event_type.to_string(),
             data: event.data.clone(),
             event_index,
-            indexed_type: truncate_str(t, EVENT_TYPE_MAX_LENGTH),
+            indexed_type: truncate_str(event_type, EVENT_TYPE_MAX_LENGTH),
             type_tag_bytes: size_info.type_tag_bytes as i64,
             total_bytes: size_info.total_bytes as i64,
         }
