@@ -36,8 +36,7 @@ use crate::{
     db::common::models::processor_status::ProcessorStatus,
     gap_detectors::ProcessingResult,
     processors::parquet_processors::{
-                parquet_ans_processor::{ParquetAnsProcessor, ParquetAnsProcessorConfig},
-
+        parquet_ans_processor::{ParquetAnsProcessor, ParquetAnsProcessorConfig},
         parquet_default_processor::{ParquetDefaultProcessor, ParquetDefaultProcessorConfig},
         parquet_fungible_asset_processor::{
             ParquetFungibleAssetProcessor, ParquetFungibleAssetProcessorConfig,
