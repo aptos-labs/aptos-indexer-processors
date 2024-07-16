@@ -13,7 +13,6 @@ use crate::{
         },
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
-            parquet_v2_collections::CollectionV2,
             parquet_v2_token_datas::TokenDataV2,
             parquet_v2_token_ownerships::TokenOwnershipV2,
             v2_token_utils::{
@@ -26,10 +25,9 @@ use crate::{
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{ArcDbPool, DbPoolConnection},
+        database::{ArcDbPool},
         util::{parse_timestamp, standardize_address},
     },
-    IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
 use anyhow::Context;
@@ -42,10 +40,6 @@ use std::{fmt::Debug, time::Duration};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParquetTokenV2ProcessorConfig {
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retries")]
-    pub query_retries: u32,
-    #[serde(default = "IndexerGrpcProcessorConfig::default_query_retry_delay_ms")]
-    pub query_retry_delay_ms: u64,
     pub google_application_credentials: Option<String>,
     pub bucket_name: String,
     pub bucket_root: String,
@@ -61,8 +55,6 @@ impl ParquetProcessorTrait for ParquetTokenV2ProcessorConfig {
 
 pub struct ParquetTokenV2Processor {
     connection_pool: ArcDbPool,
-    config: ParquetTokenV2ProcessorConfig,
-    v2_collections_sender: AsyncSender<ParquetDataGeneric<CollectionV2>>,
     v2_token_datas_sender: AsyncSender<ParquetDataGeneric<TokenDataV2>>,
     v2_token_ownerships_sender: AsyncSender<ParquetDataGeneric<TokenOwnershipV2>>,
 }
@@ -74,16 +66,6 @@ impl ParquetTokenV2Processor {
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
         config.set_google_credentials(config.google_application_credentials.clone());
-
-        let v2_collections_sender = create_parquet_handler_loop::<CollectionV2>(
-            new_gap_detector_sender.clone(),
-            ProcessorName::ParquetTokenV2Processor.into(),
-            config.bucket_name.clone(),
-            config.bucket_root.clone(),
-            config.parquet_handler_response_channel_size,
-            config.max_buffer_size,
-            config.parquet_upload_interval_in_secs(),
-        );
 
         let v2_token_datas_sender = create_parquet_handler_loop::<TokenDataV2>(
             new_gap_detector_sender.clone(),
@@ -107,8 +89,6 @@ impl ParquetTokenV2Processor {
 
         Self {
             connection_pool,
-            config,
-            v2_collections_sender,
             v2_token_datas_sender,
             v2_token_ownerships_sender,
         }
@@ -141,34 +121,14 @@ impl ProcessorTrait for ParquetTokenV2Processor {
     ) -> anyhow::Result<ProcessingResult> {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let mut conn = self.get_conn().await;
-
-        // First get all token related table metadata from the batch of transactions. This is in case
-        // an earlier transaction has metadata (in resources) that's missing from a later transaction.
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
-        let query_retries = self.config.query_retries;
-        let query_retry_delay_ms = self.config.query_retry_delay_ms;
-        // Token V2 processing which includes token v1
-        let (collections_v2, token_datas_v2, token_ownerships_v2) = parse_v2_token(
+        let (token_datas_v2, token_ownerships_v2) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
-            &mut conn,
-            query_retries,
-            query_retry_delay_ms,
         )
         .await;
-
-        let collection_v2_parquet_data = ParquetDataGeneric {
-            data: collections_v2,
-            transaction_version_to_struct_count: AHashMap::new(),
-        };
-
-        self.v2_collections_sender
-            .send(collection_v2_parquet_data)
-            .await
-            .context("Failed to send collection v2 parquet data")?;
 
         let token_data_v2_parquet_data = ParquetDataGeneric {
             data: token_datas_v2,
@@ -208,16 +168,12 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut DbPoolConnection<'_>,
-    query_retries: u32,
-    query_retry_delay_ms: u64,
 ) -> (
-    Vec<CollectionV2>,     // parquet
-    Vec<TokenDataV2>,      // parquet
-    Vec<TokenOwnershipV2>, // parquet
+    // Vec<CollectionV2>,
+    Vec<TokenDataV2>,
+    Vec<TokenOwnershipV2>,
 ) {
     // Token V2 and V1 combined
-    let mut collections_v2 = vec![];
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
 
@@ -345,21 +301,6 @@ async fn parse_v2_token(
                 let wsc_index = index as i64;
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteTableItem(table_item) => {
-                        if let Some(collection) = CollectionV2::get_v1_from_write_table_item(
-                            table_item,
-                            txn_version,
-                            wsc_index,
-                            txn_timestamp,
-                            table_handle_to_owner,
-                            conn,
-                            query_retries,
-                            query_retry_delay_ms,
-                        )
-                        .await
-                        .unwrap()
-                        {
-                            collections_v2.push(collection);
-                        }
                         if let Some(token_data) = TokenDataV2::get_v1_from_write_table_item(
                             table_item,
                             txn_version,
@@ -398,17 +339,6 @@ async fn parse_v2_token(
                         }
                     },
                     Change::WriteResource(resource) => {
-                        if let Some(collection) = CollectionV2::get_v2_from_write_resource(
-                            resource,
-                            txn_version,
-                            wsc_index,
-                            txn_timestamp,
-                            &token_v2_metadata_helper,
-                        )
-                        .unwrap()
-                        {
-                            collections_v2.push(collection);
-                        }
                         if let Some(token_data) = TokenDataV2::get_v2_from_write_resource(
                             resource,
                             txn_version,
@@ -434,5 +364,5 @@ async fn parse_v2_token(
         }
     }
 
-    (collections_v2, token_datas_v2, token_ownerships_v2)
+    (token_datas_v2, token_ownerships_v2)
 }
