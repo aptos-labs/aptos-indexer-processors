@@ -222,8 +222,7 @@ fn insert_ans_lookups_query(
     (
         diesel::insert_into(schema::ans_lookup::table)
             .values(item_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -264,8 +263,7 @@ fn insert_ans_primary_names_query(
     (
         diesel::insert_into(schema::ans_primary_name::table)
             .values(item_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -353,8 +351,7 @@ fn insert_ans_primary_names_v2_query(
     (
         diesel::insert_into(schema::ans_primary_name_v2::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }

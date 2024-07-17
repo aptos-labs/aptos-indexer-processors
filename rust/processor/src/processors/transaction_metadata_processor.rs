@@ -99,8 +99,7 @@ fn insert_transaction_sizes_query(
     (
         diesel::insert_into(schema::transaction_size_info::table)
             .values(items_to_insert)
-            .on_conflict(transaction_version)
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -115,8 +114,7 @@ fn insert_event_sizes_query(
     (
         diesel::insert_into(schema::event_size_info::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -131,8 +129,7 @@ fn insert_write_set_sizes_query(
     (
         diesel::insert_into(schema::write_set_size_info::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, index))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }

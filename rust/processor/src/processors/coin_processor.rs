@@ -170,8 +170,7 @@ fn insert_coin_balances_query(
     (
         diesel::insert_into(schema::coin_balances::table)
             .values(items_to_insert)
-            .on_conflict((transaction_version, owner_address, coin_type_hash))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }

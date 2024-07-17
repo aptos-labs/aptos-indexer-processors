@@ -184,8 +184,7 @@ fn insert_tokens_query(
     (
         diesel::insert_into(schema::tokens::table)
             .values(tokens_to_insert)
-            .on_conflict((token_data_id_hash, property_version, transaction_version))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -201,13 +200,7 @@ fn insert_token_ownerships_query(
     (
         diesel::insert_into(schema::token_ownerships::table)
             .values(token_ownerships_to_insert)
-            .on_conflict((
-                token_data_id_hash,
-                property_version,
-                transaction_version,
-                table_handle,
-            ))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -222,8 +215,7 @@ fn insert_token_datas_query(
     (
         diesel::insert_into(schema::token_datas::table)
             .values(token_datas_to_insert)
-            .on_conflict((token_data_id_hash, transaction_version))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -239,8 +231,7 @@ fn insert_collection_datas_query(
     (
         diesel::insert_into(schema::collection_datas::table)
             .values(collection_datas_to_insert)
-            .on_conflict((collection_data_id_hash, transaction_version))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -350,13 +341,7 @@ fn insert_token_activities_query(
     (
         diesel::insert_into(schema::token_activities::table)
             .values(items_to_insert)
-            .on_conflict((
-                transaction_version,
-                event_account_address,
-                event_creation_number,
-                event_sequence_number,
-            ))
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
@@ -372,8 +357,7 @@ fn insert_nft_points_query(
     (
         diesel::insert_into(schema::nft_points::table)
             .values(items_to_insert)
-            .on_conflict(transaction_version)
-            .do_nothing(),
+            .on_conflict_do_nothing(),
         None,
     )
 }
