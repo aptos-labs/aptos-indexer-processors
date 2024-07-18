@@ -1,36 +1,49 @@
 # Event Parser
+
+> [!WARNING]  
+> For production-grade indexers, we recommend the Rust processors.
+> The typescript implementation is known to get stuck when there are lots of data to process. The issue is with the GRPC client and we haven't had a chance to optimize. Please proceed with caution.
+
 This is a very simple example that just extracts events from user transactions and logs them.
 
 ## Prerequisites
+
 - `pnpm`: The code is tested with pnpm 8.6.2. Later versions should work too.
 - `node`: The code is tested with Node 18. Later versions should work too.
 
 ## Usage
+
 Install all the dependencies:
+
 ```
 pnpm install
 ```
 
 Prepare the `config.yaml` file. Make sure to update the `config.yaml` file with the correct indexer setting and database credentials.
+
 ```
 $ cp config.yaml.example ~/config.yaml
 ```
 
 Run the example:
+
 ```
 pnpm start process --config ~/config.yaml
 ```
 
 ## Explanation
+
 This example provides a basic processor that extracts events from user transactions and logs them.
 
 When creating a custom processor, the two main things you need to define are:
+
 - Parser: How you parse the data from the transactions.
 - Models: How you store the data you extract from the transactions.
 
 These are defined in `parser.ts` and `models.ts` respectively.
 
 The SDK handles the rest:
+
 - Connecting to the Transaction Stream Service.
 - Creating tables in the database.
 - Validating the chain ID.
