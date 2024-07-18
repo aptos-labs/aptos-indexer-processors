@@ -1,5 +1,9 @@
 ## Python Quickstart
 
+> [!WARNING]  
+> For production-grade indexers, we recommend the Rust processors.
+> The Python implementation is known to have a grpc deserialization recursion limit. The issue is with the GRPC library and we haven't had a chance to look into this. Please proceed with caution.
+
 ### Prerequisite
 
 - Python 3.7 or higher
@@ -23,7 +27,6 @@ $ cd aptos-indexer-processors/python
 ```
 poetry install
 ```
-
 
 3. Prepare the `config.yaml` file.
    Make sure to update the `config.yaml` file with the correct indexer settings and database credentials.
