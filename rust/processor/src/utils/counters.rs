@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use once_cell::sync::Lazy;
-use prometheus::{register_gauge_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec, GaugeVec, IntCounter, IntCounterVec, IntGaugeVec, register_histogram_vec, HistogramVec};
+use prometheus::{
+    register_gauge_vec, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec, GaugeVec, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
+};
 
 pub enum ProcessorStep {
     ReceivedTxnsFromGrpc,
@@ -144,14 +147,13 @@ pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-
 pub static BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "indexer_processor_batch_size",
         "Histogram of the received batch size",
         &["processor_name", "step", "message", "task_index"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// The amount of time that a task spent waiting for a protobuf bundle of transactions
