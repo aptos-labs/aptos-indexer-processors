@@ -6,7 +6,6 @@
 
 pub mod account_transactions_processor;
 pub mod ans_processor;
-pub mod coin_processor;
 pub mod default_processor;
 pub mod events_processor;
 pub mod fungible_asset_processor;
@@ -15,7 +14,6 @@ pub mod nft_metadata_processor;
 pub mod objects_processor;
 pub mod parquet_processors;
 pub mod stake_processor;
-pub mod token_processor;
 pub mod token_v2_processor;
 pub mod transaction_metadata_processor;
 pub mod user_transaction_processor;
@@ -23,7 +21,6 @@ pub mod user_transaction_processor;
 use self::{
     account_transactions_processor::AccountTransactionsProcessor,
     ans_processor::{AnsProcessor, AnsProcessorConfig},
-    coin_processor::CoinProcessor,
     default_processor::DefaultProcessor,
     events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor,
@@ -31,7 +28,6 @@ use self::{
     nft_metadata_processor::{NftMetadataProcessor, NftMetadataProcessorConfig},
     objects_processor::{ObjectsProcessor, ObjectsProcessorConfig},
     stake_processor::{StakeProcessor, StakeProcessorConfig},
-    token_processor::{TokenProcessor, TokenProcessorConfig},
     token_v2_processor::{TokenV2Processor, TokenV2ProcessorConfig},
     transaction_metadata_processor::TransactionMetadataProcessor,
     user_transaction_processor::UserTransactionProcessor,
@@ -186,7 +182,6 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 pub enum ProcessorConfig {
     AccountTransactionsProcessor,
     AnsProcessor(AnsProcessorConfig),
-    CoinProcessor,
     DefaultProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
@@ -194,7 +189,6 @@ pub enum ProcessorConfig {
     NftMetadataProcessor(NftMetadataProcessorConfig),
     ObjectsProcessor(ObjectsProcessorConfig),
     StakeProcessor(StakeProcessorConfig),
-    TokenProcessor(TokenProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
     TransactionMetadataProcessor,
     UserTransactionProcessor,
@@ -238,7 +232,6 @@ impl ProcessorConfig {
 pub enum Processor {
     AccountTransactionsProcessor,
     AnsProcessor,
-    CoinProcessor,
     DefaultProcessor,
     EventsProcessor,
     FungibleAssetProcessor,
@@ -246,7 +239,6 @@ pub enum Processor {
     NftMetadataProcessor,
     ObjectsProcessor,
     StakeProcessor,
-    TokenProcessor,
     TokenV2Processor,
     TransactionMetadataProcessor,
     UserTransactionProcessor,

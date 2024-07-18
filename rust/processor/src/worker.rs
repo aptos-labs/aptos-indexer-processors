@@ -12,7 +12,6 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor,
         ans_processor::AnsProcessor,
-        coin_processor::CoinProcessor,
         default_processor::DefaultProcessor,
         events_processor::EventsProcessor,
         fungible_asset_processor::FungibleAssetProcessor,
@@ -24,7 +23,6 @@ use crate::{
             parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
         },
         stake_processor::StakeProcessor,
-        token_processor::TokenProcessor,
         token_v2_processor::TokenV2Processor,
         transaction_metadata_processor::TransactionMetadataProcessor,
         user_transaction_processor::UserTransactionProcessor,
@@ -867,9 +865,6 @@ pub fn build_processor(
             per_table_chunk_sizes,
             deprecated_tables,
         )),
-        ProcessorConfig::CoinProcessor => {
-            Processor::from(CoinProcessor::new(db_pool, per_table_chunk_sizes))
-        },
         ProcessorConfig::DefaultProcessor => Processor::from(DefaultProcessor::new(
             db_pool,
             per_table_chunk_sizes,
@@ -894,11 +889,6 @@ pub fn build_processor(
             deprecated_tables,
         )),
         ProcessorConfig::StakeProcessor(config) => Processor::from(StakeProcessor::new(
-            db_pool,
-            config.clone(),
-            per_table_chunk_sizes,
-        )),
-        ProcessorConfig::TokenProcessor(config) => Processor::from(TokenProcessor::new(
             db_pool,
             config.clone(),
             per_table_chunk_sizes,
