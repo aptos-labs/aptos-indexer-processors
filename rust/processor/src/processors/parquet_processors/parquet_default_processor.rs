@@ -9,7 +9,7 @@ use crate::{
     db::common::models::default_models::{
         parquet_move_modules::MoveModule,
         parquet_move_resources::MoveResource,
-        parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
+        parquet_move_tables::{TableItem, TableMetadata},
         parquet_transactions::{Transaction as ParquetTransaction, TransactionModel},
         parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
@@ -186,7 +186,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let mr_parquet_data = ParquetDataGeneric {
             data: move_resources,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.move_resource_sender
@@ -196,7 +195,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let wsc_parquet_data = ParquetDataGeneric {
             data: write_set_changes,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
         self.wsc_sender
             .send(wsc_parquet_data)
@@ -205,7 +203,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let t_parquet_data = ParquetDataGeneric {
             data: transactions,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
         self.transaction_sender
             .send(t_parquet_data)
@@ -214,7 +211,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let ti_parquet_data = ParquetDataGeneric {
             data: table_items,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.table_item_sender
@@ -224,7 +220,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let mm_parquet_data = ParquetDataGeneric {
             data: move_modules,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.move_module_sender
@@ -234,7 +229,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let tm_parquet_data = ParquetDataGeneric {
             data: table_metadata,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.table_metadata_sender
@@ -247,7 +241,9 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
                 last_transaction_timestamp: last_transaction_timestamp.clone(),
-                txn_version_to_struct_count: AHashMap::new(),
+                txn_version_to_struct_count: Some(transaction_version_to_struct_count),
+                parquet_processed_structs: None,
+                table_name: "".to_string(),
             },
         ))
     }
@@ -280,7 +276,6 @@ pub fn process_transactions(
     let mut move_modules = vec![];
     let mut move_resources = vec![];
     let mut table_items = vec![];
-    let mut current_table_items = AHashMap::new();
     let mut table_metadata: AHashMap<String, TableMetadata> = AHashMap::new();
 
     for detail in wsc_details {
@@ -297,22 +292,13 @@ pub fn process_transactions(
                     .and_modify(|e| *e += 1);
                 move_resources.push(resource);
             },
-            WriteSetChangeDetail::Table(item, current_item, metadata) => {
+            WriteSetChangeDetail::Table(item, _current_item, metadata) => {
                 let txn_version = item.txn_version;
 
                 transaction_version_to_struct_count
                     .entry(txn_version)
                     .and_modify(|e| *e += 1);
                 table_items.push(item);
-
-                current_table_items.insert(
-                    (
-                        current_item.table_handle.clone(),
-                        current_item.key_hash.clone(),
-                    ),
-                    current_item,
-                );
-                // transaction_version_to_struct_count.entry(current_item.last_transaction_version).and_modify(|e| *e += 1); // TODO: uncomment in Tranche2
 
                 if let Some(meta) = metadata {
                     table_metadata.insert(meta.handle.clone(), meta);
@@ -324,14 +310,8 @@ pub fn process_transactions(
         }
     }
 
-    // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
-    let mut current_table_items = current_table_items
-        .into_values()
-        .collect::<Vec<CurrentTableItem>>();
     let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
     // Sort by PK
-    current_table_items
-        .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
 
     (

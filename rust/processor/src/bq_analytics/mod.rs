@@ -30,7 +30,10 @@ pub struct ParquetProcessingResult {
     pub start_version: i64,
     pub end_version: i64,
     pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
-    pub txn_version_to_struct_count: AHashMap<i64, i64>,
+    pub txn_version_to_struct_count: Option<AHashMap<i64, i64>>,
+    // This is used to store the processed structs in the parquet file
+    pub parquet_processed_structs: Option<AHashMap<i64, i64>>,
+    pub table_name: String,
 }
 
 #[derive(Debug)]

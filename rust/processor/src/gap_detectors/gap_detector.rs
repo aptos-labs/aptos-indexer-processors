@@ -8,6 +8,7 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::Result;
 
+#[derive(Clone)]
 pub struct DefaultGapDetector {
     next_version_to_process: u64,
     seen_versions: AHashMap<u64, DefaultProcessingResult>,
