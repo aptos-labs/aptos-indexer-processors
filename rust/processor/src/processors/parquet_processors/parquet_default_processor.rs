@@ -201,26 +201,20 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             .await
             .map_err(|e| anyhow!("Failed to send to parquet manager: {}", e))?;
 
-        let t_parquet_data = ParquetDataGeneric {
-            data: transactions,
-        };
+        let t_parquet_data = ParquetDataGeneric { data: transactions };
         self.transaction_sender
             .send(t_parquet_data)
             .await
             .map_err(|e| anyhow!("Failed to send to parquet manager: {}", e))?;
 
-        let ti_parquet_data = ParquetDataGeneric {
-            data: table_items,
-        };
+        let ti_parquet_data = ParquetDataGeneric { data: table_items };
 
         self.table_item_sender
             .send(ti_parquet_data)
             .await
             .map_err(|e| anyhow!("Failed to send to parquet manager: {}", e))?;
 
-        let mm_parquet_data = ParquetDataGeneric {
-            data: move_modules,
-        };
+        let mm_parquet_data = ParquetDataGeneric { data: move_modules };
 
         self.move_module_sender
             .send(mm_parquet_data)

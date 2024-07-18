@@ -120,9 +120,7 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
         let (fungible_asset_balances, coin_supply) =
             parse_v2_coin(&transactions, &mut transaction_version_to_struct_count).await;
 
-        let parquet_coin_supply = ParquetDataGeneric {
-            data: coin_supply,
-        };
+        let parquet_coin_supply = ParquetDataGeneric { data: coin_supply };
 
         self.coin_supply_sender
             .send(parquet_coin_supply)
