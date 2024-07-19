@@ -3552,7 +3552,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sdk-examples"
+name = "sdk-processor"
 version = "0.1.0"
 dependencies = [
  "ahash",
@@ -3577,6 +3577,7 @@ dependencies = [
  "native-tls",
  "num_cpus",
  "postgres-native-tls",
+ "processor",
  "rayon",
  "sdk-server-framework",
  "serde",

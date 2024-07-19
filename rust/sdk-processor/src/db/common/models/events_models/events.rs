@@ -3,13 +3,15 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::schema::events;
-use aptos_indexer_processor_sdk::{
-    aptos_protos::transaction::v1::Event as EventPB,
-    utils::convert::{standardize_address, truncate_str},
-};
+// Copied from processor crate. The only difference is the protos are imported from the SDK
+// instead of the aptos-protos crate.
+use aptos_indexer_processor_sdk::aptos_protos::transaction::v1::Event as EventPB;
 use diesel::{Identifiable, Insertable};
 use field_count::FieldCount;
+use processor::{
+    schema::events,
+    utils::util::{standardize_address, truncate_str},
+};
 use serde::{Deserialize, Serialize};
 
 // p99 currently is 303 so using 300 as a safe max length

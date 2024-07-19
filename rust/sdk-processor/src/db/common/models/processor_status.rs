@@ -3,9 +3,10 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{schema::processor_status, utils::database::DbPoolConnection};
+use crate::utils::database::DbPoolConnection;
 use diesel::{AsChangeset, ExpressionMethods, Insertable, OptionalExtension, QueryDsl, Queryable};
 use diesel_async::RunQueryDsl;
+use processor::schema::processor_status;
 
 #[derive(AsChangeset, Debug, Insertable)]
 #[diesel(table_name = processor_status)]

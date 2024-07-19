@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use sdk_examples::config::indexer_processor_config::IndexerProcessorConfig;
+use sdk_processor::config::indexer_processor_config::IndexerProcessorConfig;
 use sdk_server_framework::ServerArgs;
 
 #[cfg(unix)]

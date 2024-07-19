@@ -1,7 +1,5 @@
 use crate::{
     config::indexer_processor_config::DbConfig,
-    db::common::models::processor_status::ProcessorStatus,
-    schema::processor_status,
     utils::database::{execute_with_better_error, new_db_pool, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -14,6 +12,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use diesel::{upsert::excluded, ExpressionMethods};
+use processor::{db::common::models::processor_status::ProcessorStatus, schema::processor_status};
 
 const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
@@ -92,15 +91,17 @@ where
                 "Gap detected starting from version: {}",
                 current_batch.start_version
             );
-            self.seen_versions
-                .insert(current_batch.start_version, TransactionContext {
+            self.seen_versions.insert(
+                current_batch.start_version,
+                TransactionContext {
                     data: vec![], // No data is needed for tracking. This is to avoid clone.
                     start_version: current_batch.start_version,
                     end_version: current_batch.end_version,
                     start_transaction_timestamp: current_batch.start_transaction_timestamp.clone(),
                     end_transaction_timestamp: current_batch.end_transaction_timestamp.clone(),
                     total_size_in_bytes: current_batch.total_size_in_bytes,
-                });
+                },
+            );
         } else {
             tracing::debug!("No gap detected");
             // If the current_batch is the next expected version, update the last success batch
