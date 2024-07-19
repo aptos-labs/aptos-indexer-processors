@@ -141,7 +141,7 @@ checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=d8082a3cf495f52fd48deb734c012b0cea00ac4b#d8082a3cf495f52fd48deb734c012b0cea00ac4b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?branch=main#aa30b4b57ad0e246e857ffa5289c74586ac7d98b"
 dependencies = [
  "anyhow",
  "aptos-indexer-transaction-stream",
@@ -174,10 +174,10 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=d8082a3cf495f52fd48deb734c012b0cea00ac4b#d8082a3cf495f52fd48deb734c012b0cea00ac4b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?branch=main#aa30b4b57ad0e246e857ffa5289c74586ac7d98b"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=d8082a3cf495f52fd48deb734c012b0cea00ac4b)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?branch=main)",
  "aptos-protos 1.3.0",
  "bigdecimal",
  "chrono",
@@ -204,7 +204,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=d8082a3cf495f52fd48deb734c012b0cea00ac4b#d8082a3cf495f52fd48deb734c012b0cea00ac4b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?branch=main#aa30b4b57ad0e246e857ffa5289c74586ac7d98b"
 dependencies = [
  "chrono",
 ]
@@ -758,6 +758,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-deque"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613f8cc01fe9cf1a3eb3d7f488fd2fa8388403e97039e2f73692932e291a770d"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-epoch"
 version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -937,6 +947,20 @@ dependencies = [
 [[package]]
 name = "diesel-async"
 version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acada1517534c92d3f382217b485db8a8638f111b0e3f2a2a8e26165050f77be"
+dependencies = [
+ "async-trait",
+ "diesel",
+ "futures-util",
+ "scoped-futures",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
+name = "diesel-async"
+version = "0.4.1"
 source = "git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2#d02798c67065d763154d7272dd0c09b39757d0f2"
 dependencies = [
  "async-trait",
@@ -946,6 +970,18 @@ dependencies = [
  "scoped-futures",
  "tokio",
  "tokio-postgres",
+]
+
+[[package]]
+name = "diesel_async_migrations"
+version = "0.11.0"
+source = "git+https://github.com/niroco/diesel_async_migrations?rev=11f331b73c5cfcc894380074f748d8fda710ac12#11f331b73c5cfcc894380074f748d8fda710ac12"
+dependencies = [
+ "diesel",
+ "diesel-async 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "macros",
+ "scoped-futures",
+ "tracing",
 ]
 
 [[package]]
@@ -1799,7 +1835,7 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=d8082a3cf495f52fd48deb734c012b0cea00ac4b#d8082a3cf495f52fd48deb734c012b0cea00ac4b"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?branch=main#aa30b4b57ad0e246e857ffa5289c74586ac7d98b"
 dependencies = [
  "async-trait",
  "autometrics",
@@ -2041,6 +2077,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b955cdeb2a02b9117f121ce63aa52d08ade45de53e48fe6a38b39c10f6f709"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "macros"
+version = "0.1.0"
+source = "git+https://github.com/niroco/diesel_async_migrations?rev=11f331b73c5cfcc894380074f748d8fda710ac12#11f331b73c5cfcc894380074f748d8fda710ac12"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
@@ -2864,7 +2909,7 @@ dependencies = [
  "chrono",
  "clap",
  "diesel",
- "diesel-async",
+ "diesel-async 0.4.1 (git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2)",
  "diesel_migrations",
  "enum_dispatch",
  "field_count",
@@ -3109,6 +3154,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c297679cb867470fa8c9f67dbba74a78d78e3e98d7cf2b08d6d71540f797332"
 dependencies = [
  "bitflags 1.3.2",
+]
+
+[[package]]
+name = "rayon"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -3484,6 +3549,67 @@ checksum = "d53dcdb7c9f8158937a7981b48accfd39a43af418591a5d008c7b22b5e1b7ca4"
 dependencies = [
  "ring 0.16.20",
  "untrusted 0.7.1",
+]
+
+[[package]]
+name = "sdk-examples"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "aptos-indexer-processor-sdk",
+ "async-trait",
+ "bcs",
+ "bigdecimal",
+ "chrono",
+ "clap",
+ "diesel",
+ "diesel-async 0.4.1 (git+https://github.com/weiznich/diesel_async.git?rev=d02798c67065d763154d7272dd0c09b39757d0f2)",
+ "diesel_async_migrations",
+ "diesel_migrations",
+ "field_count",
+ "futures",
+ "futures-util",
+ "hex",
+ "jemallocator",
+ "kanal",
+ "lazy_static",
+ "native-tls",
+ "num_cpus",
+ "postgres-native-tls",
+ "rayon",
+ "sdk-server-framework",
+ "serde",
+ "serde_json",
+ "sha2 0.9.9",
+ "strum",
+ "tiny-keccak",
+ "tokio",
+ "tokio-postgres",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "sdk-server-framework"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-processor-sdk",
+ "aptos-system-utils",
+ "async-trait",
+ "autometrics",
+ "backtrace",
+ "clap",
+ "prometheus-client",
+ "serde",
+ "serde_yaml",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "warp",
 ]
 
 [[package]]
