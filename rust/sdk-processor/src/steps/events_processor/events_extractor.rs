@@ -8,6 +8,8 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use rayon::prelude::*;
 
+pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
+
 pub struct EventsExtractor
 where
     Self: Sized + Send + 'static, {}
@@ -25,6 +27,7 @@ impl Processable for EventsExtractor {
         let events = item
             .data
             .par_iter()
+            .with_min_len(MIN_TRANSACTIONS_PER_RAYON_JOB)
             .map(|txn| {
                 let mut events = vec![];
                 let txn_version = txn.version as i64;

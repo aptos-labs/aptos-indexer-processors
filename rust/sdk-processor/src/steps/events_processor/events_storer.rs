@@ -1,4 +1,5 @@
 use crate::{
+    config::indexer_processor_config::DbConfig,
     db::common::models::events_models::events::EventModel,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
@@ -21,11 +22,15 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
+    db_config: DbConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool) -> Self {
-        Self { conn_pool }
+    pub fn new(conn_pool: ArcDbPool, db_config: DbConfig) -> Self {
+        Self {
+            conn_pool,
+            db_config,
+        }
     }
 }
 
@@ -59,7 +64,8 @@ impl Processable for EventsStorer {
         &mut self,
         events: TransactionContext<EventModel>,
     ) -> Option<TransactionContext<EventModel>> {
-        let per_table_chunk_sizes: AHashMap<String, usize> = AHashMap::new();
+        let per_table_chunk_sizes: AHashMap<String, usize> =
+            self.db_config.per_table_chunk_sizes.clone();
         let execute_res = execute_in_chunks(
             self.conn_pool.clone(),
             insert_events_query,
@@ -69,10 +75,15 @@ impl Processable for EventsStorer {
         .await;
         match execute_res {
             Ok(_) => {
-                println!("Events stored successfully");
+                tracing::debug!("Events stored successfully");
             },
             Err(e) => {
-                println!("Failed to store events: {:?}", e);
+                tracing::error!(
+                    start_version = events.start_version,
+                    end_version = events.end_version,
+                    "Failed to store events: {:?}",
+                    e
+                );
             },
         }
         Some(events)

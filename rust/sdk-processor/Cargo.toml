@@ -8,6 +8,7 @@ edition = "2021"
 ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-processor-sdk = { workspace = true }
+aptos-indexer-processor-sdk-server-framework = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bigdecimal = { workspace = true }
@@ -27,7 +28,6 @@ lazy_static = { workspace = true }
 num_cpus = { workspace = true }
 processor = { workspace = true }
 rayon = { workspace = true }
-sdk-server-framework = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

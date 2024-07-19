@@ -61,7 +61,7 @@ impl EventsProcessor {
             transaction_stream.into_runnable_step(),
         );
         let events_extractor = EventsExtractor {};
-        let events_storer = EventsStorer::new(self.db_pool.clone());
+        let events_storer = EventsStorer::new(self.db_pool.clone(), self.config.db_config.clone());
         let timed_buffer = TimedBuffer::new(Duration::from_secs(1));
         let version_tracker = LatestVersionProcessedTracker::new(
             self.config.db_config,
@@ -85,12 +85,13 @@ impl EventsProcessor {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
                     if txn_context.data.is_empty() {
-                        println!("Received no transactions");
+                        tracing::debug!("Received no transactions");
                         continue;
                     }
-                    println!(
+                    tracing::debug!(
                         "Received events versions: {:?} to {:?}",
-                        txn_context.start_version, txn_context.end_version,
+                        txn_context.start_version,
+                        txn_context.end_version
                     );
                 },
                 Err(e) => {
