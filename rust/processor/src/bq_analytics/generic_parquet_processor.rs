@@ -149,16 +149,12 @@ where
             }
         }
 
-        info!(
-                "Time has elapsed more than {} since last upload. for table {}",
-                self.last_upload_time.elapsed().as_secs(),
-                ParquetType::TABLE_NAME
-        );
         if self.last_upload_time.elapsed() >= self.upload_interval {
             info!(
-                    "Time has elapsed more than {} since last upload.",
-                    self.upload_interval.as_secs()
-                );
+                "Time has elapsed more than {} since last upload for {}",
+                self.upload_interval.as_secs(),
+                ParquetType::TABLE_NAME
+            );
             if let Err(e) = self.upload_buffer(gcs_client).await {
                 error!("Failed to upload buffer: {}", e);
                 return Err(e);
@@ -169,6 +165,18 @@ where
         PARQUET_HANDLER_BUFFER_SIZE
             .with_label_values(&[ParquetType::TABLE_NAME])
             .set(self.buffer.len() as i64);
+
+        // TODO: Add more metrics
+        // NUM_TRANSACTIONS_PROCESSED_COUNT
+        //     .with_label_values(&[
+        //         processor_name,
+        //         step,
+        //         label,
+        //         &task_index_str,
+        //     ])
+        //     .inc_by(num_processed);
+        //
+
         Ok(())
     }
 

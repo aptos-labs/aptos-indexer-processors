@@ -5,10 +5,9 @@ use crate::gap_detectors::{GapDetectorResult, GapDetectorTrait, ProcessingResult
 use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result};
 use std::{
-    cmp::max,
+    cmp::{max, min},
     sync::{Arc, Mutex},
 };
-use std::cmp::min;
 use tracing::info;
 
 impl GapDetectorTrait for Arc<Mutex<ParquetFileGapDetectorInner>> {
@@ -48,7 +47,6 @@ impl ParquetFileGapDetectorInner {
         start_version: i64,
         end_version: i64,
     ) {
-        info!("populating struct map from {} to {}", start_version, end_version);
         for version in start_version..=end_version {
             if let Some(count) = txn_version_to_struct_count.get(&version) {
                 if self.version_counters.contains_key(&version) {
@@ -68,45 +66,18 @@ impl ParquetFileGapDetectorInner {
         self.max_version = max(self.max_version, end_version);
 
         // b/c of the case where file gets uploaded first, we should check if we have to update last_success_version for this processor
-        self.update_next_version_to_process(min(self.next_version_to_process, end_version), &"for all".to_string());
-
-        //
-        //
-        // {
-        //     if let Some(count) = txn_version_to_struct_count.get(&version) {
-        //         self.version_counters.insert(*version, *count);
-        //     } else {
-        //
-        //         if !self.version_counters.contains_key(&version) {
-        //             self.version_counters.insert(version, 0);
-        //         }
-        //         // else {
-        //         // this is the case where we haven't updated the map yet, while the file gets uploaded first. the bigger file size we will have,
-        //         // the less chance we will see this as upload takes longer time. And map population is done before the upload.
-        //         // info!(
-        //         //     current_version = version,
-        //         //     "No struct count found for version"
-        //         // );
-        //     }
-        // }
-        // for (version, count) in txn_version_to_struct_count.iter() {
-        //     if !self.version_counters.contains_key(version) {
-        //         self.version_counters.insert(*version, *count);
-        //     } else {
-        //         // there is an edge case where file gets uploaded before it gets processed here, so we need to add the count to the existing count.
-        //         *self.version_counters.get_mut(version).unwrap() += *count;
-        //     }
-        //
-        //     self.max_version = max(self.max_version, *version);
-        // }
-        // self.update_next_version_to_process(start_version, end_version);
-        // self.update_next_version_to_process(min(self.next_version_to_process, start_version), end_version);
+        self.update_next_version_to_process(
+            min(self.next_version_to_process, end_version),
+            &"all_table".to_string(),
+        );
     }
 
     /// This function updates the next version to process based on the current version counters.
     /// It will increment the next version to process if the current version is fully processed.
     /// It will also remove the version from the version counters if it is fully processed.
     /// what it means to be fully processed is that all the structs for that version processed, i.e. count = 0.
+    /// Note that for tables other than transactions, it won't be always the latest txn version since we update this value with
+    /// the min max version that last file has been uploaded to GCS. so whenever we restart the processor, it may generate some duplicates, and we are okay with that.
     pub fn update_next_version_to_process(&mut self, end_version: i64, table_name: &str) {
         // this has to start checking with this value all the time, since this is the value that will be stored in the db as well.
         // maybe there could be an improvement to be more performant. but prirotizing the data integrity as of now.
@@ -114,60 +85,60 @@ impl ParquetFileGapDetectorInner {
         // ending version has to be revisited, even though files has been updated to the end_version, but I think it has to be check till the max_version we have seen.
         // so that it still updates for the txn version that might not have other resources.
         // let end_version = self.max_version;
-        info!("Updating next version to process from {} to {} for table {}", current_version, end_version, table_name);
-        while current_version <= end_version { //
+        info!(
+            table_name = table_name,
+            "Updating next version to process from {} to {} for table {}",
+            current_version, end_version, table_name
+        );
+        while current_version <= end_version {
+            //
             // info!("Processing version {}", current_version);
-            match self.version_counters.get_mut(&current_version) {
-                Some(count) => {
-
-                    info!(count = *count, current_version = current_version, table_name=table_name, "Processing version with count");
-
-                    // if *count == 0 && current_version == self.next_version_to_process { //
-                    // changing this since it's always be same as next_version_to_process
-                    if *count == 0 { //
-                        while let Some(&count) =
-                            self.version_counters.get(&current_version)
-                        {
-                            if current_version > end_version {
-                                break;
-                            }
-
-                            if count == 0 {
-                                info!("Version {} fully processed. Next version to process updated to {}", current_version, current_version + 1);
-                                self.version_counters.remove(&current_version); // Remove the fully processed version
-                                self.seen_versions.insert(current_version); // seen_version holds the txns version that we have processed already
-                                current_version += 1;
-                                self.next_version_to_process += 1;
-                            } else {
-                                break;
-                            }
-                        }
+            if self.version_counters.contains_key(&current_version) {
+                while let Some(&count) = self.version_counters.get(&current_version) {
+                    if current_version > end_version {
+                        // we shouldn't update further b/c we haven't uploaded the files containing versions after end_version.
+                        break;
                     }
-                },
-                None => {
-                    // this shouldn't happen hosenlyt b/c we alwasy
-                    // TODO: validate this that we shouldn't reach this b/c we already added default count.
-                    // info!("This shouldn't happen b/c we already added default count for this version.");
-                    if self.seen_versions.contains(&current_version) {
+                    if count == 0 {
                         info!(
-                            "Version {} already processed, skipping and current next_version{} ",
-                            current_version, self.next_version_to_process
+                            "Version {} fully processed. Next version to process updated to {}",
+                            current_version,
+                            current_version + 1
                         );
-                        self.next_version_to_process =
-                            max(self.next_version_to_process, current_version + 1);
+                        self.version_counters.remove(&current_version); // Remove the fully processed version
+                        self.seen_versions.insert(current_version); // seen_version holds the txns version that we have processed already
+                        current_version += 1;
+                        self.next_version_to_process += 1;
+                    } else {
+                        break;
                     }
-                    else {
-                        // this is the case where we haven't updated the map yet, while the file gets uploaded first. the bigger file size we will have,
-                        // the less chance we will see this as upload takes longer time. And map population is done before the upload.
-                        info!(
+                }
+            } else {
+                // this shouldn't happen hosenlyt b/c we alwasy
+                // TODO: validate this that we shouldn't reach this b/c we already added default count.
+                // info!("This shouldn't happen b/c we already added default count for this version.");
+                if self.seen_versions.contains(&current_version) {
+                    info!(
+                        "Version {} already processed, skipping and current next_version {} ",
+                        current_version, self.next_version_to_process
+                    );
+                    self.next_version_to_process =
+                        max(self.next_version_to_process, current_version + 1);
+                } else {
+                    // this is the case where we haven't updated the map yet, while the file gets uploaded first. the bigger file size we will have,
+                    // the less chance we will see this as upload takes longer time. And map population is done before the upload.
+                    info!(
                             current_version = current_version,
                             "No struct count found for version. This shouldn't happen b/c we already added default count for this version."
                         );
-                    }
-                },
+                }
             }
             current_version += 1; // Move to the next version in sequence
         }
+        info!(
+            "latest next_version_to_process: {} for table {}",
+            self.next_version_to_process, table_name
+        );
     }
 }
 
@@ -180,8 +151,11 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
         let parquet_processed_structs = result
             .parquet_processed_structs
             .context("Missing parquet processed transactions")?;
-        info!(start_version = result.start_version, end_version = result.end_version,
-            "Parquet file has been uploaded.");
+        info!(
+            start_version = result.start_version,
+            end_version = result.end_version,
+            "Parquet file has been uploaded."
+        );
 
         for (version, count) in parquet_processed_structs.iter() {
             if let Some(entry) = self.version_counters.get_mut(version) {
@@ -192,17 +166,8 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
             }
         }
 
-        // what if we haven't uplaode move_modules starting 120001
-        // whenever other upload resulst comes in we shouldn't not update this update_next_version_to_prccess
+        self.update_next_version_to_process(result.end_version, &result.table_name);
 
-        // when we have latest_ 120000,
-
-
-        // if result.start_version <= self.next_version_to_process || self.next_version_to_process <= result.end_version {
-            self.update_next_version_to_process(result.end_version, &result.table_name);
-        // }
-
-        // only update when upload happens ??? what if some structs don't need to be processed. like 1 -100000 only 400 txn version has some structs
         // we still have to process
         Ok(GapDetectorResult::ParquetFileGapDetectorResult(
             ParquetFileGapDetectorResult {

@@ -142,11 +142,11 @@ pub async fn create_gap_detector_status_tracker_loop(
                                 // we need a new gap detection batch size
                                 if res.num_gaps >= gap_detection_batch_size {
                                     tracing::warn!(
-                                    processor_name,
+                                        processor_name,
                                         gap_start_version = res.next_version_to_process,
                                         num_gaps = res.num_gaps,
                                         "[Parser] Processed batches with a gap",
-                                        );
+                                    );
                                     // We don't panic as everything downstream will panic if it doesn't work/receive
                                 }
 
