@@ -1,9 +1,7 @@
 use super::database::ArcDbPool;
-use crate::{
-    config::indexer_processor_config::IndexerProcessorConfig,
-    db::common::models::processor_status::ProcessorStatusQuery,
-};
+use crate::config::indexer_processor_config::IndexerProcessorConfig;
 use anyhow::{Context, Result};
+use processor::db::common::models::processor_status::ProcessorStatusQuery;
 
 pub async fn get_starting_version(
     indexer_processor_config: &IndexerProcessorConfig,

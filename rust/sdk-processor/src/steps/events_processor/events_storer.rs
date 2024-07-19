@@ -1,6 +1,5 @@
 use crate::{
-    db::common::models::events_models::EventModel,
-    schema,
+    db::common::models::events_models::events::EventModel,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -15,6 +14,7 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
+use processor::schema;
 
 pub struct EventsStorer
 where
