@@ -145,7 +145,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                     processor_name,
                                         gap_start_version = res.next_version_to_process,
                                         num_gaps = res.num_gaps,
-                                        "[Parser] Processed {gap_detection_batch_size} batches with a gap",
+                                        "[Parser] Processed batches with a gap",
                                         );
                                     // We don't panic as everything downstream will panic if it doesn't work/receive
                                 }

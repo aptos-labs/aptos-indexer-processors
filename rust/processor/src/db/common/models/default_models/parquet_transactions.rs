@@ -389,7 +389,8 @@ impl Transaction {
             if !wsc_list.is_empty() {
                 transaction_version_to_struct_count
                     .entry(txn.txn_version)
-                    .and_modify(|e| *e += wsc_list.len() as i64);
+                    .and_modify(|e| *e += wsc_list.len() as i64)
+                    .or_insert(wsc_list.len() as i64);
             }
             wscs.append(&mut wsc_list);
 

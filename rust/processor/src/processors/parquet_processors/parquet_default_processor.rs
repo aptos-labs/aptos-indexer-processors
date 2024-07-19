@@ -222,7 +222,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             .map_err(|e| anyhow!("Failed to send to parquet manager: {}", e))?;
 
         let tm_parquet_data = ParquetDataGeneric {
-            data: table_metadata,
+            data: table_metadata
         };
 
         self.table_metadata_sender
@@ -276,9 +276,11 @@ pub fn process_transactions(
         match detail {
             WriteSetChangeDetail::Module(module) => {
                 move_modules.push(module.clone());
+                // tracing::info!("adding module to move_modules: {:?} for version {:?}", module, module.txn_version);
                 transaction_version_to_struct_count
                     .entry(module.txn_version)
-                    .and_modify(|e| *e += 1);
+                    .and_modify(|e| *e += 1)
+                    .or_insert(1);
             },
             WriteSetChangeDetail::Resource(resource) => {
                 transaction_version_to_struct_count

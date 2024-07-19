@@ -23,7 +23,7 @@ use std::{
     sync::Arc,
 };
 use tokio::{io, time::Duration};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ParquetProcessingResult {
@@ -142,11 +142,11 @@ where
 
                     match result {
                         Ok(_) => {
-                            info!(
-                                processor_name = processor_name.clone(),
-                                service_type = PROCESSOR_SERVICE_TYPE,
-                                "[Parquet Handler] Successfully processed structs to buffer",
-                            );
+                            // info!(
+                            //     processor_name = processor_name.clone(),
+                            //     service_type = PROCESSOR_SERVICE_TYPE,
+                            //     "[Parquet Handler] Successfully processed structs to buffer",
+                            // );
                         },
                         Err(e) => {
                             error!(

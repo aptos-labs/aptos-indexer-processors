@@ -147,18 +147,23 @@ where
                 }
                 self.last_upload_time = Instant::now();
             }
+        }
 
-            if self.last_upload_time.elapsed() >= self.upload_interval {
-                info!(
+        info!(
+                "Time has elapsed more than {} since last upload. for table {}",
+                self.last_upload_time.elapsed().as_secs(),
+                ParquetType::TABLE_NAME
+        );
+        if self.last_upload_time.elapsed() >= self.upload_interval {
+            info!(
                     "Time has elapsed more than {} since last upload.",
                     self.upload_interval.as_secs()
                 );
-                if let Err(e) = self.upload_buffer(gcs_client).await {
-                    error!("Failed to upload buffer: {}", e);
-                    return Err(e);
-                }
-                self.last_upload_time = Instant::now();
+            if let Err(e) = self.upload_buffer(gcs_client).await {
+                error!("Failed to upload buffer: {}", e);
+                return Err(e);
             }
+            self.last_upload_time = Instant::now();
         }
 
         PARQUET_HANDLER_BUFFER_SIZE
@@ -169,6 +174,7 @@ where
 
     async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
         if self.buffer.is_empty() {
+            info!("Buffer is empty, skipping upload.");
             return Ok(());
         }
         let start_version = self
