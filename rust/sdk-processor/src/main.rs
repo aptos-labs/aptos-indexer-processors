@@ -1,7 +1,7 @@
 use anyhow::Result;
+use aptos_indexer_processor_sdk_server_framework::ServerArgs;
 use clap::Parser;
 use sdk_processor::config::indexer_processor_config::IndexerProcessorConfig;
-use sdk_server_framework::ServerArgs;
 
 #[cfg(unix)]
 #[global_allocator]

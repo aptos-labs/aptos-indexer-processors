@@ -7,7 +7,6 @@ members = [
     "processor",
     "server-framework",
     "sdk-processor",
-    "sdk-server-framework",
 ]
 
 [workspace.package]
@@ -24,11 +23,11 @@ processor = { path = "processor" }
 server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }
 sdk-processor = { path = "sdk-processor" }
-sdk-server-framework = { path = "sdk-server-framework" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", branch = "main" }
+aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", branch = "main" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
 async-trait = "0.1.53"
