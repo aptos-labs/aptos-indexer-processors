@@ -649,6 +649,18 @@ impl Worker {
                                     },
                                     _ => panic!("Invalid gap detector type"),
                                 };
+
+                                let num_processed = (last_txn_version - first_txn_version) + 1;
+
+                                NUM_TRANSACTIONS_PROCESSED_COUNT
+                                    .with_label_values(&[
+                                        processor_name,
+                                        step,
+                                        label,
+                                        &task_index_str,
+                                    ])
+                                    .inc_by(num_processed);
+
                                 if let Some(txn_version_to_struct_count) =
                                     processing_result.txn_version_to_struct_count
                                 {

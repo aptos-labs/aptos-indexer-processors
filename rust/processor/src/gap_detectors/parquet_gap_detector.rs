@@ -88,7 +88,9 @@ impl ParquetFileGapDetectorInner {
         info!(
             table_name = table_name,
             "Updating next version to process from {} to {} for table {}",
-            current_version, end_version, table_name
+            current_version,
+            end_version,
+            table_name
         );
         while current_version <= end_version {
             //
@@ -167,6 +169,10 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
         }
 
         self.update_next_version_to_process(result.end_version, &result.table_name);
+
+        // TODO: Add metrics for
+        // Map Size in gap detector
+        // parquet processed version per table
 
         // we still have to process
         Ok(GapDetectorResult::ParquetFileGapDetectorResult(

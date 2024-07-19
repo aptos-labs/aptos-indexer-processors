@@ -3,7 +3,9 @@ use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
     utils::{
-        counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
+        counters::{
+            NUM_TRANSACTIONS_PROCESSED_COUNT, PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE,
+        },
         util::naive_datetime_to_timestamp,
     },
 };
@@ -166,17 +168,10 @@ where
             .with_label_values(&[ParquetType::TABLE_NAME])
             .set(self.buffer.len() as i64);
 
-        // TODO: Add more metrics
-        // NUM_TRANSACTIONS_PROCESSED_COUNT
-        //     .with_label_values(&[
-        //         processor_name,
-        //         step,
-        //         label,
-        //         &task_index_str,
-        //     ])
-        //     .inc_by(num_processed);
-        //
+        // Memory Usage
+        // Current Buffer Size per table
 
+        // Size of File
         Ok(())
     }
 
