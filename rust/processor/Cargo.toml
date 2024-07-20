@@ -14,6 +14,8 @@ rust-version = { workspace = true }
 
 [dependencies]
 ahash = { workspace = true }
+allocative = { workspace = true }
+allocative_derive = { workspace = true }
 anyhow = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
@@ -21,6 +23,7 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 bigdecimal = { workspace = true }
 bitflags = { workspace = true }
+canonical_json = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 diesel = { workspace = true }
@@ -32,7 +35,9 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 google-cloud-googleapis = { workspace = true }
 google-cloud-pubsub = { workspace = true }
+google-cloud-storage = { workspace = true }
 hex = { workspace = true }
+hyper = { workspace = true }
 itertools = { workspace = true }
 kanal = { workspace = true }
 lazy_static = { workspace = true }
@@ -55,23 +60,17 @@ url = { workspace = true }
 
 # Postgres SSL support
 native-tls = { workspace = true }
+num = { workspace = true }
 postgres-native-tls = { workspace = true }
 tiny-keccak = { workspace = true }
 tokio-postgres = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
-
 # Parquet support
 parquet = { workspace = true }
-num = { workspace = true }
-google-cloud-storage = { workspace = true }
-hyper = { workspace = true }
-lazy_static = { workspace = true }
 parquet_derive = { workspace = true }
-canonical_json = { workspace = true }
-allocative = { workspace = true }
-allocative_derive = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
 
 [features]
 libpq = ["diesel/postgres"]
