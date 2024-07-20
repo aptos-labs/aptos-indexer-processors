@@ -59,19 +59,18 @@ postgres-native-tls = { workspace = true }
 tiny-keccak = { workspace = true }
 tokio-postgres = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
-
 # Parquet support
 parquet = { workspace = true }
 num = { workspace = true }
 google-cloud-storage = { workspace = true }
 hyper = { workspace = true }
-lazy_static = { workspace = true }
 parquet_derive = { workspace = true }
 canonical_json = { workspace = true }
 allocative = { workspace = true }
 allocative_derive = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
 
 [features]
 libpq = ["diesel/postgres"]
