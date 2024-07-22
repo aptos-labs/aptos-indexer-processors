@@ -67,7 +67,9 @@ pub async fn upload_parquet_to_gcs(
             Ok(Ok(result)) => {
                 info!(
                     table_name = table_name,
-                    "File uploaded successfully to GCS: {}", result.name
+                    uploaded_time_iso = now.to_rfc3339(),
+                    "File uploaded successfully to GCS: {}",
+                    result.name
                 );
                 return Ok(());
             },

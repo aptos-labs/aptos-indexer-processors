@@ -118,13 +118,14 @@ where
         "[Parquet Handler] Starting parquet handler loop",
     );
 
-    let mut parquet_manager = GenericParquetHandler::new(
+    let mut parquet_handler = GenericParquetHandler::new(
         bucket_name.clone(),
         bucket_root.clone(),
         new_gap_detector_sender.clone(),
         ParquetType::schema(),
         upload_interval,
         max_buffer_size,
+        processor_name.clone(),
     )
     .expect("Failed to create parquet manager");
 
@@ -138,7 +139,7 @@ where
         loop {
             match parquet_receiver.recv().await {
                 Ok(txn_pb_res) => {
-                    let result = parquet_manager.handle(&gcs_client, txn_pb_res).await;
+                    let result = parquet_handler.handle(&gcs_client, txn_pb_res).await;
 
                     match result {
                         Ok(_) => {

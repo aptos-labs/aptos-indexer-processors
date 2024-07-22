@@ -8,7 +8,7 @@ use std::{
     cmp::{max, min},
     sync::{Arc, Mutex},
 };
-use tracing::info;
+use tracing::{debug, info};
 
 impl GapDetectorTrait for Arc<Mutex<ParquetFileGapDetectorInner>> {
     fn process_versions(&mut self, result: ProcessingResult) -> Result<GapDetectorResult> {
@@ -85,13 +85,15 @@ impl ParquetFileGapDetectorInner {
         // ending version has to be revisited, even though files has been updated to the end_version, but I think it has to be check till the max_version we have seen.
         // so that it still updates for the txn version that might not have other resources.
         // let end_version = self.max_version;
-        info!(
-            table_name = table_name,
-            "Updating next version to process from {} to {} for table {}",
-            current_version,
-            end_version,
-            table_name
-        );
+
+        // info!(
+        //     table_name = table_name,
+        //     "Updating next version to process from {} to {} for table {}",
+        //     current_version,
+        //     end_version,
+        //     table_name
+        // );
+
         while current_version <= end_version {
             //
             // info!("Processing version {}", current_version);
@@ -102,11 +104,6 @@ impl ParquetFileGapDetectorInner {
                         break;
                     }
                     if count == 0 {
-                        info!(
-                            "Version {} fully processed. Next version to process updated to {}",
-                            current_version,
-                            current_version + 1
-                        );
                         self.version_counters.remove(&current_version); // Remove the fully processed version
                         self.seen_versions.insert(current_version); // seen_version holds the txns version that we have processed already
                         current_version += 1;
@@ -120,7 +117,7 @@ impl ParquetFileGapDetectorInner {
                 // TODO: validate this that we shouldn't reach this b/c we already added default count.
                 // info!("This shouldn't happen b/c we already added default count for this version.");
                 if self.seen_versions.contains(&current_version) {
-                    info!(
+                    debug!(
                         "Version {} already processed, skipping and current next_version {} ",
                         current_version, self.next_version_to_process
                     );
@@ -137,10 +134,10 @@ impl ParquetFileGapDetectorInner {
             }
             current_version += 1; // Move to the next version in sequence
         }
-        info!(
-            "latest next_version_to_process: {} for table {}",
-            self.next_version_to_process, table_name
-        );
+        // info!(
+        //     "latest next_version_to_process: {} for table {}",
+        //     self.next_version_to_process, table_name
+        // );
     }
 }
 

@@ -3,9 +3,7 @@ use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
     utils::{
-        counters::{
-            NUM_TRANSACTIONS_PROCESSED_COUNT, PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE,
-        },
+        counters::{PARQUET_BUFFER_SIZE, PARQUET_HANDLER_CURRENT_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
         util::naive_datetime_to_timestamp,
     },
 };
@@ -72,6 +70,7 @@ where
     pub upload_interval: Duration,
     pub max_buffer_size: usize,
     pub last_upload_time: Instant,
+    pub processor_name: String,
 }
 fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
     let props = WriterProperties::builder()
@@ -104,6 +103,7 @@ where
         schema: Arc<Type>,
         upload_interval: Duration,
         max_buffer_size: usize,
+        processor_name: String,
     ) -> Result<Self> {
         // had to append unique id to avoid concurrent write issues
         let writer = create_new_writer(schema.clone())?;
@@ -120,6 +120,7 @@ where
             upload_interval,
             max_buffer_size,
             last_upload_time: Instant::now(),
+            processor_name,
         })
     }
 
@@ -129,11 +130,11 @@ where
         changes: ParquetDataGeneric<ParquetType>,
     ) -> Result<()> {
         let parquet_structs = changes.data;
-
+        let processor_name = self.processor_name.clone();
         for parquet_struct in parquet_structs {
             let size_of_struct = allocative::size_of_unique(&parquet_struct);
             PARQUET_STRUCT_SIZE
-                .with_label_values(&[ParquetType::TABLE_NAME])
+                .with_label_values(&[&processor_name, ParquetType::TABLE_NAME])
                 .set(size_of_struct as i64);
             self.buffer_size_bytes += size_of_struct;
             self.buffer.push(parquet_struct);
@@ -141,6 +142,8 @@ where
             if self.buffer_size_bytes >= self.max_buffer_size {
                 info!(
                     table_name = ParquetType::TABLE_NAME,
+                    buffer_size = self.buffer_size_bytes,
+                    max_buffer_size = self.max_buffer_size,
                     "Max buffer size reached, uploading to GCS."
                 );
                 if let Err(e) = self.upload_buffer(gcs_client).await {
@@ -164,14 +167,10 @@ where
             self.last_upload_time = Instant::now();
         }
 
-        PARQUET_HANDLER_BUFFER_SIZE
-            .with_label_values(&[ParquetType::TABLE_NAME])
+        PARQUET_HANDLER_CURRENT_BUFFER_SIZE
+            .with_label_values(&[&self.processor_name, ParquetType::TABLE_NAME])
             .set(self.buffer.len() as i64);
 
-        // Memory Usage
-        // Current Buffer Size per table
-
-        // Size of File
         Ok(())
     }
 
@@ -212,6 +211,11 @@ where
         let upload_buffer = old_writer
             .into_inner()
             .context("Failed to get inner buffer")?;
+
+        let processor_name = self.processor_name.clone();
+        PARQUET_BUFFER_SIZE
+            .with_label_values(&[&processor_name, ParquetType::TABLE_NAME])
+            .set(upload_buffer.len() as i64);
 
         debug!(
             table_name = ParquetType::TABLE_NAME,
