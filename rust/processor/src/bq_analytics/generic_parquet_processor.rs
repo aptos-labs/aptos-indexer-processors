@@ -3,7 +3,7 @@ use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
     utils::{
-        counters::{PARQUET_BUFFER_SIZE, PARQUET_HANDLER_CURRENT_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
+        counters::{PARQUET_HANDLER_CURRENT_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
         util::naive_datetime_to_timestamp,
     },
 };
@@ -169,7 +169,7 @@ where
 
         PARQUET_HANDLER_CURRENT_BUFFER_SIZE
             .with_label_values(&[&self.processor_name, ParquetType::TABLE_NAME])
-            .set(self.buffer.len() as i64);
+            .set(self.buffer_size_bytes as i64);
 
         Ok(())
     }
@@ -212,11 +212,6 @@ where
             .into_inner()
             .context("Failed to get inner buffer")?;
 
-        let processor_name = self.processor_name.clone();
-        PARQUET_BUFFER_SIZE
-            .with_label_values(&[&processor_name, ParquetType::TABLE_NAME])
-            .set(upload_buffer.len() as i64);
-
         debug!(
             table_name = ParquetType::TABLE_NAME,
             start_version = start_version,
@@ -231,6 +226,7 @@ where
             ParquetType::TABLE_NAME,
             &self.bucket_name,
             &bucket_root,
+            self.processor_name.clone(),
         )
         .await?;
 

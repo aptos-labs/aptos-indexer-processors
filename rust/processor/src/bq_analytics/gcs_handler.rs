@@ -1,23 +1,28 @@
-use crate::bq_analytics::ParquetProcessorError;
-use anyhow::Result;
+use crate::{
+    bq_analytics::ParquetProcessorError,
+    utils::counters::{PARQUET_BUFFER_SIZE, PARQUET_BUFFER_SIZE_AFTER_UPLOAD},
+};
+use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike};
 use google_cloud_storage::{
     client::Client as GCSClient,
     http::objects::upload::{Media, UploadObjectRequest, UploadType},
 };
-use hyper::Body;
+use hyper::{body::HttpBody, Body};
 use std::path::{Path, PathBuf};
 use tokio::time::{sleep, timeout, Duration};
 use tracing::{debug, error, info};
+
 const MAX_RETRIES: usize = 3;
 const INITIAL_DELAY_MS: u64 = 500;
 const TIMEOUT_SECONDS: u64 = 300;
 pub async fn upload_parquet_to_gcs(
     client: &GCSClient,
-    buffer: Vec<u8>,
+    mut buffer: Vec<u8>,
     table_name: &str,
     bucket_name: &str,
     bucket_root: &Path,
+    processor_name: String,
 ) -> Result<(), ParquetProcessorError> {
     if buffer.is_empty() {
         error!("The file is empty and has no data to upload.",);
@@ -57,6 +62,12 @@ pub async fn upload_parquet_to_gcs(
 
     loop {
         let data = Body::from(buffer.clone());
+        let size_hint = data.size_hint();
+        let size = size_hint.exact().context("Failed to get size hint")?;
+        PARQUET_BUFFER_SIZE
+            .with_label_values(&[&processor_name, table_name])
+            .set(size as i64);
+
         let upload_result = timeout(
             Duration::from_secs(TIMEOUT_SECONDS),
             client.upload_object(&upload_request, data, &upload_type),
@@ -67,10 +78,13 @@ pub async fn upload_parquet_to_gcs(
             Ok(Ok(result)) => {
                 info!(
                     table_name = table_name,
-                    uploaded_time_iso = now.to_rfc3339(),
-                    "File uploaded successfully to GCS: {}",
-                    result.name
+                    file_name = result.name,
+                    "File uploaded successfully to GCS",
                 );
+                buffer.clear();
+                PARQUET_BUFFER_SIZE_AFTER_UPLOAD
+                    .with_label_values(&[table_name])
+                    .set(buffer.len() as i64);
                 return Ok(());
             },
             Ok(Err(e)) => {

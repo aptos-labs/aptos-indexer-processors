@@ -68,7 +68,7 @@ impl ParquetFileGapDetectorInner {
         // b/c of the case where file gets uploaded first, we should check if we have to update last_success_version for this processor
         self.update_next_version_to_process(
             min(self.next_version_to_process, end_version),
-            &"all_table".to_string(),
+            "all_table",
         );
     }
 
@@ -80,23 +80,11 @@ impl ParquetFileGapDetectorInner {
     /// the min max version that last file has been uploaded to GCS. so whenever we restart the processor, it may generate some duplicates, and we are okay with that.
     pub fn update_next_version_to_process(&mut self, end_version: i64, table_name: &str) {
         // this has to start checking with this value all the time, since this is the value that will be stored in the db as well.
-        // maybe there could be an improvement to be more performant. but prirotizing the data integrity as of now.
+        // maybe there could be an improvement to be more performant. but priortizing the data integrity as of now.
         let mut current_version = self.next_version_to_process;
-        // ending version has to be revisited, even though files has been updated to the end_version, but I think it has to be check till the max_version we have seen.
-        // so that it still updates for the txn version that might not have other resources.
-        // let end_version = self.max_version;
-
-        // info!(
-        //     table_name = table_name,
-        //     "Updating next version to process from {} to {} for table {}",
-        //     current_version,
-        //     end_version,
-        //     table_name
-        // );
 
         while current_version <= end_version {
-            //
-            // info!("Processing version {}", current_version);
+            #[allow(clippy::collapsible_else_if)]
             if self.version_counters.contains_key(&current_version) {
                 while let Some(&count) = self.version_counters.get(&current_version) {
                     if current_version > end_version {
@@ -113,9 +101,6 @@ impl ParquetFileGapDetectorInner {
                     }
                 }
             } else {
-                // this shouldn't happen hosenlyt b/c we alwasy
-                // TODO: validate this that we shouldn't reach this b/c we already added default count.
-                // info!("This shouldn't happen b/c we already added default count for this version.");
                 if self.seen_versions.contains(&current_version) {
                     debug!(
                         "Version {} already processed, skipping and current next_version {} ",
@@ -126,18 +111,19 @@ impl ParquetFileGapDetectorInner {
                 } else {
                     // this is the case where we haven't updated the map yet, while the file gets uploaded first. the bigger file size we will have,
                     // the less chance we will see this as upload takes longer time. And map population is done before the upload.
-                    info!(
-                            current_version = current_version,
-                            "No struct count found for version. This shouldn't happen b/c we already added default count for this version."
-                        );
+                    debug!(
+                        current_version = current_version,
+                        "No struct count found for version. This shouldn't happen b/c we already added default count for this version."
+                    );
                 }
             }
             current_version += 1; // Move to the next version in sequence
         }
-        // info!(
-        //     "latest next_version_to_process: {} for table {}",
-        //     self.next_version_to_process, table_name
-        // );
+        debug!(
+            next_version_to_process = self.next_version_to_process,
+            table_name = table_name,
+            "Updated the next_version_to_process.",
+        );
     }
 }
 
@@ -167,11 +153,6 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
 
         self.update_next_version_to_process(result.end_version, &result.table_name);
 
-        // TODO: Add metrics for
-        // Map Size in gap detector
-        // parquet processed version per table
-
-        // we still have to process
         Ok(GapDetectorResult::ParquetFileGapDetectorResult(
             ParquetFileGapDetectorResult {
                 next_version_to_process: self.next_version_to_process as u64,
