@@ -109,7 +109,7 @@ impl Debug for ParquetTokenV2Processor {
 #[async_trait]
 impl ProcessorTrait for ParquetTokenV2Processor {
     fn name(&self) -> &'static str {
-        ProcessorName::TokenV2Processor.into()
+        ProcessorName::ParquetTokenV2Processor.into()
     }
 
     async fn process_transactions(
@@ -134,7 +134,6 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 
         let token_data_v2_parquet_data = ParquetDataGeneric {
             data: token_datas_v2,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.v2_token_datas_sender
@@ -144,7 +143,6 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 
         let token_ownerships_v2_parquet_data = ParquetDataGeneric {
             data: token_ownerships_v2,
-            transaction_version_to_struct_count,
         };
 
         self.v2_token_ownerships_sender
@@ -157,7 +155,9 @@ impl ProcessorTrait for ParquetTokenV2Processor {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
                 last_transaction_timestamp: last_transaction_timestamp.clone(),
-                txn_version_to_struct_count: AHashMap::new(),
+                txn_version_to_struct_count: Some(transaction_version_to_struct_count),
+                parquet_processed_structs: None,
+                table_name: "".to_string(),
             },
         ))
     }
