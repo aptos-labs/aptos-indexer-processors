@@ -140,7 +140,6 @@ impl ProcessorTrait for ParquetEventsProcessor {
 
         let event_parquet_data = ParquetDataGeneric {
             data: events,
-            transaction_version_to_struct_count: AHashMap::new(),
         };
 
         self.event_sender
@@ -153,7 +152,9 @@ impl ProcessorTrait for ParquetEventsProcessor {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
                 last_transaction_timestamp: last_transaction_timestamp.clone(),
-                txn_version_to_struct_count: AHashMap::new(),
+                txn_version_to_struct_count: Some(transaction_version_to_struct_count),
+                parquet_processed_structs: None,
+                table_name: "".to_string(),
             },
         ))
     }

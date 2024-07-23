@@ -14,9 +14,6 @@ pub trait ParquetProcessorTrait {
     fn set_google_credentials(&self, credentials: Option<String>) {
         if let Some(credentials) = credentials {
             std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
-        } else {
-            tracing::error!("Google application credentials not set. Please set GOOGLE_APPLICATION_CREDENTIALS environment variable.");
-            panic!();
         }
     }
 }
