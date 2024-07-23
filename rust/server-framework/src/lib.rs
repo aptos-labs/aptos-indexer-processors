@@ -9,6 +9,7 @@ use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 use std::convert::Infallible;
+#[allow(deprecated)]
 use std::{fs::File, io::Read, panic::PanicInfo, path::PathBuf, process};
 use tokio::runtime::Handle;
 use tracing::error;
@@ -110,6 +111,7 @@ pub struct CrashInfo {
 /// Tokio's default behavior is to catch panics and ignore them.  Invoking this function will
 /// ensure that all subsequent thread panics (even Tokio threads) will report the
 /// details/backtrace and then exit.
+#[allow(deprecated)]
 pub fn setup_panic_handler() {
     std::panic::set_hook(Box::new(move |pi: &PanicInfo<'_>| {
         handle_panic(pi);
@@ -117,6 +119,7 @@ pub fn setup_panic_handler() {
 }
 
 // Formats and logs panic information
+#[allow(deprecated)]
 fn handle_panic(panic_info: &PanicInfo<'_>) {
     // The Display formatter for a PanicInfo contains the message, payload and location.
     let details = format!("{}", panic_info);
