@@ -77,7 +77,8 @@ impl ParquetFileGapDetectorInner {
     /// It will also remove the version from the version counters if it is fully processed.
     /// what it means to be fully processed is that all the structs for that version processed, i.e. count = 0.
     /// Note that for tables other than transactions, it won't be always the latest txn version since we update this value with
-    /// the min max version that last file has been uploaded to GCS. so whenever we restart the processor, it may generate some duplicates, and we are okay with that.
+    /// Thus we will keep the latest version_to_process in the db with the min(max version of latest table files per processor)
+    /// that has been uploaded to GCS. so whenever we restart the processor, it may generate some duplicates rows, and we are okay with that.
     pub fn update_next_version_to_process(&mut self, end_version: i64, table_name: &str) {
         // this has to start checking with this value all the time, since this is the value that will be stored in the db as well.
         // maybe there could be an improvement to be more performant. but priortizing the data integrity as of now.
@@ -92,7 +93,7 @@ impl ParquetFileGapDetectorInner {
                         break;
                     }
                     if count == 0 {
-                        self.version_counters.remove(&current_version); // Remove the fully processed version
+                        self.version_counters.remove(&current_version);
                         self.seen_versions.insert(current_version); // seen_version holds the txns version that we have processed already
                         current_version += 1;
                         self.next_version_to_process += 1;
@@ -117,7 +118,7 @@ impl ParquetFileGapDetectorInner {
                     );
                 }
             }
-            current_version += 1; // Move to the next version in sequence
+            current_version += 1;
         }
         debug!(
             next_version_to_process = self.next_version_to_process,

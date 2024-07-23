@@ -293,13 +293,3 @@ pub static PARQUET_BUFFER_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-/// Size of parquet buffer after upload
-pub static PARQUET_BUFFER_SIZE_AFTER_UPLOAD: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_parquet_size_after_upload",
-        "Size of Parquet buffer after upload",
-        &["parquet_type"]
-    )
-    .unwrap()
-});

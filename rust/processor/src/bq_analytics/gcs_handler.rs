@@ -1,7 +1,4 @@
-use crate::{
-    bq_analytics::ParquetProcessorError,
-    utils::counters::{PARQUET_BUFFER_SIZE, PARQUET_BUFFER_SIZE_AFTER_UPLOAD},
-};
+use crate::{bq_analytics::ParquetProcessorError, utils::counters::PARQUET_BUFFER_SIZE};
 use anyhow::{Context, Result};
 use chrono::{Datelike, Timelike};
 use google_cloud_storage::{
@@ -18,7 +15,7 @@ const INITIAL_DELAY_MS: u64 = 500;
 const TIMEOUT_SECONDS: u64 = 300;
 pub async fn upload_parquet_to_gcs(
     client: &GCSClient,
-    mut buffer: Vec<u8>,
+    buffer: Vec<u8>,
     table_name: &str,
     bucket_name: &str,
     bucket_root: &Path,
@@ -81,10 +78,6 @@ pub async fn upload_parquet_to_gcs(
                     file_name = result.name,
                     "File uploaded successfully to GCS",
                 );
-                buffer.clear();
-                PARQUET_BUFFER_SIZE_AFTER_UPLOAD
-                    .with_label_values(&[table_name])
-                    .set(buffer.len() as i64);
                 return Ok(());
             },
             Ok(Err(e)) => {

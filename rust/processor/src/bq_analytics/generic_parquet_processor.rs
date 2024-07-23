@@ -140,7 +140,7 @@ where
             self.buffer.push(parquet_struct);
 
             if self.buffer_size_bytes >= self.max_buffer_size {
-                info!(
+                debug!(
                     table_name = ParquetType::TABLE_NAME,
                     buffer_size = self.buffer_size_bytes,
                     max_buffer_size = self.max_buffer_size,
@@ -175,8 +175,9 @@ where
     }
 
     async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
+        // This is to cover the case when interval duration has passed but buffer is empty
         if self.buffer.is_empty() {
-            info!("Buffer is empty, skipping upload.");
+            debug!("Buffer is empty, skipping upload.");
             return Ok(());
         }
         let start_version = self
@@ -212,12 +213,6 @@ where
             .into_inner()
             .context("Failed to get inner buffer")?;
 
-        debug!(
-            table_name = ParquetType::TABLE_NAME,
-            start_version = start_version,
-            end_version = end_version,
-            "Max buffer size reached, uploading to GCS."
-        );
         let bucket_root = PathBuf::from(&self.bucket_root);
 
         upload_parquet_to_gcs(
