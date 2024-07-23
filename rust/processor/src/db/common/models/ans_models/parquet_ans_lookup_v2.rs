@@ -34,6 +34,9 @@ pub struct AnsPrimaryNameV2 {
     pub token_name: Option<String>,
     pub is_deleted: bool,
     #[allocative(skip)]
+    pub expiration_timestamp: chrono::NaiveDateTime,
+    pub subdomain_expiration_policy: Option<i64>,
+    #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
@@ -62,6 +65,8 @@ pub struct CurrentAnsPrimaryNameV2 {
     pub token_name: Option<String>,
     pub is_deleted: bool,
     pub last_transaction_version: i64,
+    pub expiration_timestamp: chrono::NaiveDateTime,
+    pub subdomain_expiration_policy: Option<i64>,
 }
 
 impl Ord for CurrentAnsPrimaryNameV2 {
@@ -101,6 +106,8 @@ impl CurrentAnsPrimaryNameV2 {
                 subdomain: v1_primary_name.subdomain,
                 token_name: v1_primary_name.token_name,
                 is_deleted: v1_primary_name.is_deleted,
+                // expiration_timestamp: v1_primary_name.expiration_timestamp,
+                // subdomain_expiration_policy: v1_primary_name.subdomain_expiration_policy,
                 block_timestamp,
             },
         )
