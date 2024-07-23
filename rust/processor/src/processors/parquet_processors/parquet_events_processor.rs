@@ -138,9 +138,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
             events.extend(txn_events);
         }
 
-        let event_parquet_data = ParquetDataGeneric {
-            data: events,
-        };
+        let event_parquet_data = ParquetDataGeneric { data: events };
 
         self.event_sender
             .send(event_parquet_data)

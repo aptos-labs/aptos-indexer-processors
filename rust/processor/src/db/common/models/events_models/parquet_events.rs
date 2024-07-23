@@ -18,10 +18,10 @@ const EVENT_TYPE_MAX_LENGTH: usize = 300;
 
 #[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct Event {
+    pub txn_version: i64,
+    pub account_address: String,
     pub sequence_number: i64,
     pub creation_number: i64,
-    pub account_address: String,
-    pub txn_version: i64,
     pub block_height: i64,
     pub event_type: String,
     pub data: String,
@@ -29,6 +29,7 @@ pub struct Event {
     pub indexed_type: String,
     pub type_tag_bytes: i64,
     pub total_bytes: i64,
+    pub event_version: i8,
 }
 
 impl NamedTable for Event {
@@ -70,6 +71,7 @@ impl Event {
             indexed_type: truncate_str(event_type, EVENT_TYPE_MAX_LENGTH),
             type_tag_bytes: size_info.type_tag_bytes as i64,
             total_bytes: size_info.total_bytes as i64,
+            event_version: 1i8, // this is for future proofing. TODO: change when events v2 comes
         }
     }
 
