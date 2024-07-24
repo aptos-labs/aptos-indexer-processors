@@ -12,7 +12,7 @@ use crate::{
         parquet_processors::{UploadIntervalConfig, GOOGLE_APPLICATION_CREDENTIALS},
         ProcessorName, ProcessorTrait,
     },
-    utils::database::ArcDbPool,
+    utils::{database::ArcDbPool, util::parse_timestamp},
 };
 use ahash::AHashMap;
 use anyhow::Context;
@@ -101,6 +101,7 @@ impl ProcessorTrait for ParquetTransactionMetadataProcessor {
 
         for txn in &transactions {
             let txn_version = txn.version as i64;
+            let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
             let size_info = match txn.size_info.as_ref() {
                 Some(size_info) => size_info,
                 None => {
@@ -113,6 +114,7 @@ impl ProcessorTrait for ParquetTransactionMetadataProcessor {
                     write_set_size_info,
                     txn_version,
                     index as i64,
+                    block_timestamp,
                 ));
                 transaction_version_to_struct_count
                     .entry(txn_version)

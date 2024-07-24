@@ -19,6 +19,8 @@ pub struct WriteSetSize {
     pub key_bytes: i64,
     pub value_bytes: i64,
     pub total_bytes: i64,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 impl NamedTable for WriteSetSize {
@@ -33,7 +35,7 @@ impl HasVersion for WriteSetSize {
 
 impl GetTimeStamp for WriteSetSize {
     fn get_timestamp(&self) -> chrono::NaiveDateTime {
-        chrono::NaiveDateTime::default()
+        self.block_timestamp
     }
 }
 
@@ -42,6 +44,7 @@ impl WriteSetSize {
         info: &WriteOpSizeInfo,
         txn_version: i64,
         change_index: i64,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> Self {
         WriteSetSize {
             txn_version,
@@ -49,6 +52,7 @@ impl WriteSetSize {
             key_bytes: info.key_bytes as i64,
             value_bytes: info.value_bytes as i64,
             total_bytes: info.key_bytes as i64 + info.value_bytes as i64,
+            block_timestamp,
         }
     }
 }
