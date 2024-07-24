@@ -384,15 +384,16 @@ impl Transaction {
 
             if let Some(a) = block_metadata {
                 block_metadata_txns.push(a.clone());
-                // transaction_version_to_struct_count.entry(a.version).and_modify(|e| *e += 1);
             }
-            wscs.append(&mut wsc_list);
 
             if !wsc_list.is_empty() {
                 transaction_version_to_struct_count
-                    .entry(wsc_list[0].txn_version)
-                    .and_modify(|e| *e += wsc_list.len() as i64);
+                    .entry(txn.txn_version)
+                    .and_modify(|e| *e += wsc_list.len() as i64)
+                    .or_insert(wsc_list.len() as i64);
             }
+            wscs.append(&mut wsc_list);
+
             wsc_details.append(&mut wsc_detail_list);
         }
         (txns, block_metadata_txns, wscs, wsc_details)

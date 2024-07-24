@@ -6,7 +6,7 @@ use crate::{
     db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     gap_detectors::{
         create_gap_detector_status_tracker_loop, gap_detector::DefaultGapDetector,
-        parquet_gap_detector::ParquetFileGapDetector, GapDetector, ProcessingResult,
+        parquet_gap_detector::ParquetFileGapDetectorInner, GapDetector, ProcessingResult,
     },
     grpc_stream::TransactionsPBResponse,
     processors::{
@@ -51,7 +51,10 @@ use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use bitflags::bitflags;
 use kanal::AsyncSender;
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
@@ -327,14 +330,17 @@ impl Worker {
         );
 
         let gap_detector = if is_parquet_processor {
-            GapDetector::ParquetFileGapDetector(ParquetFileGapDetector::new(starting_version))
+            GapDetector::ParquetFileGapDetector(Arc::new(Mutex::new(
+                ParquetFileGapDetectorInner::new(starting_version),
+            )))
         } else {
             GapDetector::DefaultGapDetector(DefaultGapDetector::new(starting_version))
         };
+        let gap_detector_clone = gap_detector.clone();
 
         tokio::spawn(async move {
             create_gap_detector_status_tracker_loop(
-                gap_detector,
+                gap_detector_clone,
                 gap_detector_receiver,
                 processor,
                 gap_detection_batch_size,
@@ -360,7 +366,12 @@ impl Worker {
         let mut processor_tasks = vec![fetcher_task];
         for task_index in 0..concurrent_tasks {
             let join_handle: JoinHandle<()> = self
-                .launch_processor_task(task_index, receiver.clone(), gap_detector_sender.clone())
+                .launch_processor_task(
+                    task_index,
+                    receiver.clone(),
+                    gap_detector_sender.clone(),
+                    gap_detector.clone(),
+                )
                 .await;
             processor_tasks.push(join_handle);
         }
@@ -384,6 +395,7 @@ impl Worker {
         task_index: usize,
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: AsyncSender<ProcessingResult>,
+        mut gap_detector: GapDetector,
     ) -> JoinHandle<()> {
         let processor_name = self.processor_config.name();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
@@ -629,8 +641,36 @@ impl Worker {
                                     .await
                                     .expect("[Parser] Failed to send versions to gap detector");
                             },
-                            ProcessingResult::ParquetProcessingResult(_) => {
-                                debug!("parquet processing result doesn't need to be handled here");
+                            ProcessingResult::ParquetProcessingResult(processing_result) => {
+                                // we need to pupulate the map here so then we don't have to pass multiple times
+                                let parquet_gap_detector = match &mut gap_detector {
+                                    GapDetector::ParquetFileGapDetector(gap_detector) => {
+                                        gap_detector
+                                    },
+                                    _ => panic!("Invalid gap detector type"),
+                                };
+
+                                let num_processed = (last_txn_version - first_txn_version) + 1;
+
+                                NUM_TRANSACTIONS_PROCESSED_COUNT
+                                    .with_label_values(&[
+                                        processor_name,
+                                        step,
+                                        label,
+                                        &task_index_str,
+                                    ])
+                                    .inc_by(num_processed);
+
+                                if let Some(txn_version_to_struct_count) =
+                                    processing_result.txn_version_to_struct_count
+                                {
+                                    let mut detector = parquet_gap_detector.lock().unwrap();
+                                    detector.update_struct_map(
+                                        txn_version_to_struct_count,
+                                        processing_result.start_version,
+                                        processing_result.end_version,
+                                    );
+                                }
                             },
                         }
                     },

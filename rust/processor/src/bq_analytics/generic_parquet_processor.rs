@@ -3,7 +3,7 @@ use crate::{
     bq_analytics::gcs_handler::upload_parquet_to_gcs,
     gap_detectors::ProcessingResult,
     utils::{
-        counters::{PARQUET_HANDLER_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
+        counters::{PARQUET_HANDLER_CURRENT_BUFFER_SIZE, PARQUET_STRUCT_SIZE},
         util::naive_datetime_to_timestamp,
     },
 };
@@ -23,7 +23,6 @@ use tracing::{debug, error, info};
 #[derive(Debug, Default, Clone)]
 pub struct ParquetDataGeneric<ParquetType> {
     pub data: Vec<ParquetType>,
-    pub transaction_version_to_struct_count: AHashMap<i64, i64>,
 }
 
 pub trait NamedTable {
@@ -71,6 +70,7 @@ where
     pub upload_interval: Duration,
     pub max_buffer_size: usize,
     pub last_upload_time: Instant,
+    pub processor_name: String,
 }
 fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
     let props = WriterProperties::builder()
@@ -103,6 +103,7 @@ where
         schema: Arc<Type>,
         upload_interval: Duration,
         max_buffer_size: usize,
+        processor_name: String,
     ) -> Result<Self> {
         // had to append unique id to avoid concurrent write issues
         let writer = create_new_writer(schema.clone())?;
@@ -119,6 +120,7 @@ where
             upload_interval,
             max_buffer_size,
             last_upload_time: Instant::now(),
+            processor_name,
         })
     }
 
@@ -128,30 +130,21 @@ where
         changes: ParquetDataGeneric<ParquetType>,
     ) -> Result<()> {
         let parquet_structs = changes.data;
-        self.transaction_version_to_struct_count
-            .extend(changes.transaction_version_to_struct_count);
-
+        let processor_name = self.processor_name.clone();
         for parquet_struct in parquet_structs {
             let size_of_struct = allocative::size_of_unique(&parquet_struct);
             PARQUET_STRUCT_SIZE
-                .with_label_values(&[ParquetType::TABLE_NAME])
+                .with_label_values(&[&processor_name, ParquetType::TABLE_NAME])
                 .set(size_of_struct as i64);
             self.buffer_size_bytes += size_of_struct;
             self.buffer.push(parquet_struct);
 
             if self.buffer_size_bytes >= self.max_buffer_size {
-                info!("Max buffer size reached, uploading to GCS.");
-                if let Err(e) = self.upload_buffer(gcs_client).await {
-                    error!("Failed to upload buffer: {}", e);
-                    return Err(e);
-                }
-                self.last_upload_time = Instant::now();
-            }
-
-            if self.last_upload_time.elapsed() >= self.upload_interval {
-                info!(
-                    "Time has elapsed more than {} since last upload.",
-                    self.upload_interval.as_secs()
+                debug!(
+                    table_name = ParquetType::TABLE_NAME,
+                    buffer_size = self.buffer_size_bytes,
+                    max_buffer_size = self.max_buffer_size,
+                    "Max buffer size reached, uploading to GCS."
                 );
                 if let Err(e) = self.upload_buffer(gcs_client).await {
                     error!("Failed to upload buffer: {}", e);
@@ -161,14 +154,30 @@ where
             }
         }
 
-        PARQUET_HANDLER_BUFFER_SIZE
-            .with_label_values(&[ParquetType::TABLE_NAME])
-            .set(self.buffer.len() as i64);
+        if self.last_upload_time.elapsed() >= self.upload_interval {
+            info!(
+                "Time has elapsed more than {} since last upload for {}",
+                self.upload_interval.as_secs(),
+                ParquetType::TABLE_NAME
+            );
+            if let Err(e) = self.upload_buffer(gcs_client).await {
+                error!("Failed to upload buffer: {}", e);
+                return Err(e);
+            }
+            self.last_upload_time = Instant::now();
+        }
+
+        PARQUET_HANDLER_CURRENT_BUFFER_SIZE
+            .with_label_values(&[&self.processor_name, ParquetType::TABLE_NAME])
+            .set(self.buffer_size_bytes as i64);
+
         Ok(())
     }
 
     async fn upload_buffer(&mut self, gcs_client: &GCSClient) -> Result<()> {
+        // This is to cover the case when interval duration has passed but buffer is empty
         if self.buffer.is_empty() {
+            debug!("Buffer is empty, skipping upload.");
             return Ok(());
         }
         let start_version = self
@@ -183,9 +192,7 @@ where
         let end_version = last.version();
         let last_transaction_timestamp = naive_datetime_to_timestamp(last.get_timestamp());
 
-        let txn_version_to_struct_count =
-            process_struct_count_map(&self.buffer, &mut self.transaction_version_to_struct_count);
-
+        let parquet_processed_transactions = build_parquet_processed_transactions(&self.buffer);
         let struct_buffer = std::mem::take(&mut self.buffer);
 
         let mut row_group_writer = self
@@ -206,12 +213,6 @@ where
             .into_inner()
             .context("Failed to get inner buffer")?;
 
-        debug!(
-            table_name = ParquetType::TABLE_NAME,
-            start_version = start_version,
-            end_version = end_version,
-            "Max buffer size reached, uploading to GCS."
-        );
         let bucket_root = PathBuf::from(&self.bucket_root);
 
         upload_parquet_to_gcs(
@@ -220,6 +221,7 @@ where
             ParquetType::TABLE_NAME,
             &self.bucket_name,
             &bucket_root,
+            self.processor_name.clone(),
         )
         .await?;
 
@@ -229,7 +231,9 @@ where
             start_version,
             end_version,
             last_transaction_timestamp: Some(last_transaction_timestamp),
-            txn_version_to_struct_count,
+            txn_version_to_struct_count: None,
+            parquet_processed_structs: Some(parquet_processed_transactions),
+            table_name: ParquetType::TABLE_NAME.to_string(),
         };
 
         self.gap_detector_sender
@@ -243,19 +247,18 @@ where
     }
 }
 
-fn process_struct_count_map<ParquetType: NamedTable + HasVersion>(
+fn build_parquet_processed_transactions<ParquetType: NamedTable + HasVersion>(
     buffer: &[ParquetType],
-    txn_version_to_struct_count: &mut AHashMap<i64, i64>,
 ) -> AHashMap<i64, i64> {
     let mut txn_version_to_struct_count_for_gap_detector = AHashMap::new();
 
     for item in buffer.iter() {
         let version = item.version();
 
-        if let Some(count) = txn_version_to_struct_count.get(&(version)) {
-            txn_version_to_struct_count_for_gap_detector.insert(version, *count);
-            txn_version_to_struct_count.remove(&(version));
-        }
+        txn_version_to_struct_count_for_gap_detector
+            .entry(version)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
     }
     txn_version_to_struct_count_for_gap_detector
 }

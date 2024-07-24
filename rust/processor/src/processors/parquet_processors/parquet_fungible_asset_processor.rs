@@ -120,10 +120,7 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
         let (fungible_asset_balances, coin_supply) =
             parse_v2_coin(&transactions, &mut transaction_version_to_struct_count).await;
 
-        let parquet_coin_supply = ParquetDataGeneric {
-            data: coin_supply,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
-        };
+        let parquet_coin_supply = ParquetDataGeneric { data: coin_supply };
 
         self.coin_supply_sender
             .send(parquet_coin_supply)
@@ -132,7 +129,6 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
 
         let parquet_fungible_asset_balances = ParquetDataGeneric {
             data: fungible_asset_balances,
-            transaction_version_to_struct_count: transaction_version_to_struct_count.clone(),
         };
 
         self.fungible_asset_balances_sender
@@ -145,7 +141,9 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
                 last_transaction_timestamp: last_transaction_timestamp.clone(),
-                txn_version_to_struct_count: AHashMap::new(),
+                txn_version_to_struct_count: Some(transaction_version_to_struct_count),
+                parquet_processed_structs: None,
+                table_name: "".to_string(),
             },
         ))
     }

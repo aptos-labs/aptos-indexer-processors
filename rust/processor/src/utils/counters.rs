@@ -268,17 +268,28 @@ pub static PROCESSOR_UNKNOWN_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Parquet struct size
 pub static PARQUET_STRUCT_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!("indexer_parquet_struct_size", "Parquet struct size", &[
+        "processor_name",
         "parquet_type"
     ])
     .unwrap()
 });
 
 /// Parquet handler buffer size
-pub static PARQUET_HANDLER_BUFFER_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static PARQUET_HANDLER_CURRENT_BUFFER_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "indexer_parquet_handler_buffer_size",
         "Parquet handler buffer size",
-        &["parquet_type"] // TODO: add something like task_index
+        &["processor_name", "parquet_type"]
+    )
+    .unwrap()
+});
+
+/// Size of the parquet file
+pub static PARQUET_BUFFER_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "indexer_parquet_size",
+        "Size of Parquet buffer to upload",
+        &["processor_name", "parquet_type"]
     )
     .unwrap()
 });

@@ -2,7 +2,7 @@ use crate::{
     bq_analytics::ParquetProcessingResult,
     gap_detectors::{
         gap_detector::{DefaultGapDetector, DefaultGapDetectorResult},
-        parquet_gap_detector::{ParquetFileGapDetector, ParquetFileGapDetectorResult},
+        parquet_gap_detector::{ParquetFileGapDetectorInner, ParquetFileGapDetectorResult},
     },
     processors::{DefaultProcessingResult, Processor, ProcessorTrait},
     utils::counters::{PARQUET_PROCESSOR_DATA_GAP_COUNT, PROCESSOR_DATA_GAP_COUNT},
@@ -11,7 +11,8 @@ use crate::{
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
 use kanal::AsyncReceiver;
-use tracing::{error, info};
+use std::sync::{Arc, Mutex};
+
 pub mod gap_detector;
 pub mod parquet_gap_detector;
 
@@ -21,9 +22,10 @@ pub const DEFAULT_GAP_DETECTION_BATCH_SIZE: u64 = 500;
 const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
 #[enum_dispatch(GapDetectorTrait)]
+#[derive(Clone)]
 pub enum GapDetector {
     DefaultGapDetector,
-    ParquetFileGapDetector,
+    ParquetFileGapDetector(Arc<Mutex<ParquetFileGapDetectorInner>>), // made this singleton to avoid cloning structs to count map for every parquet handler
 }
 
 pub enum GapDetectorResult {
@@ -48,6 +50,7 @@ pub trait GapDetectorTrait: Send {
     fn process_versions(&mut self, result: ProcessingResult) -> Result<GapDetectorResult>;
 }
 
+#[derive(Debug, Clone)]
 pub enum ProcessingResult {
     DefaultProcessingResult(DefaultProcessingResult),
     ParquetProcessingResult(ParquetProcessingResult),
@@ -60,7 +63,7 @@ pub async fn create_gap_detector_status_tracker_loop(
     gap_detection_batch_size: u64,
 ) {
     let processor_name = processor.name();
-    info!(
+    tracing::info!(
         processor_name = processor_name,
         service_type = PROCESSOR_SERVICE_TYPE,
         "[Parser] Starting gap detector task",
@@ -111,7 +114,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                         }
                     },
                     Err(e) => {
-                        error!(
+                        tracing::error!(
                         processor_name,
                         service_type = PROCESSOR_SERVICE_TYPE,
                         error = ?e,
@@ -122,7 +125,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                 }
             },
             Ok(ProcessingResult::ParquetProcessingResult(result)) => {
-                info!(
+                tracing::info!(
                     processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     "[ParquetGapDetector] received parquet gap detector task",
@@ -138,22 +141,25 @@ pub async fn create_gap_detector_status_tracker_loop(
                                     .set(res.num_gaps as i64);
                                 // we need a new gap detection batch size
                                 if res.num_gaps >= gap_detection_batch_size {
-                                    tracing::debug!(
-                                    processor_name,
+                                    tracing::warn!(
+                                        processor_name,
                                         gap_start_version = res.next_version_to_process,
                                         num_gaps = res.num_gaps,
-                                        "[Parser] Processed {gap_detection_batch_size} batches with a gap",
-                                        );
+                                        "[Parser] Processed batches with a gap",
+                                    );
                                     // We don't panic as everything downstream will panic if it doesn't work/receive
                                 }
 
                                 if last_update_time.elapsed().as_secs()
                                     >= UPDATE_PROCESSOR_STATUS_SECS
                                 {
-                                    tracing::info!("Updating last processed version");
+                                    tracing::info!(
+                                        last_processed_version = res.next_version_to_process,
+                                        "Updating last processed version"
+                                    );
                                     processor
                                         .update_last_processed_version(
-                                            res.start_version,
+                                            res.next_version_to_process,
                                             res.last_transaction_timestamp,
                                         )
                                         .await
@@ -169,7 +175,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                         }
                     },
                     Err(e) => {
-                        error!(
+                        tracing::error!(
                             processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
                             error = ?e,
@@ -180,7 +186,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                 }
             },
             Err(e) => {
-                info!(
+                tracing::info!(
                     processor_name,
                     service_type = PROCESSOR_SERVICE_TYPE,
                     error = ?e,

@@ -30,7 +30,10 @@ pub struct ParquetProcessingResult {
     pub start_version: i64,
     pub end_version: i64,
     pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
-    pub txn_version_to_struct_count: AHashMap<i64, i64>,
+    pub txn_version_to_struct_count: Option<AHashMap<i64, i64>>,
+    // This is used to store the processed structs in the parquet file
+    pub parquet_processed_structs: Option<AHashMap<i64, i64>>,
+    pub table_name: String,
 }
 
 #[derive(Debug)]
@@ -115,13 +118,14 @@ where
         "[Parquet Handler] Starting parquet handler loop",
     );
 
-    let mut parquet_manager = GenericParquetHandler::new(
+    let mut parquet_handler = GenericParquetHandler::new(
         bucket_name.clone(),
         bucket_root.clone(),
         new_gap_detector_sender.clone(),
         ParquetType::schema(),
         upload_interval,
         max_buffer_size,
+        processor_name.clone(),
     )
     .expect("Failed to create parquet manager");
 
@@ -135,7 +139,7 @@ where
         loop {
             match parquet_receiver.recv().await {
                 Ok(txn_pb_res) => {
-                    let result = parquet_manager.handle(&gcs_client, txn_pb_res).await;
+                    let result = parquet_handler.handle(&gcs_client, txn_pb_res).await;
 
                     match result {
                         Ok(_) => {
