@@ -30,6 +30,8 @@ pub struct Event {
     pub type_tag_bytes: i64,
     pub total_bytes: i64,
     pub event_version: i8,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 impl NamedTable for Event {
@@ -44,7 +46,7 @@ impl HasVersion for Event {
 
 impl GetTimeStamp for Event {
     fn get_timestamp(&self) -> chrono::NaiveDateTime {
-        chrono::NaiveDateTime::default()
+        self.block_timestamp
     }
 }
 
@@ -55,6 +57,7 @@ impl Event {
         block_height: i64,
         event_index: i64,
         size_info: &EventSizeInfo,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> Self {
         let event_type: &str = event.type_str.as_ref();
         Event {
@@ -72,6 +75,7 @@ impl Event {
             type_tag_bytes: size_info.type_tag_bytes as i64,
             total_bytes: size_info.total_bytes as i64,
             event_version: 1i8, // this is for future proofing. TODO: change when events v2 comes
+            block_timestamp,
         }
     }
 
@@ -80,13 +84,21 @@ impl Event {
         txn_version: i64,
         block_height: i64,
         event_size_info: &[EventSizeInfo],
+        block_timestamp: chrono::NaiveDateTime,
     ) -> Vec<Self> {
         events
             .iter()
             .zip_eq(event_size_info.iter())
             .enumerate()
             .map(|(index, (event, size_info))| {
-                Self::from_event(event, txn_version, block_height, index as i64, size_info)
+                Self::from_event(
+                    event,
+                    txn_version,
+                    block_height,
+                    index as i64,
+                    size_info,
+                    block_timestamp,
+                )
             })
             .collect::<Vec<ParquetEventModel>>()
     }

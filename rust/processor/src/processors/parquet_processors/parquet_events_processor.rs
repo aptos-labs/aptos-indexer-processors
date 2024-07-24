@@ -9,7 +9,7 @@ use crate::{
     db::common::models::events_models::parquet_events::{Event, ParquetEventModel},
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
-    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool},
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool, util::parse_timestamp},
 };
 use ahash::AHashMap;
 use anyhow::Context;
@@ -96,6 +96,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
         for txn in &transactions {
             let txn_version = txn.version as i64;
             let block_height = txn.block_height as i64;
+            let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
             let size_info = match txn.size_info.as_ref() {
                 Some(size_info) => size_info,
                 None => {
@@ -131,6 +132,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
                 txn_version,
                 block_height,
                 size_info.event_size_info.as_slice(),
+                block_timestamp,
             );
             transaction_version_to_struct_count
                 .entry(txn_version)
@@ -144,7 +146,10 @@ impl ProcessorTrait for ParquetEventsProcessor {
             .send(event_parquet_data)
             .await
             .context("Failed to send to parquet manager")?;
-
+        tracing::info!(
+            "printing last transaction timestamp: {:?}",
+            last_transaction_timestamp
+        );
         Ok(ProcessingResult::ParquetProcessingResult(
             ParquetProcessingResult {
                 start_version: start_version as i64,
