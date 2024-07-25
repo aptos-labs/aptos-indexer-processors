@@ -8,10 +8,7 @@ use crate::{
     },
     db::common::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
     gap_detectors::ProcessingResult,
-    processors::{
-        parquet_processors::{UploadIntervalConfig, GOOGLE_APPLICATION_CREDENTIALS},
-        ProcessorName, ProcessorTrait,
-    },
+    processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{database::ArcDbPool, util::parse_timestamp},
 };
 use ahash::AHashMap;
@@ -34,7 +31,7 @@ pub struct ParquetTransactionMetadataProcessorConfig {
     pub parquet_upload_interval: u64,
 }
 
-impl UploadIntervalConfig for ParquetTransactionMetadataProcessorConfig {
+impl ParquetProcessorTrait for ParquetTransactionMetadataProcessorConfig {
     fn parquet_upload_interval_in_secs(&self) -> Duration {
         Duration::from_secs(self.parquet_upload_interval)
     }
@@ -51,9 +48,7 @@ impl ParquetTransactionMetadataProcessor {
         config: ParquetTransactionMetadataProcessorConfig,
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
-        if let Some(credentials) = config.google_application_credentials.clone() {
-            std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
-        }
+        config.set_google_credentials(config.google_application_credentials.clone());
 
         let write_set_size_info_sender = create_parquet_handler_loop::<WriteSetSize>(
             new_gap_detector_sender.clone(),

@@ -21,9 +21,9 @@ use crate::{
         parquet_processors::{
             parquet_ans_processor::ParquetAnsProcessor,
             parquet_default_processor::ParquetDefaultProcessor,
+            parquet_events_processor::ParquetEventsProcessor,
             parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
             parquet_transaction_metadata_processor::ParquetTransactionMetadataProcessor,
-            parquet_events_processor::ParquetEventsProcessor,
         },
         stake_processor::StakeProcessor,
         token_v2_processor::TokenV2Processor,
