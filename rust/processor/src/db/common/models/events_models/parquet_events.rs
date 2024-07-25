@@ -9,7 +9,6 @@ use crate::{
 };
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{Event as EventPB, EventSizeInfo};
-use itertools::Itertools;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
@@ -88,9 +87,14 @@ impl Event {
     ) -> Vec<Self> {
         events
             .iter()
-            .zip_eq(event_size_info.iter())
             .enumerate()
-            .map(|(index, (event, size_info))| {
+            .map(|(index, event)| {
+                let size_info = event_size_info
+                    .get(index)
+                    .unwrap_or_else(|| &EventSizeInfo {
+                        type_tag_bytes: 0,
+                        total_bytes: 0,
+                    });
                 Self::from_event(
                     event,
                     txn_version,
