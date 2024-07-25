@@ -6,14 +6,14 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
+    db::common::models::events_models::parquet_events::{Event, ParquetEventModel},
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
-    utils::{database::ArcDbPool, util::parse_timestamp},
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool, util::parse_timestamp},
 };
 use ahash::AHashMap;
 use anyhow::Context;
-use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use async_trait::async_trait;
 use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
@@ -21,8 +21,7 @@ use std::{fmt::Debug, time::Duration};
 use tracing::warn;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct ParquetTransactionMetadataProcessorConfig {
+pub struct ParquetEventsProcessorConfig {
     pub google_application_credentials: Option<String>,
     pub bucket_name: String,
     pub bucket_root: String,
@@ -31,55 +30,56 @@ pub struct ParquetTransactionMetadataProcessorConfig {
     pub parquet_upload_interval: u64,
 }
 
-impl ParquetProcessorTrait for ParquetTransactionMetadataProcessorConfig {
+impl ParquetProcessorTrait for ParquetEventsProcessorConfig {
     fn parquet_upload_interval_in_secs(&self) -> Duration {
         Duration::from_secs(self.parquet_upload_interval)
     }
 }
 
-pub struct ParquetTransactionMetadataProcessor {
+pub struct ParquetEventsProcessor {
     connection_pool: ArcDbPool,
-    write_set_size_info_sender: AsyncSender<ParquetDataGeneric<WriteSetSize>>,
+    event_sender: AsyncSender<ParquetDataGeneric<Event>>,
 }
 
-impl ParquetTransactionMetadataProcessor {
+impl ParquetEventsProcessor {
     pub fn new(
         connection_pool: ArcDbPool,
-        config: ParquetTransactionMetadataProcessorConfig,
+        config: ParquetEventsProcessorConfig,
         new_gap_detector_sender: AsyncSender<ProcessingResult>,
     ) -> Self {
         config.set_google_credentials(config.google_application_credentials.clone());
 
-        let write_set_size_info_sender = create_parquet_handler_loop::<WriteSetSize>(
+        let event_sender = create_parquet_handler_loop::<Event>(
             new_gap_detector_sender.clone(),
-            ProcessorName::ParquetTransactionMetadataProcessor.into(),
+            ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
             config.bucket_root.clone(),
             config.parquet_handler_response_channel_size,
             config.max_buffer_size,
             config.parquet_upload_interval_in_secs(),
         );
+
         Self {
             connection_pool,
-            write_set_size_info_sender,
+            event_sender,
         }
     }
 }
 
-impl Debug for ParquetTransactionMetadataProcessor {
+impl Debug for ParquetEventsProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ParquetTransactionMetadataProcessor {{ capacity of write set size info channel: {:?} }}",
-            self.write_set_size_info_sender.capacity(),
+            "ParquetProcessor {{ capacity of event channel: {:?}}}",
+            &self.event_sender.capacity(),
         )
     }
 }
 
 #[async_trait]
-impl ProcessorTrait for ParquetTransactionMetadataProcessor {
+impl ProcessorTrait for ParquetEventsProcessor {
     fn name(&self) -> &'static str {
-        ProcessorName::ParquetTransactionMetadataProcessor.into()
+        ProcessorName::ParquetEventsProcessor.into()
     }
 
     async fn process_transactions(
@@ -92,10 +92,10 @@ impl ProcessorTrait for ParquetTransactionMetadataProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
-        let mut write_set_sizes = vec![];
-
+        let mut events = vec![];
         for txn in &transactions {
             let txn_version = txn.version as i64;
+            let block_height = txn.block_height as i64;
             let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
             let size_info = match txn.size_info.as_ref() {
                 Some(size_info) => size_info,
@@ -104,28 +104,48 @@ impl ProcessorTrait for ParquetTransactionMetadataProcessor {
                     continue;
                 },
             };
-            for (index, write_set_size_info) in size_info.write_op_size_info.iter().enumerate() {
-                write_set_sizes.push(WriteSetSize::from_transaction_info(
-                    write_set_size_info,
-                    txn_version,
-                    index as i64,
-                    block_timestamp,
-                ));
-                transaction_version_to_struct_count
-                    .entry(txn_version)
-                    .and_modify(|e| *e += 1)
-                    .or_insert(1);
-            }
+            let txn_data = match txn.txn_data.as_ref() {
+                Some(data) => data,
+                None => {
+                    tracing::warn!(
+                        transaction_version = txn_version,
+                        "Transaction data doesn't exist"
+                    );
+                    PROCESSOR_UNKNOWN_TYPE_COUNT
+                        .with_label_values(&["ParquetEventsProcessor"])
+                        .inc();
+
+                    continue;
+                },
+            };
+            let default = vec![];
+            let raw_events = match txn_data {
+                TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
+                TxnData::Genesis(tx_inner) => &tx_inner.events,
+                TxnData::User(tx_inner) => &tx_inner.events,
+                TxnData::Validator(txn) => &txn.events,
+                _ => &default,
+            };
+
+            let txn_events = ParquetEventModel::from_events(
+                raw_events,
+                txn_version,
+                block_height,
+                size_info.event_size_info.as_slice(),
+                block_timestamp,
+            );
+            transaction_version_to_struct_count
+                .entry(txn_version)
+                .and_modify(|e| *e += txn_events.len() as i64);
+            events.extend(txn_events);
         }
 
-        let write_set_size_info_parquet_data = ParquetDataGeneric {
-            data: write_set_sizes,
-        };
+        let event_parquet_data = ParquetDataGeneric { data: events };
 
-        self.write_set_size_info_sender
-            .send(write_set_size_info_parquet_data)
+        self.event_sender
+            .send(event_parquet_data)
             .await
-            .context("Error sending write set size info to parquet handler")?;
+            .context("Failed to send to parquet manager")?;
 
         Ok(ProcessingResult::ParquetProcessingResult(
             ParquetProcessingResult {
