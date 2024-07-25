@@ -218,8 +218,7 @@ impl ProcessorConfig {
                 | ProcessorConfig::ParquetFungibleAssetProcessor(_)
                 | ProcessorConfig::ParquetTransactionMetadataProcessor(_)
                 | ProcessorConfig::ParquetAnsProcessor(_)
-                            | ProcessorConfig::ParquetEventsProcessor(_)
-
+                | ProcessorConfig::ParquetEventsProcessor(_)
         )
     }
 }
