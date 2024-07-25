@@ -3,8 +3,8 @@
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    register_gauge_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    GaugeVec, IntCounter, IntCounterVec, IntGaugeVec,
+    register_gauge_vec, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec, GaugeVec, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec,
 };
 
 pub enum ProcessorStep {
@@ -188,8 +188,8 @@ pub static FETCHER_THREAD_CHANNEL_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Overall processing time for a single batch of transactions (per task)
-pub static SINGLE_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
+pub static SINGLE_BATCH_PROCESSING_TIME_IN_SECS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "indexer_processor_single_batch_processing_time_in_secs",
         "Time taken to process a single batch of transactions",
         &["processor_name", "task_index"]
@@ -198,8 +198,8 @@ pub static SINGLE_BATCH_PROCESSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
 });
 
 /// Parsing time for a single batch of transactions
-pub static SINGLE_BATCH_PARSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
+pub static SINGLE_BATCH_PARSING_TIME_IN_SECS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "indexer_processor_single_batch_parsing_time_in_secs",
         "Time taken to parse a single batch of transactions",
         &["processor_name", "task_index"]
@@ -208,8 +208,8 @@ pub static SINGLE_BATCH_PARSING_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
 });
 
 /// DB insertion time for a single batch of transactions
-pub static SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
+pub static SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "indexer_processor_single_batch_db_insertion_time_in_secs",
         "Time taken to insert to DB for a single batch of transactions",
         &["processor_name", "task_index"]
@@ -246,8 +246,8 @@ pub static PARQUET_PROCESSOR_DATA_GAP_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// GRPC latency.
-pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
-    register_gauge_vec!(
+pub static GRPC_LATENCY_BY_PROCESSOR_IN_SECS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
         "indexer_processor_grpc_latency_in_secs",
         "GRPC latency observed by processor",
         &["processor_name", "task_index"]

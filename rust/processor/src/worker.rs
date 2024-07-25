@@ -60,7 +60,6 @@ use std::{
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
-
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
@@ -588,7 +587,7 @@ impl Worker {
                                 // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
                                 GRPC_LATENCY_BY_PROCESSOR_IN_SECS
                                     .with_label_values(&[processor_name, &task_index_str])
-                                    .set(time_diff_since_pb_timestamp_in_secs(
+                                    .observe(time_diff_since_pb_timestamp_in_secs(
                                         end_txn_timestamp.as_ref().unwrap(),
                                     ));
                                 LATEST_PROCESSED_VERSION
@@ -628,13 +627,13 @@ impl Worker {
 
                                 SINGLE_BATCH_PROCESSING_TIME_IN_SECS
                                     .with_label_values(&[processor_name, &task_index_str])
-                                    .set(processing_time);
+                                    .observe(processing_time);
                                 SINGLE_BATCH_PARSING_TIME_IN_SECS
                                     .with_label_values(&[processor_name, &task_index_str])
-                                    .set(processing_result.processing_duration_in_secs);
+                                    .observe(processing_result.processing_duration_in_secs);
                                 SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
                                     .with_label_values(&[processor_name, &task_index_str])
-                                    .set(processing_result.db_insertion_duration_in_secs);
+                                    .observe(processing_result.db_insertion_duration_in_secs);
 
                                 gap_detector_sender
                                     .send(ProcessingResult::DefaultProcessingResult(
