@@ -19,7 +19,6 @@ use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, time::Duration};
 use tracing::warn;
-use crate::processors::parquet_processors::ParquetProcessorTrait;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

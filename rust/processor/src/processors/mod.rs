@@ -42,10 +42,10 @@ use crate::{
         parquet_fungible_asset_processor::{
             ParquetFungibleAssetProcessor, ParquetFungibleAssetProcessorConfig,
         },
+        parquet_token_v2_processor::{ParquetTokenV2Processor, ParquetTokenV2ProcessorConfig},
         parquet_transaction_metadata_processor::{
             ParquetTransactionMetadataProcessor, ParquetTransactionMetadataProcessorConfig,
         },
-        parquet_token_v2_processor::{ParquetTokenV2Processor, ParquetTokenV2ProcessorConfig},
     },
     schema::processor_status,
     utils::{
