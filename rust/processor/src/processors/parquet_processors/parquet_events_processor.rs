@@ -146,10 +146,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
             .send(event_parquet_data)
             .await
             .context("Failed to send to parquet manager")?;
-        tracing::info!(
-            "printing last transaction timestamp: {:?}",
-            last_transaction_timestamp
-        );
+
         Ok(ProcessingResult::ParquetProcessingResult(
             ParquetProcessingResult {
                 start_version: start_version as i64,

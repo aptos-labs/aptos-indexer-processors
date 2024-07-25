@@ -9,6 +9,7 @@ use crate::{
 };
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{Event as EventPB, EventSizeInfo};
+use itertools::Itertools;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
@@ -85,14 +86,22 @@ impl Event {
         event_size_info: &[EventSizeInfo],
         block_timestamp: chrono::NaiveDateTime,
     ) -> Vec<Self> {
+        // Ensure that lengths match, otherwise log and panic to investigate
+        if events.len() != event_size_info.len() {
+            tracing::error!(
+                events_len = events.len(),
+                event_size_info_len = event_size_info.len(),
+                txn_version,
+                "Length mismatch: events size does not match event_size_info size.",
+            );
+            panic!("Length mismatch: events len does not match event_size_info len");
+        }
+
         events
             .iter()
+            .zip_eq(event_size_info.iter())
             .enumerate()
-            .map(|(index, event)| {
-                let size_info = event_size_info.get(index).unwrap_or(&EventSizeInfo {
-                    type_tag_bytes: 0,
-                    total_bytes: 0,
-                });
+            .map(|(index, (event, size_info))| {
                 Self::from_event(
                     event,
                     txn_version,
