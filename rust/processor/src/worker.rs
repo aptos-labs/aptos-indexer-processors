@@ -32,7 +32,7 @@ use crate::{
     transaction_filter::TransactionFilter,
     utils::{
         counters::{
-            ProcessorStep, BATCH_SIZE, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
+            ProcessorStep, GRPC_LATENCY_BY_PROCESSOR_IN_SECS, LATEST_PROCESSED_VERSION,
             NUM_TRANSACTIONS_PROCESSED_COUNT, PB_CHANNEL_FETCH_WAIT_TIME_SECS,
             PROCESSED_BYTES_COUNT, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
@@ -602,12 +602,6 @@ impl Worker {
                                         &task_index_str,
                                     ])
                                     .inc_by(size_in_bytes as u64);
-                                BATCH_SIZE
-                                    .with_label_values(&[processor_name, &task_index_str])
-                                    .observe(
-                                        (batch_last_txn_version - batch_first_txn_version) as f64,
-                                    );
-
                                 NUM_TRANSACTIONS_PROCESSED_COUNT
                                     .with_label_values(&[
                                         processor_name,

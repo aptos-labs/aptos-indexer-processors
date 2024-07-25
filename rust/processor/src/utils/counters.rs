@@ -147,15 +147,6 @@ pub static PROCESSED_BYTES_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "indexer_processor_batch_size",
-        "Histogram of the received batch size",
-        &["processor_name", "step", "message", "task_index"]
-    )
-    .unwrap()
-});
-
 /// The amount of time that a task spent waiting for a protobuf bundle of transactions
 pub static PB_CHANNEL_FETCH_WAIT_TIME_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
