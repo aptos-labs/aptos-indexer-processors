@@ -89,12 +89,10 @@ impl Event {
             .iter()
             .enumerate()
             .map(|(index, event)| {
-                let size_info = event_size_info
-                    .get(index)
-                    .unwrap_or_else(|| &EventSizeInfo {
-                        type_tag_bytes: 0,
-                        total_bytes: 0,
-                    });
+                let size_info = event_size_info.get(index).unwrap_or(&EventSizeInfo {
+                    type_tag_bytes: 0,
+                    total_bytes: 0,
+                });
                 Self::from_event(
                     event,
                     txn_version,
