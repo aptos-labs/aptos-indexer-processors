@@ -215,8 +215,7 @@ impl ProcessorConfig {
             ProcessorConfig::ParquetDefaultProcessor(_)
                 | ProcessorConfig::ParquetFungibleAssetProcessor(_)
                 | ProcessorConfig::ParquetTransactionMetadataProcessor(_)
-                            | ProcessorConfig::ParquetAnsProcessor(_)
-
+                | ProcessorConfig::ParquetAnsProcessor(_)
         )
     }
 }

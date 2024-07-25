@@ -82,11 +82,10 @@ impl ParquetAnsProcessor {
 
 impl Debug for ParquetAnsProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.connection_pool.state();
         write!(
             f,
-            "AnsProcessor {{ connections: {:?}  idle_connections: {:?} }}",
-            state.connections, state.idle_connections
+            "ParquetAnsProcessor {{ capacity of trnasactions channel: {:?}}}",
+            &self.ans_primary_name_v2_sender.capacity()
         )
     }
 }
@@ -94,7 +93,7 @@ impl Debug for ParquetAnsProcessor {
 #[async_trait]
 impl ProcessorTrait for ParquetAnsProcessor {
     fn name(&self) -> &'static str {
-        ProcessorName::AnsProcessor.into()
+        ProcessorName::ParquetAnsProcessor.into()
     }
 
     async fn process_transactions(
