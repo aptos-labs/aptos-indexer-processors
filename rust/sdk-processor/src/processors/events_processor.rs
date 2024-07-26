@@ -1,7 +1,12 @@
-use crate::steps::events_processor::{EventsExtractor, EventsStorer};
 use crate::{
-    config::indexer_processor_config::IndexerProcessorConfig,
-    steps::common::latest_processed_version_tracker::LatestVersionProcessedTracker,
+    config::{
+        db_config::{DbConfig, PostgresDbConfig},
+        indexer_processor_config::IndexerProcessorConfig,
+    },
+    steps::{
+        common::latest_processed_version_tracker::LatestVersionProcessedTracker,
+        events_processor::{EventsExtractor, EventsStorer},
+    },
     utils::{
         database::{new_db_pool, run_migrations, ArcDbPool},
         starting_version::get_starting_version,
@@ -19,28 +24,40 @@ use std::time::Duration;
 
 pub struct EventsProcessor {
     pub config: IndexerProcessorConfig,
+    pub postgres_config: PostgresDbConfig,
     pub db_pool: ArcDbPool,
 }
 
 impl EventsProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> Result<Self> {
-        let conn_pool = new_db_pool(
-            &config.db_config.postgres_connection_string,
-            Some(config.db_config.db_pool_size),
-        )
-        .await
-        .expect("Failed to create connection pool");
+        let db_config = config.db_config.clone();
+        match db_config {
+            DbConfig::PostgresDbConfig(postgres_db_config) => {
+                let conn_pool = new_db_pool(
+                    &postgres_db_config.connection_string,
+                    Some(postgres_db_config.db_pool_size),
+                )
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to create connection pool for PostgresDbConfig: {:?}",
+                        e
+                    )
+                })?;
 
-        Ok(Self {
-            config,
-            db_pool: conn_pool,
-        })
+                Ok(Self {
+                    config,
+                    postgres_config: postgres_db_config.clone(),
+                    db_pool: conn_pool,
+                })
+            },
+        }
     }
 
     pub async fn run_processor(self) -> Result<()> {
         // (Optional) Run migrations
         run_migrations(
-            self.config.db_config.postgres_connection_string.clone(),
+            self.postgres_config.connection_string.clone(),
             self.db_pool.clone(),
         )
         .await;
@@ -61,14 +78,13 @@ impl EventsProcessor {
             transaction_stream.into_runnable_step(),
         );
         let events_extractor = EventsExtractor {};
-        let events_storer = EventsStorer::new(self.db_pool.clone(), self.config.db_config.clone());
+        let events_storer = EventsStorer::new(self.db_pool.clone(), self.postgres_config.clone());
         let timed_buffer = TimedBuffer::new(Duration::from_secs(1));
         let version_tracker = LatestVersionProcessedTracker::new(
-            self.config.db_config,
+            self.db_pool.clone(),
             starting_version,
             self.config.processor_config.name().to_string(),
-        )
-        .await?;
+        );
 
         // Connect processor steps together
         let (_, buffer_receiver) = ProcessorBuilder::new_with_runnable_input_receiver_first_step(

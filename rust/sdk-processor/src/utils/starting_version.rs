@@ -45,6 +45,7 @@ pub async fn get_latest_processed_version_from_db(
     )
     .await?
     {
+        // Add +1 to start from the version after the last successful version
         Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
         None => Ok(None),
     }
