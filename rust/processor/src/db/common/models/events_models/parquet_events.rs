@@ -85,23 +85,31 @@ impl Event {
         block_height: i64,
         event_size_info: &[EventSizeInfo],
         block_timestamp: chrono::NaiveDateTime,
+        is_user_txn_type: bool,
     ) -> Vec<Self> {
-        // Ensure that lengths match, otherwise log and panic to investigate
+        // event_size_info will be used for user transactions only, no promises for other transactions.
+        // If event_size_info is missing due to fewer or no events, it defaults to 0.
+        // No need to backfill as event_size_info is primarily for debugging user transactions.
         if events.len() != event_size_info.len() {
-            tracing::error!(
+            tracing::warn!(
                 events_len = events.len(),
                 event_size_info_len = event_size_info.len(),
                 txn_version,
                 "Length mismatch: events size does not match event_size_info size.",
             );
-            panic!("Length mismatch: events len does not match event_size_info len");
+            if is_user_txn_type {
+                panic!("Event size info is missing for user transaction.")
+            }
         }
 
         events
             .iter()
-            .zip_eq(event_size_info.iter())
             .enumerate()
-            .map(|(index, (event, size_info))| {
+            .map(|(index, event)| {
+                let size_info = event_size_info.get(index).unwrap_or(&EventSizeInfo {
+                    type_tag_bytes: 0,
+                    total_bytes: 0,
+                });
                 Self::from_event(
                     event,
                     txn_version,
