@@ -32,54 +32,23 @@ use serde::{Deserialize, Serialize};
     strum(serialize_all = "snake_case")
 )]
 pub enum DbConfig {
-    PostgresDbConfig(PostgresDbConfig),
+    PostgresConfig(PostgresConfig),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct PostgresDbConfig {
+pub struct PostgresConfig {
     pub connection_string: String,
     // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
-    #[serde(default = "PostgresDbConfig::default_db_pool_size")]
+    #[serde(default = "PostgresConfig::default_db_pool_size")]
     pub db_pool_size: u32,
     // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
     #[serde(default = "AHashMap::new")]
     pub per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
-impl PostgresDbConfig {
+impl PostgresConfig {
     pub const fn default_db_pool_size() -> u32 {
         150
-    }
-}
-
-#[derive(Debug)]
-// To ensure that the variants of ProcessorConfig and Processor line up, in the testing
-// build path we derive EnumDiscriminants on this enum as well and make sure the two
-// sets of variants match up in `test_processor_names_complete`.
-#[cfg_attr(
-    test,
-    derive(strum::EnumDiscriminants),
-    strum_discriminants(
-        derive(strum::EnumVariantNames),
-        name(DbTypeDiscriminants),
-        strum(serialize_all = "snake_case")
-    )
-)]
-pub enum DbType {
-    PostgresDbType,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use strum::VariantNames;
-
-    /// This test exists to make sure that when a new processor is added, it is added
-    /// to both Processor and ProcessorConfig. To make sure this passes, make sure the
-    /// variants are in the same order (lexicographical) and the names match.
-    #[test]
-    fn test_processor_names_complete() {
-        assert_eq!(DbTypeName::VARIANTS, DbTypeDiscriminants::VARIANTS);
     }
 }
