@@ -1,6 +1,6 @@
 use crate::{
     config::{
-        db_config::{DbConfig, PostgresDbConfig},
+        db_config::{DbConfig, PostgresConfig},
         indexer_processor_config::IndexerProcessorConfig,
     },
     steps::{
@@ -21,10 +21,11 @@ use aptos_indexer_processor_sdk::{
     traits::{IntoRunnableStep, RunnableStepWithInputReceiver},
 };
 use std::time::Duration;
+use tracing::{debug, info};
 
 pub struct EventsProcessor {
     pub config: IndexerProcessorConfig,
-    pub postgres_config: PostgresDbConfig,
+    pub postgres_config: PostgresConfig,
     pub db_pool: ArcDbPool,
 }
 
@@ -32,7 +33,7 @@ impl EventsProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> Result<Self> {
         let db_config = config.db_config.clone();
         match db_config {
-            DbConfig::PostgresDbConfig(postgres_db_config) => {
+            DbConfig::PostgresConfig(postgres_db_config) => {
                 let conn_pool = new_db_pool(
                     &postgres_db_config.connection_string,
                     Some(postgres_db_config.db_pool_size),
@@ -40,7 +41,7 @@ impl EventsProcessor {
                 .await
                 .map_err(|e| {
                     anyhow::anyhow!(
-                        "Failed to create connection pool for PostgresDbConfig: {:?}",
+                        "Failed to create connection pool for PostgresConfig: {:?}",
                         e
                     )
                 })?;
@@ -101,17 +102,17 @@ impl EventsProcessor {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
                     if txn_context.data.is_empty() {
-                        tracing::debug!("Received no transactions");
+                        debug!("Received no transactions");
                         continue;
                     }
-                    tracing::debug!(
+                    debug!(
                         "Received events versions: {:?} to {:?}",
-                        txn_context.start_version,
-                        txn_context.end_version
+                        txn_context.start_version, txn_context.end_version
                     );
                 },
                 Err(e) => {
-                    println!("Error receiving transactions: {:?}", e);
+                    info!("No more transactions in channel: {:?}", e);
+                    break Ok(());
                 },
             }
         }

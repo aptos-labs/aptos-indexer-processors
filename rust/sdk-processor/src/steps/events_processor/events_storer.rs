@@ -1,5 +1,5 @@
 use crate::{
-    config::db_config::PostgresDbConfig,
+    config::db_config::PostgresConfig,
     db::common::models::events_models::events::EventModel,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
@@ -24,11 +24,11 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    postgres_config: PostgresDbConfig,
+    postgres_config: PostgresConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool, postgres_config: PostgresDbConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, postgres_config: PostgresConfig) -> Self {
         Self {
             conn_pool,
             postgres_config,
