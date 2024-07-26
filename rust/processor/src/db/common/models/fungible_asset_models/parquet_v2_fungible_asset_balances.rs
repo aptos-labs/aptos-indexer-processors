@@ -26,8 +26,13 @@ use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
+use lazy_static::lazy_static;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+
+lazy_static! {
+    pub static ref DEFAULT_AMOUNT_VALUE: String = "0".to_string();
+}
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
@@ -147,7 +152,7 @@ impl FungibleAssetBalance {
                     asset_type: coin_type.clone(),
                     is_primary: true,
                     is_frozen: false,
-                    amount: "0".to_string(),
+                    amount: DEFAULT_AMOUNT_VALUE.clone(),
                     block_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };

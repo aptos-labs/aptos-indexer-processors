@@ -8,6 +8,7 @@
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::{
+        fungible_asset_models::parquet_v2_fungible_asset_balances::DEFAULT_AMOUNT_VALUE,
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
         token_v2_models::{
@@ -25,7 +26,7 @@ use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-// PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
+const LEGACY_DEFAULT_PROPERTY_VERSION: u64 = 0;
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
@@ -95,10 +96,10 @@ impl TokenOwnershipV2 {
             txn_version: token_data.txn_version,
             write_set_change_index: token_data.write_set_change_index,
             token_data_id: token_data_id.clone(),
-            property_version_v1: 0,
+            property_version_v1: LEGACY_DEFAULT_PROPERTY_VERSION.clone(),
             owner_address: Some(owner_address.clone()),
             storage_id: storage_id.clone(),
-            amount: "0".to_string(),
+            amount: DEFAULT_AMOUNT_VALUE.clone(),
             table_type_v1: None,
             token_properties_mutated_v1: None,
             is_soulbound_v2: Some(is_soulbound),
@@ -118,12 +119,12 @@ impl TokenOwnershipV2 {
                 // set to negative of event index to avoid collison with write set index
                 write_set_change_index: -1 * event_index,
                 token_data_id: token_data_id.clone(),
-                property_version_v1: 0,
+                property_version_v1: LEGACY_DEFAULT_PROPERTY_VERSION,
                 // previous owner
                 owner_address: Some(transfer_event.get_from_address()),
                 storage_id: storage_id.clone(),
                 // soft delete
-                amount: "0".to_string(),
+                amount: DEFAULT_AMOUNT_VALUE.clone(),
                 table_type_v1: None,
                 token_properties_mutated_v1: None,
                 is_soulbound_v2: Some(is_soulbound),
@@ -196,7 +197,7 @@ impl TokenOwnershipV2 {
                 property_version_v1: token_id_struct.property_version.to_u64().unwrap(),
                 owner_address,
                 storage_id: table_handle,
-                amount: "0".to_string(),
+                amount: DEFAULT_AMOUNT_VALUE.clone(),
                 table_type_v1: table_type,
                 token_properties_mutated_v1: None,
                 is_soulbound_v2: None,
