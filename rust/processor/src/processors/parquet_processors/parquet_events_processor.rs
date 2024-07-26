@@ -119,10 +119,14 @@ impl ProcessorTrait for ParquetEventsProcessor {
                 },
             };
             let default = vec![];
+            let mut is_user_txn_type = false;
             let raw_events = match txn_data {
                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
                 TxnData::Genesis(tx_inner) => &tx_inner.events,
-                TxnData::User(tx_inner) => &tx_inner.events,
+                TxnData::User(tx_inner) => {
+                    is_user_txn_type = true;
+                    &tx_inner.events
+                },
                 TxnData::Validator(txn) => &txn.events,
                 _ => &default,
             };
@@ -133,6 +137,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
                 block_height,
                 size_info.event_size_info.as_slice(),
                 block_timestamp,
+                is_user_txn_type,
             );
             transaction_version_to_struct_count
                 .entry(txn_version)
