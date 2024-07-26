@@ -15,6 +15,3 @@ xclippy = [
 
 [build]
 rustflags = ["--cfg", "tokio_unstable"]
-
-[net]
-git-fetch-with-cli = true
