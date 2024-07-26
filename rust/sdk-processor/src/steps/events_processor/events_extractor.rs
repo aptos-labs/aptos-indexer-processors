@@ -4,9 +4,11 @@ use aptos_indexer_processor_sdk::{
     steps::{async_step::AsyncRunType, AsyncStep},
     traits::{NamedStep, Processable},
     types::transaction_context::TransactionContext,
+    utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
 use rayon::prelude::*;
+use tracing::warn;
 
 pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
 
@@ -23,7 +25,7 @@ impl Processable for EventsExtractor {
     async fn process(
         &mut self,
         item: TransactionContext<Transaction>,
-    ) -> Option<TransactionContext<EventModel>> {
+    ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
         let events = item
             .data
             .par_iter()
@@ -35,7 +37,7 @@ impl Processable for EventsExtractor {
                 let txn_data = match txn.txn_data.as_ref() {
                     Some(data) => data,
                     None => {
-                        tracing::warn!(
+                        warn!(
                             transaction_version = txn_version,
                             "Transaction data doesn't exist"
                         );
@@ -59,14 +61,14 @@ impl Processable for EventsExtractor {
             })
             .flatten()
             .collect::<Vec<EventModel>>();
-        Some(TransactionContext {
+        Ok(Some(TransactionContext {
             data: events,
             start_version: item.start_version,
             end_version: item.end_version,
             start_transaction_timestamp: item.start_transaction_timestamp,
             end_transaction_timestamp: item.end_transaction_timestamp,
             total_size_in_bytes: item.total_size_in_bytes,
-        })
+        }))
     }
 }
 

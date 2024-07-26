@@ -1,13 +1,15 @@
 use crate::{
-    config::indexer_processor_config::DbConfig,
+    config::db_config::PostgresDbConfig,
     db::common::models::events_models::events::EventModel,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
+use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     steps::{async_step::AsyncRunType, AsyncStep},
     traits::{NamedStep, Processable},
     types::transaction_context::TransactionContext,
+    utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
 use diesel::{
@@ -16,20 +18,20 @@ use diesel::{
     ExpressionMethods,
 };
 use processor::schema;
-
+use tracing::debug;
 pub struct EventsStorer
 where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    db_config: DbConfig,
+    postgres_config: PostgresDbConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool, db_config: DbConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, postgres_config: PostgresDbConfig) -> Self {
         Self {
             conn_pool,
-            db_config,
+            postgres_config,
         }
     }
 }
@@ -63,9 +65,9 @@ impl Processable for EventsStorer {
     async fn process(
         &mut self,
         events: TransactionContext<EventModel>,
-    ) -> Option<TransactionContext<EventModel>> {
+    ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
         let per_table_chunk_sizes: AHashMap<String, usize> =
-            self.db_config.per_table_chunk_sizes.clone();
+            self.postgres_config.per_table_chunk_sizes.clone();
         let execute_res = execute_in_chunks(
             self.conn_pool.clone(),
             insert_events_query,
@@ -75,18 +77,19 @@ impl Processable for EventsStorer {
         .await;
         match execute_res {
             Ok(_) => {
-                tracing::debug!("Events stored successfully");
-            },
-            Err(e) => {
-                tracing::error!(
-                    start_version = events.start_version,
-                    end_version = events.end_version,
-                    "Failed to store events: {:?}",
-                    e
+                debug!(
+                    "Events versions {} to {} stored successfully",
+                    events.start_version, events.end_version
                 );
+                Ok(Some(events))
             },
+            Err(e) => Err(ProcessorError::DBStoreError {
+                message: format!(
+                    "Failed to store events versions {} to {}: {:?}",
+                    events.start_version, events.end_version, e,
+                ),
+            }),
         }
-        Some(events)
     }
 }
 

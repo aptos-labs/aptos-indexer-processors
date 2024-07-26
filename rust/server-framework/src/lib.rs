@@ -9,6 +9,7 @@ use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 use std::convert::Infallible;
+// TODO: remove deprecated lint when new clippy nightly is released
 #[allow(deprecated)]
 use std::{fs::File, io::Read, panic::PanicInfo, path::PathBuf, process};
 use tokio::runtime::Handle;
@@ -113,12 +114,15 @@ pub struct CrashInfo {
 /// details/backtrace and then exit.
 #[allow(deprecated)]
 pub fn setup_panic_handler() {
+    // TODO: remove deprecated lint when new clippy nightly is released
+    #[allow(deprecated)]
     std::panic::set_hook(Box::new(move |pi: &PanicInfo<'_>| {
         handle_panic(pi);
     }));
 }
 
 // Formats and logs panic information
+// TODO: remove deprecated lint when new clippy nightly is released
 #[allow(deprecated)]
 fn handle_panic(panic_info: &PanicInfo<'_>) {
     // The Display formatter for a PanicInfo contains the message, payload and location.

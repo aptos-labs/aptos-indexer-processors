@@ -1,16 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::processor_config::ProcessorConfig;
+use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::events_processor::EventsProcessor;
-use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
 use aptos_indexer_processor_sdk_server_framework::RunnableConfig;
 use serde::{Deserialize, Serialize};
-
-pub const QUERY_DEFAULT_RETRIES: u32 = 5;
-pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -40,23 +36,5 @@ impl RunnableConfig for IndexerProcessorConfig {
             .next()
             .unwrap_or("unknown");
         before_underscore[..before_underscore.len().min(12)].to_string()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct DbConfig {
-    pub postgres_connection_string: String,
-    // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
-    #[serde(default = "DbConfig::default_db_pool_size")]
-    pub db_pool_size: u32,
-    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
-    #[serde(default = "AHashMap::new")]
-    pub per_table_chunk_sizes: AHashMap<String, usize>,
-}
-
-impl DbConfig {
-    pub const fn default_db_pool_size() -> u32 {
-        150
     }
 }
