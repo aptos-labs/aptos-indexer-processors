@@ -9,7 +9,6 @@ use crate::{
 };
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{Event as EventPB, EventSizeInfo};
-use itertools::Itertools;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
