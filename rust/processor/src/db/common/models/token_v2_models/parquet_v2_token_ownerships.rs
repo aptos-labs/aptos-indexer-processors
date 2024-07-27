@@ -96,7 +96,7 @@ impl TokenOwnershipV2 {
             txn_version: token_data.txn_version,
             write_set_change_index: token_data.write_set_change_index,
             token_data_id: token_data_id.clone(),
-            property_version_v1: LEGACY_DEFAULT_PROPERTY_VERSION.clone(),
+            property_version_v1: LEGACY_DEFAULT_PROPERTY_VERSION,
             owner_address: Some(owner_address.clone()),
             storage_id: storage_id.clone(),
             amount: DEFAULT_AMOUNT_VALUE.clone(),
