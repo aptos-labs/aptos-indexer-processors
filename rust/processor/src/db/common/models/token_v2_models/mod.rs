@@ -8,3 +8,8 @@ pub mod v2_token_datas;
 pub mod v2_token_metadata;
 pub mod v2_token_ownerships;
 pub mod v2_token_utils;
+
+// parquet models
+// pub mod parquet_v2_collections; // revisit this
+pub mod parquet_v2_token_datas;
+pub mod parquet_v2_token_ownerships;

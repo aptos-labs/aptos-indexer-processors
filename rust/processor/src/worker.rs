@@ -23,6 +23,7 @@ use crate::{
             parquet_default_processor::ParquetDefaultProcessor,
             parquet_events_processor::ParquetEventsProcessor,
             parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
+            parquet_token_v2_processor::ParquetTokenV2Processor,
             parquet_transaction_metadata_processor::ParquetTransactionMetadataProcessor,
         },
         stake_processor::StakeProcessor,
@@ -963,6 +964,13 @@ pub fn build_processor(
         },
         ProcessorConfig::ParquetTransactionMetadataProcessor(config) => {
             Processor::from(ParquetTransactionMetadataProcessor::new(
+                db_pool,
+                config.clone(),
+                gap_detector_sender.expect("Parquet processor requires a gap detector sender"),
+            ))
+        },
+        ProcessorConfig::ParquetTokenV2Processor(config) => {
+            Processor::from(ParquetTokenV2Processor::new(
                 db_pool,
                 config.clone(),
                 gap_detector_sender.expect("Parquet processor requires a gap detector sender"),
