@@ -195,7 +195,6 @@ where
                 .await
                 .expect("[Parser] Failed to send versions to gap detector");
 
-
             return Ok(());
         }
         let start_version = self
