@@ -178,6 +178,24 @@ where
         // This is to cover the case when interval duration has passed but buffer is empty
         if self.buffer.is_empty() {
             debug!("Buffer is empty, skipping upload.");
+
+            let parquet_processing_result = ParquetProcessingResult {
+                start_version: -1, // this is to indicate that nothing was actually uploaded
+                end_version: -1,
+                last_transaction_timestamp: None,
+                txn_version_to_struct_count: None,
+                parquet_processed_structs: None,
+                table_name: ParquetType::TABLE_NAME.to_string(),
+            };
+
+            self.gap_detector_sender
+                .send(ProcessingResult::ParquetProcessingResult(
+                    parquet_processing_result,
+                ))
+                .await
+                .expect("[Parser] Failed to send versions to gap detector");
+
+
             return Ok(());
         }
         let start_version = self

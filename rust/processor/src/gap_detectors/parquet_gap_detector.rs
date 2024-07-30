@@ -134,9 +134,24 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
             ProcessingResult::ParquetProcessingResult(r) => r,
             _ => panic!("Invalid result type"),
         };
-        let parquet_processed_structs = result
-            .parquet_processed_structs
-            .context("Missing parquet processed transactions")?;
+
+        let parquet_processed_structs = result.parquet_processed_structs.unwrap_or_else(|| {
+            info!("Interval duration has passed, but there are no structs to process.");
+            AHashMap::new()
+        });
+
+        if result.start_version == -1 {
+            // meaning we didn't really upload anything but we stil lwould like to update the map to reduce memory usage.
+            self.update_next_version_to_process(self.max_version, &result.table_name);
+            return Ok(GapDetectorResult::ParquetFileGapDetectorResult(
+                ParquetFileGapDetectorResult {
+                    next_version_to_process: self.next_version_to_process as u64,
+                    num_gaps: (self.max_version - self.next_version_to_process) as u64,
+                    last_transaction_timestamp: result.last_transaction_timestamp,
+                },
+            ));
+        }
+
         info!(
             start_version = result.start_version,
             end_version = result.end_version,
