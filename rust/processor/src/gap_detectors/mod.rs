@@ -155,6 +155,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                 {
                                     tracing::info!(
                                         last_processed_version = res.next_version_to_process,
+                                        processor_name,
                                         "Updating last processed version"
                                     );
                                     processor
