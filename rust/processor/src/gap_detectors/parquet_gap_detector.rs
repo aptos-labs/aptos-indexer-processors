@@ -3,7 +3,7 @@
 
 use crate::gap_detectors::{GapDetectorResult, GapDetectorTrait, ProcessingResult};
 use ahash::{AHashMap, AHashSet};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::{
     cmp::{max, min},
     sync::{Arc, Mutex},
