@@ -19,6 +19,7 @@ use diesel::{
     ExpressionMethods,
 };
 use processor::schema;
+use std::time::Duration;
 
 pub struct EventsStorer
 where
@@ -79,9 +80,9 @@ impl Processable for EventsStorer {
         match execute_res {
             Ok(_) => {
                 sample!(
-                    SampleRate::Frequency(10),
+                    SampleRate::Duration(Duration::from_secs(1)),
                     info!(
-                        "Events versions [{}, {}] stored successfully",
+                        "Events version [{}, {}] stored successfully",
                         events.start_version, events.end_version
                     )
                 );
