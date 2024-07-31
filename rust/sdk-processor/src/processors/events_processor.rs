@@ -2,6 +2,7 @@ use crate::{
     config::{
         db_config::{DbConfig, PostgresConfig},
         indexer_processor_config::IndexerProcessorConfig,
+        processor_config::ProcessorConfig,
     },
     steps::{
         common::latest_processed_version_tracker::LatestVersionProcessedTracker,
@@ -12,31 +13,38 @@ use crate::{
         starting_version::get_starting_version,
     },
 };
+use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::TransactionStreamConfig,
     builder::ProcessorBuilder,
     instrumented_channel::instrumented_bounded_channel,
-    steps::{TimedBuffer, TransactionStreamStep},
+    steps::TransactionStreamStep,
     traits::{IntoRunnableStep, RunnableStepWithInputReceiver},
 };
-use std::time::Duration;
-use tracing::{debug, info};
+use aptos_logger::{debug, info, sample, sample::SampleRate};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventsProcessorConfig {
+    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
+    #[serde(default = "AHashMap::new")]
+    pub per_table_chunk_sizes: AHashMap<String, usize>,
+}
 
 pub struct EventsProcessor {
     pub config: IndexerProcessorConfig,
-    pub postgres_config: PostgresConfig,
     pub db_pool: ArcDbPool,
 }
 
 impl EventsProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> Result<Self> {
-        let db_config = config.db_config.clone();
-        match db_config {
-            DbConfig::PostgresConfig(postgres_db_config) => {
+        match config.db_config {
+            DbConfig::PostgresConfig(ref postgres_config) => {
                 let conn_pool = new_db_pool(
-                    &postgres_db_config.connection_string,
-                    Some(postgres_db_config.db_pool_size),
+                    &postgres_config.connection_string,
+                    Some(postgres_config.db_pool_size),
                 )
                 .await
                 .map_err(|e| {
@@ -48,7 +56,6 @@ impl EventsProcessor {
 
                 Ok(Self {
                     config,
-                    postgres_config: postgres_db_config.clone(),
                     db_pool: conn_pool,
                 })
             },
@@ -56,18 +63,28 @@ impl EventsProcessor {
     }
 
     pub async fn run_processor(self) -> Result<()> {
+        let processor_name = self.config.processor_config.name();
+
         // (Optional) Run migrations
-        run_migrations(
-            self.postgres_config.connection_string.clone(),
-            self.db_pool.clone(),
-        )
-        .await;
+        match self.config.db_config {
+            DbConfig::PostgresConfig(ref postgres_config) => {
+                run_migrations(
+                    postgres_config.connection_string.clone(),
+                    self.db_pool.clone(),
+                )
+                .await;
+            },
+        }
 
         // (Optional) Merge the starting version from config and the latest processed version from the DB
         let starting_version = get_starting_version(&self.config, self.db_pool.clone()).await?;
 
         // Define processor steps
         let (_input_sender, input_receiver) = instrumented_bounded_channel("input", 1);
+
+        let processor_config = match self.config.processor_config {
+            ProcessorConfig::EventsProcessor(config) => config,
+        };
 
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
@@ -79,12 +96,11 @@ impl EventsProcessor {
             transaction_stream.into_runnable_step(),
         );
         let events_extractor = EventsExtractor {};
-        let events_storer = EventsStorer::new(self.db_pool.clone(), self.postgres_config.clone());
-        let timed_buffer = TimedBuffer::new(Duration::from_secs(1));
+        let events_storer = EventsStorer::new(self.db_pool.clone(), processor_config);
         let version_tracker = LatestVersionProcessedTracker::new(
             self.db_pool.clone(),
             starting_version,
-            self.config.processor_config.name().to_string(),
+            processor_name.to_string(),
         );
 
         // Connect processor steps together
@@ -92,7 +108,6 @@ impl EventsProcessor {
             transaction_stream_with_input,
         )
         .connect_to(events_extractor.into_runnable_step(), 10)
-        .connect_to(timed_buffer.into_runnable_step(), 10)
         .connect_to(events_storer.into_runnable_step(), 10)
         .connect_to(version_tracker.into_runnable_step(), 10)
         .end_and_return_output_receiver(10);
@@ -102,12 +117,15 @@ impl EventsProcessor {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
                     if txn_context.data.is_empty() {
-                        debug!("Received no transactions");
+                        sample!(SampleRate::Frequency(10), info!("Received no transactions"));
                         continue;
                     }
-                    debug!(
-                        "Received events versions: {:?} to {:?}",
-                        txn_context.start_version, txn_context.end_version
+                    sample!(
+                        SampleRate::Frequency(10),
+                        info!(
+                            "Received events versions: {:?} to {:?}",
+                            txn_context.start_version, txn_context.end_version
+                        )
                     );
                 },
                 Err(e) => {

@@ -42,9 +42,6 @@ pub struct PostgresConfig {
     // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
     #[serde(default = "PostgresConfig::default_db_pool_size")]
     pub db_pool_size: u32,
-    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
-    #[serde(default = "AHashMap::new")]
-    pub per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl PostgresConfig {
