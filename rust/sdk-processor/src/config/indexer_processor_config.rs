@@ -20,7 +20,7 @@ pub struct IndexerProcessorConfig {
 impl RunnableConfig for IndexerProcessorConfig {
     async fn run(&self) -> Result<()> {
         match self.processor_config {
-            ProcessorConfig::EventsProcessor => {
+            ProcessorConfig::EventsProcessor(_) => {
                 let events_processor = EventsProcessor::new(self.clone()).await?;
                 events_processor.run_processor().await
             },

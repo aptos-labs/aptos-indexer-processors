@@ -1,6 +1,6 @@
 use crate::{
-    config::db_config::PostgresConfig,
     db::common::models::events_models::events::EventModel,
+    processors::events_processor::EventsProcessorConfig,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -11,6 +11,7 @@ use aptos_indexer_processor_sdk::{
     types::transaction_context::TransactionContext,
     utils::errors::ProcessorError,
 };
+use aptos_logger::{info, sample, sample::SampleRate};
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
@@ -18,20 +19,20 @@ use diesel::{
     ExpressionMethods,
 };
 use processor::schema;
-use tracing::debug;
+
 pub struct EventsStorer
 where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    postgres_config: PostgresConfig,
+    processor_config: EventsProcessorConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool, postgres_config: PostgresConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, processor_config: EventsProcessorConfig) -> Self {
         Self {
             conn_pool,
-            postgres_config,
+            processor_config,
         }
     }
 }
@@ -67,7 +68,7 @@ impl Processable for EventsStorer {
         events: TransactionContext<EventModel>,
     ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
         let per_table_chunk_sizes: AHashMap<String, usize> =
-            self.postgres_config.per_table_chunk_sizes.clone();
+            self.processor_config.per_table_chunk_sizes.clone();
         let execute_res = execute_in_chunks(
             self.conn_pool.clone(),
             insert_events_query,
@@ -77,9 +78,12 @@ impl Processable for EventsStorer {
         .await;
         match execute_res {
             Ok(_) => {
-                debug!(
-                    "Events versions {} to {} stored successfully",
-                    events.start_version, events.end_version
+                sample!(
+                    SampleRate::Frequency(10),
+                    info!(
+                        "Events versions [{}, {}] stored successfully",
+                        events.start_version, events.end_version
+                    )
                 );
                 Ok(Some(events))
             },
