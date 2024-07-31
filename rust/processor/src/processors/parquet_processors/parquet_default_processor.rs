@@ -270,9 +270,10 @@ pub fn process_transactions(
     for detail in wsc_details {
         match detail {
             WriteSetChangeDetail::Module(module) => {
-                move_modules.push(module.clone());
+                let txn_version = module.txn_version;
+                move_modules.push(module);
                 transaction_version_to_struct_count
-                    .entry(module.txn_version)
+                    .entry(txn_version)
                     .and_modify(|e| *e += 1)
                     .or_insert(1);
             },
