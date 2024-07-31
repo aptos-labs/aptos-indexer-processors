@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use crate::processors::events_processor::EventsProcessorConfig;
+use serde::{Deserialize, Serialize};
 
 /// This enum captures the configs for all the different processors that are defined.
 /// The configs for each processor should only contain configuration specific to that
