@@ -9,7 +9,6 @@ ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-processor-sdk = { workspace = true }
 aptos-indexer-processor-sdk-server-framework = { workspace = true }
-aptos-logger = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bigdecimal = { workspace = true }

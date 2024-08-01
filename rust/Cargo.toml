@@ -28,7 +28,6 @@ ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "1d40f83c75398398adadb592c2abe254053c2d9a" }
 aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "1d40f83c75398398adadb592c2abe254053c2d9a" }
-aptos-logger = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
 async-trait = "0.1.53"
@@ -135,6 +134,3 @@ parquet_derive = { version = "52.0.0" }
 canonical_json = "0.5.0"
 allocative = "0.3.3"
 allocative_derive = "0.3.3"
-
-[patch.crates-io]
-x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
