@@ -8,6 +8,7 @@ use crate::{
         events_processor::{EventsExtractor, EventsStorer},
     },
     utils::{
+        chain_id::check_or_update_chain_id,
         database::{new_db_pool, run_migrations, ArcDbPool},
         starting_version::get_starting_version,
     },
@@ -15,15 +16,14 @@ use crate::{
 use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
-    aptos_indexer_transaction_stream::TransactionStreamConfig,
+    aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
     instrumented_channel::instrumented_bounded_channel,
     steps::TransactionStreamStep,
     traits::{IntoRunnableStep, RunnableStepWithInputReceiver},
 };
-use aptos_logger::{info, sample, sample::SampleRate};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use tracing::{debug, info};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -79,6 +79,13 @@ impl EventsProcessor {
         // (Optional) Merge the starting version from config and the latest processed version from the DB
         let starting_version = get_starting_version(&self.config, self.db_pool.clone()).await?;
 
+        // (Optional) Check and update the ledger chain id to ensure we're indexing the correct chain
+        let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())
+            .await?
+            .get_chain_id()
+            .await?;
+        check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
+
         // Define processor steps
         let (_input_sender, input_receiver) = instrumented_bounded_channel("input", 1);
 
@@ -118,12 +125,9 @@ impl EventsProcessor {
                     if txn_context.data.is_empty() {
                         continue;
                     }
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(1)),
-                        info!(
-                            "Finished processing events from versions [{:?}, {:?}]",
-                            txn_context.start_version, txn_context.end_version,
-                        )
+                    debug!(
+                        "Finished processing events from versions [{:?}, {:?}]",
+                        txn_context.start_version, txn_context.end_version,
                     );
                 },
                 Err(e) => {

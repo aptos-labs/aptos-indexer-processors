@@ -11,7 +11,6 @@ use aptos_indexer_processor_sdk::{
     types::transaction_context::TransactionContext,
     utils::errors::ProcessorError,
 };
-use aptos_logger::{info, sample, sample::SampleRate};
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
@@ -19,7 +18,7 @@ use diesel::{
     ExpressionMethods,
 };
 use processor::schema;
-use std::time::Duration;
+use tracing::debug;
 
 pub struct EventsStorer
 where
@@ -79,12 +78,9 @@ impl Processable for EventsStorer {
         .await;
         match execute_res {
             Ok(_) => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(1)),
-                    info!(
-                        "Events version [{}, {}] stored successfully",
-                        events.start_version, events.end_version
-                    )
+                debug!(
+                    "Events version [{}, {}] stored successfully",
+                    events.start_version, events.end_version
                 );
                 Ok(Some(events))
             },
