@@ -10,6 +10,7 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use diesel::{upsert::excluded, ExpressionMethods};
 use processor::{db::common::models::processor_status::ProcessorStatus, schema::processor_status};
+use tracing::info;
 
 const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
@@ -69,14 +70,20 @@ where
         &mut self,
         current_batch: TransactionContext<T>,
     ) -> Result<Option<TransactionContext<T>>, ProcessorError> {
+        info!(
+            start_version = current_batch.start_version,
+            end_version = current_batch.end_version,
+            step_name = self.name(),
+            "Processing versions"
+        );
         // If there's a gap in the next_version and current_version, save the current_version to seen_versions for
         // later processing.
         if self.next_version != current_batch.start_version {
-            tracing::debug!(
-                next_version = self.next_version,
+            tracing::info!(
+                expected_next_version = self.next_version,
                 step = self.name(),
-                "Gap detected starting from version: {}",
-                current_batch.start_version
+                batch_version = current_batch.start_version,
+                "Gap detected",
             );
             self.seen_versions
                 .insert(current_batch.start_version, TransactionContext {
@@ -88,7 +95,7 @@ where
                     total_size_in_bytes: current_batch.total_size_in_bytes,
                 });
         } else {
-            tracing::debug!("No gap detected");
+            tracing::info!("No gap detected");
             // If the current_batch is the next expected version, update the last success batch
             self.update_last_success_batch(TransactionContext {
                 data: vec![], // No data is needed for tracking. This is to avoid clone.
