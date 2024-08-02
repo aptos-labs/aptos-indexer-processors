@@ -67,6 +67,12 @@ impl Processable for EventsStorer {
         &mut self,
         events: TransactionContext<EventModel>,
     ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
+        tracing::info!(
+            start_version = events.start_version,
+            end_version = events.end_version,
+            step_name = self.name(),
+            "Processing versions",
+        );
         let per_table_chunk_sizes: AHashMap<String, usize> =
             self.processor_config.per_table_chunk_sizes.clone();
         let execute_res = execute_in_chunks(

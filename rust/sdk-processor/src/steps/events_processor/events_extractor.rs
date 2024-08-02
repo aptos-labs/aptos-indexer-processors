@@ -8,7 +8,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use rayon::prelude::*;
-use tracing::warn;
+use tracing::{info, warn};
 
 pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
 
@@ -26,6 +26,12 @@ impl Processable for EventsExtractor {
         &mut self,
         item: TransactionContext<Transaction>,
     ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
+        info!(
+            start_version = item.start_version,
+            end_version = item.end_version,
+            step_name = self.name(),
+            "Processing versions",
+        );
         let events = item
             .data
             .par_iter()
