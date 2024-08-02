@@ -141,7 +141,9 @@ impl ProcessorTrait for ParquetEventsProcessor {
             );
             transaction_version_to_struct_count
                 .entry(txn_version)
-                .and_modify(|e| *e += txn_events.len() as i64);
+                .and_modify(|e| *e += txn_events.len() as i64)
+                .or_insert(txn_events.len() as i64);
+
             events.extend(txn_events);
         }
 

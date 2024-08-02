@@ -92,7 +92,7 @@ impl Debug for ParquetFungibleAssetProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ParquetFungibleAssetProcessor {{ capacity of tsi channel: {:?}, capacity of es channel: {:?}}}",
+            "ParquetFungibleAssetProcessor {{ capacity of coin_supply channel: {:?}, capacity of fungible_asset_balances channel: {:?}}}",
             &self.coin_supply_sender.capacity(),
             &self.fungible_asset_balances_sender.capacity(),
         )

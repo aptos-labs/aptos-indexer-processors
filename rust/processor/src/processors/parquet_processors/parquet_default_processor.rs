@@ -249,14 +249,16 @@ pub fn process_transactions(
             WriteSetChangeDetail::Resource(resource) => {
                 transaction_version_to_struct_count
                     .entry(resource.txn_version)
-                    .and_modify(|e| *e += 1);
+                    .and_modify(|e| *e += 1)
+                    .or_insert(1);
                 move_resources.push(resource);
             },
             WriteSetChangeDetail::Table(item, _current_item, _) => {
                 let txn_version = item.txn_version;
                 transaction_version_to_struct_count
                     .entry(txn_version)
-                    .and_modify(|e| *e += 1);
+                    .and_modify(|e| *e += 1)
+                    .or_insert(1);
                 table_items.push(item);
             },
         }
