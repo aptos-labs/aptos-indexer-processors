@@ -886,6 +886,21 @@ pub async fn do_processor(
     processed_result
 }
 
+pub fn build_processor_for_testing(
+    processor_config: ProcessorConfig,
+    db_pool: ArcDbPool,
+) -> Processor {
+    let per_table_chunk_sizes = AHashMap::new();
+    let deprecated_tables = TableFlags::empty();
+    build_processor(
+        &processor_config,
+        per_table_chunk_sizes,
+        deprecated_tables,
+        db_pool,
+        None,
+    )
+}
+
 /// Given a config and a db pool, build a concrete instance of a processor.
 // As time goes on there might be other things that we need to provide to certain
 // processors. As that happens we can revist whether this function (which tends to

@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "indexer-metrics",
+    "integration-tests",
     "moving-average",
     "processor",
     "sdk-processor",
@@ -22,6 +23,7 @@ rust-version = "1.75"
 processor = { path = "processor" }
 server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }
+integration-tests = { path = "integration-tests" }
 sdk-processor = { path = "sdk-processor" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
@@ -29,7 +31,8 @@ anyhow = "1.0.86"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7" }
 aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
-aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
+aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
+aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"
 base64 = "0.13.0"
@@ -58,6 +61,7 @@ diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d0
 ] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 diesel_async_migrations = { git = "https://github.com/niroco/diesel_async_migrations", rev = "11f331b73c5cfcc894380074f748d8fda710ac12" }
+dirs = "5.0.1"
 enum_dispatch = "0.3.12"
 field_count = "0.1.1"
 futures = "0.3.30"
@@ -93,10 +97,11 @@ reqwest = { version = "0.11.20", features = [
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_yaml = "0.8.24"
-sha2 = "0.9.3"
-sha3 = "0.9.1"
+sha2 = "0.10.8"
+sha3 = "0.10.8"
 strum = { version = "0.24.1", features = ["derive"] }
 tempfile = "3.3.0"
+testcontainers = "0.20.1"
 toml = "0.7.4"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
