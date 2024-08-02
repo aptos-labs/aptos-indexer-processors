@@ -5,7 +5,7 @@ use crate::gap_detectors::{GapDetectorResult, GapDetectorTrait, ProcessingResult
 use ahash::{AHashMap, AHashSet};
 use anyhow::Result;
 use std::{
-    cmp::{max, min},
+    cmp::max,
     sync::{Arc, Mutex},
 };
 use tracing::{debug, info};
@@ -64,62 +64,55 @@ impl ParquetFileGapDetectorInner {
             }
         }
         self.max_version = max(self.max_version, end_version);
-
-        // b/c of the case where file gets uploaded first, we should check if we have to update last_success_version for this processor
-        self.update_next_version_to_process(
-            min(self.next_version_to_process, end_version),
-            "all_table",
-        );
     }
 
-    /// This function updates the next version to process based on the current version counters.
-    /// It will increment the next version to process if the current version is fully processed.
-    /// It will also remove the version from the version counters if it is fully processed.
-    /// what it means to be fully processed is that all the structs for that version processed, i.e. count = 0.
-    /// Note that for tables other than transactions, it won't be always the latest txn version since we update this value with
-    /// Thus we will keep the latest version_to_process in the db with the min(max version of latest table files per processor)
-    /// that has been uploaded to GCS. so whenever we restart the processor, it may generate some duplicates rows, and we are okay with that.
+    /// This function updates the `next_version_to_process` based on the current version counters.
+    /// It increments the `next_version_to_process` if the current version is fully processed, which means
+    /// that all the structs for that version have been processed, i.e., `count = 0`.
+    /// If a version is fully processed, it removes the version from the version counters and adds it to the `seen_versions`.
+    /// For tables other than transactions, the latest version to process may not always be the most recent transaction version
+    /// since this value is updated based on the minimum of the maximum versions of the latest table files per processor
+    /// that have been uploaded to GCS. Therefore, when the processor restarts, some duplicate rows may be generated, which is acceptable.
+    /// The function also ensures that the current version starts checking from the `next_version_to_process`
+    /// value stored in the database. While there might be potential performance improvements,
+    /// the current implementation prioritizes data integrity.
+    /// The function also handles cases where a version is already processed or where no struct count
+    /// is found for a version, providing appropriate logging for these scenarios.
     pub fn update_next_version_to_process(&mut self, end_version: i64, table_name: &str) {
         // this has to start checking with this value all the time, since this is the value that will be stored in the db as well.
         // maybe there could be an improvement to be more performant. but priortizing the data integrity as of now.
         let mut current_version = self.next_version_to_process;
 
         while current_version <= end_version {
-            #[allow(clippy::collapsible_else_if)]
-            if self.version_counters.contains_key(&current_version) {
-                while let Some(&count) = self.version_counters.get(&current_version) {
-                    if current_version > end_version {
-                        // we shouldn't update further b/c we haven't uploaded the files containing versions after end_version.
-                        break;
-                    }
-                    if count == 0 {
-                        self.version_counters.remove(&current_version);
-                        self.seen_versions.insert(current_version); // seen_version holds the txns version that we have processed already
-                        current_version += 1;
-                        self.next_version_to_process += 1;
-                    } else {
-                        break;
-                    }
-                }
-            } else {
-                if self.seen_versions.contains(&current_version) {
-                    debug!(
-                        "Version {} already processed, skipping and current next_version {} ",
-                        current_version, self.next_version_to_process
-                    );
-                    self.next_version_to_process =
-                        max(self.next_version_to_process, current_version + 1);
+            // If the current version has a struct count entry
+            if let Some(&count) = self.version_counters.get(&current_version) {
+                if count == 0 {
+                    self.version_counters.remove(&current_version);
+                    self.seen_versions.insert(current_version);
+                    self.next_version_to_process += 1;
                 } else {
-                    // this is the case where we haven't updated the map yet, while the file gets uploaded first. the bigger file size we will have,
-                    // the less chance we will see this as upload takes longer time. And map population is done before the upload.
-                    debug!(
-                        current_version = current_version,
-                        "No struct count found for version. This shouldn't happen b/c we already added default count for this version."
-                    );
+                    // Stop processing if the version is not yet complete
+                    break;
                 }
+            } else if self.seen_versions.contains(&current_version) {
+                // If the version is already seen and processed
+                debug!(
+                    "Version {} already processed, skipping and current next_version {} ",
+                    current_version, self.next_version_to_process
+                );
+                self.next_version_to_process =
+                    max(self.next_version_to_process, current_version + 1);
+            } else {
+                // If the version is neither in seen_versions nor version_counters
+                debug!(
+                    current_version = current_version,
+                    "No struct count found for version. This shouldn't happen b/c we already added default count for this version."
+                );
             }
+
             current_version += 1;
         }
+
         debug!(
             next_version_to_process = self.next_version_to_process,
             table_name = table_name,
@@ -155,7 +148,8 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
         info!(
             start_version = result.start_version,
             end_version = result.end_version,
-            "Parquet file has been uploaded."
+            table_name = &result.table_name,
+            "[Parquet Gap Detector] Processing versions after parquet file upload."
         );
 
         for (version, count) in parquet_processed_structs.iter() {
@@ -166,7 +160,6 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
                 self.version_counters.insert(*version, -count);
             }
         }
-
         self.update_next_version_to_process(result.end_version, &result.table_name);
 
         Ok(GapDetectorResult::ParquetFileGapDetectorResult(

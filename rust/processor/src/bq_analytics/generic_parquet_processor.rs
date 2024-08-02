@@ -131,6 +131,20 @@ where
     ) -> Result<()> {
         let parquet_structs = changes.data;
         let processor_name = self.processor_name.clone();
+
+        if self.last_upload_time.elapsed() >= self.upload_interval {
+            info!(
+                "Time has elapsed more than {} since last upload for {}",
+                self.upload_interval.as_secs(),
+                ParquetType::TABLE_NAME
+            );
+            if let Err(e) = self.upload_buffer(gcs_client).await {
+                error!("Failed to upload buffer: {}", e);
+                return Err(e);
+            }
+            self.last_upload_time = Instant::now();
+        }
+
         for parquet_struct in parquet_structs {
             let size_of_struct = allocative::size_of_unique(&parquet_struct);
             PARQUET_STRUCT_SIZE
@@ -252,7 +266,12 @@ where
             parquet_processed_structs: Some(parquet_processed_transactions),
             table_name: ParquetType::TABLE_NAME.to_string(),
         };
-
+        info!(
+            table_name = ParquetType::TABLE_NAME,
+            start_version = start_version,
+            end_version = end_version,
+            "Uploaded parquet to GCS and sending result to gap detector."
+        );
         self.gap_detector_sender
             .send(ProcessingResult::ParquetProcessingResult(
                 parquet_processing_result,
