@@ -113,6 +113,7 @@ pub struct CrashInfo {
 /// details/backtrace and then exit.
 #[allow(deprecated)]
 pub fn setup_panic_handler() {
+    #[allow(deprecated)]
     std::panic::set_hook(Box::new(move |pi: &PanicInfo<'_>| {
         handle_panic(pi);
     }));
