@@ -5,13 +5,10 @@ mod test {
         ACCOUNT_A_GET_FUNDED_FROM_FAUCET, ACCOUNT_A_TRANSFER_TO_ACCOUNT_B,
         ACCOUNT_B_TRANSFER_TO_ACCOUNT_B,
     };
-    use bigdecimal::BigDecimal;
     use diesel::{
-        pg::PgConnection,
-        query_dsl::methods::{FilterDsl, SelectDsl},
-        ExpressionMethods, RunQueryDsl,
+        pg::PgConnection, query_dsl::methods::{FilterDsl, SelectDsl}, sql_types::{BigInt, Text}, ExpressionMethods, RunQueryDsl
     };
-    use processor::schema::current_coin_balances::dsl::*;
+    use processor::schema::events::dsl::*;
 
     #[tokio::test]
     async fn test_case_1() {
@@ -23,38 +20,23 @@ mod test {
         .await
         .unwrap();
         let processor_config = TestProcessorConfig {
-            config: processor::processors::ProcessorConfig::CoinProcessor,
+            config: processor::processors::ProcessorConfig::EventsProcessor,
         };
         assert!(test_context
             .run(processor_config, |conn: &mut PgConnection| {
                 let result =
-                    current_coin_balances
-                        .select((owner_address, amount))
-                        .filter(owner_address.eq(
-                            "0xae9957b61de4c9e2c3a9d706d5785774b5c3ff365ecb692303b76ba849c4aea6",
-                        ))
-                        .load::<(String, BigDecimal)>(conn);
-                assert_eq!(result.unwrap(), vec![(
-                    "0xae9957b61de4c9e2c3a9d706d5785774b5c3ff365ecb692303b76ba849c4aea6"
-                        .to_string(),
-                    BigDecimal::from(49999200)
-                )]);
-                let result =
-                    current_coin_balances
-                        .select((owner_address, amount))
-                        .filter(owner_address.eq(
-                            "0xeea01e0c163fe390e30afd0e6ff88a3535a2d78b4cbbcc8f9bf3848b5a8fbcf2",
-                        ))
-                        .load::<(String, BigDecimal)>(conn);
-                assert_eq!(result.unwrap(), vec![(
-                    "0xeea01e0c163fe390e30afd0e6ff88a3535a2d78b4cbbcc8f9bf3848b5a8fbcf2"
-                        .to_string(),
-                    BigDecimal::from(49900100)
-                )]);
+                    events.select((transaction_version, event_index, type_))
+                        .filter(transaction_version.eq(0))
+                        .load::<(i64, i64, String)>(conn);
+                assert_eq!(result.unwrap().len(), 5);
 
-                // we also want to check the number of rows in the table
-                let result = diesel::QueryDsl::count(current_coin_balances).get_result::<i64>(conn);
-                assert_eq!(result.unwrap(), 3);
+                let withdraw_events = events
+                    .select((transaction_version, event_index, type_))
+                    .filter(type_.eq("0x1::coin::WithdrawEvent"))
+                    .load::<(i64, i64, String)>(conn);
+                
+                // Withdraw from Faucet, Withdraw from AccountA, Withdraw from AccountB
+                assert_eq!(withdraw_events.unwrap().len(), 3);
                 Ok(())
             })
             .await
