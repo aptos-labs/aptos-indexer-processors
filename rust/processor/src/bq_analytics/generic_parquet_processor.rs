@@ -168,19 +168,6 @@ where
             }
         }
 
-        if self.last_upload_time.elapsed() >= self.upload_interval {
-            info!(
-                "Time has elapsed more than {} since last upload for {}",
-                self.upload_interval.as_secs(),
-                ParquetType::TABLE_NAME
-            );
-            if let Err(e) = self.upload_buffer(gcs_client).await {
-                error!("Failed to upload buffer: {}", e);
-                return Err(e);
-            }
-            self.last_upload_time = Instant::now();
-        }
-
         PARQUET_HANDLER_CURRENT_BUFFER_SIZE
             .with_label_values(&[&self.processor_name, ParquetType::TABLE_NAME])
             .set(self.buffer_size_bytes as i64);

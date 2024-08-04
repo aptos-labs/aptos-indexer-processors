@@ -427,7 +427,7 @@ async fn parse_v2_token(
                             transaction_version_to_struct_count
                                 .entry(txn_version)
                                 .and_modify(|e| *e += ownerships.len() as i64 + 1)
-                                .or_insert(1);
+                                .or_insert(ownerships.len() as i64 + 1);
                             token_ownerships_v2.append(&mut ownerships);
                             token_datas_v2.push(token_data);
                         }
