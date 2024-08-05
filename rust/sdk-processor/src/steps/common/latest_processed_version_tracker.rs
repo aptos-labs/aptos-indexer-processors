@@ -2,8 +2,9 @@ use crate::utils::database::{execute_with_better_error, ArcDbPool};
 use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
-    steps::{pollable_async_step::PollableAsyncRunType, PollableAsyncStep},
-    traits::{NamedStep, Processable},
+    traits::{
+        pollable_async_step::PollableAsyncRunType, NamedStep, PollableAsyncStep, Processable,
+    },
     types::transaction_context::TransactionContext,
     utils::{errors::ProcessorError, time::parse_timestamp},
 };
@@ -54,75 +55,8 @@ where
         self.next_version = new_prev_batch.end_version + 1;
         self.last_success_batch = Some(new_prev_batch);
     }
-}
 
-#[async_trait]
-impl<T> Processable for LatestVersionProcessedTracker<T>
-where
-    Self: Sized + Send + 'static,
-    T: Send + 'static,
-{
-    type Input = T;
-    type Output = T;
-    type RunType = PollableAsyncRunType;
-
-    async fn process(
-        &mut self,
-        current_batch: TransactionContext<T>,
-    ) -> Result<Option<TransactionContext<T>>, ProcessorError> {
-        info!(
-            start_version = current_batch.start_version,
-            end_version = current_batch.end_version,
-            step_name = self.name(),
-            "Processing versions"
-        );
-        // If there's a gap in the next_version and current_version, save the current_version to seen_versions for
-        // later processing.
-        if self.next_version != current_batch.start_version {
-            tracing::info!(
-                expected_next_version = self.next_version,
-                step = self.name(),
-                batch_version = current_batch.start_version,
-                "Gap detected",
-            );
-            self.seen_versions
-                .insert(current_batch.start_version, TransactionContext {
-                    data: vec![], // No data is needed for tracking. This is to avoid clone.
-                    start_version: current_batch.start_version,
-                    end_version: current_batch.end_version,
-                    start_transaction_timestamp: current_batch.start_transaction_timestamp.clone(),
-                    end_transaction_timestamp: current_batch.end_transaction_timestamp.clone(),
-                    total_size_in_bytes: current_batch.total_size_in_bytes,
-                });
-        } else {
-            tracing::info!("No gap detected");
-            // If the current_batch is the next expected version, update the last success batch
-            self.update_last_success_batch(TransactionContext {
-                data: vec![], // No data is needed for tracking. This is to avoid clone.
-                start_version: current_batch.start_version,
-                end_version: current_batch.end_version,
-                start_transaction_timestamp: current_batch.start_transaction_timestamp.clone(),
-                end_transaction_timestamp: current_batch.end_transaction_timestamp.clone(),
-                total_size_in_bytes: current_batch.total_size_in_bytes,
-            });
-        }
-        // Pass through
-        Ok(Some(current_batch))
-    }
-}
-
-#[async_trait]
-impl<T: Send + 'static> PollableAsyncStep for LatestVersionProcessedTracker<T>
-where
-    Self: Sized + Send + 'static,
-    T: Send + 'static,
-{
-    fn poll_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(UPDATE_PROCESSOR_STATUS_SECS)
-    }
-
-    async fn poll(&mut self) -> Result<Option<Vec<TransactionContext<T>>>, ProcessorError> {
-        // TODO: Add metrics for gap count
+    async fn save_processor_status(&mut self) -> Result<(), ProcessorError> {
         // Update the processor status
         if let Some(last_success_batch) = self.last_success_batch.as_ref() {
             let end_timestamp = last_success_batch
@@ -153,6 +87,86 @@ where
                 message: format!("Failed to update processor status: {}", e),
             })?;
         }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<T> Processable for LatestVersionProcessedTracker<T>
+where
+    Self: Sized + Send + 'static,
+    T: Send + 'static,
+{
+    type Input = T;
+    type Output = T;
+    type RunType = PollableAsyncRunType;
+
+    async fn process(
+        &mut self,
+        current_batch: TransactionContext<T>,
+    ) -> Result<Option<TransactionContext<T>>, ProcessorError> {
+        info!(
+            start_version = current_batch.start_version,
+            end_version = current_batch.end_version,
+            step_name = self.name(),
+            "Processing versions"
+        );
+        // If there's a gap in the next_version and current_version, save the current_version to seen_versions for
+        // later processing.
+        if self.next_version != current_batch.start_version {
+            info!(
+                expected_next_version = self.next_version,
+                step = self.name(),
+                batch_version = current_batch.start_version,
+                "Gap detected",
+            );
+            self.seen_versions
+                .insert(current_batch.start_version, TransactionContext {
+                    data: vec![], // No data is needed for tracking. This is to avoid clone.
+                    start_version: current_batch.start_version,
+                    end_version: current_batch.end_version,
+                    start_transaction_timestamp: current_batch.start_transaction_timestamp.clone(),
+                    end_transaction_timestamp: current_batch.end_transaction_timestamp.clone(),
+                    total_size_in_bytes: current_batch.total_size_in_bytes,
+                });
+        } else {
+            info!("No gap detected");
+            // If the current_batch is the next expected version, update the last success batch
+            self.update_last_success_batch(TransactionContext {
+                data: vec![], // No data is needed for tracking. This is to avoid clone.
+                start_version: current_batch.start_version,
+                end_version: current_batch.end_version,
+                start_transaction_timestamp: current_batch.start_transaction_timestamp.clone(),
+                end_transaction_timestamp: current_batch.end_transaction_timestamp.clone(),
+                total_size_in_bytes: current_batch.total_size_in_bytes,
+            });
+        }
+        // Pass through
+        Ok(Some(current_batch))
+    }
+
+    async fn cleanup(
+        &mut self,
+    ) -> Result<Option<Vec<TransactionContext<Self::Output>>>, ProcessorError> {
+        // If processing or polling ends, save the last successful batch to the database.
+        self.save_processor_status().await?;
+        Ok(None)
+    }
+}
+
+#[async_trait]
+impl<T: Send + 'static> PollableAsyncStep for LatestVersionProcessedTracker<T>
+where
+    Self: Sized + Send + Sync + 'static,
+    T: Send + 'static,
+{
+    fn poll_interval(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(UPDATE_PROCESSOR_STATUS_SECS)
+    }
+
+    async fn poll(&mut self) -> Result<Option<Vec<TransactionContext<T>>>, ProcessorError> {
+        // TODO: Add metrics for gap count
+        self.save_processor_status().await?;
         // Nothing should be returned
         Ok(None)
     }
