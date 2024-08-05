@@ -148,7 +148,7 @@ impl From<&CurrentFungibleAssetBalance> for CurrentUnifiedFungibleAssetBalance {
 
 impl FungibleAssetBalance {
     /// Basically just need to index FA Store, but we'll need to look up FA metadata
-    pub async fn get_v2_from_write_resource(
+    pub fn get_v2_from_write_resource(
         write_resource: &WriteResource,
         write_set_change_index: i64,
         txn_version: i64,
