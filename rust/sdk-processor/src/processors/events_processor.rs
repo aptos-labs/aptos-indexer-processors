@@ -18,8 +18,8 @@ use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
+    common_steps::TransactionStreamStep,
     instrumented_channel::instrumented_bounded_channel,
-    steps::TransactionStreamStep,
     traits::{IntoRunnableStep, RunnableStepWithInputReceiver},
 };
 use serde::{Deserialize, Serialize};
