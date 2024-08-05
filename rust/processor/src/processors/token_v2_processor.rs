@@ -8,6 +8,7 @@ use crate::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
         },
+        should_skip,
         token_models::{
             token_claims::CurrentTokenPendingClaim,
             tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
@@ -23,9 +24,9 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
+                AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, Mint, MintEvent,
                 PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
-                TransferEvent, UnlimitedSupply,
+                TransferEvent, UnlimitedSupply, V2TokenEvent,
             },
         },
     },
@@ -854,41 +855,77 @@ async fn parse_v2_token(
                 }
             }
 
+            // This is used to dedup Mint/Burn events since it is possible both v1 and v2 coexist in
+            // different ways. Refer to move code for details.
+            let mut previous_mint_or_burn_event = None;
             // Pass through events to get the burn events and token activities v2
             // This needs to be here because we need the metadata above for token activities
             // and burn / transfer events need to come before the next section
             for (index, event) in user_txn.events.iter().enumerate() {
+                let prev_event = if index == 0 {
+                    None
+                } else {
+                    Some(&user_txn.events[index - 1])
+                };
+                if should_skip(event, prev_event) {
+                    continue;
+                }
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
-                }
-                if let Some(old_burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
-                    let burn_event = Burn::new(
-                        standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
-                        old_burn_event.get_token_address(),
-                        "".to_string(),
-                    );
-                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
-                }
-                if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap() {
+                    tokens_burned.insert(burn_event.get_token_address(), burn_event.clone());
+                    previous_mint_or_burn_event = Some(V2TokenEvent::Burn(burn_event));
+                } else if let Some(mint_event) = Mint::from_event(event, txn_version).unwrap() {
                     tokens_minted.insert(mint_event.get_token_address());
-                }
-                if let Some(transfer_events) =
-                    TransferEvent::from_event(event, txn_version).unwrap()
-                {
-                    if let Some(aggregated_data) =
-                        token_v2_metadata_helper.get_mut(&transfer_events.get_object_address())
+                    previous_mint_or_burn_event = Some(V2TokenEvent::Mint(mint_event));
+                } else {
+                    if let Some(old_burn_event) = BurnEvent::from_event(event, txn_version).unwrap()
                     {
-                        // we don't want index to be 0 otherwise we might have collision with write set change index
-                        // note that these will be multiplied by -1 so that it doesn't conflict with wsc index
-                        let index = if index == 0 {
-                            user_txn.events.len()
-                        } else {
-                            index
-                        };
-                        aggregated_data
-                            .transfer_events
-                            .push((index as i64, transfer_events));
+                        if let Some(V2TokenEvent::Burn(burn_event)) = &previous_mint_or_burn_event {
+                            if burn_event.get_token_address() == old_burn_event.get_token_address()
+                            {
+                                previous_mint_or_burn_event = None;
+                                continue;
+                            }
+                        }
+                        let burn_event = Burn::new(
+                            standardize_address(
+                                event.key.as_ref().unwrap().account_address.as_str(),
+                            ),
+                            old_burn_event.get_token_address(),
+                            "".to_string(),
+                        );
+                        tokens_burned.insert(burn_event.get_token_address(), burn_event);
+                    } else if let Some(mint_event) =
+                        MintEvent::from_event(event, txn_version).unwrap()
+                    {
+                        if let Some(V2TokenEvent::Mint(old_mint_event)) =
+                            &previous_mint_or_burn_event
+                        {
+                            if mint_event.get_token_address() == old_mint_event.get_token_address()
+                            {
+                                previous_mint_or_burn_event = None;
+                                continue;
+                            }
+                        }
+                        tokens_minted.insert(mint_event.get_token_address());
+                    } else if let Some(transfer_events) =
+                        TransferEvent::from_event(event, txn_version).unwrap()
+                    {
+                        if let Some(aggregated_data) =
+                            token_v2_metadata_helper.get_mut(&transfer_events.get_object_address())
+                        {
+                            // we don't want index to be 0 otherwise we might have collision with write set change index
+                            // note that these will be multiplied by -1 so that it doesn't conflict with wsc index
+                            let index = if index == 0 {
+                                user_txn.events.len()
+                            } else {
+                                index
+                            };
+                            aggregated_data
+                                .transfer_events
+                                .push((index as i64, transfer_events));
+                        }
                     }
+                    previous_mint_or_burn_event = None;
                 }
                 // handling all the token v1 events
                 if let Some(event) = TokenActivityV2::get_v1_from_parsed_event(

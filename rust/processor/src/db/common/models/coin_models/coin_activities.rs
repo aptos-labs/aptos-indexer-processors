@@ -19,6 +19,7 @@ use crate::{
             },
             v2_fungible_asset_utils::FeeStatement,
         },
+        should_skip,
         user_transactions_models::signatures::Signature,
     },
     schema::coin_activities,
@@ -186,6 +187,16 @@ impl CoinActivity {
             }
         }
         for (index, event) in events.iter().enumerate() {
+            if should_skip(
+                event,
+                if index == 0 {
+                    None
+                } else {
+                    Some(&events[index - 1])
+                },
+            ) {
+                continue;
+            }
             let event_type = event.type_str.clone();
             if let Some(parsed_event) =
                 CoinEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
@@ -222,23 +233,44 @@ impl CoinActivity {
         transaction_timestamp: chrono::NaiveDateTime,
         event_index: i64,
     ) -> Self {
-        let amount = match coin_event {
-            CoinEvent::WithdrawCoinEvent(inner) => inner.amount.clone(),
-            CoinEvent::DepositCoinEvent(inner) => inner.amount.clone(),
+        let (owner_address, amount, coin_type_option) = match coin_event {
+            CoinEvent::WithdrawCoinEvent(inner) => (
+                standardize_address(&event.key.as_ref().unwrap().account_address),
+                inner.amount.clone(),
+                None,
+            ),
+            CoinEvent::DepositCoinEvent(inner) => (
+                standardize_address(&event.key.as_ref().unwrap().account_address),
+                inner.amount.clone(),
+                None,
+            ),
+            CoinEvent::WithdrawCoinEventV2(inner) => (
+                standardize_address(&inner.account),
+                inner.amount.clone(),
+                Some(inner.coin_type.clone()),
+            ),
+            CoinEvent::DepositCoinEventV2(inner) => (
+                standardize_address(&inner.account),
+                inner.amount.clone(),
+                Some(inner.coin_type.clone()),
+            ),
         };
-        let event_move_guid = EventGuidResource {
-            addr: standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
-            creation_num: event.key.as_ref().unwrap().creation_number as i64,
-        };
-        let coin_type =
+        let coin_type = if let Some(coin_type) = coin_type_option {
+            coin_type
+        } else {
+            let event_move_guid = EventGuidResource {
+                addr: standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
+                creation_num: event.key.as_ref().unwrap().creation_number as i64,
+            };
             event_to_coin_type
-                .get(&event_move_guid)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                        txn_version, event_move_guid, event_to_coin_type
-                    )
-                }).clone();
+                    .get(&event_move_guid)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
+                            txn_version, event_move_guid, event_to_coin_type
+                        )
+                    }).clone()
+        };
 
         Self {
             transaction_version: txn_version,
@@ -247,7 +279,7 @@ impl CoinActivity {
             ),
             event_creation_number: event.key.as_ref().unwrap().creation_number as i64,
             event_sequence_number: event.sequence_number as i64,
-            owner_address: standardize_address(&event.key.as_ref().unwrap().account_address),
+            owner_address,
             coin_type,
             amount,
             activity_type: event_type.to_string(),
