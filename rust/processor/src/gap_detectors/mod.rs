@@ -125,11 +125,6 @@ pub async fn create_gap_detector_status_tracker_loop(
                 }
             },
             Ok(ProcessingResult::ParquetProcessingResult(result)) => {
-                tracing::info!(
-                    processor_name,
-                    service_type = PROCESSOR_SERVICE_TYPE,
-                    "[ParquetGapDetector] received parquet gap detector task",
-                );
                 match gap_detector
                     .process_versions(ProcessingResult::ParquetProcessingResult(result))
                 {
