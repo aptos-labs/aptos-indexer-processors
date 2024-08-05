@@ -29,7 +29,9 @@ pub struct CoinBalance {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Selectable,
+)]
 #[diesel(primary_key(owner_address, coin_type))]
 #[diesel(table_name = current_coin_balances)]
 pub struct CurrentCoinBalance {

@@ -20,7 +20,7 @@ pub use config::IndexerGrpcProcessorConfig;
 
 pub mod bq_analytics;
 mod config;
-mod db;
+pub mod db;
 pub mod gap_detectors;
 pub mod grpc_stream;
 pub mod processors;
