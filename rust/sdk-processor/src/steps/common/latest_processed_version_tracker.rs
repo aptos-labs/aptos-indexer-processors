@@ -105,12 +105,12 @@ where
         &mut self,
         current_batch: TransactionContext<T>,
     ) -> Result<Option<TransactionContext<T>>, ProcessorError> {
-        info!(
-            start_version = current_batch.start_version,
-            end_version = current_batch.end_version,
-            step_name = self.name(),
-            "Processing versions"
-        );
+        // info!(
+        //     start_version = current_batch.start_version,
+        //     end_version = current_batch.end_version,
+        //     step_name = self.name(),
+        //     "Processing versions"
+        // );
         // If there's a gap in the next_version and current_version, save the current_version to seen_versions for
         // later processing.
         if self.next_version != current_batch.start_version {
@@ -130,7 +130,7 @@ where
                     total_size_in_bytes: current_batch.total_size_in_bytes,
                 });
         } else {
-            info!("No gap detected");
+            // info!("No gap detected");
             // If the current_batch is the next expected version, update the last success batch
             self.update_last_success_batch(TransactionContext {
                 data: vec![], // No data is needed for tracking. This is to avoid clone.
