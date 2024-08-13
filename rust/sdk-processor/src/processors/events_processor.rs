@@ -19,8 +19,7 @@ use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
     common_steps::TransactionStreamStep,
-    instrumented_channel::instrumented_bounded_channel,
-    traits::{IntoRunnableStep, RunnableStepWithInputReceiver},
+    traits::IntoRunnableStep,
 };
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
@@ -31,6 +30,15 @@ pub struct EventsProcessorConfig {
     // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
     #[serde(default = "AHashMap::new")]
     pub per_table_chunk_sizes: AHashMap<String, usize>,
+    // Size of channel between steps
+    #[serde(default = "EventsProcessorConfig::default_channel_size")]
+    pub channel_size: usize,
+}
+
+impl EventsProcessorConfig {
+    pub const fn default_channel_size() -> usize {
+        10
+    }
 }
 
 pub struct EventsProcessor {
@@ -86,21 +94,16 @@ impl EventsProcessor {
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
-        // Define processor steps
-        let (_input_sender, input_receiver) = instrumented_bounded_channel("input", 1);
-
         let ProcessorConfig::EventsProcessor(events_processor_config) =
             self.config.processor_config;
+        let channel_size = events_processor_config.channel_size;
 
+        // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
             ..self.config.transaction_stream_config
         })
         .await?;
-        let transaction_stream_with_input = RunnableStepWithInputReceiver::new(
-            input_receiver,
-            transaction_stream.into_runnable_step(),
-        );
         let events_extractor = EventsExtractor {};
         let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
         let version_tracker = LatestVersionProcessedTracker::new(
@@ -110,13 +113,13 @@ impl EventsProcessor {
         );
 
         // Connect processor steps together
-        let (_, buffer_receiver) = ProcessorBuilder::new_with_runnable_input_receiver_first_step(
-            transaction_stream_with_input,
+        let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
+            transaction_stream.into_runnable_step(),
         )
-        .connect_to(events_extractor.into_runnable_step(), 10)
-        .connect_to(events_storer.into_runnable_step(), 10)
-        .connect_to(version_tracker.into_runnable_step(), 10)
-        .end_and_return_output_receiver(10);
+        .connect_to(events_extractor.into_runnable_step(), channel_size)
+        .connect_to(events_storer.into_runnable_step(), channel_size)
+        .connect_to(version_tracker.into_runnable_step(), channel_size)
+        .end_and_return_output_receiver(channel_size);
 
         // (Optional) Parse the results
         loop {
