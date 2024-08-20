@@ -15,7 +15,6 @@ use aptos_protos::transaction::v1::{
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
-    NoAccountSignature as NoAccountSignaturePb,
     Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
     SingleSender as SingleSenderPb,
 };
