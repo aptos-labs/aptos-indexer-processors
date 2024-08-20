@@ -1,1 +1,1 @@
-mod event_processor_tests;
+pub mod event_processor_tests;
