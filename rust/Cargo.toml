@@ -28,7 +28,7 @@ ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7" }
 aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7" }
-aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "d118ecb88bb112ce13e3802ee65ab8a52dd9a01f" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "4541add3fd29826ec57f22658ca286d2d6134b93" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"

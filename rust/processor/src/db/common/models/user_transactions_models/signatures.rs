@@ -15,6 +15,7 @@ use aptos_protos::transaction::v1::{
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
     FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
+    NoAccountSignature as NoAccountSignaturePb,
     Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
     SingleSender as SingleSenderPb,
 };
@@ -110,6 +111,9 @@ impl Signature {
                     },
                     AccountSignatureEnum::MultiKeySignature(_) => {
                         String::from("multi_key_signature")
+                    },
+                    AccountSignatureEnum::NoAccountSignature(_) => {
+                        String::from("no_account_signature")
                     },
                 }
             },
@@ -324,6 +328,7 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
+            AccountSignatureEnum::NoAccountSignature(_) => vec![],
         }
     }
 
@@ -567,6 +572,7 @@ impl Signature {
                 0,
                 None,
             ),
+            Some(AccountSignatureEnum::NoAccountSignature(_)) => vec![],
             None => vec![],
         }
     }
