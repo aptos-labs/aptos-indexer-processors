@@ -13,7 +13,7 @@ mod test {
     use processor::schema::events::dsl::*;
 
     #[tokio::test]
-    async fn test_case_1() {
+    async fn test_transfer_event() {
         let test_context = TestContext::new(&[
             ACCOUNT_A_GET_FUNDED_FROM_FAUCET,
             ACCOUNT_A_TRANSFER_TO_ACCOUNT_B,

@@ -13,7 +13,7 @@ use testcontainers::{
     ContainerAsync, GenericImage, ImageExt,
 };
 
-mod simple_tests;
+mod event_processor;
 
 /// The test context struct holds the test name and the transaction batches.
 pub struct TestContext {

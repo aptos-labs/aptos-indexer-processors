@@ -1,19 +1,19 @@
-name: Run Integration Tests
+name: "Nightly Run Integration Tests"
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-  pull_request:
+  schedule:
+    - cron: '0 9 * * *'  # This runs the workflow every day at 9:00 AM UTC
 
 jobs:
-  Integration-tests:
+
+  nightly-run:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Install deps and run linter
         run: |
           sudo apt update && sudo apt install libdw-dev
