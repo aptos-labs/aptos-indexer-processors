@@ -59,7 +59,7 @@ pub struct FungibleAssetActivity {
 }
 
 impl FungibleAssetActivity {
-    pub async fn get_v2_from_event(
+    pub fn get_v2_from_event(
         event: &Event,
         txn_version: i64,
         block_height: i64,
