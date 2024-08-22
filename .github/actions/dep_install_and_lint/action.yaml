@@ -1,0 +1,28 @@
+name: "Install Dependencies and Run Linter"
+description: "Installs dependencies and runs the Rust linter."
+
+inputs:
+  working-directory:
+    description: 'The working directory for the linter'
+    required: true
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Dependencies
+      run: |
+        sudo apt update && sudo apt install libdw-dev
+        cargo install cargo-sort
+        rustup update
+        rustup toolchain install nightly
+        rustup component add clippy --toolchain nightly
+        rustup component add rustfmt --toolchain nightly
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Run Linter
+      run: |
+        scripts/rust_lint.sh --check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}

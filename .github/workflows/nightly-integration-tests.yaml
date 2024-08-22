@@ -1,0 +1,24 @@
+name: "Nightly Run Integration Tests"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'  # This runs the workflow every day at 9:00 AM UTC
+
+jobs:
+
+  nightly-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies and Run Linter
+        uses: ./.github/actions/dep_install_and_lint
+        with:
+          working-directory: rust
+
+      - name: Run Integration Tests
+        run: cargo test --manifest-path integration-tests/Cargo.toml
+        working-directory: rust
