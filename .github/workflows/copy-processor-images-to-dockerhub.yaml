@@ -65,6 +65,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: scripts
 
+      - name: Install Dependencies and Run Linter
+        uses: ./.github/actions/dep_install_and_lint
+        with:
+          working-directory: rust
+
       - name: Run Integration Tests for Specific Crate
         run: cargo test --manifest-path integration-tests/Cargo.toml
         working-directory: rust
