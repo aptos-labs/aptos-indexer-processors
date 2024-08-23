@@ -26,7 +26,7 @@ pub struct ParquetFileGapDetectorInner {
 }
 
 pub struct ParquetFileGapDetectorResult {
-    pub next_version_to_process: u64,
+    pub last_success_version: u64,
     pub num_gaps: u64,
     pub last_transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
 }
@@ -138,7 +138,7 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
             self.update_next_version_to_process(self.max_version, &result.table_name);
             return Ok(GapDetectorResult::ParquetFileGapDetectorResult(
                 ParquetFileGapDetectorResult {
-                    next_version_to_process: self.next_version_to_process as u64,
+                    last_success_version: self.next_version_to_process as u64 - 1,
                     num_gaps: (self.max_version - self.next_version_to_process) as u64,
                     last_transaction_timestamp: result.last_transaction_timestamp,
                 },
@@ -164,7 +164,7 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
 
         Ok(GapDetectorResult::ParquetFileGapDetectorResult(
             ParquetFileGapDetectorResult {
-                next_version_to_process: self.next_version_to_process as u64,
+                last_success_version: self.next_version_to_process as u64 - 1,
                 num_gaps: (self.max_version - self.next_version_to_process) as u64,
                 last_transaction_timestamp: result.last_transaction_timestamp,
             },

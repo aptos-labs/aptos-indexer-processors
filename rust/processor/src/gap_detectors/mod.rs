@@ -138,7 +138,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                 if res.num_gaps >= gap_detection_batch_size {
                                     tracing::warn!(
                                         processor_name,
-                                        gap_start_version = res.next_version_to_process,
+                                        gap_start_version = res.last_success_version,
                                         num_gaps = res.num_gaps,
                                         "[Parser] Processed batches with a gap",
                                     );
@@ -149,13 +149,13 @@ pub async fn create_gap_detector_status_tracker_loop(
                                     >= UPDATE_PROCESSOR_STATUS_SECS
                                 {
                                     tracing::info!(
-                                        last_processed_version = res.next_version_to_process,
+                                        last_processed_version = res.last_success_version,
                                         processor_name,
                                         "Updating last processed version"
                                     );
                                     processor
                                         .update_last_processed_version(
-                                            res.next_version_to_process,
+                                            res.last_success_version,
                                             res.last_transaction_timestamp,
                                         )
                                         .await
