@@ -155,6 +155,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 }
 
 /// This enum captures the configs for all the different processors that are defined.
+/// 
 /// The configs for each processor should only contain configuration specific to that
 /// processor. For configuration that is common to all processors, put it in
 /// IndexerGrpcProcessorConfig.
@@ -226,14 +227,16 @@ impl ProcessorConfig {
     }
 }
 
-/// This enum contains all the processors defined in this crate. We use enum_dispatch
-/// as it is more efficient than using dynamic dispatch (Box<dyn ProcessorTrait>) and
+/// This enum contains all the processors defined in this crate.
+/// 
+/// We use enum_dispatch as it is more efficient than using dynamic dispatch (Box<dyn ProcessorTrait>) and
 /// it enables nice safety checks like in we do in `test_processor_names_complete`.
-#[enum_dispatch(ProcessorTrait)]
-#[derive(Debug)]
-// To ensure that the variants of ProcessorConfig and Processor line up, in the testing
+/// 
+/// // To ensure that the variants of ProcessorConfig and Processor line up, in the testing
 // build path we derive EnumDiscriminants on this enum as well and make sure the two
 // sets of variants match up in `test_processor_names_complete`.
+#[enum_dispatch(ProcessorTrait)]
+#[derive(Debug)]
 #[cfg_attr(
     test,
     derive(strum::EnumDiscriminants),
@@ -271,8 +274,10 @@ mod test {
     use strum::VariantNames;
 
     /// This test exists to make sure that when a new processor is added, it is added
-    /// to both Processor and ProcessorConfig. To make sure this passes, make sure the
-    /// variants are in the same order (lexicographical) and the names match.
+    /// to both Processor and ProcessorConfig.
+    /// 
+    /// To make sure this passes, make sure the variants are in the same order
+    /// (lexicographical) and the names match.
     #[test]
     fn test_processor_names_complete() {
         assert_eq!(ProcessorName::VARIANTS, ProcessorDiscriminants::VARIANTS);
