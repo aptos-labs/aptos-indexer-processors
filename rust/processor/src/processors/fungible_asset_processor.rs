@@ -372,9 +372,17 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
-        let (coin_balance, fa_balance): (Vec<_>, Vec<_>) = current_unified_fungible_asset_balances
-            .into_iter()
-            .partition(|x| x.is_primary.is_none());
+        // if flag turned on we need to not include any value in the table
+        let (coin_balance, fa_balance): (Vec<_>, Vec<_>) = if self
+            .deprecated_tables
+            .contains(TableFlags::CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES)
+        {
+            (vec![], vec![])
+        } else {
+            current_unified_fungible_asset_balances
+                .into_iter()
+                .partition(|x| x.is_primary.is_none())
+        };
 
         if self
             .deprecated_tables

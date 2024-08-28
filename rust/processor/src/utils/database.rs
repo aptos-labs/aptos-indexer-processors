@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Database-related functions
-#![allow(clippy::extra_unused_lifetimes)]
-
 use crate::utils::util::remove_null_bytes;
 use ahash::AHashMap;
 use diesel::{
@@ -33,7 +30,9 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/postgres/mi
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
 
 #[derive(QueryId)]
-/// Using this will append a where clause at the end of the string upsert function, e.g.
+/// Using this will append a where clause at the end of the string upsert function
+///
+/// e.g.
 /// INSERT INTO ... ON CONFLICT DO UPDATE SET ... WHERE "transaction_version" = excluded."transaction_version"
 /// This is needed when we want to maintain a table with only the latest state
 pub struct UpsertFilterLatestTransactionQuery<T> {
@@ -41,7 +40,8 @@ pub struct UpsertFilterLatestTransactionQuery<T> {
     where_clause: Option<&'static str>,
 }
 
-// the max is actually u16::MAX but we see that when the size is too big we get an overflow error so reducing it a bit
+/// the max is actually u16::MAX but we see that when the size is too big we get
+/// an overflow error so reducing it a bit
 pub const MAX_DIESEL_PARAM_SIZE: usize = (u16::MAX / 2) as usize;
 
 /// This function will clean the data for postgres. Currently it has support for removing
@@ -190,7 +190,8 @@ where
     res
 }
 
-/// Returns the entry for the config hashmap, or the default field count for the insert
+/// Returns the entry for the config hashmap, or the default field count for the insert.
+///
 /// Given diesel has a limit of how many parameters can be inserted in a single operation (u16::MAX),
 /// we default to chunk an array of items based on how many columns are in the table.
 pub fn get_config_table_chunk_size<T: field_count::FieldCount>(

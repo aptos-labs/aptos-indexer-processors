@@ -83,6 +83,7 @@ bitflags! {
         const FUNGIBLE_ASSET_BALANCES = 1 << 6;
         const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 7;
         const COIN_SUPPLY = 1 << 8;
+        const CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES = 1 << 24;
 
         // Objects
         const OBJECTS = 1 << 9;
