@@ -427,6 +427,35 @@ diesel::table! {
         storage_id -> Varchar,
         #[max_length = 66]
         owner_address -> Varchar,
+        #[max_length = 66]
+        asset_type_v2 -> Nullable<Varchar>,
+        #[max_length = 1000]
+        asset_type_v1 -> Nullable<Varchar>,
+        is_primary -> Nullable<Bool>,
+        is_frozen -> Bool,
+        amount_v1 -> Nullable<Numeric>,
+        amount_v2 -> Nullable<Numeric>,
+        amount -> Nullable<Numeric>,
+        last_transaction_version_v1 -> Nullable<Int8>,
+        last_transaction_version_v2 -> Nullable<Int8>,
+        last_transaction_version -> Nullable<Int8>,
+        last_transaction_timestamp_v1 -> Nullable<Timestamp>,
+        last_transaction_timestamp_v2 -> Nullable<Timestamp>,
+        last_transaction_timestamp -> Nullable<Timestamp>,
+        inserted_at -> Timestamp,
+        #[max_length = 1000]
+        asset_type -> Nullable<Varchar>,
+        #[max_length = 10]
+        token_standard -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    current_fungible_asset_balances_legacy (storage_id) {
+        #[max_length = 66]
+        storage_id -> Varchar,
+        #[max_length = 66]
+        owner_address -> Varchar,
         #[max_length = 1000]
         asset_type -> Varchar,
         is_primary -> Bool,
@@ -647,31 +676,6 @@ diesel::table! {
         #[max_length = 66]
         state_key_hash -> Varchar,
         last_transaction_version -> Int8,
-        inserted_at -> Timestamp,
-    }
-}
-
-diesel::table! {
-    current_unified_fungible_asset_balances_to_be_renamed (storage_id) {
-        #[max_length = 66]
-        storage_id -> Varchar,
-        #[max_length = 66]
-        owner_address -> Varchar,
-        #[max_length = 66]
-        asset_type_v2 -> Nullable<Varchar>,
-        #[max_length = 1000]
-        asset_type_v1 -> Nullable<Varchar>,
-        is_primary -> Nullable<Bool>,
-        is_frozen -> Bool,
-        amount_v1 -> Nullable<Numeric>,
-        amount_v2 -> Nullable<Numeric>,
-        amount -> Nullable<Numeric>,
-        last_transaction_version_v1 -> Nullable<Int8>,
-        last_transaction_version_v2 -> Nullable<Int8>,
-        last_transaction_version -> Nullable<Int8>,
-        last_transaction_timestamp_v1 -> Nullable<Timestamp>,
-        last_transaction_timestamp_v2 -> Nullable<Timestamp>,
-        last_transaction_timestamp -> Nullable<Timestamp>,
         inserted_at -> Timestamp,
     }
 }
@@ -1300,6 +1304,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_delegated_voter,
     current_delegator_balances,
     current_fungible_asset_balances,
+    current_fungible_asset_balances_legacy,
     current_objects,
     current_staking_pool_voter,
     current_table_items,
@@ -1310,7 +1315,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_pending_claims,
     current_token_royalty_v1,
     current_token_v2_metadata,
-    current_unified_fungible_asset_balances_to_be_renamed,
     delegated_staking_activities,
     delegated_staking_pool_balances,
     delegated_staking_pools,

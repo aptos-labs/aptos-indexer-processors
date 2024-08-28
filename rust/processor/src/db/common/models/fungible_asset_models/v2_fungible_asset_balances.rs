@@ -15,7 +15,7 @@ use crate::{
         token_v2_models::v2_token_utils::{TokenStandard, V2_STANDARD},
     },
     schema::{
-        current_fungible_asset_balances, current_unified_fungible_asset_balances_to_be_renamed,
+        current_fungible_asset_balances, current_fungible_asset_balances_legacy,
         fungible_asset_balances,
     },
     utils::util::{
@@ -53,7 +53,7 @@ pub struct FungibleAssetBalance {
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(storage_id))]
-#[diesel(table_name = current_fungible_asset_balances)]
+#[diesel(table_name = current_fungible_asset_balances_legacy)]
 pub struct CurrentFungibleAssetBalance {
     pub storage_id: String,
     pub owner_address: String,
@@ -66,9 +66,11 @@ pub struct CurrentFungibleAssetBalance {
     pub token_standard: String,
 }
 
+/// Note that this used to be called current_unified_fungible_asset_balances_to_be_renamed
+/// and was renamed to current_fungible_asset_balances to facilitate migration
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Default)]
 #[diesel(primary_key(storage_id))]
-#[diesel(table_name = current_unified_fungible_asset_balances_to_be_renamed)]
+#[diesel(table_name = current_fungible_asset_balances)]
 #[diesel(treat_none_as_null = true)]
 pub struct CurrentUnifiedFungibleAssetBalance {
     pub storage_id: String,
