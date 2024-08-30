@@ -135,7 +135,7 @@ impl From<&CurrentFungibleAssetBalance> for CurrentUnifiedFungibleAssetBalance {
                 owner_address: cfab.owner_address.clone(),
                 asset_type_v2: None,
                 asset_type_v1: Some(cfab.asset_type.clone()),
-                is_primary: None,
+                is_primary: Some(true),
                 is_frozen: cfab.is_frozen,
                 amount_v1: Some(cfab.amount.clone()),
                 amount_v2: None,
