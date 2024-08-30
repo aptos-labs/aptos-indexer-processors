@@ -444,9 +444,9 @@ diesel::table! {
         last_transaction_timestamp -> Nullable<Timestamp>,
         inserted_at -> Timestamp,
         #[max_length = 1000]
-        asset_type -> Nullable<Varchar>,
+        asset_type -> Varchar,
         #[max_length = 10]
-        token_standard -> Nullable<Varchar>,
+        token_standard -> Varchar,
     }
 }
 
