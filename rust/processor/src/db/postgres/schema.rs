@@ -963,8 +963,7 @@ diesel::table! {
         is_sender_primary -> Bool,
         #[sql_name = "type"]
         type_ -> Varchar,
-        #[max_length = 136]
-        public_key -> Varchar,
+        public_key -> Text,
         signature -> Text,
         threshold -> Int8,
         public_key_indices -> Jsonb,
