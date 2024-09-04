@@ -379,9 +379,11 @@ impl ProcessorTrait for FungibleAssetProcessor {
         {
             (vec![], vec![])
         } else {
+            // Basically we need to split the current unified balances into v1 and v2
+            // by looking at whether asset_type_v1 is null (must be v1 if not null)
             current_unified_fungible_asset_balances
                 .into_iter()
-                .partition(|x| x.is_primary.is_none())
+                .partition(|x| x.asset_type_v1.is_some())
         };
 
         if self

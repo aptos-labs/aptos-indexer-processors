@@ -431,11 +431,11 @@ diesel::table! {
         asset_type_v2 -> Nullable<Varchar>,
         #[max_length = 1000]
         asset_type_v1 -> Nullable<Varchar>,
-        is_primary -> Nullable<Bool>,
+        is_primary -> Bool,
         is_frozen -> Bool,
         amount_v1 -> Nullable<Numeric>,
         amount_v2 -> Nullable<Numeric>,
-        amount -> Nullable<Numeric>,
+        amount -> Numeric,
         last_transaction_version_v1 -> Nullable<Int8>,
         last_transaction_version_v2 -> Nullable<Int8>,
         last_transaction_version -> Nullable<Int8>,
