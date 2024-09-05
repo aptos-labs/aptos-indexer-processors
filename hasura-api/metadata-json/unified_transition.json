@@ -1355,6 +1355,12 @@
               "name": "current_fungible_asset_balances",
               "schema": "public"
             },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_fungible_asset_balances_new",
+              "custom_root_fields": {}
+            },
             "object_relationships": [
               {
                 "name": "metadata",
@@ -1378,19 +1384,62 @@
                 "permission": {
                   "columns": [
                     "amount",
-                    "amount_v1",
-                    "amount_v2",
                     "asset_type",
-                    "asset_type_v1",
-                    "asset_type_v2",
                     "is_frozen",
                     "is_primary",
                     "last_transaction_timestamp",
-                    "last_transaction_timestamp_v1",
-                    "last_transaction_timestamp_v2",
                     "last_transaction_version",
-                    "last_transaction_version_v1",
-                    "last_transaction_version_v2",
+                    "owner_address",
+                    "storage_id",
+                    "token_standard"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "current_fungible_asset_balances_legacy",
+              "schema": "public"
+            },
+            "configuration": {
+              "column_config": {},
+              "custom_column_names": {},
+              "custom_name": "current_fungible_asset_balances",
+              "custom_root_fields": {}
+            },
+            "object_relationships": [
+              {
+                "name": "metadata",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "asset_type": "asset_type"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "fungible_asset_metadata",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ],
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "amount",
+                    "asset_type",
+                    "is_frozen",
+                    "is_primary",
+                    "last_transaction_timestamp",
+                    "last_transaction_version",
                     "owner_address",
                     "storage_id",
                     "token_standard"
