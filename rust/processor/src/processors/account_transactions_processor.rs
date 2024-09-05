@@ -13,6 +13,7 @@ use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::Pg, query_builder::QueryFragment};
+use rayon::prelude::*;
 use std::fmt::Debug;
 use tracing::error;
 
@@ -101,20 +102,23 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let mut account_transactions = AHashMap::new();
-
-        for txn in &transactions {
-            account_transactions.extend(AccountTransaction::from_transaction(txn));
-        }
-        let mut account_transactions = account_transactions
-            .into_values()
-            .collect::<Vec<AccountTransaction>>();
-
-        // Sort by PK
-        account_transactions.sort_by(|a, b| {
-            (&a.transaction_version, &a.account_address)
-                .cmp(&(&b.transaction_version, &b.account_address))
-        });
+        let account_transactions: Vec<_> = transactions
+            .into_par_iter()
+            .map(|txn| {
+                let transaction_version = txn.version as i64;
+                let accounts = AccountTransaction::get_accounts(&txn);
+                accounts
+                    .into_iter()
+                    .map(|account_address| AccountTransaction {
+                        transaction_version,
+                        account_address,
+                    })
+                    .collect()
+            })
+            .collect::<Vec<Vec<_>>>()
+            .into_iter()
+            .flatten()
+            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();

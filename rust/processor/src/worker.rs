@@ -562,7 +562,7 @@ impl Worker {
 
                                 let num_processed = (last_txn_version - first_txn_version) + 1;
 
-                                debug!(
+                                info!(
                                     processor_name = processor_name,
                                     service_type = PROCESSOR_SERVICE_TYPE,
                                     first_txn_version,
