@@ -3,9 +3,14 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::object_models::{
-        v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
-        v2_objects::{CurrentObject, Object},
+    db::common::models::{
+        object_models::{
+            v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            },
+            v2_objects::{CurrentObject, Object},
+        },
+        resources::FromWriteResource,
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -195,7 +200,7 @@ impl ProcessorTrait for ObjectsProcessor {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     let address = standardize_address(&wr.address.to_string());
                     if let Some(object_with_metadata) =
-                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
+                        ObjectWithMetadata::from_write_resource(wr).unwrap()
                     {
                         // Object core is the first struct that we need to get
                         object_metadata_helper.insert(address.clone(), ObjectAggregatedData {

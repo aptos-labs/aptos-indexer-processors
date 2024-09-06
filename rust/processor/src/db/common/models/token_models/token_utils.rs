@@ -4,16 +4,18 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::utils::util::{
-    deserialize_from_string, deserialize_property_map_from_bcs_hexstring,
-    deserialize_string_from_hexstring, hash_str, standardize_address, truncate_str,
+use crate::{
+    db::common::models::resources::TOKEN_ADDR,
+    utils::util::{
+        deserialize_from_string, deserialize_property_map_from_bcs_hexstring,
+        deserialize_string_from_hexstring, hash_str, standardize_address, truncate_str,
+    },
 };
 use anyhow::{Context, Result};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
 
-pub const TOKEN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000003";
 pub const NAME_LENGTH: usize = 128;
 pub const URI_LENGTH: usize = 512;
 

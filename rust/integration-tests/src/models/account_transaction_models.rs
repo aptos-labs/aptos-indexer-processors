@@ -11,7 +11,7 @@ use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
 use processor::{
     db::common::models::{
-        object_models::v2_object_utils::ObjectWithMetadata,
+        object_models::v2_object_utils::ObjectWithMetadata, resources::FromWriteResource,
         user_transactions_models::user_transactions::UserTransaction,
     },
     schema::account_transactions,
@@ -98,9 +98,7 @@ impl AccountTransaction {
                     // owner as well.
                     // This handles partial deletes as well.
                     accounts.insert(standardize_address(res.address.as_str()));
-                    if let Some(inner) =
-                        &ObjectWithMetadata::from_write_resource(res, txn_version).unwrap()
-                    {
+                    if let Some(inner) = &ObjectWithMetadata::from_write_resource(res).unwrap() {
                         accounts.insert(inner.object_core.get_owner_address());
                     }
                 },

@@ -6,7 +6,6 @@
 
 use crate::{
     db::common::models::{
-        coin_models::coin_utils::COIN_ADDR, default_models::move_resources::MoveResource,
         token_models::token_utils::URI_LENGTH, token_v2_models::v2_token_utils::ResourceReference,
     },
     utils::util::{deserialize_from_string, truncate_str, Aggregator},
@@ -54,35 +53,15 @@ pub struct FungibleAssetMetadata {
     project_uri: String,
 }
 
-impl FungibleAssetMetadata {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
+impl TryFrom<&WriteResource> for FungibleAssetMetadata {
+    type Error = anyhow::Error;
 
-        if let V2FungibleAssetResource::FungibleAssetMetadata(inner) =
-            V2FungibleAssetResource::from_resource(
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                txn_version,
-            )?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
     }
+}
 
+impl FungibleAssetMetadata {
     pub fn get_name(&self) -> String {
         truncate_str(&self.name, FUNGIBLE_ASSET_LENGTH)
     }
@@ -108,33 +87,11 @@ pub struct FungibleAssetStore {
     pub frozen: bool,
 }
 
-impl FungibleAssetStore {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
+impl TryFrom<&WriteResource> for FungibleAssetStore {
+    type Error = anyhow::Error;
 
-        if let V2FungibleAssetResource::FungibleAssetStore(inner) =
-            V2FungibleAssetResource::from_resource(
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                txn_version,
-            )?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
     }
 }
 
@@ -153,35 +110,15 @@ pub struct OptionalBigDecimal {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct BigDecimalWrapper(#[serde(deserialize_with = "deserialize_from_string")] pub BigDecimal);
 
-impl FungibleAssetSupply {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str: String = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
+impl TryFrom<&WriteResource> for FungibleAssetSupply {
+    type Error = anyhow::Error;
 
-        if let V2FungibleAssetResource::FungibleAssetSupply(inner) =
-            V2FungibleAssetResource::from_resource(
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                txn_version,
-            )?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
     }
+}
 
+impl FungibleAssetSupply {
     pub fn get_maximum(&self) -> Option<BigDecimal> {
         self.maximum.vec.first().map(|x| x.0.clone())
     }
@@ -192,33 +129,11 @@ pub struct ConcurrentFungibleAssetSupply {
     pub current: Aggregator,
 }
 
-impl ConcurrentFungibleAssetSupply {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str: String = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
+impl TryFrom<&WriteResource> for ConcurrentFungibleAssetSupply {
+    type Error = anyhow::Error;
 
-        if let V2FungibleAssetResource::ConcurrentFungibleAssetSupply(inner) =
-            V2FungibleAssetResource::from_resource(
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                txn_version,
-            )?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
     }
 }
 
@@ -227,33 +142,11 @@ pub struct ConcurrentFungibleAssetBalance {
     pub balance: Aggregator,
 }
 
-impl ConcurrentFungibleAssetBalance {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str: String = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
+impl TryFrom<&WriteResource> for ConcurrentFungibleAssetBalance {
+    type Error = anyhow::Error;
 
-        if let V2FungibleAssetResource::ConcurrentFungibleAssetBalance(inner) =
-            V2FungibleAssetResource::from_resource(
-                &type_str,
-                resource.data.as_ref().unwrap(),
-                txn_version,
-            )?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
     }
 }
 
@@ -292,66 +185,6 @@ pub struct WithdrawEventV2 {
 pub struct FrozenEventV2 {
     pub store: String,
     pub frozen: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum V2FungibleAssetResource {
-    FungibleAssetMetadata(FungibleAssetMetadata),
-    FungibleAssetStore(FungibleAssetStore),
-    FungibleAssetSupply(FungibleAssetSupply),
-    ConcurrentFungibleAssetSupply(ConcurrentFungibleAssetSupply),
-    ConcurrentFungibleAssetBalance(ConcurrentFungibleAssetBalance),
-}
-
-impl V2FungibleAssetResource {
-    pub fn is_resource_supported(data_type: &str) -> bool {
-        [
-            format!("{}::fungible_asset::Supply", COIN_ADDR),
-            format!("{}::fungible_asset::ConcurrentSupply", COIN_ADDR),
-            format!("{}::fungible_asset::Metadata", COIN_ADDR),
-            format!("{}::fungible_asset::FungibleStore", COIN_ADDR),
-            format!("{}::fungible_asset::ConcurrentFungibleBalance", COIN_ADDR),
-        ]
-        .contains(&data_type.to_string())
-    }
-
-    pub fn from_resource(
-        data_type: &str,
-        data: &serde_json::Value,
-        txn_version: i64,
-    ) -> Result<Self> {
-        match data_type {
-            x if x == format!("{}::fungible_asset::Supply", COIN_ADDR) => {
-                serde_json::from_value(data.clone())
-                    .map(|inner| Some(Self::FungibleAssetSupply(inner)))
-            },
-            x if x == format!("{}::fungible_asset::ConcurrentSupply", COIN_ADDR) => {
-                serde_json::from_value(data.clone())
-                    .map(|inner| Some(Self::ConcurrentFungibleAssetSupply(inner)))
-            },
-            x if x == format!("{}::fungible_asset::Metadata", COIN_ADDR) => {
-                serde_json::from_value(data.clone())
-                    .map(|inner| Some(Self::FungibleAssetMetadata(inner)))
-            },
-            x if x == format!("{}::fungible_asset::FungibleStore", COIN_ADDR) => {
-                serde_json::from_value(data.clone())
-                    .map(|inner| Some(Self::FungibleAssetStore(inner)))
-            },
-            x if x == format!("{}::fungible_asset::ConcurrentFungibleBalance", COIN_ADDR) => {
-                serde_json::from_value(data.clone())
-                    .map(|inner| Some(Self::ConcurrentFungibleAssetBalance(inner)))
-            },
-            _ => Ok(None),
-        }
-        .context(format!(
-            "version {} failed! failed to parse type {}, data {:?}",
-            txn_version, data_type, data
-        ))?
-        .context(format!(
-            "Resource unsupported! Call is_resource_supported first. version {} type {}",
-            txn_version, data_type
-        ))
-    }
 }
 
 pub enum FungibleAssetEvent {
@@ -396,6 +229,7 @@ impl FungibleAssetEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::common::models::resources::V2FungibleAssetResource;
 
     #[test]
     fn test_fungible_asset_supply_null() {

@@ -5,13 +5,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::TOKEN_V2_ADDR;
 use crate::{
     db::common::models::{
-        coin_models::coin_utils::COIN_ADDR,
         default_models::move_resources::MoveResource,
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::token_utils::{NAME_LENGTH, TOKEN_ADDR},
+        resources::{COIN_ADDR, TOKEN_ADDR, TOKEN_V2_ADDR},
+        token_models::token_utils::NAME_LENGTH,
     },
     schema::current_token_v2_metadata,
     utils::util::{standardize_address, truncate_str},
