@@ -9,6 +9,7 @@ use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        resources::FromWriteResource,
         token_models::token_utils::TokenWriteSet,
         token_v2_models::{
             v2_token_datas::CurrentTokenDataV2,
@@ -71,7 +72,7 @@ impl TokenDataV2 {
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
-        if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
+        if let Some(inner) = &TokenV2::from_write_resource(write_resource)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             let mut token_name = inner.get_name_trunc();
             let is_fungible_v2;
