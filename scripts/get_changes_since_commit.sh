@@ -32,7 +32,7 @@ function geturl() {
 }
 
 cat <<EOF
-Changes since $previouscommit (newest first):
+Full changes since $previouscommit (newest first):
 EOF
 
 while IFS= read -r line; do
