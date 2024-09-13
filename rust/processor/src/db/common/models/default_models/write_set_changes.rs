@@ -192,7 +192,7 @@ impl WriteSetChange {
             WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
             WriteSetChangeTypeEnum::Unspecified => {
                 error!(
-                    wsc_index = index, 
+                    wsc_index = index,
                     txn_version = txn_version,
                     "Encountered Unspecified WriteSetChange type. "
                 );

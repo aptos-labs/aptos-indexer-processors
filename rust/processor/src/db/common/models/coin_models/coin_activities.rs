@@ -155,13 +155,18 @@ impl CoinActivity {
                     &wsc.change.as_ref().unwrap()
                 {
                     (
-                        CoinInfo::from_write_resource(write_resource, txn_version, txn_timestamp, wsc_index as i64)
-                            .unwrap(),
+                        CoinInfo::from_write_resource(
+                            write_resource,
+                            txn_version,
+                            txn_timestamp,
+                            wsc_index as i64,
+                        )
+                        .unwrap(),
                         CoinBalance::from_write_resource(
                             write_resource,
                             txn_version,
                             txn_timestamp,
-                            wsc_index as i64
+                            wsc_index as i64,
                         )
                         .unwrap(),
                     )
