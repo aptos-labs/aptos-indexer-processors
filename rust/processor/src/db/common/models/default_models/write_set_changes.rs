@@ -3,6 +3,7 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
+use tracing::log::error;
 use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
@@ -42,7 +43,7 @@ impl WriteSetChange {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, WriteSetChangeDetail) {
-        let type_ = Self::get_write_set_change_type(write_set_change);
+        let type_ = Self::get_write_set_change_type(write_set_change, transaction_version);
         let change = write_set_change
             .change
             .as_ref()
@@ -179,7 +180,7 @@ impl WriteSetChange {
             .unzip()
     }
 
-    fn get_write_set_change_type(t: &WriteSetChangePB) -> String {
+    fn get_write_set_change_type(t: &WriteSetChangePB, txn_version: i64) -> String {
         match WriteSetChangeTypeEnum::try_from(t.r#type)
             .expect("WriteSetChange must have a valid type.")
         {
@@ -190,6 +191,7 @@ impl WriteSetChange {
             WriteSetChangeTypeEnum::WriteResource => "write_resource".to_string(),
             WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
             WriteSetChangeTypeEnum::Unspecified => {
+                error!("Encountered Unspecified WriteSetChange type. Transaction Version: {}", txn_version);
                 panic!("WriteSetChange type must be specified.")
             },
         }

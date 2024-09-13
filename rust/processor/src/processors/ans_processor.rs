@@ -582,6 +582,7 @@ fn parse_ans(
                             .unwrap_or_else(|e| {
                                 error!(
                                     error = ?e,
+                                    write_set_change_index = wsc_index,
                                     "Error parsing ANS v1 name record from write table item"
                                 );
                                 panic!();
@@ -608,6 +609,7 @@ fn parse_ans(
                                 .unwrap_or_else(|e| {
                                     error!(
                                 error = ?e,
+                                write_set_change_index = wsc_index,
                                 "Error parsing ANS v1 primary name from write table item"
                             );
                                     panic!();
