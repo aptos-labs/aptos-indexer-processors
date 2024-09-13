@@ -7,6 +7,7 @@
 
 use super::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent};
 use crate::{
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::{
         coin_models::{
             coin_activities::CoinActivity,
@@ -36,6 +37,8 @@ pub type CoinType = String;
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
 pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
 
+/// TODO: This is just a copy of v2_fungible_asset_activities.rs. We should unify the 2 implementations
+/// and have parquet as an output.
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
 )]
@@ -57,6 +60,22 @@ pub struct FungibleAssetActivity {
     #[allocative(skip)]
     pub transaction_timestamp: chrono::NaiveDateTime,
     pub storage_refund_amount: u64,
+}
+
+impl NamedTable for FungibleAssetActivity {
+    const TABLE_NAME: &'static str = "fungible_asset_activities";
+}
+
+impl HasVersion for FungibleAssetActivity {
+    fn version(&self) -> i64 {
+        self.transaction_version
+    }
+}
+
+impl GetTimeStamp for FungibleAssetActivity {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.transaction_timestamp
+    }
 }
 
 impl FungibleAssetActivity {
