@@ -220,6 +220,7 @@ impl FungibleAssetBalance {
                 &delete_resource.r#type.as_ref().unwrap().generic_type_params[0],
                 delete_resource.type_str.as_ref(),
                 txn_version,
+                write_set_change_index
             );
             if let Some(coin_type) = coin_info_type.get_coin_type_below_max() {
                 let owner_address = standardize_address(delete_resource.address.as_str());
@@ -273,6 +274,7 @@ impl FungibleAssetBalance {
                 &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
                 write_resource.type_str.as_ref(),
                 txn_version,
+                write_set_change_index
             );
             if let Some(coin_type) = coin_info_type.get_coin_type_below_max() {
                 let owner_address = standardize_address(write_resource.address.as_str());

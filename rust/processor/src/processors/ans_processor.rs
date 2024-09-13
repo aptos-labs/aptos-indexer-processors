@@ -583,6 +583,7 @@ fn parse_ans(
                                 error!(
                                     error = ?e,
                                     write_set_change_index = wsc_index,
+                                    transaction_version = txn_version,
                                     "Error parsing ANS v1 name record from write table item"
                                 );
                                 panic!();

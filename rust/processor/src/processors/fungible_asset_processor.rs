@@ -689,6 +689,7 @@ async fn parse_v2_coin(
                         if let Some(fa_metadata) =
                             FungibleAssetMetadataModel::get_v1_from_write_resource(
                                 write_resource,
+                                index as i64,
                                 txn_version,
                                 txn_timestamp,
                             )

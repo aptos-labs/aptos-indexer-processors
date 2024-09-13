@@ -19,7 +19,7 @@ use aptos_protos::transaction::v1::{
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::log::error;
+use tracing::error;
 
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
@@ -43,7 +43,7 @@ impl WriteSetChange {
         transaction_version: i64,
         transaction_block_height: i64,
     ) -> (Self, WriteSetChangeDetail) {
-        let type_ = Self::get_write_set_change_type(write_set_change, transaction_version);
+        let type_ = Self::get_write_set_change_type(write_set_change, index, transaction_version);
         let change = write_set_change
             .change
             .as_ref()
@@ -180,7 +180,7 @@ impl WriteSetChange {
             .unzip()
     }
 
-    fn get_write_set_change_type(t: &WriteSetChangePB, txn_version: i64) -> String {
+    fn get_write_set_change_type(t: &WriteSetChangePB, index: i64, txn_version: i64) -> String {
         match WriteSetChangeTypeEnum::try_from(t.r#type)
             .expect("WriteSetChange must have a valid type.")
         {
@@ -192,8 +192,9 @@ impl WriteSetChange {
             WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
             WriteSetChangeTypeEnum::Unspecified => {
                 error!(
-                    "Encountered Unspecified WriteSetChange type. Transaction Version: {}",
-                    txn_version
+                    wsc_index = index, 
+                    txn_version = txn_version,
+                    "Encountered Unspecified WriteSetChange type. "
                 );
                 panic!("WriteSetChange type must be specified.")
             },
