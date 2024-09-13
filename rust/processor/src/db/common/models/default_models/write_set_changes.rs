@@ -11,10 +11,9 @@ use super::{
 };
 use crate::{
     schema::write_set_changes,
-    utils::util::{standardize_address, standardize_address_from_bytes},
 };
 use aptos_protos::transaction::v1::{
-    write_set_change::{Change as WriteSetChangeEnum, Type as WriteSetChangeTypeEnum},
+    write_set_change::{Change as WriteSetChangeEnum},
     WriteSetChange as WriteSetChangePB,
 };
 use field_count::FieldCount;
@@ -36,84 +35,59 @@ pub struct WriteSetChange {
     pub address: String,
 }
 
-impl WriteSetChange {
+#[derive(Deserialize, Serialize)]
+pub enum WriteSetChangeDetail {
+    Module(MoveModule),
+    Resource(MoveResource),
+    Table(TableItem, CurrentTableItem, Option<TableMetadata>),
+}
+
+impl WriteSetChangeDetail {
     pub fn from_write_set_change(
         write_set_change: &WriteSetChangePB,
         index: i64,
         transaction_version: i64,
         transaction_block_height: i64,
-    ) -> (Self, WriteSetChangeDetail) {
-        let type_ = Self::get_write_set_change_type(write_set_change, index, transaction_version);
+    ) -> WriteSetChangeDetail {
         let change = write_set_change
             .change
             .as_ref()
             .expect("WriteSetChange must have a change");
 
         match change {
-            WriteSetChangeEnum::WriteModule(inner) => (
-                Self {
-                    transaction_version,
-                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
-                    transaction_block_height,
-                    type_,
-                    address: standardize_address(&inner.address),
-                    index,
-                },
+            WriteSetChangeEnum::WriteModule(inner) =>
                 WriteSetChangeDetail::Module(MoveModule::from_write_module(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )),
-            ),
-            WriteSetChangeEnum::DeleteModule(inner) => (
-                Self {
-                    transaction_version,
-                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
-                    transaction_block_height,
-                    type_,
-                    address: standardize_address(&inner.address),
-                    index,
-                },
+                )
+                ),
+            WriteSetChangeEnum::DeleteModule(inner) =>
+
                 WriteSetChangeDetail::Module(MoveModule::from_delete_module(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )),
-            ),
-            WriteSetChangeEnum::WriteResource(inner) => (
-                Self {
-                    transaction_version,
-                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
-                    transaction_block_height,
-                    type_,
-                    address: standardize_address(&inner.address),
-                    index,
-                },
+                )
+                ),
+            WriteSetChangeEnum::WriteResource(inner) =>
                 WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )),
-            ),
-            WriteSetChangeEnum::DeleteResource(inner) => (
-                Self {
-                    transaction_version,
-                    hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
-                    transaction_block_height,
-                    type_,
-                    address: standardize_address(&inner.address),
-                    index,
-                },
+                )
+                ),
+            WriteSetChangeEnum::DeleteResource(inner) =>
                 WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )),
-            ),
+                )
+                ),
             WriteSetChangeEnum::WriteTableItem(inner) => {
                 let (ti, cti) = TableItem::from_write_table_item(
                     inner,
@@ -121,20 +95,11 @@ impl WriteSetChange {
                     transaction_version,
                     transaction_block_height,
                 );
-                (
-                    Self {
-                        transaction_version,
-                        hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
-                        transaction_block_height,
-                        type_,
-                        address: String::default(),
-                        index,
-                    },
-                    WriteSetChangeDetail::Table(
-                        ti,
-                        cti,
-                        Some(TableMetadata::from_write_table_item(inner)),
-                    ),
+
+                WriteSetChangeDetail::Table(
+                    ti,
+                    cti,
+                    Some(TableMetadata::from_write_table_item(inner)),
                 )
             },
             WriteSetChangeEnum::DeleteTableItem(inner) => {
@@ -144,17 +109,7 @@ impl WriteSetChange {
                     transaction_version,
                     transaction_block_height,
                 );
-                (
-                    Self {
-                        transaction_version,
-                        hash: standardize_address_from_bytes(inner.state_key_hash.as_slice()),
-                        transaction_block_height,
-                        type_,
-                        address: String::default(),
-                        index,
-                    },
-                    WriteSetChangeDetail::Table(ti, cti, None),
-                )
+                WriteSetChangeDetail::Table(ti, cti, None)
             },
         }
     }
@@ -163,7 +118,7 @@ impl WriteSetChange {
         write_set_changes: &[WriteSetChangePB],
         transaction_version: i64,
         transaction_block_height: i64,
-    ) -> (Vec<Self>, Vec<WriteSetChangeDetail>) {
+    ) -> Vec<WriteSetChangeDetail> {
         write_set_changes
             .iter()
             .enumerate()
@@ -175,9 +130,7 @@ impl WriteSetChange {
                     transaction_block_height,
                 )
             })
-            .collect::<Vec<(Self, WriteSetChangeDetail)>>()
-            .into_iter()
-            .unzip()
+            .collect::<Vec<WriteSetChangeDetail>>()
     }
 
     fn get_write_set_change_type(t: &WriteSetChangePB, index: i64, txn_version: i64) -> String {
@@ -200,13 +153,6 @@ impl WriteSetChange {
             },
         }
     }
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum WriteSetChangeDetail {
-    Module(MoveModule),
-    Resource(MoveResource),
-    Table(TableItem, CurrentTableItem, Option<TableMetadata>),
 }
 
 // Prevent conflicts with other things named `WriteSetChange`
