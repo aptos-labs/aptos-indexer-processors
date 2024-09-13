@@ -3,7 +3,6 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use tracing::log::error;
 use super::{
     move_modules::MoveModule,
     move_resources::MoveResource,
@@ -20,6 +19,7 @@ use aptos_protos::transaction::v1::{
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::log::error;
 
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
@@ -191,7 +191,10 @@ impl WriteSetChange {
             WriteSetChangeTypeEnum::WriteResource => "write_resource".to_string(),
             WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
             WriteSetChangeTypeEnum::Unspecified => {
-                error!("Encountered Unspecified WriteSetChange type. Transaction Version: {}", txn_version);
+                error!(
+                    "Encountered Unspecified WriteSetChange type. Transaction Version: {}",
+                    txn_version
+                );
                 panic!("WriteSetChange type must be specified.")
             },
         }
