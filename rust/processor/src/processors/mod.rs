@@ -58,6 +58,7 @@ use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
+use parquet_processors::parquet_fungible_asset_activities_processor::ParquetFungibleAssetActivitiesProcessorConfig;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -201,6 +202,7 @@ pub enum ProcessorConfig {
     TransactionMetadataProcessor,
     UserTransactionProcessor,
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+    ParquetFungibleAssetActivitiesProcessor(ParquetFungibleAssetActivitiesProcessorConfig),
     ParquetFungibleAssetProcessor(ParquetFungibleAssetProcessorConfig),
     ParquetTransactionMetadataProcessor(ParquetTransactionMetadataProcessorConfig),
     ParquetAnsProcessor(ParquetAnsProcessorConfig),
