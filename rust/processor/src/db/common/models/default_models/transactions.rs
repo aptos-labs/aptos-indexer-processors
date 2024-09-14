@@ -25,6 +25,7 @@ use aptos_protos::transaction::v1::{
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -330,9 +331,13 @@ impl Transaction {
         let mut wscs = vec![];
         let mut wsc_details = vec![];
 
-        for txn in transactions {
-            let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
-                Self::from_transaction(txn);
+        let processed_txns: Vec<_> = transactions
+            .par_iter()
+            .map(Self::from_transaction)
+            .collect();
+
+        for processed_txn in processed_txns {
+            let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) = processed_txn;
             txns.push(txn);
             if let Some(a) = block_metadata {
                 block_metadata_txns.push(a);
