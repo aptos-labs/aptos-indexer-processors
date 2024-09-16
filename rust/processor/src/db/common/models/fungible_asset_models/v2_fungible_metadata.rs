@@ -106,6 +106,7 @@ impl FungibleAssetMetadataModel {
     /// We can find v1 coin info from resources
     pub fn get_v1_from_write_resource(
         write_resource: &WriteResource,
+        write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<Self>> {
@@ -115,6 +116,7 @@ impl FungibleAssetMetadataModel {
                     &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
                     write_resource.type_str.as_ref(),
                     txn_version,
+                    write_set_change_index,
                 );
                 let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
                     .get_aggregator_metadata()
@@ -149,6 +151,7 @@ impl FungibleAssetMetadataModel {
 
     pub fn get_v1_from_delete_resource(
         delete_resource: &DeleteResource,
+        write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<Self>> {
@@ -158,6 +161,7 @@ impl FungibleAssetMetadataModel {
                     &delete_resource.r#type.as_ref().unwrap().generic_type_params[0],
                     delete_resource.type_str.as_ref(),
                     txn_version,
+                    write_set_change_index,
                 );
                 let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
                     .get_aggregator_metadata()

@@ -49,6 +49,7 @@ impl CoinBalance {
         write_resource: &WriteResource,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
+        wsc_index: i64,
     ) -> anyhow::Result<Option<(Self, CurrentCoinBalance, EventToCoinType)>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinStoreResource(inner)) => {
@@ -56,6 +57,7 @@ impl CoinBalance {
                     &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
                     write_resource.type_str.as_ref(),
                     txn_version,
+                    wsc_index,
                 );
                 let owner_address = standardize_address(write_resource.address.as_str());
                 let coin_balance = Self {

@@ -169,12 +169,18 @@ impl CoinInfoType {
     /// get creator address from move_type, and get coin type from move_type_str
     /// Since move_type_str will contain things we don't need, e.g. 0x1::coin::CoinInfo<T>. We will use
     /// regex to extract T.
-    pub fn from_move_type(move_type: &MoveType, move_type_str: &str, txn_version: i64) -> Self {
+    pub fn from_move_type(
+        move_type: &MoveType,
+        move_type_str: &str,
+        txn_version: i64,
+        wsc_index: i64,
+    ) -> Self {
         if let Content::Struct(struct_tag) = move_type.content.as_ref().unwrap() {
             let matched = RE.captures(move_type_str).unwrap_or_else(|| {
                 error!(
                     txn_version = txn_version,
                     move_type_str = move_type_str,
+                    wsc_index = wsc_index,
                     "move_type should look like 0x1::coin::CoinInfo<T>"
                 );
                 panic!();

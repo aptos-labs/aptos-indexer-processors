@@ -149,18 +149,24 @@ impl CoinActivity {
         }
 
         // Need coin info from move resources
-        for wsc in &transaction_info.changes {
+        for (wsc_index, wsc) in transaction_info.changes.iter().enumerate() {
             let (maybe_coin_info, maybe_coin_balance_data) =
                 if let WriteSetChangeEnum::WriteResource(write_resource) =
                     &wsc.change.as_ref().unwrap()
                 {
                     (
-                        CoinInfo::from_write_resource(write_resource, txn_version, txn_timestamp)
-                            .unwrap(),
+                        CoinInfo::from_write_resource(
+                            write_resource,
+                            txn_version,
+                            txn_timestamp,
+                            wsc_index as i64,
+                        )
+                        .unwrap(),
                         CoinBalance::from_write_resource(
                             write_resource,
                             txn_version,
                             txn_timestamp,
+                            wsc_index as i64,
                         )
                         .unwrap(),
                     )
