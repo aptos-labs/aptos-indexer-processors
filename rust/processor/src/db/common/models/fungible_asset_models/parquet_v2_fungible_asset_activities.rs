@@ -43,14 +43,14 @@ pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
 )]
 pub struct FungibleAssetActivity {
-    pub transaction_version: i64,
+    pub txn_version: i64,
     pub event_index: i64,
     pub owner_address: Option<String>,
     pub storage_id: String,
     pub asset_type: Option<String>,
     pub is_frozen: Option<bool>,
     pub amount: Option<String>, // it is a string representation of the u128
-    pub type_: String,
+    pub event_type: String,
     pub is_gas_fee: bool,
     pub gas_fee_payer_address: Option<String>,
     pub is_transaction_success: bool,
@@ -58,8 +58,8 @@ pub struct FungibleAssetActivity {
     pub block_height: i64,
     pub token_standard: String,
     #[allocative(skip)]
-    pub transaction_timestamp: chrono::NaiveDateTime,
-    pub storage_refund_amount: u64,
+    pub block_timestamp: chrono::NaiveDateTime,
+    pub storage_refund_octa: u64,
 }
 
 impl NamedTable for FungibleAssetActivity {
@@ -68,13 +68,13 @@ impl NamedTable for FungibleAssetActivity {
 
 impl HasVersion for FungibleAssetActivity {
     fn version(&self) -> i64 {
-        self.transaction_version
+        self.txn_version
     }
 }
 
 impl GetTimeStamp for FungibleAssetActivity {
     fn get_timestamp(&self) -> chrono::NaiveDateTime {
-        self.transaction_timestamp
+        self.block_timestamp
     }
 }
 
@@ -136,22 +136,22 @@ impl FungibleAssetActivity {
                 .map(|fa| fa.metadata.get_reference_address());
 
             return Ok(Some(Self {
-                transaction_version: txn_version,
+                txn_version,
                 event_index,
                 owner_address: maybe_owner_address,
                 storage_id: storage_id.clone(),
                 asset_type: maybe_asset_type,
                 is_frozen,
                 amount,
-                type_: event_type.clone(),
+                event_type: event_type.clone(),
                 is_gas_fee: false,
                 gas_fee_payer_address: None,
                 is_transaction_success: true,
                 entry_function_id_str: entry_function_id_str.clone(),
                 block_height,
                 token_standard: TokenStandard::V2.to_string(),
-                transaction_timestamp: txn_timestamp,
-                storage_refund_amount: 0,
+                block_timestamp: txn_timestamp,
+                storage_refund_octa: 0,
             }));
         }
         Ok(None)
@@ -161,7 +161,7 @@ impl FungibleAssetActivity {
         event: &Event,
         txn_version: i64,
         block_height: i64,
-        transaction_timestamp: chrono::NaiveDateTime,
+        block_timestamp: chrono::NaiveDateTime,
         entry_function_id_str: &Option<String>,
         event_to_coin_type: &EventToCoinType,
         event_index: i64,
@@ -207,22 +207,22 @@ impl FungibleAssetActivity {
                 CoinInfoType::get_storage_id(coin_type.as_str(), owner_address.as_str());
 
             Ok(Some(Self {
-                transaction_version: txn_version,
+                txn_version,
                 event_index,
                 owner_address: Some(owner_address),
                 storage_id,
                 asset_type: Some(coin_type),
                 is_frozen: None,
                 amount: Some(amount),
-                type_: event.type_str.clone(),
+                event_type: event.type_str.clone(),
                 is_gas_fee: false,
                 gas_fee_payer_address: None,
                 is_transaction_success: true,
                 entry_function_id_str: entry_function_id_str.clone(),
                 block_height,
                 token_standard: TokenStandard::V1.to_string(),
-                transaction_timestamp,
-                storage_refund_amount: 0,
+                block_timestamp,
+                storage_refund_octa: 0,
             }))
         } else {
             Ok(None)
@@ -235,8 +235,8 @@ impl FungibleAssetActivity {
         txn_info: &TransactionInfo,
         user_transaction_request: &UserTransactionRequest,
         entry_function_id_str: &Option<String>,
-        transaction_version: i64,
-        transaction_timestamp: chrono::NaiveDateTime,
+        txn_version: i64,
+        block_timestamp: chrono::NaiveDateTime,
         block_height: i64,
         fee_statement: Option<FeeStatement>,
     ) -> Self {
@@ -244,8 +244,8 @@ impl FungibleAssetActivity {
             txn_info,
             user_transaction_request,
             entry_function_id_str,
-            transaction_version,
-            transaction_timestamp,
+            txn_version,
+            block_timestamp,
             block_height,
             fee_statement,
         );
@@ -254,22 +254,22 @@ impl FungibleAssetActivity {
             v1_activity.owner_address.as_str(),
         );
         Self {
-            transaction_version,
+            txn_version,
             event_index: v1_activity.event_index.unwrap(),
             owner_address: Some(v1_activity.owner_address),
             storage_id,
             asset_type: Some(v1_activity.coin_type),
             is_frozen: None,
             amount: Some(v1_activity.amount.to_string()),
-            type_: v1_activity.activity_type,
+            event_type: v1_activity.activity_type,
             is_gas_fee: v1_activity.is_gas_fee,
             gas_fee_payer_address: v1_activity.gas_fee_payer_address,
             is_transaction_success: v1_activity.is_transaction_success,
             entry_function_id_str: v1_activity.entry_function_id_str,
             block_height,
             token_standard: TokenStandard::V1.to_string(),
-            transaction_timestamp,
-            storage_refund_amount: bigdecimal_to_u64(&v1_activity.storage_refund_amount),
+            block_timestamp,
+            storage_refund_octa: bigdecimal_to_u64(&v1_activity.storage_refund_amount),
         }
     }
 }
