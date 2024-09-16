@@ -131,6 +131,12 @@ pub async fn create_gap_detector_status_tracker_loop(
                     Ok(res) => {
                         match res {
                             GapDetectorResult::ParquetFileGapDetectorResult(res) => {
+                                if res.last_transaction_timestamp.is_none() {
+                                    // we don't want to update the last processed version if we haven't processed anything
+                                    tracing::info!("No transactions processed, skipping update the processor status");
+                                    continue
+                                }
+
                                 PARQUET_PROCESSOR_DATA_GAP_COUNT
                                     .with_label_values(&[processor_name])
                                     .set(res.num_gaps as i64);
