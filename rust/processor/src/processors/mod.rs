@@ -39,6 +39,9 @@ use crate::{
         parquet_ans_processor::{ParquetAnsProcessor, ParquetAnsProcessorConfig},
         parquet_default_processor::{ParquetDefaultProcessor, ParquetDefaultProcessorConfig},
         parquet_events_processor::{ParquetEventsProcessor, ParquetEventsProcessorConfig},
+        parquet_fungible_asset_activities_processor::{
+            ParquetFungibleAssetActivitiesProcessor, ParquetFungibleAssetActivitiesProcessorConfig,
+        },
         parquet_fungible_asset_processor::{
             ParquetFungibleAssetProcessor, ParquetFungibleAssetProcessorConfig,
         },
@@ -58,7 +61,6 @@ use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, ExpressionMethods};
 use enum_dispatch::enum_dispatch;
-use parquet_processors::parquet_fungible_asset_activities_processor::ParquetFungibleAssetActivitiesProcessorConfig;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -226,6 +228,7 @@ impl ProcessorConfig {
                 | ProcessorConfig::ParquetAnsProcessor(_)
                 | ProcessorConfig::ParquetEventsProcessor(_)
                 | ProcessorConfig::ParquetTokenV2Processor(_)
+                | ProcessorConfig::ParquetFungibleAssetActivitiesProcessor(_)
         )
     }
 }
@@ -265,6 +268,7 @@ pub enum Processor {
     // Parquet processors
     ParquetDefaultProcessor,
     ParquetFungibleAssetProcessor,
+    ParquetFungibleAssetActivitiesProcessor,
     ParquetTransactionMetadataProcessor,
     ParquetAnsProcessor,
     ParquetEventsProcessor,
