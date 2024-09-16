@@ -134,7 +134,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                 if res.last_transaction_timestamp.is_none() {
                                     // we don't want to update the last processed version if we haven't processed anything
                                     tracing::info!("No transactions processed, skipping update the processor status");
-                                    continue
+                                    continue;
                                 }
 
                                 PARQUET_PROCESSOR_DATA_GAP_COUNT
