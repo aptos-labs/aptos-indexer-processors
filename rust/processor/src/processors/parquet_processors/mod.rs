@@ -7,6 +7,7 @@ pub mod parquet_fungible_asset_activities_processor;
 pub mod parquet_fungible_asset_processor;
 pub mod parquet_token_v2_processor;
 pub mod parquet_transaction_metadata_processor;
+pub mod parquet_user_transactions_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
