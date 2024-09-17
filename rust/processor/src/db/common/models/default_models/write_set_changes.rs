@@ -9,16 +9,12 @@ use super::{
     move_tables::{CurrentTableItem, TableItem, TableMetadata},
     transactions::Transaction,
 };
-use crate::{
-    schema::write_set_changes,
-};
+use crate::schema::write_set_changes;
 use aptos_protos::transaction::v1::{
-    write_set_change::{Change as WriteSetChangeEnum},
-    WriteSetChange as WriteSetChangePB,
+    write_set_change::Change as WriteSetChangeEnum, WriteSetChange as WriteSetChangePB,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 #[derive(
     Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
@@ -55,39 +51,38 @@ impl WriteSetChangeDetail {
             .expect("WriteSetChange must have a change");
 
         match change {
-            WriteSetChangeEnum::WriteModule(inner) =>
+            WriteSetChangeEnum::WriteModule(inner) => {
                 WriteSetChangeDetail::Module(MoveModule::from_write_module(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )
-                ),
-            WriteSetChangeEnum::DeleteModule(inner) =>
-
+                ))
+            },
+            WriteSetChangeEnum::DeleteModule(inner) => {
                 WriteSetChangeDetail::Module(MoveModule::from_delete_module(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )
-                ),
-            WriteSetChangeEnum::WriteResource(inner) =>
+                ))
+            },
+            WriteSetChangeEnum::WriteResource(inner) => {
                 WriteSetChangeDetail::Resource(MoveResource::from_write_resource(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )
-                ),
-            WriteSetChangeEnum::DeleteResource(inner) =>
+                ))
+            },
+            WriteSetChangeEnum::DeleteResource(inner) => {
                 WriteSetChangeDetail::Resource(MoveResource::from_delete_resource(
                     inner,
                     index,
                     transaction_version,
                     transaction_block_height,
-                )
-                ),
+                ))
+            },
             WriteSetChangeEnum::WriteTableItem(inner) => {
                 let (ti, cti) = TableItem::from_write_table_item(
                     inner,
@@ -131,27 +126,6 @@ impl WriteSetChangeDetail {
                 )
             })
             .collect::<Vec<WriteSetChangeDetail>>()
-    }
-
-    fn get_write_set_change_type(t: &WriteSetChangePB, index: i64, txn_version: i64) -> String {
-        match WriteSetChangeTypeEnum::try_from(t.r#type)
-            .expect("WriteSetChange must have a valid type.")
-        {
-            WriteSetChangeTypeEnum::DeleteModule => "delete_module".to_string(),
-            WriteSetChangeTypeEnum::DeleteResource => "delete_resource".to_string(),
-            WriteSetChangeTypeEnum::DeleteTableItem => "delete_table_item".to_string(),
-            WriteSetChangeTypeEnum::WriteModule => "write_module".to_string(),
-            WriteSetChangeTypeEnum::WriteResource => "write_resource".to_string(),
-            WriteSetChangeTypeEnum::WriteTableItem => "write_table_item".to_string(),
-            WriteSetChangeTypeEnum::Unspecified => {
-                error!(
-                    wsc_index = index,
-                    txn_version = txn_version,
-                    "Encountered Unspecified WriteSetChange type. "
-                );
-                panic!("WriteSetChange type must be specified.")
-            },
-        }
     }
 }
 

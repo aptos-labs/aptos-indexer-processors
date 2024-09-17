@@ -6,18 +6,10 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    block_metadata_transactions::BlockMetadataTransaction,
-    write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
+    block_metadata_transactions::BlockMetadataTransaction, write_set_changes::WriteSetChangeDetail,
 };
-use crate::{
-    schema::transactions,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-    },
-};
-use aptos_protos::transaction::v1::{
-    transaction::TxnData, Transaction as TransactionPB,
-};
+use crate::{schema::transactions, utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT};
+use aptos_protos::transaction::v1::{transaction::TxnData, Transaction as TransactionPB};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use rayon::prelude::*;

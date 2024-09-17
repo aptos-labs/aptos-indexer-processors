@@ -5,8 +5,6 @@ use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::common::models::default_models::{
         block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
-        move_modules::MoveModule,
-        move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
         transactions::TransactionModel,
         write_set_changes::WriteSetChangeDetail,
@@ -291,21 +289,18 @@ fn process_transactions(
     let mut current_table_items = AHashMap::new();
     let mut table_metadata = AHashMap::new();
     for detail in wsc_details {
-        match detail {
-            WriteSetChangeDetail::Table(item, current_item, metadata) => {
-                table_items.push(item);
-                current_table_items.insert(
-                    (
-                        current_item.table_handle.clone(),
-                        current_item.key_hash.clone(),
-                    ),
-                    current_item,
-                );
-                if let Some(meta) = metadata {
-                    table_metadata.insert(meta.handle.clone(), meta);
-                }
-            },
-            _ => (),
+        if let WriteSetChangeDetail::Table(item, current_item, metadata) = detail {
+            table_items.push(item);
+            current_table_items.insert(
+                (
+                    current_item.table_handle.clone(),
+                    current_item.key_hash.clone(),
+                ),
+                current_item,
+            );
+            if let Some(meta) = metadata {
+                table_metadata.insert(meta.handle.clone(), meta);
+            }
         }
     }
 
