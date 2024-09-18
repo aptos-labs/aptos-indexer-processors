@@ -17,6 +17,7 @@ use diesel_async::{
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures_util::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
+use tokio::time::{timeout, Duration};
 
 pub type Backend = diesel::pg::Pg;
 
@@ -28,6 +29,8 @@ pub type DbPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/postgres/migrations");
 
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
+
+const DB_EXECUTE_TIMEOUT_SECONDS: u64 = 25;
 
 #[derive(QueryId)]
 /// Using this will append a where clause at the end of the string upsert function
@@ -183,11 +186,24 @@ where
             Box::new(e.to_string()),
         )
     })?;
-    let res = final_query.execute(conn).await;
-    if let Err(ref e) = res {
-        tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
+    let timeout_duration = Duration::from_secs(DB_EXECUTE_TIMEOUT_SECONDS);
+    let res = timeout(timeout_duration, final_query.execute(conn)).await;
+    
+    match res {
+        Ok(query_result) => {
+            if let Err(ref e) = query_result {
+                tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
+            }
+            query_result
+        }
+        Err(_) => {
+            tracing::warn!("Query timed out: {:?}", debug_string);
+            Err(diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UnableToSendCommand,
+                Box::new("Query timed out".to_string()),
+            ))
+        }
     }
-    res
 }
 
 /// Returns the entry for the config hashmap, or the default field count for the insert.
