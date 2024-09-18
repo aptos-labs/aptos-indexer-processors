@@ -94,6 +94,8 @@ impl Processable for EventsStorer {
                     "Failed to store events versions {} to {}: {:?}",
                     events.start_version, events.end_version, e,
                 ),
+                // TODO: fix it with a debug_query.
+                query: None,
             }),
         }
     }

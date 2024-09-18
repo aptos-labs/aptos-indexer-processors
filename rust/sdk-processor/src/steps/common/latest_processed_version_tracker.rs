@@ -85,6 +85,8 @@ where
                 Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
             ).await.map_err(|e| ProcessorError::DBStoreError {
                 message: format!("Failed to update processor status: {}", e),
+                // TODO: fix it with a debug_query.
+                query: None,
             })?;
         }
         Ok(())
