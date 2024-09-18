@@ -103,7 +103,7 @@ impl Transaction {
             .collect();
 
         for processed_txn in processed_txns {
-            let (block_metadata, mut wsc_detail_list) = processed_txns;
+            let (block_metadata, mut wsc_detail_list) = processed_txn;
             if let Some(a) = block_metadata {
                 block_metadata_txns.push(a);
             }

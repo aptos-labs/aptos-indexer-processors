@@ -274,11 +274,7 @@ fn process_transactions(
     flags: TableFlags,
 ) -> (
     Vec<BlockMetadataTransaction>,
-    (
-        Vec<TableItem>,
-        Vec<CurrentTableItem>,
-        Vec<TableMetadata>,
-    ),
+    (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
 ) {
     let (block_metadata_txns, wsc_details) = TransactionModel::from_transactions(&transactions);
     let mut block_metadata_transactions = vec![];
