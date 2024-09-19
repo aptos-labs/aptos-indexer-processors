@@ -3358,6 +3358,7 @@ dependencies = [
  "prost 0.12.6",
  "rayon",
  "regex",
+ "sample",
  "serde",
  "serde_json",
  "server-framework",
@@ -4060,6 +4061,11 @@ name = "ryu"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+
+[[package]]
+name = "sample"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=81571a5bebc4459b3faa971c64a810f171cc823a#81571a5bebc4459b3faa971c64a810f171cc823a"
 
 [[package]]
 name = "schannel"

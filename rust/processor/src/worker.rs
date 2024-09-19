@@ -55,6 +55,7 @@ use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use bitflags::bitflags;
 use kanal::AsyncSender;
+use sample::{sample, SampleRate}; 
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
@@ -68,7 +69,6 @@ use url::Url;
 
 pub const BUFFER_SIZE: usize = 300;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
-
 bitflags! {
     #[derive(Debug, Clone, Copy)]
     pub struct TableFlags: u64 {
@@ -480,8 +480,7 @@ impl Worker {
 
                         let txn_channel_fetch_latency_sec =
                             txn_channel_fetch_latency.elapsed().as_secs_f64();
-
-                        debug!(
+                        sample!(SampleRate::Frequency(10), debug!(
                             processor_name = processor_name,
                             service_type = PROCESSOR_SERVICE_TYPE,
                             start_version = batch_first_txn_version,
@@ -496,7 +495,7 @@ impl Worker {
                             bytes_per_sec = size_in_bytes / txn_channel_fetch_latency_sec,
                             "[Parser][T#{}] Successfully fetched transactions from channel.",
                             task_index
-                        );
+                        ));
 
                         // Ensure chain_id has not changed
                         if transactions_pb.chain_id != chain_id {

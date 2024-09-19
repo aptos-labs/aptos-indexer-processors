@@ -17,6 +17,7 @@ use futures_util::StreamExt;
 use itertools::Itertools;
 use kanal::AsyncSender;
 use prost::Message;
+use sample::{sample, SampleRate}; 
 use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
@@ -525,7 +526,7 @@ pub async fn create_fetcher_loop(
                         let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
 
                         let channel_size = txn_sender.len();
-                        debug!(
+                        sample!(SampleRate::Frequency(10), debug!(
                             processor_name = processor_name,
                             service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                             stream_address = indexer_grpc_data_service_address.to_string(),
@@ -539,7 +540,7 @@ pub async fn create_fetcher_loop(
                             tps,
                             num_filtered_txns,
                             "[Parser] Successfully sent transactions to channel."
-                        );
+                        ));
                         FETCHER_THREAD_CHANNEL_SIZE
                             .with_label_values(&[&processor_name])
                             .set(channel_size as i64);
