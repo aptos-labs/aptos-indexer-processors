@@ -17,7 +17,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-indexer-processors"
-rust-version = "1.75"
+rust-version = "1.78"
 
 [workspace.dependencies]
 processor = { path = "processor" }
@@ -28,8 +28,8 @@ sdk-processor = { path = "sdk-processor" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7" }
-aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7" }
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "3970abde03f9eca299e668562d71ccda8ed42ebf" }
+aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "3970abde03f9eca299e668562d71ccda8ed42ebf" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
 aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
@@ -83,10 +83,11 @@ kanal = { version = "0.1.0-pre8", features = ["async"] }
 once_cell = "1.10.0"
 num_cpus = "1.16.0"
 pbjson = "0.5.1"
-prometheus = { version = "0.13.0", default-features = false }
+prometheus = { version = "0.13.3", default-features = false }
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
-rayon = "1.10.0"
+# Keep it compatible with the aptos-core version.
+rayon = "1.5.2"
 regex = "1.5.5"
 reqwest = { version = "0.11.20", features = [
     "blocking",
