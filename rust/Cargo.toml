@@ -4,11 +4,11 @@ resolver = "2"
 members = [
     "indexer-metrics",
     "integration-tests",
-    "testing-transactions",
     "moving-average",
     "processor",
     "sdk-processor",
     "server-framework",
+    "testing-transactions",
 ]
 
 [workspace.package]
