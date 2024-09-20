@@ -27,4 +27,5 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 testcontainers = { workspace = true }
 tokio = { workspace = true }
+testing-transactions = { workspace = true }
 [dev-dependencies]
