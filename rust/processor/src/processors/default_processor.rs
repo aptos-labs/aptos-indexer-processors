@@ -453,11 +453,6 @@ fn process_transactions(
         .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
 
-    println!(
-        "table_items: {}, current_table_items: {}",
-        table_items.len(),
-        current_table_items.len()
-    );
     if flags.contains(TableFlags::MOVE_RESOURCES) {
         move_resources.clear();
     }
