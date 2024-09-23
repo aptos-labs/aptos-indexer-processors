@@ -268,8 +268,8 @@ pub enum Processor {
     UserTransactionProcessor,
     // Parquet processors
     ParquetDefaultProcessor,
-    ParquetFungibleAssetProcessor,
     ParquetFungibleAssetActivitiesProcessor,
+    ParquetFungibleAssetProcessor,
     ParquetTransactionMetadataProcessor,
     ParquetAnsProcessor,
     ParquetEventsProcessor,
