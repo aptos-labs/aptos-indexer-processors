@@ -39,6 +39,9 @@ use crate::{
         parquet_ans_processor::{ParquetAnsProcessor, ParquetAnsProcessorConfig},
         parquet_default_processor::{ParquetDefaultProcessor, ParquetDefaultProcessorConfig},
         parquet_events_processor::{ParquetEventsProcessor, ParquetEventsProcessorConfig},
+        parquet_fungible_asset_activities_processor::{
+            ParquetFungibleAssetActivitiesProcessor, ParquetFungibleAssetActivitiesProcessorConfig,
+        },
         parquet_fungible_asset_processor::{
             ParquetFungibleAssetProcessor, ParquetFungibleAssetProcessorConfig,
         },
@@ -99,6 +102,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
 
     /// Gets the connection.
     /// If it was unable to do so (default timeout: 30s), it will keep retrying until it can.
+    #[allow(unknown_lints)]
     #[allow(elided_named_lifetimes)]
     async fn get_conn(&self) -> DbPoolConnection {
         let pool = self.connection_pool();
@@ -201,6 +205,7 @@ pub enum ProcessorConfig {
     TransactionMetadataProcessor,
     UserTransactionProcessor,
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+    ParquetFungibleAssetActivitiesProcessor(ParquetFungibleAssetActivitiesProcessorConfig),
     ParquetFungibleAssetProcessor(ParquetFungibleAssetProcessorConfig),
     ParquetTransactionMetadataProcessor(ParquetTransactionMetadataProcessorConfig),
     ParquetAnsProcessor(ParquetAnsProcessorConfig),
@@ -224,6 +229,7 @@ impl ProcessorConfig {
                 | ProcessorConfig::ParquetAnsProcessor(_)
                 | ProcessorConfig::ParquetEventsProcessor(_)
                 | ProcessorConfig::ParquetTokenV2Processor(_)
+                | ProcessorConfig::ParquetFungibleAssetActivitiesProcessor(_)
         )
     }
 }
@@ -262,6 +268,7 @@ pub enum Processor {
     UserTransactionProcessor,
     // Parquet processors
     ParquetDefaultProcessor,
+    ParquetFungibleAssetActivitiesProcessor,
     ParquetFungibleAssetProcessor,
     ParquetTransactionMetadataProcessor,
     ParquetAnsProcessor,
