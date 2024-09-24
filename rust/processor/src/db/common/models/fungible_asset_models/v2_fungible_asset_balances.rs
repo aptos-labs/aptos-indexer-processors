@@ -27,14 +27,14 @@ use ahash::AHashMap;
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
-use lazy_static::lazy_static;
 
 // Storage id
 pub type CurrentFungibleAssetBalancePK = String;
 pub type CurrentFungibleAssetMapping =
-AHashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
+    AHashMap<CurrentFungibleAssetBalancePK, CurrentFungibleAssetBalance>;
 
 lazy_static!(
      pub static ref METADATA_TO_COIN_TYPE_MAPPING: AHashMap<&'static str, &'static str> = vec![
@@ -205,7 +205,9 @@ impl From<&CurrentFungibleAssetBalance> for CurrentUnifiedFungibleAssetBalance {
                 storage_id: cfab.storage_id.clone(),
                 owner_address: cfab.owner_address.clone(),
                 asset_type_v2: Some(asset_type_v2.clone()),
-                asset_type_v1: METADATA_TO_COIN_TYPE_MAPPING.get(asset_type_v2.as_str()).map(|s| s.to_string()),
+                asset_type_v1: METADATA_TO_COIN_TYPE_MAPPING
+                    .get(asset_type_v2.as_str())
+                    .map(|s| s.to_string()),
                 is_primary: cfab.is_primary,
                 is_frozen: cfab.is_frozen,
                 amount_v1: None,
