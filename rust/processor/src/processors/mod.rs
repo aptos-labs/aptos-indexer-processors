@@ -79,6 +79,10 @@ pub struct DefaultProcessingResult {
 pub trait ProcessorTrait: Send + Sync + Debug {
     fn name(&self) -> &'static str;
 
+    fn db_row_name(&self) -> &str {
+        ""
+    }
+
     /// Process all transactions including writing to the database
     async fn process_transactions(
         &self,
@@ -135,7 +139,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
     ) -> anyhow::Result<()> {
         let timestamp = last_transaction_timestamp.map(|t| parse_timestamp(&t, version as i64));
         let status = ProcessorStatus {
-            processor: self.name().to_string(),
+            processor: self.db_row_name().to_string(),
             last_success_version: version as i64,
             last_transaction_timestamp: timestamp,
         };
