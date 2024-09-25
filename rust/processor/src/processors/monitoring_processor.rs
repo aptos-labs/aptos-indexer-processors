@@ -41,6 +41,7 @@ impl ProcessorTrait for MonitoringProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         for transaction in transactions {
             // only output the events in the user transaction.
             if let Some(transaction::TxnData::User(ut)) = transaction.txn_data {
@@ -56,7 +57,7 @@ impl ProcessorTrait for MonitoringProcessor {
                 end_version,
                 processing_duration_in_secs: 0.0,
                 db_insertion_duration_in_secs: 0.0,
-                last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp,
             },
         ))
     }
