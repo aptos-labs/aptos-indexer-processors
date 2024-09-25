@@ -313,6 +313,7 @@ fn insert_current_unified_fungible_asset_balances_v2_query(
             .set(
                 (
                     owner_address.eq(excluded(owner_address)),
+                    asset_type_v1.eq(excluded(asset_type_v1)),
                     asset_type_v2.eq(excluded(asset_type_v2)),
                     is_primary.eq(excluded(is_primary)),
                     is_frozen.eq(excluded(is_frozen)),
