@@ -3,7 +3,7 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{gap_detectors::ProcessingResult, utils::database::ArcDbPool};
-use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::transaction::v1::{transaction, Transaction};
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -41,6 +41,15 @@ impl ProcessorTrait for MonitoringProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
+        for transaction in transactions {
+            // only output the events in the user transaction.
+            if let Some(transaction::TxnData::User(ut)) = transaction.txn_data {
+                for event in ut.events {
+                    println!("event: {:?}", event);
+                }
+            }
+        }
+
         Ok(ProcessingResult::DefaultProcessingResult(
             DefaultProcessingResult {
                 start_version,
