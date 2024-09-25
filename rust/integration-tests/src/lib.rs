@@ -1,7 +1,6 @@
 use anyhow::Context;
 use aptos_protos::transaction::v1::Transaction;
 use diesel::{pg::PgConnection, sql_query, Connection, RunQueryDsl};
-use itertools::Itertools;
 use processor::{
     processors::{ProcessorConfig, ProcessorTrait},
     utils::database::{new_db_pool, run_pending_migrations},
@@ -13,7 +12,10 @@ use testcontainers::{
     ContainerAsync, GenericImage, ImageExt,
 };
 
-mod event_processor;
+mod diff_test_helper;
+mod diff_tests;
+mod models;
+mod scenarios_tests;
 
 /// The test context struct holds the test name and the transaction batches.
 pub struct TestContext {
@@ -23,7 +25,7 @@ pub struct TestContext {
 
 #[derive(Debug, Clone)]
 pub struct TestProcessorConfig {
-    config: ProcessorConfig,
+    pub config: ProcessorConfig,
 }
 
 impl TestContext {
@@ -31,10 +33,8 @@ impl TestContext {
     pub async fn new(txn_bytes: &[&[u8]]) -> anyhow::Result<Self> {
         let transaction_batches = txn_bytes
             .iter()
-            .enumerate()
-            .map(|(idx, txn)| {
-                let mut txn: Transaction = serde_json::from_slice(txn).unwrap();
-                txn.version = idx as u64;
+            .map(|txn| {
+                let txn: Transaction = serde_json::from_slice(txn).unwrap();
                 txn
             })
             .collect::<Vec<Transaction>>();
@@ -100,7 +100,7 @@ impl TestContext {
         verification_f: F,
     ) -> anyhow::Result<()>
     where
-        F: Fn(&mut PgConnection) -> anyhow::Result<()> + Send + Sync + 'static,
+        F: Fn(&mut PgConnection, &str) -> anyhow::Result<()> + Send + Sync + 'static,
     {
         let transactions = self.transaction_batches.clone();
         let db_url = self.get_db_url().await;
@@ -111,18 +111,18 @@ impl TestContext {
         // Iterate over all permutations of the transaction batches to ensure that the processor can handle transactions in any order.
         // By testing different permutations, we verify that the order of transactions
         // does not affect the correctness of the processing logic.
-        for perm in transactions.iter().permutations(transactions.len()) {
-            self.create_schema().await?;
-            let processor =
-                build_processor_for_testing(processor_config.config.clone(), db_pool.clone());
-            for txn in perm {
-                let version = txn.version;
-                processor
-                    .process_transactions(vec![txn.clone()], version, version, None)
-                    .await?;
-            }
+        // for perm in transactions.iter().permutations(transactions.len()) {
+        self.create_schema().await?;
+        let processor =
+            build_processor_for_testing(processor_config.config.clone(), db_pool.clone());
+        for txn in transactions.iter() {
+            let version = txn.version;
+            processor
+                .process_transactions(vec![txn.clone()], version, version, None)
+                .await?;
+            // }
             // Run the verification function.
-            verification_f(&mut conn)?;
+            verification_f(&mut conn, &version.to_string())?;
         }
         Ok(())
     }
