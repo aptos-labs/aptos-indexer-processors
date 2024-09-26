@@ -6,9 +6,16 @@ use std::{env, fs, path::Path};
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
+    println!("OUT_DIR: {:?}", out_dir);
     let dest_path = Path::new(&out_dir).join("generate_transactions.rs");
 
     let mut all_transactions_code = String::new();
+
+    // Create directories if they do not exist
+    create_directory_if_missing("json_transactions/imported_mainnet_txns");
+    create_directory_if_missing("json_transactions/imported_testnet_txns");
+    create_directory_if_missing("json_transactions/generated_txns");
+
 
     // Process each directory and generate code for it
     all_transactions_code.push_str(&process_directory("imported_mainnet_txns", "imported_mainnet_txns"));
@@ -57,4 +64,11 @@ fn process_directory(dir_name: &str, module_name: &str) -> String {
     ));
 
     transactions_code
+}
+
+fn create_directory_if_missing(dir: &str) {
+    let path = Path::new(dir);
+    if !path.exists() {
+        fs::create_dir_all(path).expect("Failed to create directory");
+    }
 }
