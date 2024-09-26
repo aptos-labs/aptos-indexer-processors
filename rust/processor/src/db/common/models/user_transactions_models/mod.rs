@@ -5,3 +5,4 @@ pub mod signatures;
 pub mod user_transactions;
 // parquet models
 pub mod parquet_signatures;
+pub mod parquet_user_transactions;
