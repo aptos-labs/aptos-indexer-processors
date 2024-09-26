@@ -20,6 +20,7 @@ mod test {
         ALL_GENERATED_TXNS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
     };
     use crate::diff_tests::{get_expected_generated_txns, get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns};
+    use crate::{TestType, DiffTest};
 
     #[tokio::test]
     async fn test_all_testnet_txns_schema_output_for_all_processors() {
@@ -42,11 +43,13 @@ mod test {
         };
 
         let processor_configs = vec![processor_config, processor_config2];
-
+        // let test_type = TestType::Scenario(ScenarioTest);
         let test_context = TestContext::new(ALL_IMPORTED_TESTNET_TXNS).await.unwrap();
 
         for processor_config in processor_configs {
             let processor_name = processor_config.config.name();
+            let test_type = TestType::Diff(DiffTest);
+
             // println!("Running tests for processor: {}", processor_name);
             if let Some(test_helper) = processor_map.get(processor_name) {
                 let test_helper = Arc::clone(test_helper);
@@ -55,6 +58,7 @@ mod test {
                 test_context
                     .run(
                         processor_config,
+                        test_type,
                         move |conn: &mut PgConnection, txn_version: &str| {
                             // Process the transaction using the processor logic
                             // Load and validate data using the test helper
@@ -103,10 +107,13 @@ mod test {
 
         let processor_configs = vec![processor_config];
 
+
         let test_context = TestContext::new(ALL_IMPORTED_MAINNET_TXNS).await.unwrap();
 
         for processor_config in processor_configs {
             let processor_name = processor_config.config.name();
+            let test_type = TestType::Diff(DiffTest);
+
             // println!("Running tests for processor: {}", processor_name);
             if let Some(test_helper) = processor_map.get(processor_name) {
                 let test_helper = Arc::clone(test_helper);
@@ -115,6 +122,7 @@ mod test {
                 test_context
                     .run(
                         processor_config,
+                        test_type,
                         move |conn: &mut PgConnection, txn_version: &str| {
                             // Process the transaction using the processor logic
                             // Load and validate data using the test helper
@@ -166,7 +174,8 @@ mod test {
 
         for processor_config in processor_configs {
             let processor_name = processor_config.config.name();
-            // println!("Running tests for processor: {}", processor_name);
+            let test_type = TestType::Diff(DiffTest);
+
             if let Some(test_helper) = processor_map.get(processor_name) {
                 let test_helper = Arc::clone(test_helper);
                 println!("Running tests for processor: {}", processor_name);
@@ -174,6 +183,7 @@ mod test {
                 test_context
                     .run(
                         processor_config,
+                        test_type,
                         move |conn: &mut PgConnection, txn_version: &str| {
                             // Process the transaction using the processor logic
                             // Load and validate data using the test helper

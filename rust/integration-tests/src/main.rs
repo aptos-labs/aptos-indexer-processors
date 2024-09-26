@@ -1,7 +1,7 @@
 // main.rs
 use anyhow::{anyhow, Result};
 use diesel::{pg::PgConnection, query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
-use integration_tests::{TestContext, TestProcessorConfig};
+use integration_tests::{TestContext, TestProcessorConfig, TestType, DiffTest};
 use processor::schema::events::dsl::*;
 use std::fs;
 use testing_transactions::{
@@ -11,10 +11,12 @@ mod models;
 use crate::models::queryable_models::{Event, FungibleAssetActivity};
 use processor::schema::fungible_asset_activities::dsl::{fungible_asset_activities, transaction_version as transaction_version_fa};
 
+
+// TODO: Support cli args for specifying the processor to run.
 #[tokio::main]
 async fn main() -> Result<()> {
 
-    // TODO: Support cli to be more flexible
+
     let test_context = TestContext::new(ALL_IMPORTED_TESTNET_TXNS).await.unwrap();
 
     let processor_config = TestProcessorConfig {
@@ -22,21 +24,20 @@ async fn main() -> Result<()> {
     };
 
     let processor_name = processor::processors::ProcessorConfig::FungibleAssetProcessor.name();
+    let test_type = TestType::Diff(DiffTest);
+
     let result = test_context
         .run(
             processor_config,
+            test_type,
             move |conn: &mut PgConnection, txn_version: &str| {
                 // let events_result = events
                 //     .filter(transaction_version.eq(txn_version.parse::<i64>().unwrap()))
                 //     .load::<Event>(conn);
 
-
                 let fungible_asset_activities_result = fungible_asset_activities
                     .filter(transaction_version_fa.eq(txn_version.parse::<i64>().unwrap()))
                     .load::<FungibleAssetActivity>(conn);
-
-                // let all_fungible_asset_activities = fungible_asset_activities_result.clone()?;
-                // let json_data = serde_json::to_string_pretty(&all_fungible_asset_activities)?;
 
                 let results = match fungible_asset_activities_result {
                     Ok(results) => results,
@@ -58,7 +59,7 @@ async fn main() -> Result<()> {
                 // let mut output_json_file = File::create("db_output_canonical_pretty.json")?;
                 // output_json_file.write_all(json.as_bytes())?;
                 // Write JSON data to file
-                let output_json_file = format!("expected_{}_{}.json", processor_name, txn_version);
+                let output_json_file = format!("{}_{}.json", processor_name, txn_version);
                 // println!("Writing JSON data to file: {}", json_data);
                 println!("Attempting to write file: {}", output_json_file);
 

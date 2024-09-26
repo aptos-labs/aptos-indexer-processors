@@ -1,7 +1,7 @@
 #[allow(clippy::needless_return)]
 #[cfg(test)]
 mod test {
-    use crate::{TestContext, TestProcessorConfig};
+    use crate::{ScenarioTest, TestContext, TestProcessorConfig, TestType};
     use aptos_indexer_test_transactions::{
         ACCOUNT_A_GET_FUNDED_FROM_FAUCET, ACCOUNT_A_TRANSFER_TO_ACCOUNT_B,
         ACCOUNT_B_TRANSFER_TO_ACCOUNT_B, GENERATED_USER_SCRIPT_TRANSACTION, VALIDATOR_TRANSACTION,
@@ -12,6 +12,8 @@ mod test {
         BoolExpressionMethods, ExpressionMethods, QueryResult, RunQueryDsl,
     };
     use processor::schema::events::dsl::*;
+
+
 
     const WITHDRAW_EVENT: &str = "0x1::coin::WithdrawEvent";
     const DEPOSIT_EVENT: &str = "0x1::coin::DepositEvent";
@@ -29,11 +31,14 @@ mod test {
             config: processor::processors::ProcessorConfig::EventsProcessor,
         };
         let expected_transaction = test_context.transaction_batches[0].clone();
+        let test_type = TestType::Scenario(ScenarioTest);
 
         assert!(test_context
             .run(
                 processor_config,
+                test_type,
                 move |conn: &mut PgConnection, version: &str| {
+                    println!("version: {}", version);
                     // Load and validate events
                     let withdraw_events = load_transaction_events(
                         conn,
@@ -80,10 +85,14 @@ mod test {
     async fn test_validator_transaction_distribute_rewards_events() {
         let test_context = TestContext::new(&[VALIDATOR_TRANSACTION]).await.unwrap();
         let expected_transaction = test_context.transaction_batches[0].clone();
-
+        let processor_config = TestProcessorConfig {
+            config: processor::processors::ProcessorConfig::EventsProcessor,
+        };
+        let test_type = TestType::Scenario(ScenarioTest);
         assert!(test_context
             .run(
-                default_processor_config(),
+                processor_config,
+                test_type,
                 move |conn: &mut PgConnection, version: &str| {
                     // Load and validate events
                     let distributed_rewards_events = load_transaction_events(
@@ -117,10 +126,14 @@ mod test {
             .await
             .unwrap();
         let expected_transaction = test_context.transaction_batches[0].clone();
-
+        let processor_config = TestProcessorConfig {
+            config: processor::processors::ProcessorConfig::EventsProcessor,
+        };
+        let test_type = TestType::Scenario(ScenarioTest);
         assert!(test_context
             .run(
-                default_processor_config(),
+                processor_config,
+                test_type,
                 move |conn: &mut PgConnection, version: &str| {
                     // Load and validate events
                     let actual_events = load_transaction_events(
@@ -157,12 +170,16 @@ mod test {
         ])
         .await
         .unwrap();
-
+        let test_type = TestType::Scenario(ScenarioTest);
+        let processor_config = TestProcessorConfig {
+            config: processor::processors::ProcessorConfig::EventsProcessor,
+        };
         assert!(test_context
             .run(
-                default_processor_config(),
+                processor_config,
+                test_type,
                 move |conn: &mut PgConnection, version: &str| {
-                    let _result = events
+                    let result = events
                         .select((
                             transaction_version,
                             event_index,
@@ -172,65 +189,57 @@ mod test {
                         ))
                         .filter(transaction_version.eq(version.parse::<i64>().unwrap()))
                         .load::<(i64, i64, String, serde_json::Value, i64)>(conn);
-                    // let result_events = result.expect("Failed to load events");
-                    // assert_eq!(result_events.len(), 1);
-                    //
-                    // let withdraw_events = events
-                    //     .select((transaction_version, event_index, type_))
-                    //     .filter(type_.eq("0x1::coin::WithdrawEvent")
-                    //                 .and(transaction_version.eq(5524193329)),
-                    //     )
-                    //     .load::<(i64, i64, String)>(conn);
-                    //
-                    // // Withdraw from Faucet, Withdraw from AccountA, Withdraw from AccountB
-                    // assert_eq!(withdraw_events.unwrap().len(), 1);
+                    let result_events = result.expect("Failed to load events");
+                    assert_eq!(result_events.len(), 3);
 
-                    // let deposit_events = events
-                    //     .select((
-                    //         transaction_version,
-                    //         event_index,
-                    //         type_,
-                    //         data,
-                    //         account_address,
-                    //     ))
-                    //     .filter(type_.eq("0x1::coin::DepositEvent"))
-                    //     .load::<(i64, i64, String, serde_json::Value, String)>(conn);
-                    //
-                    // let deposit_events = deposit_events.expect("Failed to load DepositEvent");
-                    // let account_a_address =
-                    //     "0xeea01e0c163fe390e30afd0e6ff88a3535a2d78b4cbbcc8f9bf3848b5a8fbcf2";
-                    // // Verify that specific events with a given transaction version and creation number contain the correct data
-                    // deposit_events
-                    //     .iter()
-                    //     .filter(|(_, _, _, _, _account_address)| _account_address.eq(account_a_address)) // Ensure correct creation number
-                    //     .for_each(|(_, _, _, _data, _)| {
-                    //         // Ensure that any key starting with "amount" has the expected value
-                    //         _data
-                    //             .as_object()
-                    //             .unwrap()
-                    //             .iter()
-                    //             .filter(|(k, _)| k.starts_with("amount"))
-                    //             .for_each(|(_, v)| {
-                    //                 assert_eq!(v.as_str().unwrap(), "100000000"); // checking deposit into account A is 100000000
-                    //             });
-                    //     });
-                    //
-                    // // total 4 deposit events = 2 from faucet, 1 from account A, and 1 from account b
-                    // assert_eq!(deposit_events.len(), 4);
+                    let withdraw_events = events
+                        .select((transaction_version, event_index, type_))
+                        .filter(type_.eq("0x1::coin::WithdrawEvent")
+                                    .and(transaction_version.eq(5524193329)),
+                        )
+                        .load::<(i64, i64, String)>(conn);
+
+                    // Withdraw from Faucet, Withdraw from AccountA, Withdraw from AccountB
+                    assert_eq!(withdraw_events.unwrap().len(), 1);
+
+                    let deposit_events = events
+                        .select((
+                            transaction_version,
+                            event_index,
+                            type_,
+                            data,
+                            account_address,
+                        ))
+                        .filter(type_.eq("0x1::coin::DepositEvent"))
+                        .load::<(i64, i64, String, serde_json::Value, String)>(conn);
+
+                    let deposit_events = deposit_events.expect("Failed to load DepositEvent");
+                    let account_a_address =
+                        "0xeea01e0c163fe390e30afd0e6ff88a3535a2d78b4cbbcc8f9bf3848b5a8fbcf2";
+                    // Verify that specific events with a given transaction version and creation number contain the correct data
+                    deposit_events
+                        .iter()
+                        .filter(|(_, _, _, _, _account_address)| _account_address.eq(account_a_address)) // Ensure correct creation number
+                        .for_each(|(_, _, _, _data, _)| {
+                            // Ensure that any key starting with "amount" has the expected value
+                            _data
+                                .as_object()
+                                .unwrap()
+                                .iter()
+                                .filter(|(k, _)| k.starts_with("amount"))
+                                .for_each(|(_, v)| {
+                                    assert_eq!(v.as_str().unwrap(), "100000000"); // checking deposit into account A is 100000000
+                                });
+                        });
+
+                    // total 4 deposit events = 2 from faucet, 1 from account A, and 1 from account b
+                    assert_eq!(deposit_events.len(), 4);
 
                     Ok(())
                 }
             )
             .await
             .is_ok());
-    }
-
-    // Default Event processor configuration
-    // TODO: Move this to a common location later when we have more processor tests
-    fn default_processor_config() -> TestProcessorConfig {
-        TestProcessorConfig {
-            config: processor::processors::ProcessorConfig::EventsProcessor,
-        }
     }
 
     fn load_transaction_events(
