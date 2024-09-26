@@ -97,6 +97,7 @@ impl TestContext {
     pub async fn run<F>(
         &self,
         processor_config: TestProcessorConfig,
+        test_type: TestType,
         verification_f: F,
     ) -> anyhow::Result<()>
     where
@@ -115,15 +116,86 @@ impl TestContext {
         self.create_schema().await?;
         let processor =
             build_processor_for_testing(processor_config.config.clone(), db_pool.clone());
+
+        let mut last_version = None;
+
         for txn in transactions.iter() {
             let version = txn.version;
             processor
                 .process_transactions(vec![txn.clone()], version, version, None)
                 .await?;
             // }
-            // Run the verification function.
-            verification_f(&mut conn, &version.to_string())?;
+
+            last_version = Some(version);
+
+            // For DiffTest, run verification after each transaction
+            if matches!(test_type, TestType::Diff(_)) {
+                test_type.run_verification(&mut conn, &version.to_string(), &verification_f)?;
+            }
         }
+        // For ScenarioTest, use the last transaction version if needed
+        if matches!(test_type, TestType::Scenario(_)) {
+            if let Some(last_version) = last_version {
+                test_type.run_verification(&mut conn, &last_version.to_string(), &verification_f)?;
+            } else {
+                return Err(anyhow::anyhow!("No transactions found to get the last version"));
+            }
+        }
+
         Ok(())
+    }
+}
+
+trait TestStrategy {
+    fn verify(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()>;
+}
+
+pub struct DiffTest;
+
+impl TestStrategy for DiffTest {
+    fn verify(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        verification_f(conn, version)
+    }
+}
+
+pub struct ScenarioTest;
+
+impl TestStrategy for ScenarioTest {
+    fn verify(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        verification_f(conn, version)
+    }
+}
+
+pub enum TestType {
+    Diff(DiffTest),
+    Scenario(ScenarioTest),
+}
+
+impl TestType {
+    fn run_verification(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        match self {
+            TestType::Diff(strategy) => strategy.verify(conn, version, verification_f),
+            TestType::Scenario(strategy) => strategy.verify(conn, version, verification_f),
+        }
     }
 }

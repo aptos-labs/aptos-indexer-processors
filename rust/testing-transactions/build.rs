@@ -24,8 +24,8 @@ fn process_directory(dir_name: &str, module_name: &str) -> String {
     let mut all_constants = String::new();
     let json_dir = Path::new("json_transactions").join(dir_name);
 
-    for entry in fs::read_dir(json_dir).unwrap() {
-        let entry = entry.unwrap();
+    for entry in fs::read_dir(json_dir).expect("Failed to read directory") {
+        let entry = entry.expect("Failed to get directory entry");
         let path = entry.path();
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {

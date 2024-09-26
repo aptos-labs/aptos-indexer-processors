@@ -4,14 +4,13 @@ use crate::{
 use anyhow::Result;
 use diesel::{pg::PgConnection, query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
 use serde_json::Value;
+use processor::schema::fungible_asset_activities::dsl::*;
 
-// Example implementation for the EventsProcessor
 pub struct FungibleAssetProcessorTestHelper;
 
 impl ProcessorTestHelper for FungibleAssetProcessorTestHelper {
     fn load_data(&self, conn: &mut PgConnection, txn_version: &str) -> Result<Value> {
-        // This is the schema-specific logic for the EventsProcessor
-        use processor::schema::fungible_asset_activities::dsl::*;
+
 
         let fungible_asset_activities_result = fungible_asset_activities
             .filter(transaction_version.eq(txn_version.parse::<i64>().unwrap()))
