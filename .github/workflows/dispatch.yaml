@@ -1,0 +1,16 @@
+
+name: Dispatch Workflow
+
+on:
+  repository_dispatch:
+    types: [trigger_ci]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Build
+        run: echo "Build triggered by Aptos Core!"
