@@ -5,11 +5,9 @@ use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::common::models::default_models::{
         block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
-        move_modules::MoveModule,
-        move_resources::MoveResource,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
         transactions::TransactionModel,
-        write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
+        write_set_changes::WriteSetChangeDetail,
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -65,12 +63,8 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    txns: &[TransactionModel],
     block_metadata_transactions: &[BlockMetadataTransactionModel],
-    wscs: &[WriteSetChangeModel],
-    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
-        &[MoveModule],
-        &[MoveResource],
+    (table_items, current_table_items, table_metadata): (
         &[TableItem],
         &[CurrentTableItem],
         &[TableMetadata],
@@ -84,13 +78,6 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let txns_res = execute_in_chunks(
-        conn.clone(),
-        insert_transactions_query,
-        txns,
-        get_config_table_chunk_size::<TransactionModel>("transactions", per_table_chunk_sizes),
-    );
-
     let bmt_res = execute_in_chunks(
         conn.clone(),
         insert_block_metadata_transactions_query,
@@ -99,30 +86,6 @@ async fn insert_to_db(
             "block_metadata_transactions",
             per_table_chunk_sizes,
         ),
-    );
-
-    let wst_res = execute_in_chunks(
-        conn.clone(),
-        insert_write_set_changes_query,
-        wscs,
-        get_config_table_chunk_size::<WriteSetChangeModel>(
-            "write_set_changes",
-            per_table_chunk_sizes,
-        ),
-    );
-
-    let mm_res = execute_in_chunks(
-        conn.clone(),
-        insert_move_modules_query,
-        move_modules,
-        get_config_table_chunk_size::<MoveModule>("move_modules", per_table_chunk_sizes),
-    );
-
-    let mr_res = execute_in_chunks(
-        conn.clone(),
-        insert_move_resources_query,
-        move_resources,
-        get_config_table_chunk_size::<MoveResource>("move_resources", per_table_chunk_sizes),
     );
 
     let ti_res = execute_in_chunks(
@@ -149,37 +112,13 @@ async fn insert_to_db(
         get_config_table_chunk_size::<TableMetadata>("table_metadatas", per_table_chunk_sizes),
     );
 
-    let (txns_res, wst_res, bmt_res, mm_res, mr_res, ti_res, cti_res, tm_res) =
-        join!(txns_res, wst_res, bmt_res, mm_res, mr_res, ti_res, cti_res, tm_res);
+    let (bmt_res, ti_res, cti_res, tm_res) = join!(bmt_res, ti_res, cti_res, tm_res);
 
-    for res in [
-        txns_res, wst_res, bmt_res, mm_res, mr_res, ti_res, cti_res, tm_res,
-    ] {
+    for res in [bmt_res, ti_res, cti_res, tm_res] {
         res?;
     }
 
     Ok(())
-}
-
-fn insert_transactions_query(
-    items_to_insert: Vec<TransactionModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::transactions::dsl::*;
-
-    (
-        diesel::insert_into(schema::transactions::table)
-            .values(items_to_insert)
-            .on_conflict(version)
-            .do_update()
-            .set((
-                inserted_at.eq(excluded(inserted_at)),
-                payload_type.eq(excluded(payload_type)),
-            )),
-        None,
-    )
 }
 
 fn insert_block_metadata_transactions_query(
@@ -194,57 +133,6 @@ fn insert_block_metadata_transactions_query(
         diesel::insert_into(schema::block_metadata_transactions::table)
             .values(items_to_insert)
             .on_conflict(version)
-            .do_nothing(),
-        None,
-    )
-}
-
-fn insert_write_set_changes_query(
-    items_to_insert: Vec<WriteSetChangeModel>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::write_set_changes::dsl::*;
-
-    (
-        diesel::insert_into(schema::write_set_changes::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, index))
-            .do_nothing(),
-        None,
-    )
-}
-
-fn insert_move_modules_query(
-    items_to_insert: Vec<MoveModule>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::move_modules::dsl::*;
-
-    (
-        diesel::insert_into(schema::move_modules::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
-}
-
-fn insert_move_resources_query(
-    items_to_insert: Vec<MoveResource>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::move_resources::dsl::*;
-
-    (
-        diesel::insert_into(schema::move_resources::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
             .do_nothing(),
         None,
     )
@@ -325,14 +213,10 @@ impl ProcessorTrait for DefaultProcessor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         let flags = self.deprecated_tables;
-        let (
-            txns,
-            block_metadata_transactions,
-            write_set_changes,
-            (move_modules, move_resources, table_items, current_table_items, table_metadata),
-        ) = tokio::task::spawn_blocking(move || process_transactions(transactions, flags))
-            .await
-            .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
+        let (block_metadata_transactions, (table_items, current_table_items, table_metadata)) =
+            tokio::task::spawn_blocking(move || process_transactions(transactions, flags))
+                .await
+                .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -341,16 +225,8 @@ impl ProcessorTrait for DefaultProcessor {
             self.name(),
             start_version,
             end_version,
-            &txns,
             &block_metadata_transactions,
-            &write_set_changes,
-            (
-                &move_modules,
-                &move_resources,
-                &table_items,
-                &current_table_items,
-                &table_metadata,
-            ),
+            (&table_items, &current_table_items, &table_metadata),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -358,11 +234,7 @@ impl ProcessorTrait for DefaultProcessor {
         // These vectors could be super large and take a lot of time to drop, move to background to
         // make it faster.
         tokio::task::spawn(async move {
-            drop(txns);
             drop(block_metadata_transactions);
-            drop(write_set_changes);
-            drop(move_modules);
-            drop(move_resources);
             drop(table_items);
             drop(current_table_items);
             drop(table_metadata);
@@ -401,45 +273,30 @@ fn process_transactions(
     transactions: Vec<Transaction>,
     flags: TableFlags,
 ) -> (
-    Vec<crate::db::common::models::default_models::transactions::Transaction>,
     Vec<BlockMetadataTransaction>,
-    Vec<WriteSetChangeModel>,
-    (
-        Vec<MoveModule>,
-        Vec<MoveResource>,
-        Vec<TableItem>,
-        Vec<CurrentTableItem>,
-        Vec<TableMetadata>,
-    ),
+    (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
 ) {
-    let (mut txns, block_metadata_txns, mut write_set_changes, wsc_details) =
-        TransactionModel::from_transactions(&transactions);
+    let (block_metadata_txns, wsc_details) = TransactionModel::from_transactions(&transactions);
     let mut block_metadata_transactions = vec![];
     for block_metadata_txn in block_metadata_txns {
         block_metadata_transactions.push(block_metadata_txn);
     }
-    let mut move_modules = vec![];
-    let mut move_resources = vec![];
     let mut table_items = vec![];
     let mut current_table_items = AHashMap::new();
     let mut table_metadata = AHashMap::new();
     for detail in wsc_details {
-        match detail {
-            WriteSetChangeDetail::Module(module) => move_modules.push(module),
-            WriteSetChangeDetail::Resource(resource) => move_resources.push(resource),
-            WriteSetChangeDetail::Table(item, current_item, metadata) => {
-                table_items.push(item);
-                current_table_items.insert(
-                    (
-                        current_item.table_handle.clone(),
-                        current_item.key_hash.clone(),
-                    ),
-                    current_item,
-                );
-                if let Some(meta) = metadata {
-                    table_metadata.insert(meta.handle.clone(), meta);
-                }
-            },
+        if let WriteSetChangeDetail::Table(item, current_item, metadata) = detail {
+            table_items.push(item);
+            current_table_items.insert(
+                (
+                    current_item.table_handle.clone(),
+                    current_item.key_hash.clone(),
+                ),
+                current_item,
+            );
+            if let Some(meta) = metadata {
+                table_metadata.insert(meta.handle.clone(), meta);
+            }
         }
     }
 
@@ -453,35 +310,15 @@ fn process_transactions(
         .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
 
-    if flags.contains(TableFlags::MOVE_RESOURCES) {
-        move_resources.clear();
-    }
-    if flags.contains(TableFlags::TRANSACTIONS) {
-        txns.clear();
-    }
-    if flags.contains(TableFlags::WRITE_SET_CHANGES) {
-        write_set_changes.clear();
-    }
     if flags.contains(TableFlags::TABLE_ITEMS) {
         table_items.clear();
     }
     if flags.contains(TableFlags::TABLE_METADATAS) {
         table_metadata.clear();
     }
-    if flags.contains(TableFlags::MOVE_MODULES) {
-        move_modules.clear();
-    }
 
     (
-        txns,
         block_metadata_transactions,
-        write_set_changes,
-        (
-            move_modules,
-            move_resources,
-            table_items,
-            current_table_items,
-            table_metadata,
-        ),
+        (table_items, current_table_items, table_metadata),
     )
 }

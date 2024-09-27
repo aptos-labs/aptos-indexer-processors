@@ -81,6 +81,7 @@ impl RunnableConfig for PostProcessorConfig {
     }
 }
 
+#[allow(clippy::needless_return)]
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = ServerArgs::parse();
@@ -198,6 +199,7 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
     }
 }
 
+#[allow(clippy::needless_return)]
 #[cfg(test)]
 mod test {
     use super::*;
