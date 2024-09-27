@@ -26,5 +26,6 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 testcontainers = { workspace = true }
+testing-transactions = { workspace = true }
 tokio = { workspace = true }
 [dev-dependencies]

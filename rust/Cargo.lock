@@ -147,7 +147,7 @@ checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7#e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "anyhow",
  "aptos-indexer-transaction-stream",
@@ -179,7 +179,7 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-processor-sdk-server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7#e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "anyhow",
  "aptos-indexer-processor-sdk",
@@ -212,16 +212,17 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7#e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "chrono",
  "futures-util",
  "once_cell",
  "prometheus",
  "prost 0.12.6",
+ "sample",
  "serde",
  "tokio",
  "tonic 0.11.0",
@@ -239,7 +240,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7#e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "chrono",
 ]
@@ -2202,7 +2203,7 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7#e1e1bdd9349f0a68c9fc53b7e2cebda9e2ce92b7"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "delegate",
  "derive_builder",
@@ -2235,6 +2236,7 @@ dependencies = [
  "serde",
  "serde_json",
  "testcontainers",
+ "testing-transactions",
  "tokio",
 ]
 
@@ -4065,7 +4067,7 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 [[package]]
 name = "sample"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=81571a5bebc4459b3faa971c64a810f171cc823a#81571a5bebc4459b3faa971c64a810f171cc823a"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 
 [[package]]
 name = "schannel"
@@ -4664,6 +4666,14 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "url",
+]
+
+[[package]]
+name = "testing-transactions"
+version = "0.1.0"
+dependencies = [
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "serde_json",
 ]
 
 [[package]]

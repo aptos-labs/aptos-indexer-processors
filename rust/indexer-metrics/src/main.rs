@@ -31,11 +31,9 @@ struct FullnodeResponse {
 #[derive(Debug, Deserialize, Serialize)]
 struct ProcessorStatus {
     processor: String,
-    #[serde(deserialize_with = "deserialize_from_string")]
     last_updated: NaiveDateTime,
     last_success_version: u64,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    last_transaction_timestamp: NaiveDateTime,
+    last_transaction_timestamp: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -83,6 +81,7 @@ impl RunnableConfig for PostProcessorConfig {
     }
 }
 
+#[allow(clippy::needless_return)]
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = ServerArgs::parse();
@@ -150,6 +149,13 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                     // Process the data as needed
                     let system_time_now = chrono::Utc::now().naive_utc();
                     for processor in resp.data.processor_status {
+                        // If the last_transaction_timestamp is None, then the processor has not processed any transactions.
+                        // Skip.
+                        let last_transaction_timestamp = match processor.last_transaction_timestamp
+                        {
+                            Some(timestamp) => timestamp,
+                            None => continue,
+                        };
                         HASURA_API_LATEST_VERSION
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(processor.last_success_version as i64);
@@ -159,13 +165,10 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
                         HASURA_API_LATEST_TRANSACTION_TIMESTAMP
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(
-                                processor
-                                    .last_transaction_timestamp
-                                    .and_utc()
-                                    .timestamp_micros() as f64
+                                last_transaction_timestamp.and_utc().timestamp_micros() as f64
                                     * 1e-6,
                             );
-                        let latency = system_time_now - processor.last_transaction_timestamp;
+                        let latency = system_time_now - last_transaction_timestamp;
                         HASURA_API_LATEST_TRANSACTION_LATENCY_IN_SECS
                             .with_label_values(&[&processor.processor, &chain_name])
                             .set(latency.num_milliseconds() as f64 * 1e-3);
@@ -193,5 +196,80 @@ async fn start_processor_status_fetch(url: String, chain_name: String) {
         if elapsed < MIN_TIME_QUERIES_MS {
             tokio::time::sleep(Duration::from_millis(MIN_TIME_QUERIES_MS - elapsed)).await;
         }
+    }
+}
+
+#[allow(clippy::needless_return)]
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_response_parsing() {
+        let response_str = r#"
+        {
+            "data": {
+                "processor_status": [
+                {
+                    "processor": "token_processor",
+                    "last_updated": "2024-07-02T17:23:50.47637",
+                    "last_success_version": 1010349813,
+                    "last_transaction_timestamp": "2024-07-02T17:23:49.595574"
+                }
+                ]
+            }
+        }
+        "#;
+        let resp: ProcessorsResponse = serde_json::from_str(response_str).unwrap();
+        assert_eq!(resp.data.processor_status.len(), 1);
+        assert!(resp.data.processor_status[0]
+            .last_transaction_timestamp
+            .is_some());
+        assert_eq!(resp.data.processor_status[0].processor, "token_processor");
+        let expected_last_updated =
+            NaiveDateTime::parse_from_str("2024-07-02T17:23:50.47637", "%Y-%m-%dT%H:%M:%S%.f")
+                .unwrap();
+        assert_eq!(
+            resp.data.processor_status[0].last_updated,
+            expected_last_updated
+        );
+        let timestamp = resp.data.processor_status[0]
+            .last_transaction_timestamp
+            .unwrap();
+        let actual_datetime =
+            NaiveDateTime::parse_from_str("2024-07-02T17:23:49.595574", "%Y-%m-%dT%H:%M:%S%.f")
+                .unwrap();
+        assert_eq!(timestamp, actual_datetime);
+    }
+
+    #[tokio::test]
+    async fn test_response_parsing_with_null() {
+        let response_str = r#"
+        {
+            "data": {
+                "processor_status": [
+                {
+                    "processor": "token_processor",
+                    "last_updated": "2024-07-02T17:23:50.47637",
+                    "last_success_version": 1010349813,
+                    "last_transaction_timestamp": null
+                }
+                ]
+            }
+        }
+        "#;
+        let resp: ProcessorsResponse = serde_json::from_str(response_str).unwrap();
+        assert_eq!(resp.data.processor_status.len(), 1);
+        assert_eq!(resp.data.processor_status[0].processor, "token_processor");
+        let expected_last_updated =
+            NaiveDateTime::parse_from_str("2024-07-02T17:23:50.47637", "%Y-%m-%dT%H:%M:%S%.f")
+                .unwrap();
+        assert_eq!(
+            resp.data.processor_status[0].last_updated,
+            expected_last_updated
+        );
+        assert!(resp.data.processor_status[0]
+            .last_transaction_timestamp
+            .is_none());
     }
 }

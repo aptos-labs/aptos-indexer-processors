@@ -70,6 +70,7 @@ impl DefaultGapDetector {
     }
 }
 
+#[allow(clippy::needless_return)]
 #[cfg(test)]
 mod test {
     use super::*;
