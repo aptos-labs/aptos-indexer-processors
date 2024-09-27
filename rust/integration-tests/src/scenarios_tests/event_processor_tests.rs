@@ -13,8 +13,6 @@ mod test {
     };
     use processor::schema::events::dsl::*;
 
-
-
     const WITHDRAW_EVENT: &str = "0x1::coin::WithdrawEvent";
     const DEPOSIT_EVENT: &str = "0x1::coin::DepositEvent";
     const FEE_STATEMENT_EVENT: &str = "0x1::transaction_fee::FeeStatement";
@@ -194,8 +192,10 @@ mod test {
 
                     let withdraw_events = events
                         .select((transaction_version, event_index, type_))
-                        .filter(type_.eq("0x1::coin::WithdrawEvent")
-                                    .and(transaction_version.eq(5524193329)),
+                        .filter(
+                            type_
+                                .eq("0x1::coin::WithdrawEvent")
+                                .and(transaction_version.eq(5524193329)),
                         )
                         .load::<(i64, i64, String)>(conn);
 
@@ -219,7 +219,9 @@ mod test {
                     // Verify that specific events with a given transaction version and creation number contain the correct data
                     deposit_events
                         .iter()
-                        .filter(|(_, _, _, _, _account_address)| _account_address.eq(account_a_address)) // Ensure correct creation number
+                        .filter(|(_, _, _, _, _account_address)| {
+                            _account_address.eq(account_a_address)
+                        }) // Ensure correct creation number
                         .for_each(|(_, _, _, _data, _)| {
                             // Ensure that any key starting with "amount" has the expected value
                             _data
@@ -228,7 +230,8 @@ mod test {
                                 .iter()
                                 .filter(|(k, _)| k.starts_with("amount"))
                                 .for_each(|(_, v)| {
-                                    assert_eq!(v.as_str().unwrap(), "100000000"); // checking deposit into account A is 100000000
+                                    assert_eq!(v.as_str().unwrap(), "100000000");
+                                    // checking deposit into account A is 100000000
                                 });
                         });
 

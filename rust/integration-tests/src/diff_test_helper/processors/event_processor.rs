@@ -1,8 +1,8 @@
 use crate::{diff_test_helper::ProcessorTestHelper, models::queryable_models::Event};
 use anyhow::Result;
 use diesel::{pg::PgConnection, query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
-use serde_json::Value;
 use processor::schema::events::dsl::*;
+use serde_json::Value;
 
 // Example implementation for the EventsProcessor
 pub struct EventsProcessorTestHelper;

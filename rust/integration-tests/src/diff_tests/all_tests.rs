@@ -10,8 +10,11 @@ mod test {
             },
             ProcessorTestHelper,
         },
-        diff_tests::remove_inserted_at,
-        TestContext, TestProcessorConfig,
+        diff_tests::{
+            get_expected_generated_txns, get_expected_imported_mainnet_txns,
+            get_expected_imported_testnet_txns, remove_inserted_at,
+        },
+        DiffTest, TestContext, TestProcessorConfig, TestType,
     };
     use assert_json_diff::assert_json_eq;
     use diesel::pg::PgConnection;
@@ -19,8 +22,6 @@ mod test {
     use testing_transactions::{
         ALL_GENERATED_TXNS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
     };
-    use crate::diff_tests::{get_expected_generated_txns, get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns};
-    use crate::{TestType, DiffTest};
 
     #[tokio::test]
     async fn test_all_testnet_txns_schema_output_for_all_processors() {
@@ -64,7 +65,8 @@ mod test {
                             // Load and validate data using the test helper
                             let mut json_data = test_helper.load_data(conn, txn_version)?;
                             // Read the trusted JSON file
-                            let trusted_json_path = get_expected_imported_testnet_txns(processor_name, txn_version);
+                            let trusted_json_path =
+                                get_expected_imported_testnet_txns(processor_name, txn_version);
                             let mut trusted_json = match fs::read_to_string(&trusted_json_path) {
                                 Ok(content) => serde_json::from_str(&content).unwrap(),
                                 Err(e) => {
@@ -107,7 +109,6 @@ mod test {
 
         let processor_configs = vec![processor_config];
 
-
         let test_context = TestContext::new(ALL_IMPORTED_MAINNET_TXNS).await.unwrap();
 
         for processor_config in processor_configs {
@@ -128,7 +129,8 @@ mod test {
                             // Load and validate data using the test helper
                             let mut json_data = test_helper.load_data(conn, txn_version)?;
                             // Read the trusted JSON file
-                            let trusted_json_path = get_expected_imported_mainnet_txns(processor_name, txn_version);
+                            let trusted_json_path =
+                                get_expected_imported_mainnet_txns(processor_name, txn_version);
                             let mut trusted_json = match fs::read_to_string(&trusted_json_path) {
                                 Ok(content) => serde_json::from_str(&content).unwrap(),
                                 Err(e) => {
@@ -189,7 +191,8 @@ mod test {
                             // Load and validate data using the test helper
                             let mut json_data = test_helper.load_data(conn, txn_version)?;
                             // Read the trusted JSON file
-                            let trusted_json_path = get_expected_generated_txns(processor_name, txn_version);
+                            let trusted_json_path =
+                                get_expected_generated_txns(processor_name, txn_version);
                             let mut trusted_json = match fs::read_to_string(&trusted_json_path) {
                                 Ok(content) => serde_json::from_str(&content).unwrap(),
                                 Err(e) => {
