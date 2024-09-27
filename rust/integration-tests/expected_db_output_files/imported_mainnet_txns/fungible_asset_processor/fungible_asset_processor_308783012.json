@@ -1,0 +1,40 @@
+[
+  {
+    "transaction_version": 308783012,
+    "event_index": -1,
+    "owner_address": "0xc3f85f808a9f47a944c48cb3082d2f0bc178990610b2213438a1bfa1d77f0a38",
+    "storage_id": "0x16a83e9c69716e3203fee6f10bb13d16eed9beea82be2df678360a3b3a506fed",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "39700",
+    "type_": "0x1::aptos_coin::GasFeeEvent",
+    "is_gas_fee": true,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x498d8926f16eb9ca90cab1b3a26aa6f97a080b3fcbe6e83ae150b7243a00fb68::devnet_coins::mint_to_wallet",
+    "block_height": 24954497,
+    "token_standard": "v1",
+    "transaction_timestamp": "2022-10-27T11:57:33",
+    "inserted_at": "2024-09-27T07:28:32.617",
+    "storage_refund_amount": "0"
+  },
+  {
+    "transaction_version": 308783012,
+    "event_index": 0,
+    "owner_address": "0xc3f85f808a9f47a944c48cb3082d2f0bc178990610b2213438a1bfa1d77f0a38",
+    "storage_id": "0x46b108685834ad15b08e776e275992d7e19c0ca2fcb724c21740fb5e2b8cc87e",
+    "asset_type": "0x498d8926f16eb9ca90cab1b3a26aa6f97a080b3fcbe6e83ae150b7243a00fb68::devnet_coins::DevnetBTC",
+    "is_frozen": null,
+    "amount": "100000000",
+    "type_": "0x1::coin::DepositEvent",
+    "is_gas_fee": false,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x498d8926f16eb9ca90cab1b3a26aa6f97a080b3fcbe6e83ae150b7243a00fb68::devnet_coins::mint_to_wallet",
+    "block_height": 24954497,
+    "token_standard": "v1",
+    "transaction_timestamp": "2022-10-27T11:57:33",
+    "inserted_at": "2024-09-27T07:28:32.617",
+    "storage_refund_amount": "0"
+  }
+]

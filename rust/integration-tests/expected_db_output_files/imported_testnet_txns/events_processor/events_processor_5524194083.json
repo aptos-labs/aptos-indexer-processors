@@ -9,7 +9,7 @@
     "data": {
       "amount": "20000000"
     },
-    "inserted_at": "2024-09-25T22:35:00.931945",
+    "inserted_at": "2024-09-27T07:25:40.989044",
     "event_index": 0,
     "indexed_type": "0x1::coin::WithdrawEvent"
   },
@@ -23,7 +23,7 @@
     "data": {
       "amount": "20000000"
     },
-    "inserted_at": "2024-09-25T22:35:00.931945",
+    "inserted_at": "2024-09-27T07:25:40.989044",
     "event_index": 1,
     "indexed_type": "0x1::coin::DepositEvent"
   },
@@ -41,7 +41,7 @@
       "total_charge_gas_units": "8",
       "storage_fee_refund_octas": "0"
     },
-    "inserted_at": "2024-09-25T22:35:00.931945",
+    "inserted_at": "2024-09-27T07:25:40.989044",
     "event_index": 2,
     "indexed_type": "0x1::transaction_fee::FeeStatement"
   }
