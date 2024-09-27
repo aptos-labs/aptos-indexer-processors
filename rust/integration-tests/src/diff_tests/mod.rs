@@ -16,9 +16,7 @@ pub fn remove_inserted_at(value: &mut Value) {
 pub fn get_expected_imported_testnet_txns(processor_name: &str, txn_version: &str) -> String {
     format!(
         "expected_db_output_files/imported_testnet_txns/{}/{}_{}.json",
-        processor_name,
-        processor_name,
-        txn_version
+        processor_name, processor_name, txn_version
     )
 }
 
@@ -26,9 +24,7 @@ pub fn get_expected_imported_testnet_txns(processor_name: &str, txn_version: &st
 pub fn get_expected_imported_mainnet_txns(processor_name: &str, txn_version: &str) -> String {
     format!(
         "expected_db_output_files/imported_mainnet_txns/{}/{}_{}.json",
-        processor_name,
-        processor_name,
-        txn_version
+        processor_name, processor_name, txn_version
     )
 }
 
@@ -36,8 +32,6 @@ pub fn get_expected_imported_mainnet_txns(processor_name: &str, txn_version: &st
 pub fn get_expected_generated_txns(processor_name: &str, txn_version: &str) -> String {
     format!(
         "expected_db_output_files/generated_txns/{}/{}_{}.json",
-        processor_name,
-        processor_name,
-        txn_version
+        processor_name, processor_name, txn_version
     )
 }

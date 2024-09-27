@@ -136,9 +136,15 @@ impl TestContext {
         // For ScenarioTest, use the last transaction version if needed
         if matches!(test_type, TestType::Scenario(_)) {
             if let Some(last_version) = last_version {
-                test_type.run_verification(&mut conn, &last_version.to_string(), &verification_f)?;
+                test_type.run_verification(
+                    &mut conn,
+                    &last_version.to_string(),
+                    &verification_f,
+                )?;
             } else {
-                return Err(anyhow::anyhow!("No transactions found to get the last version"));
+                return Err(anyhow::anyhow!(
+                    "No transactions found to get the last version"
+                ));
             }
         }
 

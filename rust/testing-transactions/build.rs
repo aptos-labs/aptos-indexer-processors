@@ -16,10 +16,15 @@ fn main() {
     create_directory_if_missing("json_transactions/imported_testnet_txns");
     create_directory_if_missing("json_transactions/generated_txns");
 
-
     // Process each directory and generate code for it
-    all_transactions_code.push_str(&process_directory("imported_mainnet_txns", "imported_mainnet_txns"));
-    all_transactions_code.push_str(&process_directory("imported_testnet_txns", "imported_testnet_txns"));
+    all_transactions_code.push_str(&process_directory(
+        "imported_mainnet_txns",
+        "imported_mainnet_txns",
+    ));
+    all_transactions_code.push_str(&process_directory(
+        "imported_testnet_txns",
+        "imported_testnet_txns",
+    ));
     all_transactions_code.push_str(&process_directory("generated_txns", "generated_txns"));
 
     // Write the generated Rust code to the output file
