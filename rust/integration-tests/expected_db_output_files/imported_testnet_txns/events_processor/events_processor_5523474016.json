@@ -10,7 +10,7 @@
       "pool_address": "0xa4113560d0b18ba38797f2a899c4b27e0c5b0476be5d8f6be68fba8b1861ed0",
       "rewards_amount": "789371656"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 0,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -25,7 +25,7 @@
       "pool_address": "0x286e8af6717ef6b1e361aae8ab28dd6664bf562c2805dd9a53432246ec66566e",
       "rewards_amount": "19174256316"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 1,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -40,7 +40,7 @@
       "pool_address": "0x116176e2af223a8b7f8db80dc52f7a423b4d7f8c0553a1747e92ef58849aff4f",
       "rewards_amount": "19178730843"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 2,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -55,7 +55,7 @@
       "pool_address": "0xba08cec00a8cfa1deff6c9212dda8d198c8fa6ee1992f3ada76d645f99e3402b",
       "rewards_amount": "818123890"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 3,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -70,7 +70,7 @@
       "pool_address": "0x12000330d7cd8a748f46c25e6ce5d236a27e13d0b510d4516ac84ecc5fddd002",
       "rewards_amount": "19178287161"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 4,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -85,7 +85,7 @@
       "pool_address": "0x5176f2252762e527e3598c22f1bdb3a1ac0ff0db2d7518cabbc99305330a864a",
       "rewards_amount": "963055869"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 5,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -100,7 +100,7 @@
       "pool_address": "0xf0a156ed79ab6ccb5a643af48716263b565fd985ba36560966b4a91bdc8521f4",
       "rewards_amount": "19177688699"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 6,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -115,7 +115,7 @@
       "pool_address": "0xa562415be88d9f08ba98fa3f6af9be0e36580c0f8fff5100a50b519e8f4a15c9",
       "rewards_amount": "841058926"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 7,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -130,7 +130,7 @@
       "pool_address": "0x676f640c90cb6c45f21be50974531d440309aa4ddad919ae0429039789a3d8a9",
       "rewards_amount": "19178518163"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 8,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -145,7 +145,7 @@
       "pool_address": "0x3c04549114877c55f45649aba48ac0a4ff086ab7bdce3b8cc8d3d9947bc0d99",
       "rewards_amount": "19185171265"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 9,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -160,7 +160,7 @@
       "pool_address": "0x6d00a8a82bd0b6d187f9a328118ad61b5c80237362e8f5dd2454f2d3a1b03890",
       "rewards_amount": "19174925092"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 10,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -175,7 +175,7 @@
       "pool_address": "0x7a2ddb6af66beb0d9987c6c9010cb9053454f067e16775a8ecf19961195c3d28",
       "rewards_amount": "18813123628"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 11,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -190,7 +190,7 @@
       "pool_address": "0xeecd6e9fb71f3a67db6321e93deecf7a9d7c3f4fac6cd170deb3e8b183281943",
       "rewards_amount": "828031401"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 12,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -205,7 +205,7 @@
       "pool_address": "0xfd47a2fb988c959839ea2fe4d7169b48536a42bf5e4933790701a08252ba2039",
       "rewards_amount": "798768182"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 13,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -220,7 +220,7 @@
       "pool_address": "0x479ca442491cfd636f84fa8e56fa420c8038587e459e886d16a0b9d3993b16ba",
       "rewards_amount": "18896078163"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 14,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -235,7 +235,7 @@
       "pool_address": "0x95a0e6b1105ba7ef9382e585d32e9dbf1a73833975af77d9b6924aa33468df07",
       "rewards_amount": "18894077814"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 15,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -250,7 +250,7 @@
       "pool_address": "0xb59c2db675c086d0c07b0f5d5ebd95ea9ead4429d836284fc4a576c4eed5799c",
       "rewards_amount": "787639333"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 16,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -265,7 +265,7 @@
       "pool_address": "0x50e52098d22c91f4c6a0065d03b2602cc2643089b218096e3cfe5f1bd98d80e6",
       "rewards_amount": "789473752"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 17,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -280,7 +280,7 @@
       "pool_address": "0xa5ed5d5e8c892165b18c2062596e8d1139fbb2cc451d430f787cd707122ce023",
       "rewards_amount": "787913628"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 18,
     "indexed_type": "0x1::stake::DistributeRewardsEvent"
   },
@@ -294,7 +294,7 @@
     "data": {
       "epoch": "16644"
     },
-    "inserted_at": "2024-09-25T22:35:00.939235",
+    "inserted_at": "2024-09-27T07:25:40.998375",
     "event_index": 19,
     "indexed_type": "0x1::reconfiguration::NewEpochEvent"
   }

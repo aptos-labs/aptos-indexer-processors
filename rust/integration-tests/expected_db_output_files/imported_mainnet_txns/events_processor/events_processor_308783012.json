@@ -1,0 +1,16 @@
+[
+  {
+    "sequence_number": 476,
+    "creation_number": 8,
+    "account_address": "0xc3f85f808a9f47a944c48cb3082d2f0bc178990610b2213438a1bfa1d77f0a38",
+    "transaction_version": 308783012,
+    "transaction_block_height": 24954497,
+    "type_": "0x1::coin::DepositEvent",
+    "data": {
+      "amount": "100000000"
+    },
+    "inserted_at": "2024-09-27T07:25:58.941259",
+    "event_index": 0,
+    "indexed_type": "0x1::coin::DepositEvent"
+  }
+]
