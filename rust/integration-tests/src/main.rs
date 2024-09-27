@@ -2,17 +2,18 @@
 use anyhow::{anyhow, Result};
 use diesel::{pg::PgConnection, query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
 use integration_tests::{TestContext, TestProcessorConfig, TestType, DiffTest};
-use processor::schema::events::dsl::*;
+// use processor::schema::events::dsl::*;
 use std::fs;
 use testing_transactions::{
-    ALL_GENERATED_TXNS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
+     ALL_IMPORTED_TESTNET_TXNS,
 };
 mod models;
-use crate::models::queryable_models::{Event, FungibleAssetActivity};
+use crate::models::queryable_models::{ FungibleAssetActivity};
 use processor::schema::fungible_asset_activities::dsl::{fungible_asset_activities, transaction_version as transaction_version_fa};
 
 
 // TODO: Support cli args for specifying the processor to run.
+#[allow(clippy::needless_return)]
 #[tokio::main]
 async fn main() -> Result<()> {
 
