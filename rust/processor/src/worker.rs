@@ -56,7 +56,7 @@ use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
 use bitflags::bitflags;
 use kanal::AsyncSender;
-use sample::{sample, SampleRate}; 
+use sample::{sample, SampleRate};
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
@@ -481,22 +481,26 @@ impl Worker {
 
                         let txn_channel_fetch_latency_sec =
                             txn_channel_fetch_latency.elapsed().as_secs_f64();
-                        sample!(SampleRate::Frequency(10), debug!(
-                            processor_name = processor_name,
-                            service_type = PROCESSOR_SERVICE_TYPE,
-                            start_version = batch_first_txn_version,
-                            end_version = batch_last_txn_version,
-                            num_of_transactions =
-                                (batch_last_txn_version - batch_first_txn_version) as i64 + 1,
-                            size_in_bytes,
-                            task_index,
-                            duration_in_secs = txn_channel_fetch_latency_sec,
-                            tps = (batch_last_txn_version as f64 - batch_first_txn_version as f64)
-                                / txn_channel_fetch_latency_sec,
-                            bytes_per_sec = size_in_bytes / txn_channel_fetch_latency_sec,
-                            "[Parser][T#{}] Successfully fetched transactions from channel.",
-                            task_index
-                        ));
+                        sample!(
+                            SampleRate::Frequency(10),
+                            debug!(
+                                processor_name = processor_name,
+                                service_type = PROCESSOR_SERVICE_TYPE,
+                                start_version = batch_first_txn_version,
+                                end_version = batch_last_txn_version,
+                                num_of_transactions =
+                                    (batch_last_txn_version - batch_first_txn_version) as i64 + 1,
+                                size_in_bytes,
+                                task_index,
+                                duration_in_secs = txn_channel_fetch_latency_sec,
+                                tps = (batch_last_txn_version as f64
+                                    - batch_first_txn_version as f64)
+                                    / txn_channel_fetch_latency_sec,
+                                bytes_per_sec = size_in_bytes / txn_channel_fetch_latency_sec,
+                                "[Parser][T#{}] Successfully fetched transactions from channel.",
+                                task_index
+                            )
+                        );
 
                         // Ensure chain_id has not changed
                         if transactions_pb.chain_id != chain_id {
@@ -562,30 +566,33 @@ impl Worker {
 
                                 let num_processed = (last_txn_version - first_txn_version) + 1;
 
-                                sample!(SampleRate::Frequency(5), info!(
-                                    processor_name = processor_name,
-                                    service_type = PROCESSOR_SERVICE_TYPE,
-                                    first_txn_version,
-                                    batch_first_txn_version,
-                                    last_txn_version,
-                                    batch_last_txn_version,
-                                    start_txn_timestamp_iso,
-                                    end_txn_timestamp_iso,
-                                    num_of_transactions = num_processed,
-                                    concurrent_tasks,
-                                    task_index,
-                                    size_in_bytes,
-                                    processing_duration_in_secs =
-                                        processing_result.processing_duration_in_secs,
-                                    db_insertion_duration_in_secs =
-                                        processing_result.db_insertion_duration_in_secs,
-                                    duration_in_secs = processing_time,
-                                    tps = tps,
-                                    bytes_per_sec = size_in_bytes / processing_time,
-                                    step = &step,
-                                    "{}",
-                                    label,
-                                ));
+                                sample!(
+                                    SampleRate::Frequency(5),
+                                    info!(
+                                        processor_name = processor_name,
+                                        service_type = PROCESSOR_SERVICE_TYPE,
+                                        first_txn_version,
+                                        batch_first_txn_version,
+                                        last_txn_version,
+                                        batch_last_txn_version,
+                                        start_txn_timestamp_iso,
+                                        end_txn_timestamp_iso,
+                                        num_of_transactions = num_processed,
+                                        concurrent_tasks,
+                                        task_index,
+                                        size_in_bytes,
+                                        processing_duration_in_secs =
+                                            processing_result.processing_duration_in_secs,
+                                        db_insertion_duration_in_secs =
+                                            processing_result.db_insertion_duration_in_secs,
+                                        duration_in_secs = processing_time,
+                                        tps = tps,
+                                        bytes_per_sec = size_in_bytes / processing_time,
+                                        step = &step,
+                                        "{}",
+                                        label,
+                                    )
+                                );
 
                                 // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
                                 GRPC_LATENCY_BY_PROCESSOR_IN_SECS

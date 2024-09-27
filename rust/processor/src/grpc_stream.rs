@@ -17,7 +17,7 @@ use futures_util::StreamExt;
 use itertools::Itertools;
 use kanal::AsyncSender;
 use prost::Message;
-use sample::{sample, SampleRate}; 
+use sample::{sample, SampleRate};
 use std::time::Duration;
 use tokio::time::timeout;
 use tonic::{Response, Streaming};
@@ -396,32 +396,35 @@ pub async fn create_fetcher_loop(
                         let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
                         let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
 
-                        sample!(SampleRate::Frequency(5), info!(
-                            processor_name = processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
-                            start_version,
-                            end_version,
-                            start_txn_timestamp_iso = start_txn_timestamp
-                                .as_ref()
-                                .map(timestamp_to_iso)
-                                .unwrap_or_default(),
-                            end_txn_timestamp_iso = end_txn_timestamp
-                                .as_ref()
-                                .map(timestamp_to_iso)
-                                .unwrap_or_default(),
-                            num_of_transactions = end_version - start_version + 1,
-                            num_filtered_txns,
-                            channel_size = txn_sender.len(),
-                            size_in_bytes,
-                            duration_in_secs,
-                            tps = fetch_ma.avg().ceil() as u64,
-                            bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
-                            step,
-                            "{}",
-                            label,
-                        ));
+                        sample!(
+                            SampleRate::Frequency(5),
+                            info!(
+                                processor_name = processor_name,
+                                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                                stream_address = indexer_grpc_data_service_address.to_string(),
+                                connection_id,
+                                start_version,
+                                end_version,
+                                start_txn_timestamp_iso = start_txn_timestamp
+                                    .as_ref()
+                                    .map(timestamp_to_iso)
+                                    .unwrap_or_default(),
+                                end_txn_timestamp_iso = end_txn_timestamp
+                                    .as_ref()
+                                    .map(timestamp_to_iso)
+                                    .unwrap_or_default(),
+                                num_of_transactions = end_version - start_version + 1,
+                                num_filtered_txns,
+                                channel_size = txn_sender.len(),
+                                size_in_bytes,
+                                duration_in_secs,
+                                tps = fetch_ma.avg().ceil() as u64,
+                                bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
+                                step,
+                                "{}",
+                                label,
+                            )
+                        );
 
                         if last_fetched_version + 1 != start_version as i64 {
                             error!(
@@ -526,21 +529,24 @@ pub async fn create_fetcher_loop(
                         let bytes_per_sec = size_in_bytes as f64 / duration_in_secs;
 
                         let channel_size = txn_sender.len();
-                        sample!(SampleRate::Frequency(10), debug!(
-                            processor_name = processor_name,
-                            service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
-                            stream_address = indexer_grpc_data_service_address.to_string(),
-                            connection_id,
-                            start_version,
-                            end_version,
-                            channel_size,
-                            size_in_bytes,
-                            duration_in_secs,
-                            bytes_per_sec,
-                            tps,
-                            num_filtered_txns,
-                            "[Parser] Successfully sent transactions to channel."
-                        ));
+                        sample!(
+                            SampleRate::Frequency(10),
+                            debug!(
+                                processor_name = processor_name,
+                                service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
+                                stream_address = indexer_grpc_data_service_address.to_string(),
+                                connection_id,
+                                start_version,
+                                end_version,
+                                channel_size,
+                                size_in_bytes,
+                                duration_in_secs,
+                                bytes_per_sec,
+                                tps,
+                                num_filtered_txns,
+                                "[Parser] Successfully sent transactions to channel."
+                            )
+                        );
                         FETCHER_THREAD_CHANNEL_SIZE
                             .with_label_values(&[&processor_name])
                             .set(channel_size as i64);

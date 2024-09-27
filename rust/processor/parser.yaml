@@ -5,6 +5,6 @@ health_check_port: 8084
 server_config:
   processor_config:
     type: default_processor
-  postgres_connection_string: postgresql://seanyang:@localhost:5432/postgres
-  indexer_grpc_data_service_address: https://grpc.testnet.aptoslabs.com:443
-  auth_token: aptoslabs_No5KWpMQKvz_7ohYQejzxmgpL27BS9gK784GpA14EP9mb
+  postgres_connection_string: postgresql://postgres:@localhost:5432/default_processor
+  indexer_grpc_data_service_address: http://127.0.0.1:50051
+  auth_token: AUTH_TOKEN

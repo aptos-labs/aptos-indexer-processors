@@ -97,6 +97,7 @@ reqwest = { version = "0.11.20", features = [
     "json",
     "stream",
 ] }
+sample = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "81571a5bebc4459b3faa971c64a810f171cc823a" }
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_yaml = "0.8.24"
