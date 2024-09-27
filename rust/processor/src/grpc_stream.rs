@@ -396,7 +396,7 @@ pub async fn create_fetcher_loop(
                         let step = ProcessorStep::ReceivedTxnsFromGrpc.get_step();
                         let label = ProcessorStep::ReceivedTxnsFromGrpc.get_label();
 
-                        info!(
+                        sample!(SampleRate::Frequency(5), info!(
                             processor_name = processor_name,
                             service_type = crate::worker::PROCESSOR_SERVICE_TYPE,
                             stream_address = indexer_grpc_data_service_address.to_string(),
@@ -421,7 +421,7 @@ pub async fn create_fetcher_loop(
                             step,
                             "{}",
                             label,
-                        );
+                        ));
 
                         if last_fetched_version + 1 != start_version as i64 {
                             error!(

@@ -561,7 +561,7 @@ impl Worker {
 
                                 let num_processed = (last_txn_version - first_txn_version) + 1;
 
-                                info!(
+                                sample!(SampleRate::Frequency(5), info!(
                                     processor_name = processor_name,
                                     service_type = PROCESSOR_SERVICE_TYPE,
                                     first_txn_version,
@@ -584,7 +584,7 @@ impl Worker {
                                     step = &step,
                                     "{}",
                                     label,
-                                );
+                                ));
 
                                 // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
                                 GRPC_LATENCY_BY_PROCESSOR_IN_SECS
