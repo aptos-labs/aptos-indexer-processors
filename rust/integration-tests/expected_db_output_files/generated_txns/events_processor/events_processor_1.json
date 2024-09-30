@@ -13,8 +13,7 @@
       "total_charge_gas_units": "3",
       "storage_fee_refund_octas": "0"
     },
-    "inserted_at": "2024-09-26T04:23:33.530256",
-    "event_index": 0,
-    "indexed_type": "0x1::transaction_fee::FeeStatement"
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 0
   }
 ]

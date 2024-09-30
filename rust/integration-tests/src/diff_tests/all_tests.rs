@@ -1,3 +1,10 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use crate::diff_test_helper::processors::event_processor::EventsProcessorTestHelper;
+use crate::diff_test_helper::processors::fungible_asset_processor::FungibleAssetProcessorTestHelper;
+use crate::diff_test_helper::processors::token_v2_processor::TokenV2ProcessorTestHelper;
+use crate::diff_test_helper::ProcessorTestHelper;
+
 #[allow(clippy::needless_return)]
 #[cfg(test)]
 mod test {
@@ -24,7 +31,7 @@ mod test {
         ALL_GENERATED_TXNS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
     };
     use crate::diff_test_helper::processors::token_v2_processor::TokenV2ProcessorTestHelper;
-
+    use crate::diff_tests::get_processor_map;
     #[tokio::test]
     async fn test_all_testnet_txns_schema_output_for_all_processors() {
         let processor_map = get_processor_map();
@@ -135,7 +142,7 @@ mod test {
 
                             // Optionally remove fields that should be ignored during comparison (e.g., `inserted_at`)
                             remove_inserted_at(&mut json_data);
-                            remove_inserted_at(&mut trusted_json);
+                            // remove_inserted_at(&mut trusted_json);
 
                             assert_json_eq!(&json_data, &trusted_json);
                             println!("Test passed for transaction version: {}", txn_version);
@@ -204,23 +211,22 @@ mod test {
             }
         }
     }
-
-    fn get_processor_map() -> HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> {
-        let mut processor_map: HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> = HashMap::new();
-        processor_map.insert(
-            "events_processor".to_string(),
-            Arc::new(Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-        );
-        processor_map.insert(
-            "fungible_asset_processor".to_string(),
-            Arc::new(Box::new(FungibleAssetProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-        );
-        processor_map.insert(
-            "token_v2_processor".to_string(),
-            Arc::new(Box::new(TokenV2ProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-        );
-
-        processor_map
-    }
 }
 
+pub fn get_processor_map() -> HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> {
+    let mut processor_map: HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> = HashMap::new();
+    processor_map.insert(
+        "events_processor".to_string(),
+        Arc::new(Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
+    );
+    processor_map.insert(
+        "fungible_asset_processor".to_string(),
+        Arc::new(Box::new(FungibleAssetProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
+    );
+    processor_map.insert(
+        "token_v2_processor".to_string(),
+        Arc::new(Box::new(TokenV2ProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
+    );
+
+    processor_map
+}

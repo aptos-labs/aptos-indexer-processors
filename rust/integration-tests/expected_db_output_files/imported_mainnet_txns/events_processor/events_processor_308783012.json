@@ -9,8 +9,7 @@
     "data": {
       "amount": "100000000"
     },
-    "inserted_at": "2024-09-27T07:25:58.941259",
-    "event_index": 0,
-    "indexed_type": "0x1::coin::DepositEvent"
+    "indexed_type": "0x1::coin::DepositEvent",
+    "event_index": 0
   }
 ]

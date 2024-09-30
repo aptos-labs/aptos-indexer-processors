@@ -12,8 +12,8 @@ use testcontainers::{
     ContainerAsync, GenericImage, ImageExt,
 };
 
-mod diff_test_helper;
-mod diff_tests;
+pub mod diff_test_helper;
+pub mod diff_tests;
 mod models;
 mod scenarios_tests;
 

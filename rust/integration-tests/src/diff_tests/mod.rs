@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-mod all_tests;
+pub mod all_tests;
 
 #[allow(dead_code)]
 pub fn remove_inserted_at(value: &mut Value) {
