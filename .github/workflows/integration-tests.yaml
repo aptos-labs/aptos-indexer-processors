@@ -1,7 +1,14 @@
 name: Run Integration Tests
 
 on:
+  repository_dispatch:
+    types: [json-change-detected]  # Custom event type to trigger the workflow
   workflow_dispatch:
+    inputs:
+      commit_hash:
+          description: 'Commit hash to use for the dependency update'
+          required: true
+          default: 'main'
   push:
     branches:
       - main
@@ -15,10 +22,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Dependencies and Run Linter
-        uses: ./.github/actions/dep_install_and_lint
-        with:
-          working-directory: rust
+#      - name: Install Dependencies and Run Linter
+#        uses: ./.github/actions/dep_install_and_lint
+#        with:
+#          working-directory: rust
+
+      - name: list files
+        run: ls -la
+
+#      update commite haash in the cargo.toml and run tests
+      - name: Show Cargo.toml Before Update
+        run: cat Cargo.toml  # Print the contents of Cargo.toml before the update
+
+        # Update the Cargo.toml with the provided commit hash
+      - name: Update Cargo.toml with new commit hash
+        run: |
+          echo "Updating dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
+          sed -i 's|git = "https://github.com/yuunlimm/test-workflow2.git", rev = ".*"|git = "https://github.com/yuunlimm/test-workflow2.git", rev = "${{ github.event.inputs.commit_hash }}"|g' demo/Cargo.toml
+
+      # Update the aptos-system-utils dependency
+      - name: Update aptos-system-utils dependency
+        run: |
+          echo "Updating aptos-system-utils dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
+          sed -i '/aptos-system-utils = {/!b;n;s|rev = ".*"|rev = "${{ github.event.inputs.commit_hash }}"|' demo/Cargo.toml
+
+      # Update the aptos-indexer-test-transactions dependency
+      - name: Update aptos-indexer-test-transactions dependency
+        run: |
+          echo "Updating aptos-indexer-test-transactions dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
+          sed -i '/aptos-indexer-test-transactions = {/!b;n;s|rev = ".*"|rev = "${{ github.event.inputs.commit_hash }}"|' demo/Cargo.toml
+
+      - name: Show Cargo.toml After Update
+        run: cat Cargo.toml
+
 
       - name: Run Integration Tests
         run: cargo test --manifest-path integration-tests/Cargo.toml
