@@ -1,4 +1,6 @@
-use crate::processors::events_processor::EventsProcessorConfig;
+use crate::processors::{
+    events_processor::EventsProcessorConfig, fungible_asset_processor::FungibleAssetProcessorConfig,
+};
 use serde::{Deserialize, Serialize};
 
 /// This enum captures the configs for all the different processors that are defined.
@@ -35,6 +37,7 @@ use serde::{Deserialize, Serialize};
 )]
 pub enum ProcessorConfig {
     EventsProcessor(EventsProcessorConfig),
+    FungibleAssetProcessor(FungibleAssetProcessorConfig),
 }
 
 impl ProcessorConfig {

@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
-use crate::processors::events_processor::EventsProcessor;
+use crate::processors::{
+    events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+};
+use ahash::HashSet;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
 use aptos_indexer_processor_sdk_server_framework::RunnableConfig;
@@ -14,6 +17,10 @@ pub struct IndexerProcessorConfig {
     pub processor_config: ProcessorConfig,
     pub transaction_stream_config: TransactionStreamConfig,
     pub db_config: DbConfig,
+
+    // String vector for deprecated tables to skip db writes
+    #[serde(default)]
+    pub deprecated_tables: HashSet<String>,
 }
 
 #[async_trait::async_trait]
@@ -23,6 +30,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::EventsProcessor(_) => {
                 let events_processor = EventsProcessor::new(self.clone()).await?;
                 events_processor.run_processor().await
+            },
+            ProcessorConfig::FungibleAssetProcessor(_) => {
+                let fungible_asset_processor = FungibleAssetProcessor::new(self.clone()).await?;
+                fungible_asset_processor.run_processor().await
             },
         }
     }
