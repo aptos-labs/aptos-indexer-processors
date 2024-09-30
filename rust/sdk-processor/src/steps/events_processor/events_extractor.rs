@@ -68,11 +68,7 @@ impl Processable for EventsExtractor {
             .collect::<Vec<EventModel>>();
         Ok(Some(TransactionContext {
             data: events,
-            start_version: item.start_version,
-            end_version: item.end_version,
-            start_transaction_timestamp: item.start_transaction_timestamp,
-            end_transaction_timestamp: item.end_transaction_timestamp,
-            total_size_in_bytes: item.total_size_in_bytes,
+            context: item.context,
         }))
     }
 }

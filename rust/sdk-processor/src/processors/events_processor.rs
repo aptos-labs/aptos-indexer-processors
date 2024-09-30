@@ -136,8 +136,13 @@ impl EventsProcessor {
                         continue;
                     }
                     debug!(
-                        "Finished processing events from versions [{:?}, {:?}]",
-                        txn_context.start_version, txn_context.end_version,
+                        "Finished processing events from versions {}",
+                        txn_context
+                            .get_versions()
+                            .iter()
+                            .map(|(x, y)| format!("[{}, {}]", x, y))
+                            .collect::<Vec<_>>()
+                            .join(", "),
                     );
                 },
                 Err(e) => {

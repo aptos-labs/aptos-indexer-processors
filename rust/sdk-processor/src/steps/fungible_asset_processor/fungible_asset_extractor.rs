@@ -71,11 +71,7 @@ impl Processable for FungibleAssetExtractor {
                 current_unified_fungible_asset_balances,
                 coin_supply,
             )],
-            start_version: transactions.start_version,
-            end_version: transactions.end_version,
-            start_transaction_timestamp: transactions.start_transaction_timestamp,
-            end_transaction_timestamp: transactions.end_transaction_timestamp,
-            total_size_in_bytes: transactions.total_size_in_bytes,
+            context: transactions.context,
         }))
     }
 }

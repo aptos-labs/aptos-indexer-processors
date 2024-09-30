@@ -239,7 +239,7 @@ fn insert_fungible_asset_balances_query(
     )
 }
 
-fn insert_current_fungible_asset_balances_query(
+pub fn insert_current_fungible_asset_balances_query(
     items_to_insert: Vec<CurrentFungibleAssetBalance>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,

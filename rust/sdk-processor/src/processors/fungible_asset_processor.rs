@@ -6,6 +6,10 @@ use crate::{
     steps::{
         common::latest_processed_version_tracker::LatestVersionProcessedTracker,
         events_processor::{EventsExtractor, EventsStorer},
+        fungible_asset_processor::{
+            fungible_asset_extractor::FungibleAssetExtractor,
+            fungible_asset_storer::FungibleAssetStorer,
+        },
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -106,8 +110,8 @@ impl FungibleAssetProcessor {
             ..self.config.transaction_stream_config
         })
         .await?;
-        // let events_extractor = EventsExtractor {};
-        // let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
+        let fa_extractor = FungibleAssetExtractor {};
+        let fa_storer = FungibleAssetStorer::new(self.db_pool.clone(), fa_config);
         let version_tracker = LatestVersionProcessedTracker::new(
             self.db_pool.clone(),
             starting_version,
@@ -118,8 +122,8 @@ impl FungibleAssetProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        // .connect_to(events_extractor.into_runnable_step(), channel_size)
-        // .connect_to(events_storer.into_runnable_step(), channel_size)
+        .connect_to(fa_extractor.into_runnable_step(), channel_size)
+        .connect_to(fa_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
@@ -131,8 +135,13 @@ impl FungibleAssetProcessor {
                         continue;
                     }
                     debug!(
-                        "Finished processing versions [{:?}, {:?}]",
-                        txn_context.start_version, txn_context.end_version,
+                        "Finished processing versions {}",
+                        txn_context
+                            .get_versions()
+                            .iter()
+                            .map(|(x, y)| format!("[{}, {}]", x, y))
+                            .collect::<Vec<_>>()
+                            .join(", "),
                     );
                 },
                 Err(e) => {

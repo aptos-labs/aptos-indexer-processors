@@ -84,15 +84,26 @@ impl Processable for EventsStorer {
         match execute_res {
             Ok(_) => {
                 debug!(
-                    "Events version [{}, {}] stored successfully",
-                    events.start_version, events.end_version
+                    "Events version {} stored successfully",
+                    events
+                        .get_versions()
+                        .iter()
+                        .map(|(x, y)| format!("[{}, {}]", x, y))
+                        .collect::<Vec<_>>()
+                        .join(", "),
                 );
                 Ok(Some(events))
             },
             Err(e) => Err(ProcessorError::DBStoreError {
                 message: format!(
-                    "Failed to store events versions {} to {}: {:?}",
-                    events.start_version, events.end_version, e,
+                    "Failed to store events versions {:?}: {:?}",
+                    events
+                        .get_versions()
+                        .iter()
+                        .map(|(x, y)| format!("[{}, {}]", x, y))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    e,
                 ),
                 // TODO: fix it with a debug_query.
                 query: None,
