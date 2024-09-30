@@ -6,6 +6,8 @@ on:
     branches:
       - main
   pull_request:
+  repository_dispatch:
+    types: [ json-change-detected ]
 
 jobs:
   Integration-tests:
