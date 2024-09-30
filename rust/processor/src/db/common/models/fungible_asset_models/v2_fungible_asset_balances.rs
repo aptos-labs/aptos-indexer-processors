@@ -29,7 +29,10 @@ use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
+use std::{
+    borrow::Borrow,
+    hash::{Hash, Hasher},
+};
 
 // Storage id
 pub type CurrentFungibleAssetBalancePK = String;
@@ -153,6 +156,12 @@ pub struct CurrentFungibleAssetBalance {
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub token_standard: String,
 }
+
+// impl Hash for CurrentFungibleAssetBalance {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         self.storage_id.hash(state);
+//     }
+// }
 
 /// Note that this used to be called current_unified_fungible_asset_balances_to_be_renamed
 /// and was renamed to current_fungible_asset_balances to facilitate migration

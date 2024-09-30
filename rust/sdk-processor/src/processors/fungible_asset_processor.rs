@@ -7,6 +7,7 @@ use crate::{
         common::latest_processed_version_tracker::LatestVersionProcessedTracker,
         events_processor::{EventsExtractor, EventsStorer},
         fungible_asset_processor::{
+            fungible_asset_deduper::FungibleAssetDeduper,
             fungible_asset_extractor::FungibleAssetExtractor,
             fungible_asset_storer::FungibleAssetStorer,
         },
@@ -26,6 +27,7 @@ use aptos_indexer_processor_sdk::{
     traits::IntoRunnableStep,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tracing::{debug, info};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -111,6 +113,7 @@ impl FungibleAssetProcessor {
         })
         .await?;
         let fa_extractor = FungibleAssetExtractor {};
+        let fa_deduper = FungibleAssetDeduper::new(Duration::from_secs(1));
         let fa_storer = FungibleAssetStorer::new(self.db_pool.clone(), fa_config);
         let version_tracker = LatestVersionProcessedTracker::new(
             self.db_pool.clone(),
@@ -123,6 +126,7 @@ impl FungibleAssetProcessor {
             transaction_stream.into_runnable_step(),
         )
         .connect_to(fa_extractor.into_runnable_step(), channel_size)
+        .connect_to(fa_deduper.into_runnable_step(), channel_size)
         .connect_to(fa_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
