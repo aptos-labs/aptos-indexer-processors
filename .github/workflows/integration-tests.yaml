@@ -22,6 +22,10 @@ jobs:
         with:
           working-directory: rust
 
+      - name: Update Cargo.toml with new commit hash
+        run: |
+          echo "Updating dependency in Cargo.toml to use commit hash ${{ github.event.client_payload.commit_hash }}"
+
       - name: Run Integration Tests
         run: cargo test --manifest-path integration-tests/Cargo.toml
         working-directory: rust
