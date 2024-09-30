@@ -26,27 +26,27 @@ use tracing::{debug, info};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventsProcessorConfig {
+pub struct FungibleAssetProcessorConfig {
     // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
     #[serde(default = "AHashMap::new")]
     pub per_table_chunk_sizes: AHashMap<String, usize>,
     // Size of channel between steps
-    #[serde(default = "EventsProcessorConfig::default_channel_size")]
+    #[serde(default = "FungibleAssetProcessorConfig::default_channel_size")]
     pub channel_size: usize,
 }
 
-impl EventsProcessorConfig {
+impl FungibleAssetProcessorConfig {
     pub const fn default_channel_size() -> usize {
         10
     }
 }
 
-pub struct EventsProcessor {
+pub struct FungibleAssetProcessor {
     pub config: IndexerProcessorConfig,
     pub db_pool: ArcDbPool,
 }
 
-impl EventsProcessor {
+impl FungibleAssetProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> Result<Self> {
         match config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
@@ -94,16 +94,11 @@ impl EventsProcessor {
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
-        let events_processor_config = match self.config.processor_config {
-            ProcessorConfig::EventsProcessor(events_processor_config) => events_processor_config,
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Invalid processor config for EventsProcessor: {:?}",
-                    self.config.processor_config
-                ))
-            },
+        let fa_config = match self.config.processor_config {
+            ProcessorConfig::FungibleAssetProcessor(fa_config) => fa_config,
+            _ => return Err(anyhow::anyhow!("Processor config is wrong type")),
         };
-        let channel_size = events_processor_config.channel_size;
+        let channel_size = fa_config.channel_size;
 
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
@@ -111,8 +106,8 @@ impl EventsProcessor {
             ..self.config.transaction_stream_config
         })
         .await?;
-        let events_extractor = EventsExtractor {};
-        let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
+        // let events_extractor = EventsExtractor {};
+        // let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
         let version_tracker = LatestVersionProcessedTracker::new(
             self.db_pool.clone(),
             starting_version,
@@ -123,8 +118,8 @@ impl EventsProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(events_extractor.into_runnable_step(), channel_size)
-        .connect_to(events_storer.into_runnable_step(), channel_size)
+        // .connect_to(events_extractor.into_runnable_step(), channel_size)
+        // .connect_to(events_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
@@ -136,7 +131,7 @@ impl EventsProcessor {
                         continue;
                     }
                     debug!(
-                        "Finished processing events from versions [{:?}, {:?}]",
+                        "Finished processing versions [{:?}, {:?}]",
                         txn_context.start_version, txn_context.end_version,
                     );
                 },
