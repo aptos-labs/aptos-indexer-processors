@@ -203,9 +203,9 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-test-transactions"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb#82a8e2bfff1e822781462da83f3abd6cda3f44eb"
 dependencies = [
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb)",
  "serde_json",
 ]
 
@@ -248,7 +248,7 @@ dependencies = [
 [[package]]
 name = "aptos-profiler"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -261,7 +261,7 @@ dependencies = [
 [[package]]
 name = "aptos-profiler"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb#82a8e2bfff1e822781462da83f3abd6cda3f44eb"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -269,18 +269,6 @@ dependencies = [
  "jemallocator",
  "pprof",
  "regex",
-]
-
-[[package]]
-name = "aptos-protos"
-version = "1.3.1"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
-dependencies = [
- "futures-core",
- "pbjson",
- "prost 0.12.6",
- "serde",
- "tonic 0.11.0",
 ]
 
 [[package]]
@@ -296,12 +284,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-protos"
+version = "1.3.1"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb#82a8e2bfff1e822781462da83f3abd6cda3f44eb"
+dependencies = [
+ "futures-core",
+ "pbjson",
+ "prost 0.12.6",
+ "serde",
+ "tonic 0.11.0",
+]
+
+[[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
  "async-mutex",
  "http 0.2.12",
  "hyper 0.14.30",
@@ -318,10 +318,10 @@ dependencies = [
 [[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb#82a8e2bfff1e822781462da83f3abd6cda3f44eb"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb)",
  "async-mutex",
  "http 0.2.12",
  "hyper 0.14.30",
@@ -2245,6 +2245,7 @@ dependencies = [
  "assert-json-diff",
  "bigdecimal",
  "chrono",
+ "clap",
  "diesel",
  "dirs",
  "field_count",
@@ -2256,6 +2257,7 @@ dependencies = [
  "serde",
  "serde_canonical_json",
  "serde_json",
+ "serde_yaml",
  "testcontainers",
  "testing-transactions",
  "tokio",
@@ -4343,7 +4345,7 @@ name = "server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb)",
  "async-trait",
  "backtrace",
  "clap",

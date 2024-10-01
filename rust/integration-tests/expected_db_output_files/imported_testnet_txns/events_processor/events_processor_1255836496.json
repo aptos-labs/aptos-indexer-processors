@@ -1,0 +1,77 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 3,
+    "account_address": "0xf21d4c76354db6492841e31fefeaa5a3e8a1071d2bcbbdd1cf1cbc6fa3954b88",
+    "transaction_version": 1255836496,
+    "transaction_block_height": 295534162,
+    "type_": "0x1::coin::WithdrawEvent",
+    "data": {
+      "amount": "300000"
+    },
+    "indexed_type": "0x1::coin::WithdrawEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 707,
+    "creation_number": 4,
+    "account_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
+    "transaction_version": 1255836496,
+    "transaction_block_height": 295534162,
+    "type_": "0x1::coin::DepositEvent",
+    "data": {
+      "amount": "300000"
+    },
+    "indexed_type": "0x1::coin::DepositEvent",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 1255836496,
+    "transaction_block_height": 295534162,
+    "type_": "0x1::fungible_asset::Deposit",
+    "data": {
+      "store": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+      "amount": "300000"
+    },
+    "indexed_type": "0x1::fungible_asset::Deposit",
+    "event_index": 2
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 1255836496,
+    "transaction_block_height": 295534162,
+    "type_": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::lending_pool::Deposit",
+    "data": {
+      "pool": {
+        "inner": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8"
+      },
+      "user": "0xf21d4c76354db6492841e31fefeaa5a3e8a1071d2bcbbdd1cf1cbc6fa3954b88",
+      "token": "0x1::aptos_coin::AptosCoin",
+      "amount": "300000"
+    },
+    "indexed_type": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::lending_pool::Deposit",
+    "event_index": 3
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 1255836496,
+    "transaction_block_height": 295534162,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "16",
+      "storage_fee_octas": "45720",
+      "execution_gas_units": "32",
+      "total_charge_gas_units": "505",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 4
+  }
+]

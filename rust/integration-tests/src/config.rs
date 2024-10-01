@@ -12,8 +12,9 @@ use std::{
 };
 use diesel::pg::PgConnection;
 use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
-use integration_tests::{TestContext, TestProcessorConfig};
-use testing_transactions::ALL_IMPORTED_TESTNET_TXNS;
+use aptos_indexer_test_transactions::{
+    ALL_GENERATED_TXNS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS
+};
 use integration_tests::{
     diff_test_helper::{ProcessorTestHelper, processors::fungible_asset_processor::FungibleAssetProcessorTestHelper},
     diff_tests::{all_tests::get_processor_map, remove_inserted_at},
@@ -21,7 +22,6 @@ use integration_tests::{
 };
 use anyhow::anyhow;
 
-const IMPORTED_TRANSACTIONS_FOLDER: &str = "imported_transactions";
 
 #[derive(Parser)]
 pub struct IndexerCliArgs {
@@ -56,7 +56,7 @@ impl IndexerCliArgs {
 
             if let Some(test_helper) = processor_map.get(processor_name) {
                 let test_helper: Arc<Box<dyn ProcessorTestHelper>> = Arc::clone(test_helper);
-                let test_context = TestContext::new(ALL_IMPORTED_MAINNET_TXNS).await.unwrap();
+                let test_context = TestContext::new(ALL_IMPORTED_TESTNET_TXNS).await.unwrap();
                 let output_folder = self.output_folder.clone();
 
                 let result = test_context

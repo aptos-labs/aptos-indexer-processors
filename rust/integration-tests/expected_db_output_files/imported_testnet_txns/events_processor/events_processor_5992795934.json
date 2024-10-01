@@ -1,0 +1,47 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 5992795934,
+    "transaction_block_height": 356437526,
+    "type_": "0x1::fungible_asset::Withdraw",
+    "data": {
+      "store": "0x8bd5745daa2d6e5817819c6bf37600196e55cfba8c5bcdfdf55684bf4accbb9c",
+      "amount": "100000000"
+    },
+    "indexed_type": "0x1::fungible_asset::Withdraw",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 5992795934,
+    "transaction_block_height": 356437526,
+    "type_": "0x1::fungible_asset::Deposit",
+    "data": {
+      "store": "0xfe90bdd996728b93e09f5d59fd91d6d44be85ab7acea5d1ed535b4c13b2c32c0",
+      "amount": "100000000"
+    },
+    "indexed_type": "0x1::fungible_asset::Deposit",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 5992795934,
+    "transaction_block_height": 356437526,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "7",
+      "storage_fee_octas": "0",
+      "execution_gas_units": "5",
+      "total_charge_gas_units": "12",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 2
+  }
+]
