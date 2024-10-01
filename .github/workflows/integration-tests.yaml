@@ -38,10 +38,10 @@ jobs:
           toml set rust/Cargo.toml workspace.dependencies.aptos-system-utils.rev "${{ github.event.inputs.commit_hash }}" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
       # Update aptos-indexer-test-transactions dependency using toml-cli
-      - name: Update aptos-system-utils dependency
+      - name: Update aptos-indexer-test-transactions dependency
         if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
         run: |
-          echo "Updating aptos-system-utils dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
+          echo "Updating aptos-indexer-test-transactions dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
           toml set rust/Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "${{ github.event.inputs.commit_hash }}" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
       # Show Cargo.toml after the update
