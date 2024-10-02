@@ -34,7 +34,7 @@ aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-index
 aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "9ecd252ccff53023664562001dd04c2886488c0d" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
-aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
+aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "82a8e2bfff1e822781462da83f3abd6cda3f44eb" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"
 base64 = "0.13.0"
@@ -81,6 +81,8 @@ jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
 ] }
+json-structural-diff = "0.1.0"
+assert-json-diff = "2.0.2"
 kanal = { version = "0.1.0-pre8", features = ["async"] }
 once_cell = "1.10.0"
 num_cpus = "1.16.0"
@@ -138,5 +140,6 @@ google-cloud-storage = "0.13.0"
 hyper = { version = "0.14.18", features = ["full"] }
 parquet_derive = { version = "52.0.0" }
 canonical_json = "0.5.0"
+serde_canonical_json = "1.0.0"
 allocative = "0.3.3"
 allocative_derive = "0.3.3"

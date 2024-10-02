@@ -1,0 +1,62 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0xb7a4a81a3d513e3e18ee6bec61a001d7e18c5d92bb6645a2f21f0b0fec2531a6",
+    "transaction_version": 5979639459,
+    "transaction_block_height": 354619634,
+    "type_": "0x1::account::CoinRegisterEvent",
+    "data": {
+      "type_info": {
+        "module_name": "0x6170746f735f636f696e",
+        "struct_name": "0x4170746f73436f696e",
+        "account_address": "0x1"
+      }
+    },
+    "indexed_type": "0x1::account::CoinRegisterEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 21684,
+    "creation_number": 3,
+    "account_address": "0x54ce130990ecf55cd12de74bff03dcfaacf63066e0945d3c415d61644303da39",
+    "transaction_version": 5979639459,
+    "transaction_block_height": 354619634,
+    "type_": "0x1::coin::WithdrawEvent",
+    "data": {
+      "amount": "10"
+    },
+    "indexed_type": "0x1::coin::WithdrawEvent",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 2,
+    "account_address": "0xb7a4a81a3d513e3e18ee6bec61a001d7e18c5d92bb6645a2f21f0b0fec2531a6",
+    "transaction_version": 5979639459,
+    "transaction_block_height": 354619634,
+    "type_": "0x1::coin::DepositEvent",
+    "data": {
+      "amount": "10"
+    },
+    "indexed_type": "0x1::coin::DepositEvent",
+    "event_index": 2
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 5979639459,
+    "transaction_block_height": 354619634,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "5",
+      "storage_fee_octas": "98800",
+      "execution_gas_units": "6",
+      "total_charge_gas_units": "999",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 3
+  }
+]

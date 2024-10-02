@@ -1,7 +1,6 @@
 use anyhow::Context;
 use aptos_protos::transaction::v1::Transaction;
 use diesel::{pg::PgConnection, sql_query, Connection, RunQueryDsl};
-use itertools::Itertools;
 use processor::{
     processors::{ProcessorConfig, ProcessorTrait},
     utils::database::{new_db_pool, run_pending_migrations},
@@ -13,7 +12,10 @@ use testcontainers::{
     ContainerAsync, GenericImage, ImageExt,
 };
 
-mod event_processor;
+mod diff_test_helper;
+mod diff_tests;
+mod models;
+mod scenarios_tests;
 
 /// The test context struct holds the test name and the transaction batches.
 pub struct TestContext {
@@ -23,7 +25,7 @@ pub struct TestContext {
 
 #[derive(Debug, Clone)]
 pub struct TestProcessorConfig {
-    config: ProcessorConfig,
+    pub config: ProcessorConfig,
 }
 
 impl TestContext {
@@ -31,10 +33,8 @@ impl TestContext {
     pub async fn new(txn_bytes: &[&[u8]]) -> anyhow::Result<Self> {
         let transaction_batches = txn_bytes
             .iter()
-            .enumerate()
-            .map(|(idx, txn)| {
-                let mut txn: Transaction = serde_json::from_slice(txn).unwrap();
-                txn.version = idx as u64;
+            .map(|txn| {
+                let txn: Transaction = serde_json::from_slice(txn).unwrap();
                 txn
             })
             .collect::<Vec<Transaction>>();
@@ -97,10 +97,11 @@ impl TestContext {
     pub async fn run<F>(
         &self,
         processor_config: TestProcessorConfig,
+        test_type: TestType,
         verification_f: F,
     ) -> anyhow::Result<()>
     where
-        F: Fn(&mut PgConnection) -> anyhow::Result<()> + Send + Sync + 'static,
+        F: Fn(&mut PgConnection, &str) -> anyhow::Result<()> + Send + Sync + 'static,
     {
         let transactions = self.transaction_batches.clone();
         let db_url = self.get_db_url().await;
@@ -108,22 +109,95 @@ impl TestContext {
             .with_context(|| format!("Error connecting to {}", db_url))?;
         let db_pool = new_db_pool(&db_url, None).await.unwrap();
 
-        // Iterate over all permutations of the transaction batches to ensure that the processor can handle transactions in any order.
-        // By testing different permutations, we verify that the order of transactions
-        // does not affect the correctness of the processing logic.
-        for perm in transactions.iter().permutations(transactions.len()) {
-            self.create_schema().await?;
-            let processor =
-                build_processor_for_testing(processor_config.config.clone(), db_pool.clone());
-            for txn in perm {
-                let version = txn.version;
-                processor
-                    .process_transactions(vec![txn.clone()], version, version, None)
-                    .await?;
+        self.create_schema().await?;
+        let processor =
+            build_processor_for_testing(processor_config.config.clone(), db_pool.clone());
+
+        let mut last_version = None;
+
+        for txn in transactions.iter() {
+            let version = txn.version;
+            processor
+                .process_transactions(vec![txn.clone()], version, version, None)
+                .await?;
+            // }
+
+            last_version = Some(version);
+
+            // For DiffTest, run verification after each transaction
+            if matches!(test_type, TestType::Diff(_)) {
+                test_type.run_verification(&mut conn, &version.to_string(), &verification_f)?;
             }
-            // Run the verification function.
-            verification_f(&mut conn)?;
         }
+        // For ScenarioTest, use the last transaction version if needed
+        if matches!(test_type, TestType::Scenario(_)) {
+            if let Some(last_version) = last_version {
+                test_type.run_verification(
+                    &mut conn,
+                    &last_version.to_string(),
+                    &verification_f,
+                )?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "No transactions found to get the last version"
+                ));
+            }
+        }
+
         Ok(())
+    }
+}
+
+trait TestStrategy {
+    fn verify(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()>;
+}
+
+pub struct DiffTest;
+
+impl TestStrategy for DiffTest {
+    fn verify(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        verification_f(conn, version)
+    }
+}
+
+pub struct ScenarioTest;
+
+impl TestStrategy for ScenarioTest {
+    fn verify(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        verification_f(conn, version)
+    }
+}
+
+pub enum TestType {
+    Diff(DiffTest),
+    Scenario(ScenarioTest),
+}
+
+impl TestType {
+    fn run_verification(
+        &self,
+        conn: &mut PgConnection,
+        version: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
+        match self {
+            TestType::Diff(strategy) => strategy.verify(conn, version, verification_f),
+            TestType::Scenario(strategy) => strategy.verify(conn, version, verification_f),
+        }
     }
 }
