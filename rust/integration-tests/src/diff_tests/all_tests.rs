@@ -69,8 +69,7 @@ mod test {
         processor_configs: Vec<TestProcessorConfig>,
         test_context: &TestContext,
         get_expected_json_path_fn: fn(&str, &str) -> String,
-    )
-    {
+    ) {
         let processor_map = get_processor_map();
         for processor_config in processor_configs {
             let processor_name = processor_config.config.name();
