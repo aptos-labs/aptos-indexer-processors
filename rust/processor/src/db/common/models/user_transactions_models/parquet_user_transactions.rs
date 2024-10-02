@@ -28,20 +28,20 @@ use serde::{Deserialize, Serialize};
 pub struct UserTransaction {
     pub txn_version: i64,
     pub block_height: i64,
-    pub parent_signature_type: String,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
+    pub epoch: i64,
     pub sender: String,
     pub sequence_number: i64,
-    pub max_gas_amount: u64,
-    pub expiration_timestamp_secs: u64,
-    pub gas_unit_price: u64,
-    pub gas_used: u64,
-    #[allocative(skip)]
-    pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
-    pub epoch: i64,
+    pub expiration_timestamp_secs: u64,
+    pub parent_signature_type: String,
     pub gas_fee_payer_address: Option<String>,
+    pub gas_used_octa: u64,
+    pub gas_unit_price: u64,
+    pub max_gas_amount: u64,
+    pub storage_refund_octa: u64,
     pub is_transaction_success: bool,
-    pub storage_refund_amount: u64,
     pub num_signatures: i64,
 }
 
@@ -57,7 +57,7 @@ impl HasVersion for UserTransaction {
 
 impl GetTimeStamp for UserTransaction {
     fn get_timestamp(&self) -> chrono::NaiveDateTime {
-        self.timestamp
+        self.block_timestamp
     }
 }
 
@@ -101,14 +101,14 @@ impl UserTransaction {
                 .expect("Expiration timestamp is not present in user txn")
                 .seconds as u64,
             gas_unit_price: user_request.gas_unit_price,
-            timestamp: parse_timestamp(timestamp, version),
+            block_timestamp: parse_timestamp(timestamp, version),
             entry_function_id_str: get_entry_function_from_user_request(user_request)
                 .unwrap_or_default(),
             epoch,
-            gas_used: txn_info.gas_used,
+            gas_used_octa: txn_info.gas_used,
             gas_fee_payer_address,
             is_transaction_success: txn_info.success,
-            storage_refund_amount: fee_statement
+            storage_refund_octa: fee_statement
                 .map(|fs| fs.storage_fee_refund_octas)
                 .unwrap_or(0),
             num_signatures,
