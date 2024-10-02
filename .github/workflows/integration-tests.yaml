@@ -54,6 +54,11 @@ jobs:
       - name: Show Cargo.toml After Update
         run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
 
+      # Ensure Cargo.lock is updated with the latest dependencies
+      - name: Update Dependencies
+        run: cargo update
+        working-directory: rust
+
       - name: Install Dependencies and Run Linter
         uses: ./.github/actions/dep_install_and_lint
         with:
