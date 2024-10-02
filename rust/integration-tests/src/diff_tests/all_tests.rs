@@ -65,21 +65,18 @@ mod test {
     }
 
     // Helper function to reduce duplicate code for running tests on all processors
-    async fn run_processor_tests<F>(
+    async fn run_processor_tests(
         processor_configs: Vec<TestProcessorConfig>,
         test_context: &TestContext,
-        get_expected_json_path_fn: F,
-    ) where
-        F: Fn(&str, &str) -> String + Send + Sync + 'static + std::marker::Copy,
+        get_expected_json_path_fn: fn(&str, &str) -> String,
+    )
     {
         let processor_map = get_processor_map();
         for processor_config in processor_configs {
             let processor_name = processor_config.config.name();
             let test_type = TestType::Diff(DiffTest);
 
-            if let Some(test_helper) = processor_map.get(processor_name) {
-                let test_helper = Arc::clone(test_helper);
-
+            if let Some(test_helper) = processor_map.get(processor_name).cloned() {
                 test_context
                     .run(
                         processor_config,
@@ -108,8 +105,8 @@ mod test {
                                 }
                             };
 
+                            // TODO: we need to enhance json diff, as we might have more complex diffs.
                             remove_inserted_at(&mut json_data);
-                            // Remove the Err handling around assert_json_eq!, as it doesn't return a Result type
                             assert_json_eq!(&json_data, &expected_json);
 
                             println!(
@@ -126,7 +123,7 @@ mod test {
     }
 
     // Helper function to read and parse JSON files
-    fn read_and_parse_json(path: &str) -> Result<serde_json::Value, anyhow::Error> {
+    fn read_and_parse_json(path: &str) -> anyhow::Result<serde_json::Value> {
         match fs::read_to_string(path) {
             Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(json) => Ok(json),

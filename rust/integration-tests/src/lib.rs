@@ -109,10 +109,6 @@ impl TestContext {
             .with_context(|| format!("Error connecting to {}", db_url))?;
         let db_pool = new_db_pool(&db_url, None).await.unwrap();
 
-        // Iterate over all permutations of the transaction batches to ensure that the processor can handle transactions in any order.
-        // By testing different permutations, we verify that the order of transactions
-        // does not affect the correctness of the processing logic.
-        // for perm in transactions.iter().permutations(transactions.len()) {
         self.create_schema().await?;
         let processor =
             build_processor_for_testing(processor_config.config.clone(), db_pool.clone());

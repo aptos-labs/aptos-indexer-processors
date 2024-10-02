@@ -248,7 +248,7 @@ dependencies = [
 [[package]]
 name = "aptos-profiler"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -261,7 +261,7 @@ dependencies = [
 [[package]]
 name = "aptos-profiler"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb#82a8e2bfff1e822781462da83f3abd6cda3f44eb"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -298,10 +298,10 @@ dependencies = [
 [[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
  "async-mutex",
  "http 0.2.12",
  "hyper 0.14.30",
@@ -318,10 +318,10 @@ dependencies = [
 [[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb#82a8e2bfff1e822781462da83f3abd6cda3f44eb"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93#4541add3fd29826ec57f22658ca286d2d6134b93"
 dependencies = [
  "anyhow",
- "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb)",
+ "aptos-profiler 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=4541add3fd29826ec57f22658ca286d2d6134b93)",
  "async-mutex",
  "http 0.2.12",
  "hyper 0.14.30",
@@ -4343,7 +4343,7 @@ name = "server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=82a8e2bfff1e822781462da83f3abd6cda3f44eb)",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
  "async-trait",
  "backtrace",
  "clap",
