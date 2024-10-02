@@ -2,7 +2,8 @@ name: Run Integration Tests
 
 on:
   repository_dispatch:
-    types: [json-change-detected]  # Custom event type to trigger the workflow
+    types: [test-txn-json-change-detected]  # Custom event type to trigger the workflow
+
   workflow_dispatch:
     inputs:
       commit_hash:
@@ -21,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.client_payload.branch || 'main' }}  # Use PR branch or fallback to 'main'
 
       # Install toml-cli using cargo
       - name: Install toml-cli
@@ -34,15 +37,18 @@ jobs:
       - name: Update aptos-system-utils dependency
         if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
         run: |
-          echo "Updating aptos-system-utils dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
-          toml set rust/Cargo.toml workspace.dependencies.aptos-system-utils.rev "${{ github.event.inputs.commit_hash }}" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
+          COMMIT_HASH=${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
+          echo "Updating aptos-system-utils dependency in Cargo.toml to use commit hash $COMMIT_HASH"
+          toml set rust/Cargo.toml workspace.dependencies.aptos-system-utils.rev "$COMMIT_HASH" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
       # Update aptos-indexer-test-transactions dependency using toml-cli
       - name: Update aptos-indexer-test-transactions dependency
         if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
         run: |
-          echo "Updating aptos-indexer-test-transactions dependency in Cargo.toml to use commit hash ${{ github.event.inputs.commit_hash }}"
-          toml set rust/Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "${{ github.event.inputs.commit_hash }}" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
+          COMMIT_HASH=${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
+
+          echo "Updating aptos-indexer-test-transactions dependency in Cargo.toml to use commit hash $COMMIT_HASH"
+          toml set rust/Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$COMMIT_HASH" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
       # Show Cargo.toml after the update
       - name: Show Cargo.toml After Update
