@@ -17,7 +17,7 @@ on:
 
 jobs:
   Integration-tests:
-    runs-on: ubuntu-latest  # Ensure the correct runner is used
+    runs-on: runs-on,runner=2cpu-linux-x64,run-id=${{ github.run_id }}
 
     steps:
       - name: Checkout code
@@ -25,46 +25,53 @@ jobs:
         with:
           ref: ${{ github.event.client_payload.branch || 'main' }}  # Use PR branch or fallback to 'main'
 
-      # Install toml-cli using cargo
+      # Optional: Verify which commit is being used
+      - name: Display the current commit
+        run: |
+          git log -1
+          echo "Using commit hash: ${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash || github.sha }}"
+
+      # 2. Install toml-cli
       - name: Install toml-cli
         run: cargo install toml-cli
 
-      # Show Cargo.toml Before Update
       - name: Show Cargo.toml Before Update
         run: cat rust/Cargo.toml
 
-      # Update aptos-system-utils dependency using toml-cli
-      - name: Update aptos-system-utils dependency
-        if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
-        run: |
-          COMMIT_HASH=${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
-          echo "Updating aptos-system-utils dependency in Cargo.toml to use commit hash $COMMIT_HASH"
-          toml set rust/Cargo.toml workspace.dependencies.aptos-system-utils.rev "$COMMIT_HASH" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
-
-      # Update aptos-indexer-test-transactions dependency using toml-cli
+      # 4. Update aptos-indexer-test-transactions dependency using the same commit hash
       - name: Update aptos-indexer-test-transactions dependency
         if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
         run: |
           COMMIT_HASH=${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
-
           echo "Updating aptos-indexer-test-transactions dependency in Cargo.toml to use commit hash $COMMIT_HASH"
           toml set rust/Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$COMMIT_HASH" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
-      # Show Cargo.toml after the update
       - name: Show Cargo.toml After Update
-        run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
+        run: cat rust/Cargo.toml
 
-      # Ensure Cargo.lock is updated with the latest dependencies
+      # 5. Ensure Cargo.lock is updated with the latest dependencies
       - name: Update Dependencies
         run: cargo update
         working-directory: rust
 
+      # 6. Install dependencies and lint the code
       - name: Install Dependencies and Run Linter
-        uses: ./.github/actions/dep_install_and_lint
-        with:
-          working-directory: rust
+        run: |
+          echo "Installing dependencies and running linter"
+          cargo check --verbose    # Ensure dependencies are resolved correctly
+          cargo fmt -- --check      # Run rustfmt to check for formatting issues
+          cargo clippy --all-targets --all-features -- -D warnings # Run clippy and treat warnings as errors
+        working-directory: rust
 
-      # Run Integration Tests
+      # 7. Run integration tests with proper manifest path
       - name: Run Integration Tests
         run: cargo test --manifest-path integration-tests/Cargo.toml
         working-directory: rust
+
+      # Optional: Save logs and artifacts if needed for debugging
+      - name: Save Logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-logs
+          path: rust/target/debug/deps
