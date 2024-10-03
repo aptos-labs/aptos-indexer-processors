@@ -31,14 +31,29 @@ else
     CREDENTIAL_MOUNT="$HOME/.config/gcloud:/root/.config/gcloud:ro"
 fi
 
+# Normalize GIT_BRANCH if it's set
+if [ -n "${GIT_BRANCH}" ]; then
+    export NORMALIZED_GIT_BRANCH=$(printf "${GIT_BRANCH}" | sed -e 's/[^a-zA-Z0-9]/-/g')
+fi
+
 for example in $EXAMPLES_TO_BUILD; do
+    # Set DESTINATIONS based on GIT_SHA since that is always set
+    DESTINATIONS="--destination ${TARGET_REGISTRY}/${example}:${GIT_SHA}"
+
+    # If GIT_BRANCH is set and not empty, add it as an additional tag
+    if [ -n "${NORMALIZED_GIT_BRANCH}" ]; then
+        DESTINATIONS="${DESTINATIONS} --destination ${TARGET_REGISTRY}/${example}:${NORMALIZED_GIT_BRANCH}"
+        DESTINATIONS="${DESTINATIONS} --destination ${TARGET_REGISTRY}/${example}:${NORMALIZED_GIT_BRANCH}_${GIT_SHA}"
+    fi
+
+    # build and push the image
     docker run \
         --rm \
         -v $CREDENTIAL_MOUNT \
         -v $(pwd)/$example:/workspace \
         gcr.io/kaniko-project/executor:latest \
         --dockerfile /workspace/Dockerfile \
-        --destination "$TARGET_REGISTRY/$example:$GIT_SHA" \
+        $DESTINATIONS \
         --context dir:///workspace/ \
         --cache=true
 done
