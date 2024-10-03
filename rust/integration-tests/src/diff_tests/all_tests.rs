@@ -12,13 +12,13 @@ mod test {
             ProcessorTestHelper,
         },
         diff_tests::{
-            get_expected_generated_txns, get_expected_imported_mainnet_txns,
-            get_expected_imported_testnet_txns, remove_inserted_at,
+            get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
+            get_expected_scripted_txns, remove_inserted_at, remove_transaction_timestamp,
         },
         DiffTest, TestContext, TestProcessorConfig, TestType,
     };
     use aptos_indexer_test_transactions::{
-        ALL_GENERATED_TXNS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
+        ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
     };
     use assert_json_diff::assert_json_eq;
     use diesel::pg::PgConnection;
@@ -52,16 +52,11 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_all_generated_txns_schema_output_for_all_processors() {
+    async fn test_all_scripted_txns_schema_output_for_all_processors() {
         let processor_configs = get_processor_configs();
-        let test_context = TestContext::new(ALL_GENERATED_TXNS).await.unwrap();
+        let test_context = TestContext::new(ALL_SCRIPTED_TRANSACTIONS).await.unwrap();
 
-        run_processor_tests(
-            processor_configs,
-            &test_context,
-            get_expected_generated_txns,
-        )
-        .await;
+        run_processor_tests(processor_configs, &test_context, get_expected_scripted_txns).await;
     }
 
     // Helper function to reduce duplicate code for running tests on all processors
@@ -93,7 +88,7 @@ mod test {
                             };
 
                             let expected_json_path = get_expected_json_path_fn(processor_name, txn_version);
-                            let expected_json = match read_and_parse_json(&expected_json_path) {
+                            let mut expected_json = match read_and_parse_json(&expected_json_path) {
                                 Ok(json) => json,
                                 Err(e) => {
                                     eprintln!(
@@ -106,6 +101,8 @@ mod test {
 
                             // TODO: we need to enhance json diff, as we might have more complex diffs.
                             remove_inserted_at(&mut json_data);
+                            remove_transaction_timestamp(&mut json_data);
+                            remove_transaction_timestamp(&mut expected_json);
                             assert_json_eq!(&json_data, &expected_json);
 
                             println!(
