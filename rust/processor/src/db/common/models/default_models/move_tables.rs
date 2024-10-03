@@ -3,7 +3,6 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::transactions::Transaction;
 use crate::{
     schema::{current_table_items, table_items, table_metadatas},
     utils::util::{hash_str, standardize_address},
@@ -25,10 +24,7 @@ pub struct CurrentTableItem {
     pub is_deleted: bool,
 }
 
-#[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = table_items)]
 pub struct TableItem {
