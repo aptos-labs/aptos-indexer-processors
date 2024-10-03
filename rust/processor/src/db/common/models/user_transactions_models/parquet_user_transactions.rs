@@ -39,7 +39,7 @@ pub struct UserTransaction {
     pub gas_fee_payer_address: Option<String>,
     pub gas_used_octa: u64,
     pub gas_unit_price: u64,
-    pub max_gas_amount: u64,
+    pub max_gas_octa: u64,
     pub storage_refund_octa: u64,
     pub is_transaction_success: bool,
     pub num_signatures: i64,
@@ -94,7 +94,7 @@ impl UserTransaction {
                 .unwrap_or_default(),
             sender: standardize_address(&user_request.sender),
             sequence_number: user_request.sequence_number as i64,
-            max_gas_amount: user_request.max_gas_amount,
+            max_gas_octa: user_request.max_gas_amount,
             expiration_timestamp_secs: user_request
                 .expiration_timestamp_secs
                 .as_ref()
