@@ -6,10 +6,6 @@ on:
   push:
     branches:
       - main
-      # aptos-indexer-processors network-specific release branches
-      - aptos-indexer-processors-devnet
-      - aptos-indexer-processors-testnet
-      - aptos-indexer-processors-mainnet
 
 # cancel redundant builds
 concurrency:
@@ -37,4 +33,12 @@ jobs:
         with:
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      - run: ./scripts/build-and-push-images.sh ${{ matrix.example }}
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+      - name: Build and push images
+        run: ./scripts/build-and-push-images.sh ${{ matrix.example }}
+        env:
+          GIT_BRANCH: ${{ steps.extract_branch.outputs.branch }}
+      

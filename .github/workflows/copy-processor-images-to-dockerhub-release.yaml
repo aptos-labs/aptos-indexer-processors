@@ -1,11 +1,6 @@
 name: Copy images to dockerhub on release
 on:
   push:
-    branches:
-      # aptos-indexer-processors network-specific release branches
-      - aptos-indexer-processors-devnet
-      - aptos-indexer-processors-testnet
-      - aptos-indexer-processors-mainnet
     tags:
       - aptos-indexer-processors-v*
 
