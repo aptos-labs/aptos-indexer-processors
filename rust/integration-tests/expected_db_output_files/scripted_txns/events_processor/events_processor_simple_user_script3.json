@@ -3,8 +3,8 @@
     "sequence_number": 0,
     "creation_number": 0,
     "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "transaction_version": 43,
-    "transaction_block_height": 20,
+    "transaction_version": 19,
+    "transaction_block_height": 9,
     "type_": "0x1::transaction_fee::FeeStatement",
     "data": {
       "io_gas_units": "1",

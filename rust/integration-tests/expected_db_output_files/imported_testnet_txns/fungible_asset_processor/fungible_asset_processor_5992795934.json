@@ -14,7 +14,6 @@
     "entry_function_id_str": "0x7120b5552460116c3734ec3fed721e376bf9afc10c1bba13c678d74cd4608f12::TeviStar::force_transfer",
     "block_height": 356437526,
     "token_standard": "v1",
-    "transaction_timestamp": "2024-09-16T06:58:10",
     "storage_refund_amount": "0"
   },
   {
@@ -32,7 +31,6 @@
     "entry_function_id_str": "0x7120b5552460116c3734ec3fed721e376bf9afc10c1bba13c678d74cd4608f12::TeviStar::force_transfer",
     "block_height": 356437526,
     "token_standard": "v2",
-    "transaction_timestamp": "2024-09-16T06:58:10",
     "storage_refund_amount": "0"
   },
   {
@@ -50,7 +48,6 @@
     "entry_function_id_str": "0x7120b5552460116c3734ec3fed721e376bf9afc10c1bba13c678d74cd4608f12::TeviStar::force_transfer",
     "block_height": 356437526,
     "token_standard": "v2",
-    "transaction_timestamp": "2024-09-16T06:58:10",
     "storage_refund_amount": "0"
   }
 ]

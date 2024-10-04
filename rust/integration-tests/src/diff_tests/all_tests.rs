@@ -1,29 +1,53 @@
+use crate::diff_test_helper::{
+    processors::{
+        event_processor::EventsProcessorTestHelper,
+        fungible_asset_processor::FungibleAssetProcessorTestHelper,
+        token_v2_processor::TokenV2ProcessorTestHelper,
+    },
+    ProcessorTestHelper,
+};
+use std::{collections::HashMap, sync::Arc};
+
+pub fn get_processor_map() -> HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> {
+    let mut processor_map: HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> = HashMap::new();
+    processor_map.insert(
+        "events_processor".to_string(),
+        Arc::new(Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
+    );
+    processor_map.insert(
+        "fungible_asset_processor".to_string(),
+        Arc::new(Box::new(FungibleAssetProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
+    );
+    processor_map.insert(
+        "token_v2_processor".to_string(),
+        Arc::new(Box::new(TokenV2ProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
+    );
+
+    processor_map
+}
+
 #[allow(clippy::needless_return)]
 #[cfg(test)]
 mod test {
 
     use crate::{
-        diff_test_helper::{
-            processors::{
-                event_processor::EventsProcessorTestHelper,
-                fungible_asset_processor::FungibleAssetProcessorTestHelper,
-                token_v2_processor::TokenV2ProcessorTestHelper,
-            },
-            ProcessorTestHelper,
-        },
         diff_tests::{
-            get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
-            get_expected_scripted_txns, remove_inserted_at, remove_transaction_timestamp,
+            all_tests::get_processor_map, get_expected_imported_mainnet_txns,
+            get_expected_imported_testnet_txns, get_expected_scripted_txns, remove_inserted_at,
+            remove_transaction_timestamp,
         },
         DiffTest, TestContext, TestProcessorConfig, TestType,
-    };
-    use aptos_indexer_test_transactions::{
-        ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
     };
     use assert_json_diff::assert_json_eq;
     use diesel::pg::PgConnection;
     use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
-    use std::{collections::HashMap, fs, sync::Arc};
+    use std::fs;
+    // use aptos_indexer_test_transactions::{
+    //     ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
+    // };
+    use testing_transactions::{
+        ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
+    };
 
     #[tokio::test]
     async fn test_all_testnet_txns_schema_output_for_all_processors() {
@@ -34,6 +58,7 @@ mod test {
             processor_configs,
             &test_context,
             get_expected_imported_testnet_txns,
+            false,
         )
         .await;
     }
@@ -47,6 +72,7 @@ mod test {
             processor_configs,
             &test_context,
             get_expected_imported_mainnet_txns,
+            false,
         )
         .await;
     }
@@ -56,7 +82,13 @@ mod test {
         let processor_configs = get_processor_configs();
         let test_context = TestContext::new(ALL_SCRIPTED_TRANSACTIONS).await.unwrap();
 
-        run_processor_tests(processor_configs, &test_context, get_expected_scripted_txns).await;
+        run_processor_tests(
+            processor_configs,
+            &test_context,
+            get_expected_scripted_txns,
+            true,
+        )
+        .await;
     }
 
     // Helper function to reduce duplicate code for running tests on all processors
@@ -64,6 +96,7 @@ mod test {
         processor_configs: Vec<TestProcessorConfig>,
         test_context: &TestContext,
         get_expected_json_path_fn: fn(&str, &str) -> String,
+        for_scripted_txn: bool,
     ) {
         let processor_map = get_processor_map();
         for processor_config in processor_configs {
@@ -75,7 +108,7 @@ mod test {
                     .run(
                         processor_config,
                         test_type,
-                        move |conn: &mut PgConnection, txn_version: &str| {
+                        move |conn: &mut PgConnection, txn_version: &str, txn_name: &str| {
                             let mut json_data = match test_helper.load_data(conn, txn_version) {
                                 Ok(data) => data,
                                 Err(e) => {
@@ -86,8 +119,12 @@ mod test {
                                     return Err(e);
                                 }
                             };
+                            let expected_json_path = if for_scripted_txn {
+                                get_expected_json_path_fn(processor_name, txn_name)
+                            } else {
+                                get_expected_json_path_fn(processor_name, txn_version)
+                            };
 
-                            let expected_json_path = get_expected_json_path_fn(processor_name, txn_version);
                             let mut expected_json = match read_and_parse_json(&expected_json_path) {
                                 Ok(json) => json,
                                 Err(e) => {
@@ -133,24 +170,6 @@ mod test {
                 Err(anyhow::anyhow!("Failed to read file: {}", e))
             },
         }
-    }
-
-    fn get_processor_map() -> HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> {
-        let mut processor_map: HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> = HashMap::new();
-        processor_map.insert(
-            "events_processor".to_string(),
-            Arc::new(Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-        );
-        processor_map.insert(
-            "fungible_asset_processor".to_string(),
-            Arc::new(Box::new(FungibleAssetProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-        );
-        processor_map.insert(
-            "token_v2_processor".to_string(),
-            Arc::new(Box::new(TokenV2ProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-        );
-
-        processor_map
     }
 
     fn get_processor_configs() -> Vec<TestProcessorConfig> {

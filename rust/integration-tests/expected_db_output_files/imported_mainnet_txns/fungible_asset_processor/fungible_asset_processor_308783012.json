@@ -14,7 +14,6 @@
     "entry_function_id_str": "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609::mint::resource_mint_token_memo",
     "block_height": 106350614,
     "token_standard": "v1",
-    "transaction_timestamp": "2023-10-24T09:08:03",
     "storage_refund_amount": "0"
   }
 ]

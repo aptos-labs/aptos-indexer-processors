@@ -13,8 +13,7 @@
     "after_value": null,
     "entry_function_id_str": "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609::mint::resource_mint_token_memo",
     "token_standard": "v2",
-    "is_fungible_v2": null,
-    "transaction_timestamp": "2023-10-24T09:08:03.606880"
+    "is_fungible_v2": null
   },
   {
     "transaction_version": 308783012,
@@ -30,7 +29,6 @@
     "after_value": null,
     "entry_function_id_str": "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609::mint::resource_mint_token_memo",
     "token_standard": "v2",
-    "is_fungible_v2": null,
-    "transaction_timestamp": "2023-10-24T09:08:03.606880"
+    "is_fungible_v2": null
   }
 ]

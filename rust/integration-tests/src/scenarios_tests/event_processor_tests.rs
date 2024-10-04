@@ -36,7 +36,7 @@ mod test {
             .run(
                 processor_config,
                 test_type,
-                move |conn: &mut PgConnection, version: &str| {
+                move |conn: &mut PgConnection, version: &str, _txn_name: &str| {
                     println!("version: {}", version);
                     // Load and validate events
                     let withdraw_events = load_transaction_events(
@@ -94,7 +94,7 @@ mod test {
             .run(
                 processor_config,
                 test_type,
-                move |conn: &mut PgConnection, version: &str| {
+                move |conn: &mut PgConnection, version: &str, _txn_name: &str| {
                     // Load and validate events
                     let distributed_rewards_events = load_transaction_events(
                         conn,
@@ -135,7 +135,7 @@ mod test {
             .run(
                 processor_config,
                 test_type,
-                move |conn: &mut PgConnection, version: &str| {
+                move |conn: &mut PgConnection, version: &str, _txn_name: &str| {
                     // Load and validate events
                     let actual_events = load_transaction_events(
                         conn,

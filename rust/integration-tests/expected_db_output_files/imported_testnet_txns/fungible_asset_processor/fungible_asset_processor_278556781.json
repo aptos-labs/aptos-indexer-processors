@@ -14,7 +14,6 @@
     "entry_function_id_str": "0x1::code::publish_package_txn",
     "block_height": 20040326,
     "token_standard": "v1",
-    "transaction_timestamp": "2022-10-13T01:46:57",
     "storage_refund_amount": "0"
   },
   {
@@ -32,7 +31,6 @@
     "entry_function_id_str": "0x1::code::publish_package_txn",
     "block_height": 20040326,
     "token_standard": "v1",
-    "transaction_timestamp": "2022-10-13T01:46:57",
     "storage_refund_amount": "0"
   }
 ]

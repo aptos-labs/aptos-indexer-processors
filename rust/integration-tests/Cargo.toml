@@ -19,6 +19,7 @@ aptos-protos = { workspace = true }
 assert-json-diff = { workspace = true }
 bigdecimal = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
 diesel = { workspace = true }
 dirs = { workspace = true }
 field_count = { workspace = true }
@@ -33,4 +34,5 @@ serde_json = { workspace = true }
 testcontainers = { workspace = true }
 testing-transactions = { workspace = true }
 tokio = { workspace = true }
+serde_yaml = "0.8.26"
 [dev-dependencies]
