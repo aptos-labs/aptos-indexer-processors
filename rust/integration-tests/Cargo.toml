@@ -31,8 +31,8 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde_canonical_json = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 testcontainers = { workspace = true }
 testing-transactions = { workspace = true }
 tokio = { workspace = true }
-serde_yaml = "0.8.26"
 [dev-dependencies]
