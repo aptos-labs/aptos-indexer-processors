@@ -239,7 +239,7 @@ fn insert_fungible_asset_balances_query(
     )
 }
 
-fn insert_current_fungible_asset_balances_query(
+pub fn insert_current_fungible_asset_balances_query(
     items_to_insert: Vec<CurrentFungibleAssetBalance>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -451,7 +451,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 }
 
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
-async fn parse_v2_coin(
+pub async fn parse_v2_coin(
     transactions: &[Transaction],
 ) -> (
     Vec<FungibleAssetActivity>,
