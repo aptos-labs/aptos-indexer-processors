@@ -1,5 +1,4 @@
 use crate::utils::database::{execute_with_better_error, ArcDbPool};
-use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     traits::{
@@ -12,9 +11,8 @@ use async_trait::async_trait;
 use diesel::{upsert::excluded, ExpressionMethods};
 use processor::{db::common::models::processor_status::ProcessorStatus, schema::processor_status};
 use std::marker::PhantomData;
-use tracing::info;
 
-const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
+pub const UPDATE_PROCESSOR_STATUS_SECS: u64 = 1;
 
 pub struct LatestVersionProcessedTracker<T>
 where
@@ -23,12 +21,8 @@ where
 {
     conn_pool: ArcDbPool,
     tracker_name: String,
-    // Next version to process that we expect.
-    next_version: u64,
     // Last successful batch of sequentially processed transactions. Includes metadata to write to storage.
     last_success_batch: Option<TransactionContext<()>>,
-    // Tracks all the versions that have been processed out of order.
-    seen_versions: AHashMap<u64, TransactionContext<()>>,
     _marker: PhantomData<T>,
 }
 
@@ -37,28 +31,13 @@ where
     Self: Sized + Send + 'static,
     T: Send + 'static,
 {
-    pub fn new(conn_pool: ArcDbPool, starting_version: u64, tracker_name: String) -> Self {
+    pub fn new(conn_pool: ArcDbPool, tracker_name: String) -> Self {
         Self {
             conn_pool,
             tracker_name,
-            next_version: starting_version,
             last_success_batch: None,
-            seen_versions: AHashMap::new(),
             _marker: PhantomData,
         }
-    }
-
-    fn update_last_success_batch(&mut self, current_batch: TransactionContext<()>) {
-        let mut new_prev_batch = current_batch;
-        // While there are batches in seen_versions that are in order, update the new_prev_batch to the next batch.
-        while let Some(next_version) = self
-            .seen_versions
-            .remove(&(new_prev_batch.metadata.end_version + 1))
-        {
-            new_prev_batch = next_version;
-        }
-        self.next_version = new_prev_batch.metadata.end_version + 1;
-        self.last_success_batch = Some(new_prev_batch);
     }
 
     async fn save_processor_status(&mut self) -> Result<(), ProcessorError> {
@@ -113,34 +92,24 @@ where
         &mut self,
         current_batch: TransactionContext<T>,
     ) -> Result<Option<TransactionContext<T>>, ProcessorError> {
-        // info!(
-        //     start_version = current_batch.start_version,
-        //     end_version = current_batch.end_version,
-        //     step_name = self.name(),
-        //     "Processing versions"
-        // );
-        // If there's a gap in the next_version and current_version, save the current_version to seen_versions for
-        // later processing.
-        if self.next_version != current_batch.metadata.start_version {
-            info!(
-                expected_next_version = self.next_version,
-                step = self.name(),
-                batch_version = current_batch.metadata.start_version,
-                "Gap detected",
-            );
-            self.seen_versions
-                .insert(current_batch.metadata.start_version, TransactionContext {
-                    data: (), // No data is needed for tracking.
-                    metadata: current_batch.metadata.clone(),
+        // If there's a gap in version, return an error
+        if let Some(last_success_batch) = self.last_success_batch.as_ref() {
+            if last_success_batch.metadata.end_version + 1 != current_batch.metadata.start_version {
+                return Err(ProcessorError::ProcessError {
+                    message: format!(
+                        "Gap detected starting from version: {}",
+                        current_batch.metadata.start_version
+                    ),
                 });
-        } else {
-            // info!("No gap detected");
-            // If the current_batch is the next expected version, update the last success batch
-            self.update_last_success_batch(TransactionContext {
-                data: (), // No data is needed for tracking.
-                metadata: current_batch.metadata.clone(),
-            });
+            }
         }
+
+        // Update the last success batch
+        self.last_success_batch = Some(TransactionContext {
+            data: (),
+            metadata: current_batch.metadata.clone(),
+        });
+
         // Pass through
         Ok(Some(current_batch))
     }

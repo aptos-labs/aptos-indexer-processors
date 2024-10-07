@@ -4,7 +4,9 @@ use crate::{
         processor_config::ProcessorConfig,
     },
     steps::{
-        common::latest_processed_version_tracker::LatestVersionProcessedTracker,
+        common::latest_processed_version_tracker::{
+            LatestVersionProcessedTracker, UPDATE_PROCESSOR_STATUS_SECS,
+        },
         events_processor::{EventsExtractor, EventsStorer},
     },
     utils::{
@@ -17,9 +19,10 @@ use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
-    common_steps::TransactionStreamStep,
+    common_steps::{OrderByVersionStep, TransactionStreamStep},
     traits::IntoRunnableStep,
 };
+use std::time::Duration;
 use tracing::{debug, info};
 
 pub struct EventsProcessor {
@@ -94,11 +97,12 @@ impl EventsProcessor {
         .await?;
         let events_extractor = EventsExtractor {};
         let events_storer = EventsStorer::new(self.db_pool.clone(), processor_config);
-        let version_tracker = LatestVersionProcessedTracker::new(
-            self.db_pool.clone(),
+        let order_step = OrderByVersionStep::new(
             starting_version,
-            processor_name.to_string(),
+            Duration::from_secs(UPDATE_PROCESSOR_STATUS_SECS),
         );
+        let version_tracker =
+            LatestVersionProcessedTracker::new(self.db_pool.clone(), processor_name.to_string());
 
         // Connect processor steps together
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
@@ -106,6 +110,7 @@ impl EventsProcessor {
         )
         .connect_to(events_extractor.into_runnable_step(), channel_size)
         .connect_to(events_storer.into_runnable_step(), channel_size)
+        .connect_to(order_step.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
