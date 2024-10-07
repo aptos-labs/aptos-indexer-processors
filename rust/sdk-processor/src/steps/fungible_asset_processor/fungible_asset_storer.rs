@@ -1,10 +1,5 @@
 use crate::{
-    config::indexer_processor_config::IndexerProcessorConfig,
-    db::common::models::events_models::events::EventModel,
-    processors::{
-        events_processor::EventsProcessorConfig,
-        fungible_asset_processor::FungibleAssetProcessorConfig,
-    },
+    processors::fungible_asset_processor::FungibleAssetProcessorConfig,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -15,11 +10,6 @@ use aptos_indexer_processor_sdk::{
     utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
-use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
-};
 use processor::{
     db::common::models::{
         coin_models::coin_supply::CoinSupply,
@@ -39,10 +29,8 @@ use processor::{
         insert_fungible_asset_activities_query, insert_fungible_asset_balances_query,
         insert_fungible_asset_metadata_query,
     },
-    schema,
     worker::TableFlags,
 };
-use serde::de;
 
 pub struct FungibleAssetStorer
 where
