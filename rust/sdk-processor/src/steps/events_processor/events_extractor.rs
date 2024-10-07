@@ -17,14 +17,14 @@ where
 
 #[async_trait]
 impl Processable for EventsExtractor {
-    type Input = Transaction;
-    type Output = EventModel;
+    type Input = Vec<Transaction>;
+    type Output = Vec<EventModel>;
     type RunType = AsyncRunType;
 
     async fn process(
         &mut self,
-        item: TransactionContext<Transaction>,
-    ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
+        item: TransactionContext<Vec<Transaction>>,
+    ) -> Result<Option<TransactionContext<Vec<EventModel>>>, ProcessorError> {
         // info!(
         //     start_version = item.start_version,
         //     end_version = item.end_version,
@@ -68,11 +68,7 @@ impl Processable for EventsExtractor {
             .collect::<Vec<EventModel>>();
         Ok(Some(TransactionContext {
             data: events,
-            start_version: item.start_version,
-            end_version: item.end_version,
-            start_transaction_timestamp: item.start_transaction_timestamp,
-            end_transaction_timestamp: item.end_transaction_timestamp,
-            total_size_in_bytes: item.total_size_in_bytes,
+            metadata: item.metadata,
         }))
     }
 }

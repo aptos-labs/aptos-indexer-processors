@@ -5,7 +5,10 @@ use crate::{
     },
     steps::{
         common::latest_processed_version_tracker::LatestVersionProcessedTracker,
-        events_processor::{EventsExtractor, EventsStorer},
+        fungible_asset_processor::{
+            fungible_asset_extractor::FungibleAssetExtractor,
+            fungible_asset_storer::FungibleAssetStorer,
+        },
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -21,6 +24,7 @@ use aptos_indexer_processor_sdk::{
     common_steps::TransactionStreamStep,
     traits::IntoRunnableStep,
 };
+use processor::worker::TableFlags;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
@@ -44,10 +48,13 @@ impl FungibleAssetProcessorConfig {
 pub struct FungibleAssetProcessor {
     pub config: IndexerProcessorConfig,
     pub db_pool: ArcDbPool,
+    pub deprecated_table_flags: TableFlags,
 }
 
 impl FungibleAssetProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> Result<Self> {
+        let deprecated_table_flags = TableFlags::from_set(&config.deprecated_tables);
+
         match config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
                 let conn_pool = new_db_pool(
@@ -65,6 +72,7 @@ impl FungibleAssetProcessor {
                 Ok(Self {
                     config,
                     db_pool: conn_pool,
+                    deprecated_table_flags,
                 })
             },
         }
@@ -106,8 +114,9 @@ impl FungibleAssetProcessor {
             ..self.config.transaction_stream_config
         })
         .await?;
-        // let events_extractor = EventsExtractor {};
-        // let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
+        let fa_extractor = FungibleAssetExtractor {};
+        let fa_storer =
+            FungibleAssetStorer::new(self.db_pool.clone(), fa_config, self.deprecated_table_flags);
         let version_tracker = LatestVersionProcessedTracker::new(
             self.db_pool.clone(),
             starting_version,
@@ -118,8 +127,8 @@ impl FungibleAssetProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        // .connect_to(events_extractor.into_runnable_step(), channel_size)
-        // .connect_to(events_storer.into_runnable_step(), channel_size)
+        .connect_to(fa_extractor.into_runnable_step(), channel_size)
+        .connect_to(fa_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
@@ -127,12 +136,9 @@ impl FungibleAssetProcessor {
         loop {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
-                    if txn_context.data.is_empty() {
-                        continue;
-                    }
                     debug!(
                         "Finished processing versions [{:?}, {:?}]",
-                        txn_context.start_version, txn_context.end_version,
+                        txn_context.metadata.start_version, txn_context.metadata.end_version,
                     );
                 },
                 Err(e) => {

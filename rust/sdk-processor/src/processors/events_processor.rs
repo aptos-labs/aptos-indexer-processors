@@ -132,12 +132,9 @@ impl EventsProcessor {
         loop {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
-                    if txn_context.data.is_empty() {
-                        continue;
-                    }
                     debug!(
                         "Finished processing events from versions [{:?}, {:?}]",
-                        txn_context.start_version, txn_context.end_version,
+                        txn_context.metadata.start_version, txn_context.metadata.end_version,
                     );
                 },
                 Err(e) => {

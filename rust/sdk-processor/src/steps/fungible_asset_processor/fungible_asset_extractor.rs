@@ -26,7 +26,7 @@ where
 
 #[async_trait]
 impl Processable for FungibleAssetExtractor {
-    type Input = Transaction;
+    type Input = Vec<Transaction>;
     type Output = (
         Vec<FungibleAssetActivity>,
         Vec<FungibleAssetMetadataModel>,
@@ -39,7 +39,7 @@ impl Processable for FungibleAssetExtractor {
 
     async fn process(
         &mut self,
-        transactions: TransactionContext<Transaction>,
+        transactions: TransactionContext<Vec<Transaction>>,
     ) -> Result<
         Option<
             TransactionContext<(
@@ -63,19 +63,15 @@ impl Processable for FungibleAssetExtractor {
         ) = parse_v2_coin(&transactions.data).await;
 
         Ok(Some(TransactionContext {
-            data: vec![(
+            data: (
                 fungible_asset_activities,
                 fungible_asset_metadata,
                 fungible_asset_balances,
                 current_fungible_asset_balances,
                 current_unified_fungible_asset_balances,
                 coin_supply,
-            )],
-            start_version: transactions.start_version,
-            end_version: transactions.end_version,
-            start_transaction_timestamp: transactions.start_transaction_timestamp,
-            end_transaction_timestamp: transactions.end_transaction_timestamp,
-            total_size_in_bytes: transactions.total_size_in_bytes,
+            ),
+            metadata: transactions.metadata,
         }))
     }
 }

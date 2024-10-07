@@ -5,11 +5,11 @@ use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::{
     events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
 };
-use ahash::HashSet;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
 use aptos_indexer_processor_sdk_server_framework::RunnableConfig;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
