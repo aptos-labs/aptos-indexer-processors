@@ -8,7 +8,7 @@
 use super::v2_token_utils::{TokenStandard, TokenV2, TokenV2Burned};
 use crate::{
     db::common::models::{
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        object_models::v2_object_utils::ObjectAggregatedDataMapping, resources::FromWriteResource,
         token_models::token_utils::TokenWriteSet,
     },
     schema::{current_token_datas_v2, token_datas_v2},
@@ -79,7 +79,7 @@ impl TokenDataV2 {
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentTokenDataV2)>> {
-        if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
+        if let Some(inner) = &TokenV2::from_write_resource(write_resource)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             let mut token_name = inner.get_name_trunc();
             let is_fungible_v2;

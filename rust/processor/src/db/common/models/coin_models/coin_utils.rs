@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    db::common::models::default_models::move_resources::MoveResource,
+    db::common::models::{default_models::move_resources::MoveResource, resources::COIN_ADDR},
     utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
 };
 use anyhow::{bail, Context, Result};
@@ -16,7 +16,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-pub const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const COIN_TYPE_HASH_LENGTH: usize = 5000;
 const COIN_TYPE_MAX: usize = 1000;
 

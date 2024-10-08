@@ -5,11 +5,11 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_token_utils::{TokenStandard, V2TokenResource};
+use super::v2_token_utils::{Collection, TokenStandard};
 use crate::{
     db::common::models::{
-        default_models::move_resources::MoveResource,
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        resources::FromWriteResource,
         token_models::{
             collection_datas::CollectionData,
             token_utils::{CollectionDataIdType, TokenWriteSet},
@@ -87,27 +87,13 @@ impl CollectionV2 {
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
-        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let V2TokenResource::Collection(inner) = &V2TokenResource::from_resource(
-            &type_str,
-            resource.data.as_ref().unwrap(),
-            txn_version,
-        )? {
+        if let Some(inner) = Collection::from_write_resource(write_resource)? {
             let (mut current_supply, mut max_supply, mut total_minted_v2) =
                 (BigDecimal::zero(), None, None);
             let (mut mutable_description, mut mutable_uri) = (None, None);
             let mut collection_properties = serde_json::Value::Null;
-            if let Some(object_data) = object_metadatas.get(&resource.address) {
+            let address = standardize_address(&write_resource.address);
+            if let Some(object_data) = object_metadatas.get(&address) {
                 // Getting supply data (prefer fixed supply over unlimited supply although they should never appear at the same time anyway)
                 let fixed_supply = object_data.fixed_supply.as_ref();
                 let unlimited_supply = object_data.unlimited_supply.as_ref();
@@ -157,7 +143,7 @@ impl CollectionV2 {
                 return Ok(None);
             }
 
-            let collection_id = resource.address.clone();
+            let collection_id = address;
             let creator_address = inner.get_creator_address();
             let collection_name = inner.get_name_trunc();
             let description = inner.description.clone();
