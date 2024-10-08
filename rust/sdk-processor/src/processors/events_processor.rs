@@ -13,7 +13,6 @@ use crate::{
         starting_version::get_starting_version,
     },
 };
-use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
@@ -21,25 +20,7 @@ use aptos_indexer_processor_sdk::{
     common_steps::TransactionStreamStep,
     traits::IntoRunnableStep,
 };
-use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct EventsProcessorConfig {
-    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
-    #[serde(default = "AHashMap::new")]
-    pub per_table_chunk_sizes: AHashMap<String, usize>,
-    // Size of channel between steps
-    #[serde(default = "EventsProcessorConfig::default_channel_size")]
-    pub channel_size: usize,
-}
-
-impl EventsProcessorConfig {
-    pub const fn default_channel_size() -> usize {
-        10
-    }
-}
 
 pub struct EventsProcessor {
     pub config: IndexerProcessorConfig,
@@ -73,7 +54,7 @@ impl EventsProcessor {
     pub async fn run_processor(self) -> Result<()> {
         let processor_name = self.config.processor_config.name();
 
-        // (Optional) Run migrations
+        // Run migrations
         match self.config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
                 run_migrations(
@@ -84,18 +65,18 @@ impl EventsProcessor {
             },
         }
 
-        // (Optional) Merge the starting version from config and the latest processed version from the DB
+        //  Merge the starting version from config and the latest processed version from the DB
         let starting_version = get_starting_version(&self.config, self.db_pool.clone()).await?;
 
-        // (Optional) Check and update the ledger chain id to ensure we're indexing the correct chain
+        // Check and update the ledger chain id to ensure we're indexing the correct chain
         let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())
             .await?
             .get_chain_id()
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
-        let events_processor_config = match self.config.processor_config {
-            ProcessorConfig::EventsProcessor(events_processor_config) => events_processor_config,
+        let processor_config = match self.config.processor_config {
+            ProcessorConfig::EventsProcessor(processor_config) => processor_config,
             _ => {
                 return Err(anyhow::anyhow!(
                     "Invalid processor config for EventsProcessor: {:?}",
@@ -103,7 +84,7 @@ impl EventsProcessor {
                 ))
             },
         };
-        let channel_size = events_processor_config.channel_size;
+        let channel_size = processor_config.channel_size;
 
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
@@ -112,7 +93,7 @@ impl EventsProcessor {
         })
         .await?;
         let events_extractor = EventsExtractor {};
-        let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
+        let events_storer = EventsStorer::new(self.db_pool.clone(), processor_config);
         let version_tracker = LatestVersionProcessedTracker::new(
             self.db_pool.clone(),
             starting_version,

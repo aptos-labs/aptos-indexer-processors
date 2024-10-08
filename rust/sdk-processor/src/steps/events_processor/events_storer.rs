@@ -1,6 +1,6 @@
 use crate::{
+    config::processor_config::DefaultProcessorConfig,
     db::common::models::events_models::events::EventModel,
-    processors::events_processor::EventsProcessorConfig,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -24,11 +24,11 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    processor_config: EventsProcessorConfig,
+    processor_config: DefaultProcessorConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool, processor_config: EventsProcessorConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, processor_config: DefaultProcessorConfig) -> Self {
         Self {
             conn_pool,
             processor_config,

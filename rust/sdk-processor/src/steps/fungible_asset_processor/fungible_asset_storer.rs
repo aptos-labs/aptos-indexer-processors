@@ -1,5 +1,5 @@
 use crate::{
-    processors::fungible_asset_processor::FungibleAssetProcessorConfig,
+    config::processor_config::DefaultProcessorConfig,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -37,19 +37,19 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    fa_config: FungibleAssetProcessorConfig,
+    processor_config: DefaultProcessorConfig,
     deprecated_tables: TableFlags,
 }
 
 impl FungibleAssetStorer {
     pub fn new(
         conn_pool: ArcDbPool,
-        fa_config: FungibleAssetProcessorConfig,
+        processor_config: DefaultProcessorConfig,
         deprecated_tables: TableFlags,
     ) -> Self {
         Self {
             conn_pool,
-            fa_config,
+            processor_config,
             deprecated_tables,
         }
     }
@@ -89,7 +89,7 @@ impl Processable for FungibleAssetStorer {
         ) = input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
-            self.fa_config.per_table_chunk_sizes.clone();
+            self.processor_config.per_table_chunk_sizes.clone();
         // if flag turned on we need to not include any value in the table
         let (unified_coin_balances, unified_fa_balances): (Vec<_>, Vec<_>) = if self
             .deprecated_tables
