@@ -476,7 +476,7 @@ pub async fn parse_v2_coin(
             let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = AHashMap::new();
             let mut fungible_asset_metadata: FungibleAssetMetadataMapping = AHashMap::new();
 
-            // Get Metadata for fungible assets by object
+            // Get Metadata for fungible assets by object address
             let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = AHashMap::new();
 
             let txn_version = txn.version as i64;
@@ -523,8 +523,8 @@ pub async fn parse_v2_coin(
             // the event to the resource using the event guid
             let mut event_to_v1_coin_type: EventToCoinType = AHashMap::new();
 
-            // First loop to get all objects
-            // Need to do a first pass to get all the objects
+            // Loop 1: to get all object addresses
+            // Need to do a first pass to get all the object addresses and insert them into the helper
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     if let Some(object) =
@@ -540,7 +540,7 @@ pub async fn parse_v2_coin(
                     }
                 }
             }
-            // Loop to get the metadata relevant to parse v1 and v2.
+            // Loop 2: Get the metadata relevant to parse v1 coin and v2 fungible asset.
             // As an optimization, we also handle v1 balances in the process
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
@@ -558,7 +558,8 @@ pub async fn parse_v2_coin(
                             .insert(current_balance.storage_id.clone(), current_balance.clone());
                         event_to_v1_coin_type.extend(event_to_coin);
                     }
-                    // Fill the v2 object metadata
+                    // Fill the v2 fungible_asset_object_helper. This is used to track which objects exist at each object address.
+                    // The data will be used to reconstruct the full data in Loop 4.
                     let address = standardize_address(&write_resource.address.to_string());
                     if let Some(aggregated_data) = fungible_asset_object_helper.get_mut(&address) {
                         if let Some(fungible_asset_metadata) =
@@ -643,7 +644,7 @@ pub async fn parse_v2_coin(
                 fungible_asset_activities.push(gas_event);
             }
 
-            // Loop to handle events and collect additional metadata from events for v2
+            // Loop 3 to handle events and collect additional metadata from events for v2
             for (index, event) in events.iter().enumerate() {
                 if let Some(v1_activity) = FungibleAssetActivity::get_v1_from_event(
                     event,
@@ -685,7 +686,7 @@ pub async fn parse_v2_coin(
                 }
             }
 
-            // Loop to handle all the other changes
+            // Loop 4 to handle write set changes for metadata, balance, and v1 supply
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteResource(write_resource) => {

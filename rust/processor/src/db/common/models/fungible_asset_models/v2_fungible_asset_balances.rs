@@ -394,6 +394,7 @@ impl FungibleAssetBalance {
                     last_transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };
+                // What is this for?
                 let event_to_coin_mapping: EventToCoinType = AHashMap::from([
                     (
                         inner.withdraw_events.guid.id.get_standardized(),
