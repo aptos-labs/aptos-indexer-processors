@@ -6,6 +6,7 @@
 
 use super::stake_utils::StakeEvent;
 use crate::{
+    db::common::models::should_skip,
     schema::proposal_votes,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
@@ -49,10 +50,20 @@ impl ProposalVote {
         let txn_version = transaction.version as i64;
 
         if let TxnData::User(user_txn) = txn_data {
-            for event in &user_txn.events {
+            for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(StakeEvent::GovernanceVoteEvent(ev)) =
                     StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
                 {
+                    if should_skip(
+                        event,
+                        if index == 0 {
+                            None
+                        } else {
+                            Some(&user_txn.events[index - 1])
+                        },
+                    ) {
+                        continue;
+                    };
                     proposal_votes.push(Self {
                         transaction_version: txn_version,
                         proposal_id: ev.proposal_id as i64,
