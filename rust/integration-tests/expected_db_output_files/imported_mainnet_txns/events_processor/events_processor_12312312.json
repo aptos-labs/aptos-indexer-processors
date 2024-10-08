@@ -1,0 +1,22 @@
+[
+  {
+    "sequence_number": 3356271,
+    "creation_number": 3,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "transaction_version": 12312312,
+    "transaction_block_height": 3356271,
+    "type_": "0x1::block::NewBlockEvent",
+    "data": {
+      "hash": "0xaff23d73ac6de5e3e8ccdb1bfb030c68e9f276a16837bf841b15d54bd8a5b1da",
+      "epoch": "155",
+      "round": "3256",
+      "height": "3356271",
+      "proposer": "0xfcbc1da54b125c093d49bf4a604a1854d38f99b6cffc09255d8af5446898ddba",
+      "time_microseconds": "1666705695930329",
+      "failed_proposer_indices": [],
+      "previous_block_votes_bitvec": "0x8001d7eeffe1effe8fe7bdffbc"
+    },
+    "indexed_type": "0x1::block::NewBlockEvent",
+    "event_index": 0
+  }
+]

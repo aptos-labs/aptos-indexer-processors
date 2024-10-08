@@ -19,6 +19,7 @@ aptos-protos = { workspace = true }
 assert-json-diff = { workspace = true }
 bigdecimal = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
 diesel = { workspace = true }
 dirs = { workspace = true }
 field_count = { workspace = true }
@@ -30,6 +31,7 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde_canonical_json = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 testcontainers = { workspace = true }
 testing-transactions = { workspace = true }
 tokio = { workspace = true }

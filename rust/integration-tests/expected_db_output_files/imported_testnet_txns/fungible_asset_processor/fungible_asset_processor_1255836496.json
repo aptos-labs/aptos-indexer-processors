@@ -14,7 +14,6 @@
     "entry_function_id_str": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::meso::deposit_coin",
     "block_height": 295534162,
     "token_standard": "v1",
-    "transaction_timestamp": "2024-06-18T05:07:55",
     "storage_refund_amount": "0"
   },
   {
@@ -32,7 +31,6 @@
     "entry_function_id_str": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::meso::deposit_coin",
     "block_height": 295534162,
     "token_standard": "v1",
-    "transaction_timestamp": "2024-06-18T05:07:55",
     "storage_refund_amount": "0"
   },
   {
@@ -50,7 +48,6 @@
     "entry_function_id_str": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::meso::deposit_coin",
     "block_height": 295534162,
     "token_standard": "v1",
-    "transaction_timestamp": "2024-06-18T05:07:55",
     "storage_refund_amount": "0"
   },
   {
@@ -68,7 +65,6 @@
     "entry_function_id_str": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::meso::deposit_coin",
     "block_height": 295534162,
     "token_standard": "v2",
-    "transaction_timestamp": "2024-06-18T05:07:55",
     "storage_refund_amount": "0"
   }
 ]

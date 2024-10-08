@@ -6,14 +6,16 @@ use processor::{
     utils::database::{new_db_pool, run_pending_migrations},
     worker::build_processor_for_testing,
 };
+use std::collections::HashMap;
 use testcontainers::{
     core::{IntoContainerPort, WaitFor},
     runners::AsyncRunner,
     ContainerAsync, GenericImage, ImageExt,
 };
+use testing_transactions::get_transaction_name;
 
-mod diff_test_helper;
-mod diff_tests;
+pub mod diff_test_helper;
+pub mod diff_tests;
 mod models;
 mod scenarios_tests;
 
@@ -21,6 +23,7 @@ mod scenarios_tests;
 pub struct TestContext {
     pub transaction_batches: Vec<Transaction>,
     postgres_container: ContainerAsync<GenericImage>,
+    pub version_to_txn_name: HashMap<u64, String>, // this is to map the scripted txn name
 }
 
 #[derive(Debug, Clone)]
@@ -31,10 +34,17 @@ pub struct TestProcessorConfig {
 impl TestContext {
     // TODO: move this to builder pattern to allow chaining.
     pub async fn new(txn_bytes: &[&[u8]]) -> anyhow::Result<Self> {
+        let mut version_to_txn_name = HashMap::new();
         let transaction_batches = txn_bytes
             .iter()
-            .map(|txn| {
+            .map(|&txn| {
+                // we are only going to use this txn_name for scripted txn
+                let txn_name = get_transaction_name(txn)
+                    .unwrap_or("imported_transactions")
+                    .to_string();
                 let txn: Transaction = serde_json::from_slice(txn).unwrap();
+                let txn_version = txn.version;
+                version_to_txn_name.insert(txn_version, txn_name.to_string());
                 txn
             })
             .collect::<Vec<Transaction>>();
@@ -52,6 +62,7 @@ impl TestContext {
         Ok(TestContext {
             transaction_batches,
             postgres_container,
+            version_to_txn_name,
         })
     }
 
@@ -81,19 +92,6 @@ impl TestContext {
     }
 
     // The `run` function takes a closure that is executed after the test context is created.
-    // The closure is executed multiple times with different permutations of the transactions.
-    // For example:
-    //   test.run(async move | context | {
-    //       // Runs after every permutatation
-    //       let result = events
-    //         .select((transaction_version, event_index, type_))
-    //         .filter(transaction_version.eq(0))
-    //         .load::<(i64, i64, String)>(conn);
-    //       assert_eq!(result.unwrap().len(), 1);
-    //   })
-    //   .await
-    //   .is_ok());
-    //
     pub async fn run<F>(
         &self,
         processor_config: TestProcessorConfig,
@@ -101,7 +99,7 @@ impl TestContext {
         verification_f: F,
     ) -> anyhow::Result<()>
     where
-        F: Fn(&mut PgConnection, &str) -> anyhow::Result<()> + Send + Sync + 'static,
+        F: Fn(&mut PgConnection, &str, &str) -> anyhow::Result<()> + Send + Sync + 'static,
     {
         let transactions = self.transaction_batches.clone();
         let db_url = self.get_db_url().await;
@@ -120,13 +118,17 @@ impl TestContext {
             processor
                 .process_transactions(vec![txn.clone()], version, version, None)
                 .await?;
-            // }
 
             last_version = Some(version);
-
+            let txn_name = self.version_to_txn_name.get(&version).unwrap();
             // For DiffTest, run verification after each transaction
             if matches!(test_type, TestType::Diff(_)) {
-                test_type.run_verification(&mut conn, &version.to_string(), &verification_f)?;
+                test_type.run_verification(
+                    &mut conn,
+                    &version.to_string(),
+                    txn_name,
+                    &verification_f,
+                )?;
             }
         }
         // For ScenarioTest, use the last transaction version if needed
@@ -135,6 +137,7 @@ impl TestContext {
                 test_type.run_verification(
                     &mut conn,
                     &last_version.to_string(),
+                    "",
                     &verification_f,
                 )?;
             } else {
@@ -153,7 +156,8 @@ trait TestStrategy {
         &self,
         conn: &mut PgConnection,
         version: &str,
-        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+        txn_name: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str, &str) -> anyhow::Result<()>,
     ) -> anyhow::Result<()>;
 }
 
@@ -164,9 +168,10 @@ impl TestStrategy for DiffTest {
         &self,
         conn: &mut PgConnection,
         version: &str,
-        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+        txn_name: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str, &str) -> anyhow::Result<()>,
     ) -> anyhow::Result<()> {
-        verification_f(conn, version)
+        verification_f(conn, version, txn_name)
     }
 }
 
@@ -177,9 +182,10 @@ impl TestStrategy for ScenarioTest {
         &self,
         conn: &mut PgConnection,
         version: &str,
-        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+        txn_name: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str, &str) -> anyhow::Result<()>,
     ) -> anyhow::Result<()> {
-        verification_f(conn, version)
+        verification_f(conn, version, txn_name)
     }
 }
 
@@ -193,11 +199,14 @@ impl TestType {
         &self,
         conn: &mut PgConnection,
         version: &str,
-        verification_f: &dyn Fn(&mut PgConnection, &str) -> anyhow::Result<()>,
+        txn_name: &str,
+        verification_f: &dyn Fn(&mut PgConnection, &str, &str) -> anyhow::Result<()>,
     ) -> anyhow::Result<()> {
         match self {
-            TestType::Diff(strategy) => strategy.verify(conn, version, verification_f),
-            TestType::Scenario(strategy) => strategy.verify(conn, version, verification_f),
+            TestType::Diff(strategy) => strategy.verify(conn, version, txn_name, verification_f),
+            TestType::Scenario(strategy) => {
+                strategy.verify(conn, version, txn_name, verification_f)
+            },
         }
     }
 }

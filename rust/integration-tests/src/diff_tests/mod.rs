@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-mod all_tests;
+pub mod all_tests;
 
 #[allow(dead_code)]
 pub fn remove_inserted_at(value: &mut Value) {
@@ -41,9 +41,9 @@ pub fn get_expected_imported_mainnet_txns(processor_name: &str, txn_version: &st
 }
 
 #[allow(dead_code)]
-pub fn get_expected_scripted_txns(processor_name: &str, txn_version: &str) -> String {
+pub fn get_expected_scripted_txns(processor_name: &str, txn_name: &str) -> String {
     format!(
         "expected_db_output_files/scripted_txns/{}/{}_{}.json",
-        processor_name, processor_name, txn_version
+        processor_name, processor_name, txn_name
     )
 }
