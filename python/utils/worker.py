@@ -248,6 +248,7 @@ def producer(
                 )
                 if q.qsize() == 0:
                     break
+                sleep(1) # don't log to much
             logging.info(
                 "[Parser] The stream is ended",
                 extra={
@@ -362,8 +363,12 @@ async def consumer_impl(
         total_size = 0
         for task_index in range(num_concurrent_processing_tasks):
             if task_index == 0:
-                # If we're the first task, we should wait until we get data.
-                chain_id, size_in_bytes, transactions = q.get()
+                # If we're the first task, we should wait longer to get data.
+                try:
+                    # here the producer may have exited, just calling q.get() will make the consumer_impl be stucked here 
+                    chain_id, size_in_bytes, transactions = q.get(timeout=5)
+                except queue.Empty:
+                    continue
             else:
                 # If we're not the first task, we should poll to see if we get any data.
                 try:
@@ -389,7 +394,9 @@ async def consumer_impl(
                 # os._exit(1)
             last_fetched_version = transactions[-1].version
             transaction_batches.append(transactions)
-
+        if len(transaction_batches) == 0:
+            # continue to check producer_thread.is_alive()
+            continue
         processor_threads = []
         for transactions in transaction_batches:
             thread = IndexerProcessorServer.WorkerThread(
