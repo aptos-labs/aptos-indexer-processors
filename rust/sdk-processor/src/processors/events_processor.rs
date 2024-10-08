@@ -113,7 +113,7 @@ impl EventsProcessor {
         .connect_to(order_step.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
-
+        
         // (Optional) Parse the results
         loop {
             match buffer_receiver.recv().await {
