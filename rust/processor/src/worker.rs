@@ -114,6 +114,18 @@ bitflags! {
     }
 }
 
+impl TableFlags {
+    pub fn from_set(set: &HashSet<String>) -> Self {
+        let mut flags = TableFlags::empty();
+        for table in set {
+            if let Some(flag) = TableFlags::from_name(table) {
+                flags |= flag;
+            }
+        }
+        flags
+    }
+}
+
 pub struct Worker {
     pub db_pool: ArcDbPool,
     pub processor_config: ProcessorConfig,

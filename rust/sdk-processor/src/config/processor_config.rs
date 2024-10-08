@@ -1,5 +1,6 @@
-use crate::processors::events_processor::EventsProcessorConfig;
+use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// This enum captures the configs for all the different processors that are defined.
 ///
@@ -34,7 +35,8 @@ use serde::{Deserialize, Serialize};
     strum(serialize_all = "snake_case")
 )]
 pub enum ProcessorConfig {
-    EventsProcessor(EventsProcessorConfig),
+    EventsProcessor(DefaultProcessorConfig),
+    FungibleAssetProcessor(DefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -44,33 +46,23 @@ impl ProcessorConfig {
         self.into()
     }
 }
-#[derive(Debug)]
-// To ensure that the variants of ProcessorConfig and Processor line up, in the testing
-// build path we derive EnumDiscriminants on this enum as well and make sure the two
-// sets of variants match up in `test_processor_names_complete`.
-#[cfg_attr(
-    test,
-    derive(strum::EnumDiscriminants),
-    strum_discriminants(
-        derive(strum::EnumVariantNames),
-        name(ProcessorDiscriminants),
-        strum(serialize_all = "snake_case")
-    )
-)]
-pub enum Processor {
-    EventsProcessor,
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DefaultProcessorConfig {
+    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
+    #[serde(default = "AHashMap::new")]
+    pub per_table_chunk_sizes: AHashMap<String, usize>,
+    // Size of channel between steps
+    #[serde(default = "DefaultProcessorConfig::default_channel_size")]
+    pub channel_size: usize,
+    // String vector for deprecated tables to skip db writes
+    #[serde(default)]
+    pub deprecated_tables: HashSet<String>,
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use strum::VariantNames;
-
-    /// This test exists to make sure that when a new processor is added, it is added
-    /// to both Processor and ProcessorConfig. To make sure this passes, make sure the
-    /// variants are in the same order (lexicographical) and the names match.
-    #[test]
-    fn test_processor_names_complete() {
-        assert_eq!(ProcessorName::VARIANTS, ProcessorDiscriminants::VARIANTS);
+impl DefaultProcessorConfig {
+    pub const fn default_channel_size() -> usize {
+        10
     }
 }

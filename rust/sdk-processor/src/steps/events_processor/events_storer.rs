@@ -1,6 +1,6 @@
 use crate::{
+    config::processor_config::DefaultProcessorConfig,
     db::common::models::events_models::events::EventModel,
-    processors::events_processor::EventsProcessorConfig,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -24,11 +24,11 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    processor_config: EventsProcessorConfig,
+    processor_config: DefaultProcessorConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool, processor_config: EventsProcessorConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, processor_config: DefaultProcessorConfig) -> Self {
         Self {
             conn_pool,
             processor_config,
@@ -58,14 +58,14 @@ fn insert_events_query(
 
 #[async_trait]
 impl Processable for EventsStorer {
-    type Input = EventModel;
-    type Output = EventModel;
+    type Input = Vec<EventModel>;
+    type Output = ();
     type RunType = AsyncRunType;
 
     async fn process(
         &mut self,
-        events: TransactionContext<EventModel>,
-    ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
+        events: TransactionContext<Vec<EventModel>>,
+    ) -> Result<Option<TransactionContext<()>>, ProcessorError> {
         // tracing::info!(
         //     start_version = events.start_version,
         //     end_version = events.end_version,
@@ -85,14 +85,17 @@ impl Processable for EventsStorer {
             Ok(_) => {
                 debug!(
                     "Events version [{}, {}] stored successfully",
-                    events.start_version, events.end_version
+                    events.metadata.start_version, events.metadata.end_version
                 );
-                Ok(Some(events))
+                Ok(Some(TransactionContext {
+                    data: (),
+                    metadata: events.metadata,
+                }))
             },
             Err(e) => Err(ProcessorError::DBStoreError {
                 message: format!(
                     "Failed to store events versions {} to {}: {:?}",
-                    events.start_version, events.end_version, e,
+                    events.metadata.start_version, events.metadata.end_version, e,
                 ),
                 // TODO: fix it with a debug_query.
                 query: None,
