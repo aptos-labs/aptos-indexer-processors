@@ -99,19 +99,33 @@ impl Signature {
             SignatureEnum::FeePayer(_) => String::from("fee_payer_signature"),
             SignatureEnum::SingleSender(sender) => {
                 let account_signature = sender.sender.as_ref().unwrap();
-                let signature = account_signature.signature.as_ref().unwrap();
+                let signature = account_signature.signature.as_ref();
                 match signature {
-                    AccountSignatureEnum::Ed25519(_) => String::from("ed25519_signature"),
-                    AccountSignatureEnum::MultiEd25519(_) => {
+                    Some(AccountSignatureEnum::Ed25519(_)) => String::from("ed25519_signature"),
+                    Some(AccountSignatureEnum::MultiEd25519(_)) => {
                         String::from("multi_ed25519_signature")
                     },
-                    AccountSignatureEnum::SingleKeySignature(_) => {
+                    Some(AccountSignatureEnum::SingleKeySignature(_)) => {
                         String::from("single_key_signature")
                     },
-                    AccountSignatureEnum::MultiKeySignature(_) => {
+                    Some(AccountSignatureEnum::MultiKeySignature(_)) => {
                         String::from("multi_key_signature")
                     },
-                }
+                    None => String::from("unknown_signature")
+                 }
+                // let signature = account_signature.signature.as_ref().unwrap();
+                // match signature {
+                //     AccountSignatureEnum::Ed25519(_) => String::from("ed25519_signature"),
+                //     AccountSignatureEnum::MultiEd25519(_) => {
+                //         String::from("multi_ed25519_signature")
+                //     },
+                //     AccountSignatureEnum::SingleKeySignature(_) => {
+                //         String::from("single_key_signature")
+                //     },
+                //     AccountSignatureEnum::MultiKeySignature(_) => {
+                //         String::from("multi_key_signature")
+                //     },
+                // }
             },
         }
     }
