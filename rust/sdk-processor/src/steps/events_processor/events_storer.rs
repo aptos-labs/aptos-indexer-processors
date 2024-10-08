@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::{
     db::common::models::events_models::events::EventModel,
     processors::events_processor::EventsProcessorConfig,
@@ -72,6 +73,10 @@ impl Processable for EventsStorer {
         //     step_name = self.name(),
         //     "Processing versions",
         // );
+        println!(
+            "Processing versions {} to {} {}",
+            events.start_version, events.end_version, events.data.len(),
+        );
         let per_table_chunk_sizes: AHashMap<String, usize> =
             self.processor_config.per_table_chunk_sizes.clone();
         let execute_res = execute_in_chunks(
@@ -83,6 +88,12 @@ impl Processable for EventsStorer {
         .await;
         match execute_res {
             Ok(_) => {
+                println!(
+                    "Events version {} to {} stored successfully",
+                    events.start_version, events.end_version
+                );
+                tokio::time::sleep(Duration::from_millis(1000)).await;
+
                 debug!(
                     "Events version [{}, {}] stored successfully",
                     events.start_version, events.end_version

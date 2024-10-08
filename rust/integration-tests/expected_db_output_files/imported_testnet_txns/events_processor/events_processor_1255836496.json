@@ -18,7 +18,7 @@
     "account_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
     "transaction_version": 1255836496,
     "transaction_block_height": 295534162,
-    "type_": "0x1::coin::DepositEvent",
+    "type_": "0x1::coin::DepositEventgi",
     "data": {
       "amount": "300000"
     },

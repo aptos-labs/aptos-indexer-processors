@@ -76,6 +76,7 @@ impl EventsProcessor {
         // (Optional) Run migrations
         match self.config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
+                println!("Running migrations");
                 run_migrations(
                     postgres_config.connection_string.clone(),
                     self.db_pool.clone(),
@@ -84,9 +85,13 @@ impl EventsProcessor {
             },
         }
 
+        // can we log the schema
+        // let schema = self.db_pool.get().await?.schema().to_string();
+        // println!("Schema: {}", schema);
+
         // (Optional) Merge the starting version from config and the latest processed version from the DB
         let starting_version = get_starting_version(&self.config, self.db_pool.clone()).await?;
-
+        
         // (Optional) Check and update the ledger chain id to ensure we're indexing the correct chain
         let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())
             .await?
@@ -120,11 +125,14 @@ impl EventsProcessor {
         .connect_to(events_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
-
+        
         // (Optional) Parse the results
         loop {
+            println!("Processing transactions");
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
+                    println!("Received transactions");
+
                     if txn_context.data.is_empty() {
                         continue;
                     }

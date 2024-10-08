@@ -13,6 +13,9 @@ pub struct EventsProcessorTestHelper;
 
 impl ProcessorTestHelper for EventsProcessorTestHelper {
     fn load_data(&self, conn: &mut PgConnection, txn_version: &str) -> Result<Value> {
+        let events_res = diesel::sql_query("SELECT * FROM events").execute(conn).expect("Failed to execute query");
+        println!("Queried {} event(s)", events_res);
+
         let events_result = events
             .filter(transaction_version.eq(txn_version.parse::<i64>().unwrap()))
             .then_order_by(event_index.asc())
@@ -20,6 +23,7 @@ impl ProcessorTestHelper for EventsProcessorTestHelper {
 
         let all_events = events_result?;
         let json_data = serde_json::to_string_pretty(&all_events)?;
+        
         Ok(serde_json::from_str(&json_data)?)
     }
 }

@@ -280,6 +280,10 @@ pub async fn run_migrations(postgres_connection_string: String, _conn_pool: ArcD
     let mut conn =
         PgConnection::establish(&postgres_connection_string).expect("migrations failed!");
     run_pending_migrations(&mut conn);
+    println!(
+        "Migration time: {}",
+        migration_time.elapsed().as_secs_f64()
+    );
     tracing::info!(
         duration_in_secs = migration_time.elapsed().as_secs_f64(),
         "[Parser] Finished migrations"

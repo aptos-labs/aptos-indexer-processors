@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use ahash::AHashMap;
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::events_processor::EventsProcessor;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
 use aptos_indexer_processor_sdk_server_framework::RunnableConfig;
 use serde::{Deserialize, Serialize};
+use processor::utils::database::ArcDbPool;
+use processor::worker::{build_processor, TableFlags};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
