@@ -11,11 +11,8 @@ use integration_tests::{
 };
 use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
 use std::{fs, path::PathBuf, sync::Arc};
-// use aptos_indexer_test_transactions::{
-//     ALL_SCRIPTED_TRANSACTIONS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
-// };
-use testing_transactions::{
-    ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
+use aptos_indexer_test_transactions::{
+    ALL_SCRIPTED_TRANSACTIONS, ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS,
 };
 
 const IMPORTED_TESTNET_FOLDER: &str = "expected_db_output_files/imported_testnet_txns";
@@ -97,28 +94,6 @@ impl IndexerCliArgs {
 
                     // Clone the root folder so it can be used inside the closure
                     let output_folder = root_folder.clone();
-
-                    // Precompute the transaction names before the closure
-                    // let txn_names_map: HashMap<String, String> = test_context
-                    //     .transaction_batches
-                    //     .iter()
-                    //     .map(|txn| {
-                    //         let version = txn.version.to_string();
-                    //         let name = test_context
-                    //             .(&version)
-                    //             .unwrap_or_else(|| "unknown".to_string());
-                    //         (version, name)
-                    //     })
-                    //     .collect(); // Collect into a HashMap of version -> name
-                    // test_context.transaction_batches.iter().map(|txn| {
-                    //
-                    //     // let version = txn.version.to_string();
-                    //     // let name = test_context
-                    //     //     .transaction_names
-                    //     //     .get(&version)
-                    //     //     .unwrap_or_else(|| "unknown".to_string());
-                    //     // (version, name)
-                    // }).collect::<HashMap<String, String>>(
 
                     let cloned_test_context_name = test_context_name.clone();
                     let result = test_context
