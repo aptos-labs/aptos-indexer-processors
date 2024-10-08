@@ -66,6 +66,7 @@ impl Processable for EventsExtractor {
             })
             .flatten()
             .collect::<Vec<EventModel>>();
+            
         Ok(Some(TransactionContext {
             data: events,
             start_version: item.start_version,
