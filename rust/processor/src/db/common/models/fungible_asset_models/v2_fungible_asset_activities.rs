@@ -103,14 +103,16 @@ impl FungibleAssetActivity {
                 },
             };
 
-            // The event account address will also help us find fungible store which tells us where to find
-            // the metadata
+            // Lookup the event address in the object_aggregated_data_mapping to get additional metadata
+            // The events are emitted on the address of the fungible store.
             let maybe_object_metadata = object_aggregated_data_mapping.get(&storage_id);
-            // The ObjectCore might not exist in the transaction if the object got deleted
+            // Get the store's owner address from ObjectCore.
+            // The ObjectCore might not exist in the transaction if the object got deleted in the same transaction
             let maybe_owner_address = maybe_object_metadata
                 .map(|metadata| &metadata.object.object_core)
                 .map(|object_core| object_core.get_owner_address());
-            // The FungibleStore might not exist in the transaction if it's a secondary store that got burnt
+            // Get the store's asset type
+            // The FungibleStore might not exist in the transaction if it's a secondary store that got burnt in the same transaction
             let maybe_asset_type = maybe_object_metadata
                 .and_then(|metadata| metadata.fungible_asset_store.as_ref())
                 .map(|fa| fa.metadata.get_reference_address());
