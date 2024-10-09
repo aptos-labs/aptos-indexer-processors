@@ -9,6 +9,13 @@ use testcontainers::{
     runners::AsyncRunner,
     ContainerAsync, GenericImage, ImageExt,
 };
+use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
+use sdk_processor::{
+    config::{
+        db_config::{DbConfig, PostgresConfig},
+    },
+    schema::events::dsl::*,
+};use url::Url;
 
 pub struct SdkTestContext {
     pub transaction_batches: Vec<Transaction>,
@@ -69,6 +76,37 @@ impl SdkTestContext {
             println!("Starting Mock GRPC server");
             mock_grpc_server.run().await;
         });
+    }
+
+    /// Helper function to create TransactionStreamConfig and DbConfig, now part of SdkTestContext.
+    pub async fn create_transaction_and_db_config(
+        &self,
+        starting_version: Option<u64>,
+        ending_version: Option<u64>,
+    ) -> (TransactionStreamConfig, DbConfig) {
+        let db_url = self.get_db_url().await;
+
+        let transaction_stream_config = TransactionStreamConfig {
+            indexer_grpc_data_service_address: Url::parse("http://localhost:51254")
+                .expect("Could not parse database url"),
+            starting_version, // dynamically pass the starting version
+            request_ending_version: ending_version, // dynamically pass the ending version
+            auth_token: "".to_string(),
+            request_name_header: "sdk testing".to_string(),
+            indexer_grpc_http2_ping_interval_secs: 30,
+            indexer_grpc_http2_ping_timeout_secs: 10,
+            indexer_grpc_reconnection_timeout_secs: 10,
+            indexer_grpc_response_item_timeout_secs: 60,
+        };
+
+        let postgres_config = PostgresConfig {
+            connection_string: db_url.to_string(),
+            db_pool_size: 100,
+        };
+
+        let db_config = DbConfig::PostgresConfig(postgres_config);
+
+        (transaction_stream_config, db_config)
     }
 
     pub async fn run<F>(
