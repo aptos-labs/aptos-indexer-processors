@@ -38,10 +38,20 @@ impl RawData for MockGrpcServer {
                     println!("Checking transaction version: {}", tx.version);
                     tx.version == version
                 })
-            })
-            .expect("Transaction not found");
+            });
 
-        let mut response = transaction.clone();
+        let result = match transaction {
+            Some(t) => t.clone(),
+            None => {
+                // just return what we have in self.transactions
+                self.transactions[0].clone()
+            }
+        } ;
+
+
+        // let mut response = transaction.clone();
+        // response.chain_id = Some(self.chain_id); // Set chain_id in the response
+        let mut response = result.clone();
         response.chain_id = Some(self.chain_id); // Set chain_id in the response
 
         let stream = futures::stream::iter(vec![Ok(response)]);
