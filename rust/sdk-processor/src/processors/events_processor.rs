@@ -21,8 +21,16 @@ use aptos_indexer_processor_sdk::{
     common_steps::TransactionStreamStep,
     traits::IntoRunnableStep,
 };
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use std::fmt::Debug;
+use tracing::{info, debug};
+
+
+#[async_trait]
+pub trait ProcessorTrait: Send + Sync {
+    async fn run_processor(&self) -> anyhow::Result<()>;
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -69,10 +77,95 @@ impl EventsProcessor {
             },
         }
     }
+    //
+    // pub async fn run_processor(self) -> Result<()> {
+    //     let processor_name = self.config.processor_config.name();
+    //
+    //     // (Optional) Run migrations
+    //     match self.config.db_config {
+    //         DbConfig::PostgresConfig(ref postgres_config) => {
+    //             println!("Running migrations");
+    //             run_migrations(
+    //                 postgres_config.connection_string.clone(),
+    //                 self.db_pool.clone(),
+    //             )
+    //             .await;
+    //         },
+    //     }
+    //
+    //     // can we log the schema
+    //     // let schema = self.db_pool.get().await?.schema().to_string();
+    //     // println!("Schema: {}", schema);
+    //
+    //     // (Optional) Merge the starting version from config and the latest processed version from the DB
+    //     let starting_version = get_starting_version(&self.config, self.db_pool.clone()).await?;
+    //     println!("Starting version: {:?}", starting_version);
+    //
+    //     // (Optional) Check and update the ledger chain id to ensure we're indexing the correct chain
+    //     let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())
+    //         .await?
+    //         .get_chain_id()
+    //         .await?;
+    //     check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
+    //     println!("Chain ID: {:?}", grpc_chain_id);
+    //     let ProcessorConfig::EventsProcessor(events_processor_config) =
+    //         self.config.processor_config;
+    //     let channel_size = events_processor_config.channel_size;
+    //
+    //     // Define processor steps
+    //     let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
+    //         starting_version: Some(starting_version),
+    //         ..self.config.transaction_stream_config
+    //     })
+    //     .await?;
+    //
+    //     println!("Transaction stream created with starting version: {:?}", starting_version);
+    //     let events_extractor = EventsExtractor {};
+    //     let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
+    //     let version_tracker = LatestVersionProcessedTracker::new(
+    //         self.db_pool.clone(),
+    //         starting_version,
+    //         processor_name.to_string(),
+    //     );
+    //
+    //     // Connect processor steps together
+    //     let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
+    //         transaction_stream.into_runnable_step(),
+    //     )
+    //     .connect_to(events_extractor.into_runnable_step(), channel_size)
+    //     .connect_to(events_storer.into_runnable_step(), channel_size)
+    //     .connect_to(version_tracker.into_runnable_step(), channel_size)
+    //     .end_and_return_output_receiver(channel_size);
+    //
+    //     // (Optional) Parse the results
+    //     loop {
+    //         println!("Processing transactions");
+    //         match buffer_receiver.recv().await {
+    //             Ok(txn_context) => {
+    //                 println!("Received transactions");
+    //
+    //                 if txn_context.data.is_empty() {
+    //                     continue;
+    //                 }
+    //                 debug!(
+    //                     "Finished processing events from versions [{:?}, {:?}]",
+    //                     txn_context.start_version, txn_context.end_version,
+    //                 );
+    //             },
+    //             Err(e) => {
+    //                 info!("No more transactions in channel: {:?}", e);
+    //                 break Ok(());
+    //             },
+    //         }
+    //     }
+    // }
+}
 
-    pub async fn run_processor(self) -> Result<()> {
+#[async_trait]
+impl ProcessorTrait for EventsProcessor {
+    async fn run_processor(&self) -> Result<()> {
         let processor_name = self.config.processor_config.name();
-
+        println!("Processor name: {:?}", processor_name);
         // (Optional) Run migrations
         match self.config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
@@ -91,24 +184,37 @@ impl EventsProcessor {
 
         // (Optional) Merge the starting version from config and the latest processed version from the DB
         let starting_version = get_starting_version(&self.config, self.db_pool.clone()).await?;
-        
+        println!("Starting version: {:?}", starting_version);
+
         // (Optional) Check and update the ledger chain id to ensure we're indexing the correct chain
         let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())
             .await?
             .get_chain_id()
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
+        println!("Chain ID: {:?}", grpc_chain_id);
 
         let ProcessorConfig::EventsProcessor(events_processor_config) =
-            self.config.processor_config;
+            self.config.processor_config.clone();
         let channel_size = events_processor_config.channel_size;
 
         // Define processor steps
+        let txn_config = TransactionStreamConfig {
+            starting_version: Some(starting_version),
+            ..self.config.transaction_stream_config.clone()
+        };
+        println!("Transaction stream config: {:?}", txn_config);
+
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
-            ..self.config.transaction_stream_config
+            ..txn_config
         })
         .await?;
+
+        println!(
+            "Transaction stream created with starting version: {:?}",
+            starting_version
+        );
         let events_extractor = EventsExtractor {};
         let events_storer = EventsStorer::new(self.db_pool.clone(), events_processor_config);
         let version_tracker = LatestVersionProcessedTracker::new(
@@ -125,7 +231,7 @@ impl EventsProcessor {
         .connect_to(events_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
-        
+
         // (Optional) Parse the results
         loop {
             println!("Processing transactions");
@@ -149,3 +255,23 @@ impl EventsProcessor {
         }
     }
 }
+
+// this is required for easier validation for the testing
+// impl ProcessorTestHelper for EventsProcessor {
+//     fn load_data(&self, _conn: &mut PgConnection, _txn_version: &str) -> Result<Value> {
+//         // let events_res = diesel::sql_query("SELECT * FROM events").execute(conn).expect("Failed to execute query");
+//         // println!("Queried {} event(s)", events_res);
+//
+//         // let events_result = events
+//         //     .filter(transaction_version.eq(txn_version.parse::<i64>().unwrap()))
+//         //     .then_order_by(event_index.asc())
+//         //     .load::<Event>(conn);
+//         //
+//         // let all_events = events_result?;
+//         // let json_data = serde_json::to_string_pretty(&all_events)?;
+//
+//         Ok(serde_json::from_str(&"json_data")?)
+//     }
+
+// }
+//

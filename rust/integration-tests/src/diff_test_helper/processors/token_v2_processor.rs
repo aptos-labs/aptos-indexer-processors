@@ -1,4 +1,4 @@
-use crate::{diff_test_helper::ProcessorTestHelper, models::queryable_models::TokenActivityV2};
+use crate::models::queryable_models::TokenActivityV2;
 use anyhow::Result;
 use diesel::{
     pg::PgConnection,
@@ -7,6 +7,7 @@ use diesel::{
 };
 use processor::schema::token_activities_v2::dsl::*;
 use serde_json::Value;
+use test_utils::ProcessorTestHelper;
 
 pub struct TokenV2ProcessorTestHelper;
 

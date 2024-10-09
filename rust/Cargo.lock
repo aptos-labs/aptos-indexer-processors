@@ -2260,6 +2260,7 @@ dependencies = [
  "serde_canonical_json",
  "serde_json",
  "tempfile",
+ "test-utils",
  "testcontainers",
  "testing-transactions",
  "tokio",
@@ -4176,6 +4177,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "strum",
+ "test-utils",
  "tiny-keccak",
  "tokio",
  "tokio-postgres",
@@ -4684,6 +4686,15 @@ name = "termtree"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
+
+[[package]]
+name = "test-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "diesel",
+ "serde_json",
+]
 
 [[package]]
 name = "testcontainers"

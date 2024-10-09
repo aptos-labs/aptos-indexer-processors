@@ -1,4 +1,3 @@
-use std::time::Duration;
 use crate::{
     db::common::models::events_models::events::EventModel,
     processors::events_processor::EventsProcessorConfig,
@@ -18,6 +17,7 @@ use diesel::{
     ExpressionMethods,
 };
 use processor::schema;
+use std::time::Duration;
 use tracing::debug;
 
 pub struct EventsStorer
@@ -75,7 +75,9 @@ impl Processable for EventsStorer {
         // );
         println!(
             "Processing versions {} to {} {}",
-            events.start_version, events.end_version, events.data.len(),
+            events.start_version,
+            events.end_version,
+            events.data.len(),
         );
         let per_table_chunk_sizes: AHashMap<String, usize> =
             self.processor_config.per_table_chunk_sizes.clone();

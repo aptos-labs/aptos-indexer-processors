@@ -1,4 +1,4 @@
-use crate::{diff_test_helper::ProcessorTestHelper, models::queryable_models::Event};
+use crate::models::queryable_models::Event; //diff_test_helper::ProcessorTestHelper,
 use anyhow::Result;
 use diesel::{
     pg::PgConnection,
@@ -7,13 +7,16 @@ use diesel::{
 };
 use processor::schema::events::dsl::*;
 use serde_json::Value;
+use test_utils::ProcessorTestHelper;
 
 // Example implementation for the EventsProcessor
 pub struct EventsProcessorTestHelper;
 
 impl ProcessorTestHelper for EventsProcessorTestHelper {
     fn load_data(&self, conn: &mut PgConnection, txn_version: &str) -> Result<Value> {
-        let events_res = diesel::sql_query("SELECT * FROM events").execute(conn).expect("Failed to execute query");
+        let events_res = diesel::sql_query("SELECT * FROM events")
+            .execute(conn)
+            .expect("Failed to execute query");
         println!("Queried {} event(s)", events_res);
 
         let events_result = events
@@ -23,7 +26,7 @@ impl ProcessorTestHelper for EventsProcessorTestHelper {
 
         let all_events = events_result?;
         let json_data = serde_json::to_string_pretty(&all_events)?;
-        
+
         Ok(serde_json::from_str(&json_data)?)
     }
 }

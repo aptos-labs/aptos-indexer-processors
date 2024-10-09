@@ -3,13 +3,10 @@
 mod test {
 
     use crate::{
-        diff_test_helper::{
-            processors::{
-                event_processor::EventsProcessorTestHelper,
-                fungible_asset_processor::FungibleAssetProcessorTestHelper,
-                token_v2_processor::TokenV2ProcessorTestHelper,
-            },
-            ProcessorTestHelper,
+        diff_test_helper::processors::{
+            event_processor::EventsProcessorTestHelper,
+            fungible_asset_processor::FungibleAssetProcessorTestHelper,
+            token_v2_processor::TokenV2ProcessorTestHelper,
         },
         diff_tests::{
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
@@ -24,7 +21,7 @@ mod test {
     use diesel::pg::PgConnection;
     use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
     use std::{collections::HashMap, fs, sync::Arc};
-
+    use test_utils::ProcessorTestHelper;
     #[tokio::test]
     async fn test_all_testnet_txns_schema_output_for_all_processors() {
         let processor_configs = get_processor_configs();

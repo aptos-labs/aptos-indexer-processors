@@ -31,14 +31,13 @@ impl Processable for EventsExtractor {
         //     step_name = self.name(),
         //     "Processing versions",
         // );
+        println!("poll item: {:?}", item.start_version);
         let events = item
             .data
             .par_iter()
             .with_min_len(MIN_TRANSACTIONS_PER_RAYON_JOB)
             .map(|txn| {
-                println!(
-                    "txn: {:?}", txn
-                );
+                // println!("txn: {:?}", txn);
                 let mut events = vec![];
                 let txn_version = txn.version as i64;
                 let block_height = txn.block_height as i64;
@@ -47,9 +46,6 @@ impl Processable for EventsExtractor {
                     None => {
                         warn!(
                             transaction_version = txn_version,
-                            "Transaction data doesn't exist"
-                        );
-                        println!(
                             "Transaction data doesn't exist"
                         );
                         // PROCESSOR_UNKNOWN_TYPE_COUNT
@@ -72,9 +68,6 @@ impl Processable for EventsExtractor {
             })
             .flatten()
             .collect::<Vec<EventModel>>();
-        println!(
-            "events: {:?}", events
-        );
 
         Ok(Some(TransactionContext {
             data: events,

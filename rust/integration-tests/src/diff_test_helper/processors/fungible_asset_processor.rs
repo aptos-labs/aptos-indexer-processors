@@ -1,6 +1,4 @@
-use crate::{
-    diff_test_helper::ProcessorTestHelper, models::queryable_models::FungibleAssetActivity,
-};
+use crate::models::queryable_models::FungibleAssetActivity;
 use anyhow::Result;
 use diesel::{
     pg::PgConnection,
@@ -9,6 +7,7 @@ use diesel::{
 };
 use processor::schema::fungible_asset_activities::dsl::*;
 use serde_json::Value;
+use test_utils::ProcessorTestHelper;
 
 pub struct FungibleAssetProcessorTestHelper;
 
