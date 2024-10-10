@@ -1,7 +1,9 @@
 use super::database::ArcDbPool;
-use crate::config::indexer_processor_config::IndexerProcessorConfig;
+use crate::{
+    config::indexer_processor_config::IndexerProcessorConfig,
+    db::common::models::processor_status::ProcessorStatusQuery,
+};
 use anyhow::{Context, Result};
-use processor::db::common::models::processor_status::ProcessorStatusQuery;
 
 pub async fn get_starting_version(
     indexer_processor_config: &IndexerProcessorConfig,
@@ -25,8 +27,7 @@ pub async fn get_starting_version(
             .await
             .context("Failed to get latest processed version from DB")?;
     if let Some(latest_processed_version_tracker) = latest_processed_version_from_db {
-        // Add +1 to start from the version after the last successful version
-        return Ok(latest_processed_version_tracker + 1);
+        return Ok(latest_processed_version_tracker);
     }
 
     // If latest_processed_version is not stored in DB, return the default 0
@@ -46,7 +47,7 @@ pub async fn get_latest_processed_version_from_db(
     )
     .await?
     {
-        Some(status) => Ok(Some(status.last_success_version as u64)),
+        Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
         None => Ok(None),
     }
 }

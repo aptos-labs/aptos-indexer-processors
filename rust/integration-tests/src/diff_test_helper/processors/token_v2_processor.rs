@@ -7,7 +7,7 @@ use diesel::{
 };
 use processor::schema::token_activities_v2::dsl::*;
 use serde_json::Value;
-use test_utils::ProcessorTestHelper;
+use crate::diff_test_helper::ProcessorTestHelper;
 
 pub struct TokenV2ProcessorTestHelper;
 

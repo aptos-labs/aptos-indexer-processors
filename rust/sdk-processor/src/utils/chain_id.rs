@@ -1,7 +1,9 @@
 use super::database::ArcDbPool;
-use crate::utils::database::execute_with_better_error_conn;
+use crate::{
+    db::common::models::ledger_info::LedgerInfo, schema::ledger_infos,
+    utils::database::execute_with_better_error_conn,
+};
 use anyhow::{Context, Result};
-use processor::{db::common::models::ledger_info::LedgerInfo, schema::ledger_infos};
 use tracing::info;
 
 /// Verify the chain id from GRPC against the database.

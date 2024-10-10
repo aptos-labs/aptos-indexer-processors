@@ -1,6 +1,6 @@
 use crate::{
-    db::common::models::events_models::events::EventModel,
-    processors::events_processor::EventsProcessorConfig,
+    db::common::models::events_models::EventModel,
+    schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -16,24 +16,19 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use processor::schema;
-use std::time::Duration;
-use tracing::debug;
+use tracing::{error, info};
 
+/// EventsStorer is a step that inserts events in the database.
 pub struct EventsStorer
 where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    processor_config: EventsProcessorConfig,
 }
 
 impl EventsStorer {
-    pub fn new(conn_pool: ArcDbPool, processor_config: EventsProcessorConfig) -> Self {
-        Self {
-            conn_pool,
-            processor_config,
-        }
+    pub fn new(conn_pool: ArcDbPool) -> Self {
+        Self { conn_pool }
     }
 }
 
@@ -59,28 +54,15 @@ fn insert_events_query(
 
 #[async_trait]
 impl Processable for EventsStorer {
-    type Input = EventModel;
-    type Output = EventModel;
+    type Input = Vec<EventModel>;
+    type Output = Vec<EventModel>;
     type RunType = AsyncRunType;
 
     async fn process(
         &mut self,
-        events: TransactionContext<EventModel>,
-    ) -> Result<Option<TransactionContext<EventModel>>, ProcessorError> {
-        // tracing::info!(
-        //     start_version = events.start_version,
-        //     end_version = events.end_version,
-        //     step_name = self.name(),
-        //     "Processing versions",
-        // );
-        println!(
-            "Processing versions {} to {} {}",
-            events.start_version,
-            events.end_version,
-            events.data.len(),
-        );
-        let per_table_chunk_sizes: AHashMap<String, usize> =
-            self.processor_config.per_table_chunk_sizes.clone();
+        events: TransactionContext<Vec<EventModel>>,
+    ) -> Result<Option<TransactionContext<Vec<EventModel>>>, ProcessorError> {
+        let per_table_chunk_sizes: AHashMap<String, usize> = AHashMap::new();
         let execute_res = execute_in_chunks(
             self.conn_pool.clone(),
             insert_events_query,
@@ -90,27 +72,16 @@ impl Processable for EventsStorer {
         .await;
         match execute_res {
             Ok(_) => {
-                println!(
-                    "Events version {} to {} stored successfully",
-                    events.start_version, events.end_version
-                );
-                tokio::time::sleep(Duration::from_millis(1000)).await;
-
-                debug!(
+                info!(
                     "Events version [{}, {}] stored successfully",
-                    events.start_version, events.end_version
+                    events.metadata.start_version, events.metadata.end_version
                 );
-                Ok(Some(events))
-            },
-            Err(e) => Err(ProcessorError::DBStoreError {
-                message: format!(
-                    "Failed to store events versions {} to {}: {:?}",
-                    events.start_version, events.end_version, e,
-                ),
-                // TODO: fix it with a debug_query.
-                query: None,
-            }),
+            }
+            Err(e) => {
+                error!("Failed to store events: {:?}", e);
+            }
         }
+        Ok(Some(events))
     }
 }
 

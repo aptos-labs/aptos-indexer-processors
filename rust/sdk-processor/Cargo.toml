@@ -35,7 +35,6 @@ tiny-keccak = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
-test-utils = { workspace = true }
 
 # Postgres SSL support
 native-tls = { workspace = true }

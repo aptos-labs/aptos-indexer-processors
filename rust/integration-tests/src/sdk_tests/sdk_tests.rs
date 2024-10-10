@@ -1,42 +1,49 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        models::queryable_models::Event, sdk::sdk_test_context,
-        DiffTest, TestType,
-    };
-    use ahash::AHashMap;
+    use std::fs;
+    use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
     use aptos_indexer_test_transactions::IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_;
-    use aptos_protos::transaction::v1::Transaction;
+    use assert_json_diff::assert_json_eq;
     use diesel::{pg::PgConnection, RunQueryDsl};
     use sdk_processor::{
         config::{
             indexer_processor_config::IndexerProcessorConfig,
             processor_config::ProcessorConfig,
         },
-        processors::events_processor::{EventsProcessor, EventsProcessorConfig},
+        processors::events::events_processor::{EventsProcessor},
         schema::events::dsl::*,
     };
+    use testing_framework::new_test_context::{PostgresTestDatabase, SdkTestContext, TestDatabase};
+    use sdk_processor::config::indexer_processor_config::DbConfig;
+    use diesel::Connection;
+    use crate::diff_test_helper::processors::event_processor::EventsProcessorTestHelper;
+    use crate::diff_test_helper::ProcessorTestHelper;
+    use crate::diff_tests::{remove_inserted_at, remove_transaction_timestamp};
 
     #[tokio::test]
     async fn test_run() {
         // Step 1: set up an input transaction that will be used
         let imported_txns = [IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_];
-        let txn: Transaction = serde_json::from_slice(IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_).unwrap();
-        
-        let test_context = sdk_test_context::SdkTestContext::new(&imported_txns)
+
+        let txn_version = 1255836496; // TOOD: more elegant way to get this
+
+        // custom db setup
+        let db = PostgresTestDatabase::new();
+
+        // test context setup
+        let test_context = SdkTestContext::new(&imported_txns, db)
             .await
             .unwrap();
-        
-        // Step 2: build processor config
-        let (transaction_stream_config, db_config) = test_context.create_transaction_and_db_config(Some(txn.version), Some(txn.version)).await;
-        
-        let events_processor_config = EventsProcessorConfig {
-            channel_size: 10,
-            per_table_chunk_sizes: AHashMap::new(),
+
+        // Step 2: build a custom processor
+        let processor_config = ProcessorConfig::EventsProcessor;
+        let transaction_stream_config = test_context.create_transaction_stream_config(1255836496, 1255836496);
+
+        let db_config = DbConfig {
+            postgres_connection_string: test_context.database.get_db_url(),
+            db_pool_size: 100,
         };
 
-        let processor_config = ProcessorConfig::EventsProcessor(events_processor_config);
-        
         let indexer_processor_config = IndexerProcessorConfig {
             processor_config,
             transaction_stream_config,
@@ -46,33 +53,82 @@ mod tests {
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
             .expect("Failed to create EventsProcessor");
-        
-        // Not going to expose this. 
-        let test_type = TestType::Diff(DiffTest);
 
-        test_context
+
+        let custom_output_path = Some("custom_output_path/test_results.json".to_string());
+        let processor_name = events_processor.name();
+
+        // Step 3: run the processor with custom validation logic
+        let mut db_value = test_context
             .run(
                 &events_processor,
-                test_type,
-                move |conn: &mut PgConnection, _txn_version: &str| {
-                    // validation logic here
-                    let events_result = events.load::<Event>(conn);
+                txn_version,
+                true,   // TODO: enable a command line flag
+                custom_output_path.clone(),
+                move|db_url| {
+                    // Custom validation logic
+                    let mut conn = PgConnection::establish(&db_url).expect("Failed to establish DB connection");
+                    let test_helper = Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>;
+                    let json_data = match test_helper.load_data(&mut conn, &txn_version.to_string()) {
+                        Ok(events_json) => {
+                            events_json
+                        }
+                        Err(e) => {
+                            println!(
+                                "[ERROR] Failed to load data for processor {} and transaction version {}: {}",
+                                processor_name, "txn_version", e
+                            );
+                            return Err(e);
+                        }
+                    };
 
-                    let all_events = events_result.expect("Failed to load events");
-                    let json_data = serde_json::to_string_pretty(&all_events)
-                        .expect("Failed to serialize events");
-                    assert_eq!(
-                        all_events.len(),
-                        5,
-                        "Expected 1 event, got {}",
-                        all_events.len()
+                    println!(
+                        "[INFO] Test passed for processor {} and transaction version: {}",
+                        processor_name, txn_version
                     );
-                    println!("json data: {}", json_data);
-                    Ok(())
+                    Ok(json_data)
                 },
             )
             .await
             .unwrap();
+
+        // Additional custom validation logic can be added here
+        let mut expected_json = match read_and_parse_json(&custom_output_path.unwrap()) {
+            Ok(json) => json,
+            Err(e) => {
+                println!(
+                    "[ERROR] Error handling JSON for processor {} and transaction version {}: {}",
+                    processor_name, txn_version, e
+                );
+                panic!("Failed to read and parse JSON");
+            }
+        };
+
+        // TODO: we need to enhance json diff, as we might have more complex diffs.
+        remove_inserted_at(&mut db_value);
+        remove_transaction_timestamp(&mut db_value);
+        remove_transaction_timestamp(&mut expected_json);
+        remove_inserted_at(&mut expected_json);
+        println!("Json data: {:?}", db_value);
+        println!("Expected json: {:?}", expected_json);
+        assert_json_eq!(&db_value, &expected_json);
+
     }
-    
+
+    fn read_and_parse_json(path: &str) -> anyhow::Result<serde_json::Value> {
+        match fs::read_to_string(path) {
+            Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(json) => Ok(json),
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to parse JSON at {}: {}", path, e);
+                    Err(anyhow::anyhow!("Failed to parse JSON: {}", e))
+                },
+            },
+            Err(e) => {
+                eprintln!("[ERROR] Failed to read file at {}: {}", path, e);
+                Err(anyhow::anyhow!("Failed to read file: {}", e))
+            },
+        }
+    }
 }
+

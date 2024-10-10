@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use ahash::AHashMap;
-use aptos_indexer_processor_sdk::utils::convert::remove_null_bytes;
+use aptos_indexer_processor_sdk::utils::{convert::remove_null_bytes, errors::ProcessorError};
 use diesel::{
     query_builder::{AstPass, Query, QueryFragment, QueryId},
     ConnectionResult, QueryResult,
@@ -20,6 +20,7 @@ use diesel_async::{
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures_util::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
+use tracing::{info, warn};
 
 pub type Backend = diesel::pg::Pg;
 
@@ -28,15 +29,13 @@ pub type DbPool = Pool<MyDbConnection>;
 pub type ArcDbPool = Arc<DbPool>;
 pub type DbPoolConnection<'a> = PooledConnection<'a, MyDbConnection>;
 
-pub const MIGRATIONS: EmbeddedMigrations =
-    embed_migrations!("../processor/src/db/postgres/migrations");
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/postgres/migrations");
 
 pub const DEFAULT_MAX_POOL_SIZE: u32 = 150;
 
 #[derive(QueryId)]
-/// Using this will append a where clause at the end of the string upsert function
-///
-/// e.g.
+#[allow(clippy::too_long_first_doc_paragraph)]
+/// Using this will append a where clause at the end of the string upsert function, e.g.
 /// INSERT INTO ... ON CONFLICT DO UPDATE SET ... WHERE "transaction_version" = excluded."transaction_version"
 /// This is needed when we want to maintain a table with only the latest state
 pub struct UpsertFilterLatestTransactionQuery<T> {
@@ -131,7 +130,7 @@ pub async fn execute_in_chunks<U, T>(
     build_query: fn(Vec<T>) -> (U, Option<&'static str>),
     items_to_insert: &[T],
     chunk_size: usize,
-) -> Result<(), diesel::result::Error>
+) -> Result<(), ProcessorError>
 where
     U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send + 'static,
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone + Send + 'static,
@@ -163,7 +162,7 @@ pub async fn execute_with_better_error<U>(
     pool: ArcDbPool,
     query: U,
     mut additional_where_clause: Option<&'static str>,
-) -> QueryResult<usize>
+) -> Result<usize, ProcessorError>
 where
     U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send,
 {
@@ -178,23 +177,27 @@ where
         where_clause: additional_where_clause,
     };
     let debug_string = diesel::debug_query::<Backend, _>(&final_query).to_string();
-    tracing::debug!("Executing query: {:?}", debug_string);
     let conn = &mut pool.get().await.map_err(|e| {
-        tracing::warn!("Error getting connection from pool: {:?}", e);
-        diesel::result::Error::DatabaseError(
-            diesel::result::DatabaseErrorKind::UnableToSendCommand,
-            Box::new(e.to_string()),
-        )
+        warn!("Error getting connection from pool: {:?}", e);
+        ProcessorError::DBStoreError {
+            message: format!("{:#}", e),
+            query: Some(debug_string.clone()),
+        }
     })?;
-    let res = final_query.execute(conn).await;
-    if let Err(ref e) = res {
-        tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
-    }
-    res
+    final_query
+        .execute(conn)
+        .await
+        .inspect_err(|e| {
+            warn!("Error running query: {:?}\n{:?}", e, debug_string);
+        })
+        .map_err(|e| ProcessorError::DBStoreError {
+            message: format!("{:#}", e),
+            query: Some(debug_string),
+        })
 }
 
-/// Returns the entry for the config hashmap, or the default field count for the insert.
-///
+#[allow(clippy::too_long_first_doc_paragraph)]
+/// Returns the entry for the config hashmap, or the default field count for the insert
 /// Given diesel has a limit of how many parameters can be inserted in a single operation (u16::MAX),
 /// we default to chunk an array of items based on how many columns are in the table.
 pub fn get_config_table_chunk_size<T: field_count::FieldCount>(
@@ -226,12 +229,9 @@ where
         where_clause: additional_where_clause,
     };
     let debug_string = diesel::debug_query::<Backend, _>(&final_query).to_string();
-    tracing::debug!("Executing query: {:?}", debug_string);
-    let res = final_query.execute(conn).await;
-    if let Err(ref e) = res {
-        tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
-    }
-    res
+    final_query.execute(conn).await.inspect_err(|e| {
+        warn!("Error running query: {:?}\n{:?}", e, debug_string);
+    })
 }
 
 async fn execute_or_retry_cleaned<U, T>(
@@ -240,25 +240,25 @@ async fn execute_or_retry_cleaned<U, T>(
     items: Vec<T>,
     query: U,
     additional_where_clause: Option<&'static str>,
-) -> Result<(), diesel::result::Error>
+) -> Result<(), ProcessorError>
 where
     U: QueryFragment<Backend> + diesel::query_builder::QueryId + Send,
     T: serde::Serialize + for<'de> serde::Deserialize<'de> + Clone,
 {
     match execute_with_better_error(conn.clone(), query, additional_where_clause).await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(_) => {
             let cleaned_items = clean_data_for_db(items, true);
             let (cleaned_query, additional_where_clause) = build_query(cleaned_items);
             match execute_with_better_error(conn.clone(), cleaned_query, additional_where_clause)
                 .await
             {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     return Err(e);
-                },
+                }
             }
-        },
+        }
     }
     Ok(())
 }
@@ -275,13 +275,12 @@ pub fn run_pending_migrations<DB: diesel::backend::Backend>(conn: &mut impl Migr
 pub async fn run_migrations(postgres_connection_string: String, _conn_pool: ArcDbPool) {
     use diesel::{Connection, PgConnection};
 
-    tracing::info!("Running migrations: {:?}", postgres_connection_string);
+    info!("Running migrations: {:?}", postgres_connection_string);
     let migration_time = std::time::Instant::now();
     let mut conn =
         PgConnection::establish(&postgres_connection_string).expect("migrations failed!");
     run_pending_migrations(&mut conn);
-    println!("Migration time: {}", migration_time.elapsed().as_secs_f64());
-    tracing::info!(
+    info!(
         duration_in_secs = migration_time.elapsed().as_secs_f64(),
         "[Parser] Finished migrations"
     );
@@ -293,7 +292,7 @@ pub async fn run_migrations(postgres_connection_string: String, _conn_pool: ArcD
 pub async fn run_migrations(postgres_connection_string: String, conn_pool: ArcDbPool) {
     use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 
-    tracing::info!("Running migrations: {:?}", postgres_connection_string);
+    info!("Running migrations: {:?}", postgres_connection_string);
     let conn = conn_pool
         // We need to use this since AsyncConnectionWrapper doesn't know how to
         // work with a pooled connection.

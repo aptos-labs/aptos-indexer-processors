@@ -7,7 +7,7 @@ use diesel::{
 };
 use processor::schema::fungible_asset_activities::dsl::*;
 use serde_json::Value;
-use test_utils::ProcessorTestHelper;
+use crate::diff_test_helper::ProcessorTestHelper;
 
 pub struct FungibleAssetProcessorTestHelper;
 

@@ -1,8 +1,6 @@
-use crate::processors::events_processor::EventsProcessorConfig;
 use serde::{Deserialize, Serialize};
 
 /// This enum captures the configs for all the different processors that are defined.
-///
 /// The configs for each processor should only contain configuration specific to that
 /// processor. For configuration that is common to all processors, put it in
 /// IndexerGrpcProcessorConfig.
@@ -34,7 +32,7 @@ use serde::{Deserialize, Serialize};
     strum(serialize_all = "snake_case")
 )]
 pub enum ProcessorConfig {
-    EventsProcessor(EventsProcessorConfig),
+    EventsProcessor,
 }
 
 impl ProcessorConfig {

@@ -16,7 +16,6 @@ mod diff_test_helper;
 mod diff_tests;
 mod models;
 mod scenarios_tests;
-mod sdk;
 mod sdk_tests;
 
 /// The test context struct holds the test name and the transaction batches.
@@ -148,19 +147,6 @@ impl TestContext {
 
         Ok(())
     }
-    //
-    // // New function for SDK processor testing
-    // pub async fn run_sdk_test<F>(
-    //     &self,
-    //     processor_config: TestProcessorConfig,
-    //     mock_grpc_server: MockGrpcServer,
-    //     verification_f: F,
-    // ) -> anyhow::Result<()>
-    //     where
-    //         F: Fn(&mut PgConnection, &str) -> anyhow::Result<()> + Send + Sync + 'static,
-    // {
-    //     run_sdk_processor_test(self, processor_config, mock_grpc_server, verification_f).await
-    // }
 }
 
 trait TestStrategy {

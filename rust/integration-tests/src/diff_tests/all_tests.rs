@@ -21,7 +21,7 @@ mod test {
     use diesel::pg::PgConnection;
     use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
     use std::{collections::HashMap, fs, sync::Arc};
-    use test_utils::ProcessorTestHelper;
+    use crate::diff_test_helper::ProcessorTestHelper;
     #[tokio::test]
     async fn test_all_testnet_txns_schema_output_for_all_processors() {
         let processor_configs = get_processor_configs();

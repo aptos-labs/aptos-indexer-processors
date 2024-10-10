@@ -38,9 +38,9 @@ tonic = { workspace = true }
 tempfile = { workspace = true }
 sdk-processor = { workspace = true }
 aptos-indexer-processor-sdk = { workspace = true }
+testing-framework = { workspace = true }
 ahash = { workspace = true }
 url = { workspace = true }
-test-utils = { workspace = true }
 
 [dev-dependencies]
 futures = { workspace = true }
