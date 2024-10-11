@@ -6,7 +6,10 @@ use crate::processors::{
     events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
 };
 use anyhow::Result;
-use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
+use aptos_indexer_processor_sdk::{
+    aptos_indexer_transaction_stream::TransactionStreamConfig,
+    traits::processor_trait::ProcessorTrait,
+};
 use aptos_indexer_processor_sdk_server_framework::RunnableConfig;
 use serde::{Deserialize, Serialize};
 

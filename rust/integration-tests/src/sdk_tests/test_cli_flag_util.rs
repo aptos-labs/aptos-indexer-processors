@@ -1,10 +1,11 @@
-
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TestArgs {
     pub diff: bool,
     pub output_path: Option<String>,
 }
 
+#[allow(dead_code)]
 pub fn parse_test_args() -> TestArgs {
     // Capture the raw arguments
     let raw_args: Vec<String> = std::env::args().collect();
@@ -22,12 +23,14 @@ pub fn parse_test_args() -> TestArgs {
     };
     println!("Custom arguments: {:?}", custom_args);
 
-    // Manually parse the "--diff" flag and the output path
+    // Manually parse the "--diff" flag
     let diff_flag = custom_args.contains(&"--diff".to_string());
+
+    // Manually parse the "--output-path" flag and get its associated value
     let output_path = custom_args
-        .iter()
-        .position(|arg| arg == "--output_path")
-        .and_then(|index| custom_args.get(index + 1).cloned());
+        .windows(2)
+        .find(|args| args[0] == "--output-path")
+        .map(|args| args[1].clone()); // Correct the flag name to `--output-path`
 
     // Log the parsed values
     println!("Parsed diff_flag: {}", diff_flag);
