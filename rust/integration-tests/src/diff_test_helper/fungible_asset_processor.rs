@@ -1,4 +1,4 @@
-use crate::models::queryable_models::{
+use crate::queryable_models::fungible_asset_models::{
     CoinSupply, CurrentFungibleAssetBalance, FungibleAssetActivity, FungibleAssetBalance,
     FungibleAssetMetadataModel,
 };

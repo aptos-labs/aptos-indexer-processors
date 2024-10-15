@@ -15,7 +15,7 @@ use testcontainers::{
 mod cli_parser;
 mod diff_test_helper;
 mod diff_tests;
-mod models;
+mod queryable_models;
 mod scenarios_tests;
 mod sdk_tests;
 

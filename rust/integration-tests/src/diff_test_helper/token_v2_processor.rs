@@ -1,4 +1,4 @@
-use crate::models::queryable_models::TokenActivityV2;
+use crate::queryable_models::token_v2_models::TokenActivityV2;
 use anyhow::Result;
 use diesel::{
     pg::PgConnection,

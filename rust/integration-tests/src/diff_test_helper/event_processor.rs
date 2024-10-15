@@ -1,4 +1,4 @@
-use crate::models::queryable_models::Event;
+use crate::queryable_models::events_models::Event;
 use anyhow::Result;
 use diesel::{
     pg::PgConnection,

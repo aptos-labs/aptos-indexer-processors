@@ -9,7 +9,9 @@ use diesel::{Connection, PgConnection};
 use serde_json::Value;
 use std::{collections::HashMap, fs, path::Path};
 
+#[cfg(test)]
 mod events_processor_tests;
+#[cfg(test)]
 mod fungible_asset_processor_tests;
 
 #[allow(dead_code)]

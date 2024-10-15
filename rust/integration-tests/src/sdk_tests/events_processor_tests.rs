@@ -1,3 +1,42 @@
+use ahash::AHashMap;
+use aptos_indexer_testing_framework::new_test_context::SdkTestContext;
+use sdk_processor::config::{
+    db_config::{DbConfig, PostgresConfig},
+    indexer_processor_config::IndexerProcessorConfig,
+    processor_config::{DefaultProcessorConfig, ProcessorConfig},
+};
+use std::collections::HashSet;
+
+pub fn setup_events_processor_config(
+    test_context: &SdkTestContext,
+    txn_version: u64,
+    db_url: &str,
+) -> (IndexerProcessorConfig, &'static str) {
+    let transaction_stream_config = test_context.create_transaction_stream_config(txn_version);
+    let postgres_config = PostgresConfig {
+        connection_string: db_url.to_string(),
+        db_pool_size: 100,
+    };
+
+    let db_config = DbConfig::PostgresConfig(postgres_config);
+    let default_processor_config = DefaultProcessorConfig {
+        per_table_chunk_sizes: AHashMap::new(),
+        channel_size: 100,
+        deprecated_tables: HashSet::new(),
+    };
+
+    let processor_config = ProcessorConfig::EventsProcessor(default_processor_config);
+    let processor_name = processor_config.name();
+    (
+        IndexerProcessorConfig {
+            processor_config,
+            transaction_stream_config,
+            db_config,
+        },
+        processor_name,
+    )
+}
+
 #[allow(clippy::needless_return)]
 #[cfg(test)]
 mod tests {
@@ -5,22 +44,14 @@ mod tests {
         cli_parser::get_test_config,
         diff_test_helper::event_processor::load_data,
         sdk_tests::{
-            run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
+            events_processor_tests::setup_events_processor_config, run_processor_test,
+            setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use ahash::AHashMap;
     use aptos_indexer_test_transactions::ALL_IMPORTED_TESTNET_TXNS;
     use aptos_indexer_testing_framework::database::TestDatabase;
     use aptos_protos::transaction::v1::Transaction;
-    use sdk_processor::{
-        config::{
-            db_config::{DbConfig, PostgresConfig},
-            indexer_processor_config::IndexerProcessorConfig,
-            processor_config::{DefaultProcessorConfig, ProcessorConfig},
-        },
-        processors::events_processor::EventsProcessor,
-    };
-    use std::collections::HashSet;
+    use sdk_processor::processors::events_processor::EventsProcessor;
 
     // This test cases runs the events processor and validates the output of all available transactions proto jsons
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -44,27 +75,8 @@ mod tests {
             // Step 3: Run the processor
             let db_url = db.get_db_url();
 
-            let transaction_stream_config =
-                test_context.create_transaction_stream_config(txn_version);
-            let postgres_config = PostgresConfig {
-                connection_string: db_url.to_string(),
-                db_pool_size: 100,
-            };
-
-            let db_config = DbConfig::PostgresConfig(postgres_config);
-            let default_processor_config = DefaultProcessorConfig {
-                per_table_chunk_sizes: AHashMap::new(),
-                channel_size: 100,
-                deprecated_tables: HashSet::new(),
-            };
-
-            let processor_config = ProcessorConfig::EventsProcessor(default_processor_config);
-            let process_name = processor_config.name();
-            let indexer_processor_config = IndexerProcessorConfig {
-                processor_config,
-                transaction_stream_config,
-                db_config,
-            };
+            let (indexer_processor_config, processor_name) =
+                setup_events_processor_config(&test_context, txn_version, &db_url);
 
             let events_processor = EventsProcessor::new(indexer_processor_config)
                 .await
@@ -85,7 +97,7 @@ mod tests {
                     let _ = validate_json(
                         &mut db_value,
                         txn_version,
-                        process_name,
+                        processor_name,
                         output_path.clone(),
                     );
                 },
