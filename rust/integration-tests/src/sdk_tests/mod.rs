@@ -12,8 +12,10 @@ use std::{collections::HashMap, fs, path::Path};
 mod events_processor_tests;
 mod fungible_asset_processor_tests;
 
+#[allow(dead_code)]
 const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
 
+#[allow(dead_code)]
 pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
     match fs::read_to_string(path) {
         Ok(content) => match serde_json::from_str::<Value>(&content) {
@@ -31,6 +33,7 @@ pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
 }
 
 // Common setup for database and test context
+#[allow(dead_code)]
 async fn setup_test_environment(transactions: &[&[u8]]) -> (PostgresTestDatabase, SdkTestContext) {
     let mut db = PostgresTestDatabase::new();
     db.setup().await.unwrap();
@@ -40,6 +43,7 @@ async fn setup_test_environment(transactions: &[&[u8]]) -> (PostgresTestDatabase
     (db, test_context)
 }
 
+#[allow(dead_code)]
 fn validate_json(
     db_values: &mut HashMap<String, Value>,
     txn_version: u64,
@@ -76,6 +80,7 @@ fn validate_json(
 }
 
 // Helper function to configure and run the processor
+#[allow(dead_code)]
 async fn run_processor_test<F>(
     test_context: &mut SdkTestContext,
     processor: impl ProcessorTrait,

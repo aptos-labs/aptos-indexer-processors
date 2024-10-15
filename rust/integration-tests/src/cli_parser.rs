@@ -2,12 +2,14 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
 // Define a global static to store the parsed arguments
+#[allow(dead_code)]
 static TEST_CONFIG: Lazy<Mutex<TestArgs>> = Lazy::new(|| {
     let args = parse_test_args();
     Mutex::new(args)
 });
 
 // function to fetch global test args
+#[allow(dead_code)]
 pub fn get_test_config() -> (bool, Option<String>) {
     let test_args = TEST_CONFIG.lock().unwrap().clone();
     (test_args.generate_output, test_args.output_path)
