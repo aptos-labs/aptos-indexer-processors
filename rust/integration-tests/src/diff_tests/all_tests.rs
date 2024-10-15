@@ -14,6 +14,7 @@ mod test {
         },
         DiffTest, TestContext, TestProcessorConfig, TestType,
     };
+    use anyhow::Context;
     use aptos_indexer_test_transactions::{
         ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
     };

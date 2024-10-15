@@ -1,24 +1,21 @@
-use crate::diff_tests::{remove_inserted_at, remove_transaction_timestamp};
+use crate::{
+    diff_tests::{remove_inserted_at, remove_transaction_timestamp},
+    sdk_tests::test_cli_flag_util::{parse_test_args, TestArgs},
+};
+use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
 use aptos_indexer_testing_framework::{
     database::{PostgresTestDatabase, TestDatabase},
     new_test_context::SdkTestContext,
 };
 use assert_json_diff::assert_json_eq;
-use std::{fs, path::Path};
-use std::collections::HashMap;
-use std::sync::Mutex;
-use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
-use diesel::PgConnection;
-use serde_json::Value;
-use crate::diff_test_helper::ProcessorTestHelper;
-use diesel::Connection;
+use diesel::{Connection, PgConnection};
 use once_cell::sync::Lazy;
-use crate::sdk_tests::test_cli_flag_util::{parse_test_args, TestArgs};
+use serde_json::Value;
+use std::{collections::HashMap, fs, path::Path, sync::Mutex};
 
 mod events_processor_tests;
 mod fungible_asset_processor_tests;
 mod test_cli_flag_util;
-
 
 const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
 
@@ -71,7 +68,7 @@ fn validate_json(
         let expected_file_path = Path::new(&output_path)
             .join(processor_name)
             .join(txn_version.to_string())
-            .join(format!("{}.json", table_name));  // File name format: processor_table_txnVersion.json
+            .join(format!("{}.json", table_name)); // File name format: processor_table_txnVersion.json
 
         let mut expected_json = match read_and_parse_json(expected_file_path.to_str().unwrap()) {
             Ok(json) => json,
@@ -96,17 +93,24 @@ fn validate_json(
 }
 
 // Helper function to configure and run the processor
-async fn run_processor_test<T: ProcessorTestHelper + 'static>(
+async fn run_processor_test<F>(
     test_context: &mut SdkTestContext,
     processor: impl ProcessorTrait,
-    test_helper: T,
+    load_data: F,
     db_url: &str,
     txn_version: u64,
     diff_flag: bool,
     output_path: String,
-) -> anyhow::Result<HashMap<String, serde_json::Value>> {
+) -> anyhow::Result<HashMap<String, Value>>
+where
+    F: Fn(&mut PgConnection, &str) -> anyhow::Result<HashMap<String, Value>>
+        + Send
+        + Sync
+        + 'static,
+{
     println!(
-        "[INFO] Running test for transaction version: {}",
+        "[INFO] Running {} test for transaction version: {}",
+        processor.name(),
         txn_version
     );
 
@@ -117,11 +121,12 @@ async fn run_processor_test<T: ProcessorTestHelper + 'static>(
             txn_version,
             diff_flag,
             output_path.clone(),
-            move |db_url| { // TODO: might not need this.
+            move |db_url| {
+                // TODO: might not need this.
                 let mut conn =
                     PgConnection::establish(db_url).expect("Failed to establish DB connection");
 
-                let db_values = match test_helper.load_data(&mut conn, &txn_version.to_string()) {
+                let db_values = match load_data(&mut conn, &txn_version.to_string()) {
                     Ok(db_data) => db_data,
                     Err(e) => {
                         eprintln!(

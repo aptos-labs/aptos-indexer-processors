@@ -2,36 +2,75 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        diff_test_helper::fungible_asset_processor::load_data,
+        diff_test_helper::{
+            processors::fungible_asset_processor::FungibleAssetProcessorTestHelper,
+        },
         sdk_tests::{
-            get_test_config, run_processor_test, setup_test_environment, validate_json,
-            DEFAULT_OUTPUT_FOLDER,
+            setup_test_environment,
+            test_cli_flag_util::{parse_test_args, TestArgs},
+            validate_json,
         },
     };
     use ahash::AHashMap;
     use aptos_indexer_test_transactions::ALL_IMPORTED_TESTNET_TXNS;
-    use aptos_indexer_testing_framework::database::TestDatabase;
+    use aptos_indexer_testing_framework::{
+        database::{TestDatabase},
+    };
     use aptos_protos::transaction::v1::Transaction;
+    use once_cell::sync::Lazy;
     use sdk_processor::{
         config::{
             db_config::{DbConfig, PostgresConfig},
             indexer_processor_config::IndexerProcessorConfig,
-            processor_config::{DefaultProcessorConfig, ProcessorConfig},
+            processor_config::{
+                DefaultProcessorConfig, ProcessorConfig,
+            },
         },
         processors::fungible_asset_processor::FungibleAssetProcessor,
     };
-    use std::collections::HashSet;
+    use std::{collections::HashSet};
+    use crate::sdk_tests::run_processor_test;
+    use crate::sdk_tests::get_test_config;
+    use crate::sdk_tests::DEFAULT_OUTPUT_FOLDER;
+    use std::collections::HashMap;
 
     #[tokio::test]
     async fn fa_processor_db_output_diff_test() {
-        let (diff_flag, custom_output_path) = get_test_config();
-        let output_path = custom_output_path
-            .unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string() + "imported_testnet_txns");
-
+        // Step 0: Get the test configuration (args)
+        let (diff_flag , custom_output_path) = get_test_config();
+        let output_path = custom_output_path.unwrap_or_else(|| {
+            DEFAULT_OUTPUT_FOLDER.to_string() + "imported_testnet_txns"});
+        let mut version_to_txn_name = HashMap::new();
+        // Step 1: set up an input transaction that will be used
         let transaction_batches = ALL_IMPORTED_TESTNET_TXNS
             .iter()
-            .map(|txn| serde_json::from_slice(txn).unwrap())
+            .map(|&txn| {
+                // we are only going to use this txn_name for scripted txn
+                let txn_name = get_transaction_name(txn)
+                    .unwrap_or("imported_transactions")
+                    .to_string();
+                let txn: Transaction = serde_json::from_slice(txn).unwrap();
+                let txn_version = txn.version;
+                version_to_txn_name.insert(txn_version, txn_name.to_string());
+                txn
+            })
             .collect::<Vec<Transaction>>();
+
+
+        // .map(|txn| serde_json::from_slice(txn).unwrap())
+        // .collect::<Vec<Transaction>>();
+
+        // for scdripted:
+        // .map(|&txn| {
+        //                 // we are only going to use this txn_name for scripted txn
+        //                 let txn_name = get_transaction_name(txn)
+        //                     .unwrap_or("imported_transactions")
+        //                     .to_string();
+        //                 let txn: Transaction = serde_json::from_slice(txn).unwrap();
+        //                 let txn_version = txn.version;
+        //                 version_to_txn_name.insert(txn_version, txn_name.to_string());
+        //                 txn
+        //             })
 
         let (db, mut test_context) = setup_test_environment(ALL_IMPORTED_TESTNET_TXNS).await;
 
@@ -42,8 +81,7 @@ mod tests {
             // Step 3: Run the processor
             let db_url = db.get_db_url();
 
-            let transaction_stream_config =
-                test_context.create_transaction_stream_config(txn_version);
+            let transaction_stream_config = test_context.create_transaction_stream_config(txn_version);
             let postgres_config = PostgresConfig {
                 connection_string: db_url.to_string(),
                 db_pool_size: 100,
@@ -56,8 +94,7 @@ mod tests {
                 deprecated_tables: HashSet::new(),
             };
 
-            let processor_config =
-                ProcessorConfig::FungibleAssetProcessor(default_processor_config);
+            let processor_config = ProcessorConfig::FungibleAssetProcessor(default_processor_config);
 
             let indexer_processor_config = IndexerProcessorConfig {
                 processor_config,
@@ -69,16 +106,18 @@ mod tests {
                 .await
                 .expect("Failed to create FungibleAssetProcessor");
 
+            let test_helper = FungibleAssetProcessorTestHelper;
+
             match run_processor_test(
                 &mut test_context,
                 fungible_asset_processor,
-                load_data,
+                test_helper,
                 &db_url,
                 txn_version,
                 diff_flag,
                 output_path.clone(),
             )
-            .await
+                .await
             {
                 Ok(mut db_value) => {
                     let _ = validate_json(
