@@ -1,7 +1,7 @@
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TestArgs {
-    pub diff: bool,
+    pub generate_output: bool,
     pub output_path: Option<String>,
 }
 
@@ -23,8 +23,8 @@ pub fn parse_test_args() -> TestArgs {
     };
     println!("Custom arguments: {:?}", custom_args);
 
-    // Manually parse the "--diff" flag
-    let diff_flag = custom_args.contains(&"--diff".to_string());
+    // Manually parse the "--generate-output" flag
+    let generate_output_flag = custom_args.contains(&"--generate-output".to_string());
 
     // Manually parse the "--output-path" flag and get its associated value
     let output_path = custom_args
@@ -33,11 +33,11 @@ pub fn parse_test_args() -> TestArgs {
         .map(|args| args[1].clone()); // Correct the flag name to `--output-path`
 
     // Log the parsed values
-    println!("Parsed diff_flag: {}", diff_flag);
+    println!("Parsed generate_output_flag: {}", generate_output_flag);
     println!("Parsed output_path: {:?}", output_path);
 
     TestArgs {
-        diff: diff_flag,
+        generate_output: generate_output_flag,
         output_path,
     }
 }
