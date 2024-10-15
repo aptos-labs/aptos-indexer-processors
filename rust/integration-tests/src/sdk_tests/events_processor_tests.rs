@@ -23,7 +23,7 @@ mod tests {
     use std::collections::HashSet;
 
     // This test cases runs the events processor and validates the output of all available transactions proto jsons
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn testnet_events_processor_db_output_diff_test() {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path

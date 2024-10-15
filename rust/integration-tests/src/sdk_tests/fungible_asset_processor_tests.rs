@@ -22,7 +22,7 @@ mod tests {
     };
     use std::collections::HashSet;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn fa_processor_db_output_diff_test() {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
