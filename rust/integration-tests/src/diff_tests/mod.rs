@@ -51,11 +51,11 @@ pub fn get_expected_imported_mainnet_txns(
 #[allow(dead_code)]
 pub fn get_expected_scripted_txns(
     processor_name: &str,
-    txn_name: &str,
+    txn_version: &str,
     table_name: &str,
 ) -> String {
     format!(
         "expected_db_output_files/scripted_txns/{}/{}/{}.json",
-        processor_name, txn_name, table_name
+        processor_name, txn_version, table_name
     )
 }
