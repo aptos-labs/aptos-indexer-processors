@@ -1,0 +1,11 @@
+[
+  {
+    "transaction_version": 1,
+    "coin_type_hash": "91ceb1308a98389691e05158b07ed5f079ab78461a6bb8d5a4054b1bb5cb8bb6",
+    "coin_type": "0x1::aptos_coin::AptosCoin",
+    "supply": "18448344078275751615",
+    "transaction_timestamp": "2022-09-09T01:24:17",
+    "transaction_epoch": 1,
+    "inserted_at": "2024-10-15T05:16:57.771610"
+  }
+]

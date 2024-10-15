@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use std::sync::Mutex;
 
 // Define a global static to store the parsed arguments
 static TEST_CONFIG: Lazy<Mutex<TestArgs>> = Lazy::new(|| {
