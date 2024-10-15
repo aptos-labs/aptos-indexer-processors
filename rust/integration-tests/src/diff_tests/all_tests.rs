@@ -3,6 +3,7 @@
 mod test {
 
     use crate::{
+        cli_parser::get_test_config,
         diff_test_helper::{
             event_processor::load_data as load_event_data,
             fungible_asset_processor::load_data as load_fungible_asset_data,
@@ -12,7 +13,6 @@ mod test {
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
             get_expected_scripted_txns, remove_inserted_at, remove_transaction_timestamp,
         },
-        cli_parser::get_test_config,
         DiffTest, TestContext, TestProcessorConfig, TestType,
     };
     use anyhow::Context;

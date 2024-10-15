@@ -17,6 +17,7 @@ ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-processor-sdk = { workspace = true }
 aptos-indexer-test-transactions  = { workspace = true }
+aptos-indexer-testing-framework = { workspace = true }
 aptos-protos = { workspace = true }
 assert-json-diff = { workspace = true }
 bigdecimal = { workspace = true }
@@ -38,7 +39,6 @@ serde_canonical_json = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 testcontainers = { workspace = true }
-aptos-indexer-testing-framework = { workspace = true }
 testing-transactions = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
