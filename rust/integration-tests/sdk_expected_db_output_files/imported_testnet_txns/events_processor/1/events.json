@@ -1,0 +1,94 @@
+[
+  {
+    "sequence_number": 1,
+    "creation_number": 3,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "transaction_version": 1,
+    "transaction_block_height": 1,
+    "type_": "0x1::block::NewBlockEvent",
+    "data": {
+      "hash": "0x1f4392dc07a74b39eaea58b912855cbbd1ab67e5089ae6166329e883c2085f0",
+      "epoch": "1",
+      "round": "3",
+      "height": "1",
+      "proposer": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+      "time_microseconds": "1662686657227425",
+      "failed_proposer_indices": [
+        "2",
+        "1"
+      ],
+      "previous_block_votes_bitvec": "0x00"
+    },
+    "indexed_type": "0x1::block::NewBlockEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 12,
+    "account_address": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c",
+    "transaction_version": 1,
+    "transaction_block_height": 1,
+    "type_": "0x1::stake::DistributeRewardsEvent",
+    "data": {
+      "pool_address": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c",
+      "rewards_amount": "0"
+    },
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 12,
+    "account_address": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+    "transaction_version": 1,
+    "transaction_block_height": 1,
+    "type_": "0x1::stake::DistributeRewardsEvent",
+    "data": {
+      "pool_address": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+      "rewards_amount": "4566200000"
+    },
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 2
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 12,
+    "account_address": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f",
+    "transaction_version": 1,
+    "transaction_block_height": 1,
+    "type_": "0x1::stake::DistributeRewardsEvent",
+    "data": {
+      "pool_address": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f",
+      "rewards_amount": "0"
+    },
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 3
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 12,
+    "account_address": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f",
+    "transaction_version": 1,
+    "transaction_block_height": 1,
+    "type_": "0x1::stake::DistributeRewardsEvent",
+    "data": {
+      "pool_address": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f",
+      "rewards_amount": "0"
+    },
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 4
+  },
+  {
+    "sequence_number": 1,
+    "creation_number": 2,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "transaction_version": 1,
+    "transaction_block_height": 1,
+    "type_": "0x1::reconfiguration::NewEpochEvent",
+    "data": {
+      "epoch": "2"
+    },
+    "indexed_type": "0x1::reconfiguration::NewEpochEvent",
+    "event_index": 5
+  }
+]

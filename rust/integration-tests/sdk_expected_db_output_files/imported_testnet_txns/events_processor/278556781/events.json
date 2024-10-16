@@ -1,0 +1,32 @@
+[
+  {
+    "sequence_number": 2,
+    "creation_number": 0,
+    "account_address": "0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862",
+    "transaction_version": 278556781,
+    "transaction_block_height": 20040326,
+    "type_": "0x1::account::CoinRegisterEvent",
+    "data": {
+      "type_info": {
+        "module_name": "0x70726f746f6e5f63626479",
+        "struct_name": "0x5052545f4b4642434343",
+        "account_address": "0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862"
+      }
+    },
+    "indexed_type": "0x1::account::CoinRegisterEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 10,
+    "account_address": "0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862",
+    "transaction_version": 278556781,
+    "transaction_block_height": 20040326,
+    "type_": "0x1::coin::DepositEvent",
+    "data": {
+      "amount": "1000000000000000000"
+    },
+    "indexed_type": "0x1::coin::DepositEvent",
+    "event_index": 1
+  }
+]

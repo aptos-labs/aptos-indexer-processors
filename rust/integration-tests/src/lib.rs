@@ -12,10 +12,12 @@ use testcontainers::{
     ContainerAsync, GenericImage, ImageExt,
 };
 
+mod cli_parser;
 mod diff_test_helper;
 mod diff_tests;
-mod models;
+mod queryable_models;
 mod scenarios_tests;
+mod sdk_tests;
 
 /// The test context struct holds the test name and the transaction batches.
 pub struct TestContext {
@@ -120,7 +122,6 @@ impl TestContext {
             processor
                 .process_transactions(vec![txn.clone()], version, version, None)
                 .await?;
-            // }
 
             last_version = Some(version);
 

@@ -25,25 +25,37 @@ pub fn remove_transaction_timestamp(value: &mut Value) {
 }
 
 #[allow(dead_code)]
-pub fn get_expected_imported_testnet_txns(processor_name: &str, txn_version: &str) -> String {
+pub fn get_expected_imported_testnet_txns(
+    processor_name: &str,
+    txn_version: &str,
+    table_name: &str,
+) -> String {
     format!(
-        "expected_db_output_files/imported_testnet_txns/{}/{}_{}.json",
-        processor_name, processor_name, txn_version
+        "expected_db_output_files/imported_testnet_txns/{}/{}/{}.json",
+        processor_name, txn_version, table_name
     )
 }
 
 #[allow(dead_code)]
-pub fn get_expected_imported_mainnet_txns(processor_name: &str, txn_version: &str) -> String {
+pub fn get_expected_imported_mainnet_txns(
+    processor_name: &str,
+    txn_version: &str,
+    table_name: &str,
+) -> String {
     format!(
-        "expected_db_output_files/imported_mainnet_txns/{}/{}_{}.json",
-        processor_name, processor_name, txn_version
+        "expected_db_output_files/imported_mainnet_txns/{}/{}/{}.json",
+        processor_name, txn_version, table_name
     )
 }
 
 #[allow(dead_code)]
-pub fn get_expected_scripted_txns(processor_name: &str, txn_version: &str) -> String {
+pub fn get_expected_scripted_txns(
+    processor_name: &str,
+    txn_name: &str,
+    table_name: &str,
+) -> String {
     format!(
-        "expected_db_output_files/scripted_txns/{}/{}_{}.json",
-        processor_name, processor_name, txn_version
+        "expected_db_output_files/scripted_txns/{}/{}/{}.json",
+        processor_name, txn_name, table_name
     )
 }
