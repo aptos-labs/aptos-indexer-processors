@@ -4,13 +4,12 @@ mod tests {
     use crate::{
         diff_test_helper::fungible_asset_processor::load_data,
         sdk_tests::{
-            get_test_config, run_processor_test, setup_test_environment, validate_json,
-            DEFAULT_OUTPUT_FOLDER,
+            run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use ahash::AHashMap;
     use aptos_indexer_test_transactions::ALL_IMPORTED_TESTNET_TXNS;
-    use aptos_indexer_testing_framework::database::TestDatabase;
+    use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use aptos_protos::transaction::v1::Transaction;
     use sdk_processor::{
         config::{

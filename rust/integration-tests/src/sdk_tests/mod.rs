@@ -1,35 +1,20 @@
-use crate::{
-    diff_tests::{remove_inserted_at, remove_transaction_timestamp},
-    sdk_tests::test_cli_flag_util::{parse_test_args, TestArgs},
-};
+use crate::diff_tests::remove_transaction_timestamp;
 use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
 use aptos_indexer_testing_framework::{
     database::{PostgresTestDatabase, TestDatabase},
-    new_test_context::SdkTestContext,
+    sdk_test_context::{remove_inserted_at, SdkTestContext},
 };
 use assert_json_diff::assert_json_eq;
 use diesel::{Connection, PgConnection};
-use once_cell::sync::Lazy;
 use serde_json::Value;
-use std::{collections::HashMap, fs, path::Path, sync::Mutex};
+use std::{collections::HashMap, fs, path::Path};
 
 mod events_processor_tests;
 mod fungible_asset_processor_tests;
 mod test_cli_flag_util;
 
+#[allow(dead_code)]
 const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
-
-// Define a global static to store the parsed arguments
-static TEST_CONFIG: Lazy<Mutex<TestArgs>> = Lazy::new(|| {
-    let args = parse_test_args();
-    Mutex::new(args)
-});
-
-// function to fetch global test args
-pub fn get_test_config() -> (bool, Option<String>) {
-    let test_args = TEST_CONFIG.lock().unwrap().clone();
-    (test_args.generate_output, test_args.output_path)
-}
 
 pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
     match fs::read_to_string(path) {

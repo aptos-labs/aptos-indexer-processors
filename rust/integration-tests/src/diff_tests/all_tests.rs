@@ -8,13 +8,12 @@ mod test {
             fungible_asset_processor::load_data as load_fungible_asset_data,
             token_v2_processor::load_data as load_token_v2_data,
         },
-        diff_tests::diff_tests_helper::{
+        diff_tests::{
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
             get_expected_scripted_txns, remove_inserted_at, remove_transaction_timestamp,
         },
         DiffTest, TestContext, TestProcessorConfig, TestType,
     };
-    use anyhow::Context;
     use aptos_indexer_test_transactions::{
         ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
     };
