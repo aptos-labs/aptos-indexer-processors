@@ -9,8 +9,9 @@
     "data": {
       "amount": "300000"
     },
-    "indexed_type": "0x1::coin::WithdrawEvent",
-    "event_index": 0
+    "inserted_at": "2024-10-15T05:15:48.641863",
+    "event_index": 0,
+    "indexed_type": "0x1::coin::WithdrawEvent"
   },
   {
     "sequence_number": 707,
@@ -22,8 +23,9 @@
     "data": {
       "amount": "300000"
     },
-    "indexed_type": "0x1::coin::DepositEvent",
-    "event_index": 1
+    "inserted_at": "2024-10-15T05:15:48.641863",
+    "event_index": 1,
+    "indexed_type": "0x1::coin::DepositEvent"
   },
   {
     "sequence_number": 0,
@@ -36,8 +38,9 @@
       "store": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
       "amount": "300000"
     },
-    "indexed_type": "0x1::fungible_asset::Deposit",
-    "event_index": 2
+    "inserted_at": "2024-10-15T05:15:48.641863",
+    "event_index": 2,
+    "indexed_type": "0x1::fungible_asset::Deposit"
   },
   {
     "sequence_number": 0,
@@ -54,8 +57,9 @@
       "token": "0x1::aptos_coin::AptosCoin",
       "amount": "300000"
     },
-    "indexed_type": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::lending_pool::Deposit",
-    "event_index": 3
+    "inserted_at": "2024-10-15T05:15:48.641863",
+    "event_index": 3,
+    "indexed_type": "0xfabb471223cefd7064b1f19f6e0e06468d2bd830d8ae832916406dd8297098af::lending_pool::Deposit"
   },
   {
     "sequence_number": 0,
@@ -71,7 +75,8 @@
       "total_charge_gas_units": "505",
       "storage_fee_refund_octas": "0"
     },
-    "indexed_type": "0x1::transaction_fee::FeeStatement",
-    "event_index": 4
+    "inserted_at": "2024-10-15T05:15:48.641863",
+    "event_index": 4,
+    "indexed_type": "0x1::transaction_fee::FeeStatement"
   }
 ]
