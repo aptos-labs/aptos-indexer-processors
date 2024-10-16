@@ -8,7 +8,6 @@
     "amount": "464000",
     "last_transaction_timestamp": "2023-10-24T09:08:03",
     "last_transaction_version": 308783012,
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T04:55:33.360215"
+    "token_standard": "v1"
   }
 ]

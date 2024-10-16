@@ -10,11 +10,11 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
-pub fn load_data(conn: &mut PgConnection, txn_version: &str) -> Result<HashMap<String, Value>> {
+pub fn load_data(conn: &mut PgConnection, txn_version: i64) -> Result<HashMap<String, Value>> {
     let mut result_map: HashMap<String, Value> = HashMap::new();
 
     let token_activities_v2_result = token_activities_v2
-        .filter(transaction_version.eq(txn_version.parse::<i64>().unwrap()))
+        .filter(transaction_version.eq(txn_version))
         .then_order_by(event_index.asc())
         .load::<TokenActivityV2>(conn);
 

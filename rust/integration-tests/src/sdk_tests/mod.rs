@@ -13,6 +13,7 @@ use std::{collections::HashMap, fs, path::Path};
 mod events_processor_tests;
 #[cfg(test)]
 mod fungible_asset_processor_tests;
+mod sdk_scenario_tests;
 
 #[allow(dead_code)]
 const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
@@ -87,13 +88,14 @@ async fn run_processor_test<F>(
     test_context: &mut SdkTestContext,
     processor: impl ProcessorTrait,
     load_data: F,
-    db_url: &str,
+    db_url: String,
     txn_version: u64,
+    txn_count: u64,
     diff_flag: bool,
     output_path: String,
 ) -> anyhow::Result<HashMap<String, Value>>
 where
-    F: Fn(&mut PgConnection, &str) -> anyhow::Result<HashMap<String, Value>>
+    F: Fn(&mut PgConnection, i64) -> anyhow::Result<HashMap<String, Value>>
         + Send
         + Sync
         + 'static,
@@ -104,19 +106,18 @@ where
         txn_version
     );
 
-    let db_value = test_context
+    let db_values = test_context
         .run(
             &processor,
-            db_url,
             txn_version,
             diff_flag,
             output_path.clone(),
-            move |db_url| {
+            false,
+            move || {
                 // TODO: might not need this.
                 let mut conn =
-                    PgConnection::establish(db_url).expect("Failed to establish DB connection");
-
-                let db_values = match load_data(&mut conn, &txn_version.to_string()) {
+                PgConnection::establish(&db_url).expect("Failed to establish DB connection");
+                let db_values = match load_data(&mut conn, txn_version as i64) {
                     Ok(db_data) => db_data,
                     Err(e) => {
                         eprintln!(
@@ -132,6 +133,40 @@ where
                 }
 
                 Ok(db_values)
+            },
+        )
+        .await?;
+
+    Ok(db_values)
+}
+
+
+#[allow(dead_code)]
+pub async fn run_scenario_test<F>(
+    test_context: &mut SdkTestContext,
+    processor: impl ProcessorTrait,
+    txn_version: u64,
+    custom_validation_fn: F,
+) -> anyhow::Result<HashMap<String, Value>>
+    where
+        F: Fn() -> anyhow::Result<()> + Send + Sync + 'static,
+{
+    println!(
+        "[INFO] Running {} test for transaction version: {}",
+        processor.name(),
+        txn_version
+    );
+
+    let db_value = test_context
+        .run(
+            &processor,
+            txn_version,
+            false,
+            "".to_string(),
+            true,
+            move|| {
+                let _ = custom_validation_fn();
+                Ok(HashMap::new())
             },
         )
         .await?;

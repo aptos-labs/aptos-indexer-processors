@@ -116,7 +116,7 @@ mod test {
                         test_type,
                         move |conn: &mut PgConnection, txn_version: &str| {
 
-                            let mut db_values = match db_values_fn(conn, txn_version) {
+                            let mut db_values = match db_values_fn(conn, txn_version.parse::<i64>().unwrap()) {
                                 Ok(db_data) => db_data,
                                 Err(e) => {
                                     eprintln!(
@@ -194,24 +194,6 @@ mod test {
         }
     }
 
-    // fn get_processor_map() -> HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> {
-    //     let mut processor_map: HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> = HashMap::new();
-    //     processor_map.insert(
-    //         "events_processor".to_string(),
-    //         Arc::new(Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-    //     );
-    //     processor_map.insert(
-    //         "fungible_asset_processor".to_string(),
-    //         Arc::new(Box::new(FungibleAssetProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-    //     );
-    //     processor_map.insert(
-    //         "token_v2_processor".to_string(),
-    //         Arc::new(Box::new(TokenV2ProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-    //     );
-    //
-    //     processor_map
-    // }
-
     fn get_processor_configs() -> Vec<TestProcessorConfig> {
         vec![
             TestProcessorConfig {
@@ -236,7 +218,7 @@ mod test {
         processor_name: &str,
         table_name: &str,
         txn_version: &str,
-        db_values: &serde_json::Value,
+        db_values: &mut serde_json::Value,
         output_path: &str,
         _scripted: bool,
         _txn_name: Option<String>,
@@ -251,7 +233,7 @@ mod test {
         let file_path = construct_file_path(output_path, processor_name, txn_version, table_name);
 
         ensure_directory_exists(&file_path)?;
-
+        remove_inserted_at(db_values);
         fs::write(&file_path, to_string_pretty(db_values)?)
             .context(format!("Failed to write file to {:?}", file_path))?;
         println!("[TEST] Generated output file at: {}", file_path.display());

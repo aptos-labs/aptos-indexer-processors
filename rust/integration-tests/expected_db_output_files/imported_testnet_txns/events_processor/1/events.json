@@ -19,9 +19,8 @@
       ],
       "previous_block_votes_bitvec": "0x00"
     },
-    "inserted_at": "2024-10-15T05:15:50.241072",
-    "event_index": 0,
-    "indexed_type": "0x1::block::NewBlockEvent"
+    "indexed_type": "0x1::block::NewBlockEvent",
+    "event_index": 0
   },
   {
     "sequence_number": 0,
@@ -34,9 +33,8 @@
       "pool_address": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c",
       "rewards_amount": "0"
     },
-    "inserted_at": "2024-10-15T05:15:50.241072",
-    "event_index": 1,
-    "indexed_type": "0x1::stake::DistributeRewardsEvent"
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 1
   },
   {
     "sequence_number": 0,
@@ -49,9 +47,8 @@
       "pool_address": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
       "rewards_amount": "4566200000"
     },
-    "inserted_at": "2024-10-15T05:15:50.241072",
-    "event_index": 2,
-    "indexed_type": "0x1::stake::DistributeRewardsEvent"
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 2
   },
   {
     "sequence_number": 0,
@@ -64,9 +61,8 @@
       "pool_address": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f",
       "rewards_amount": "0"
     },
-    "inserted_at": "2024-10-15T05:15:50.241072",
-    "event_index": 3,
-    "indexed_type": "0x1::stake::DistributeRewardsEvent"
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 3
   },
   {
     "sequence_number": 0,
@@ -79,9 +75,8 @@
       "pool_address": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f",
       "rewards_amount": "0"
     },
-    "inserted_at": "2024-10-15T05:15:50.241072",
-    "event_index": 4,
-    "indexed_type": "0x1::stake::DistributeRewardsEvent"
+    "indexed_type": "0x1::stake::DistributeRewardsEvent",
+    "event_index": 4
   },
   {
     "sequence_number": 1,
@@ -93,8 +88,7 @@
     "data": {
       "epoch": "2"
     },
-    "inserted_at": "2024-10-15T05:15:50.241072",
-    "event_index": 5,
-    "indexed_type": "0x1::reconfiguration::NewEpochEvent"
+    "indexed_type": "0x1::reconfiguration::NewEpochEvent",
+    "event_index": 5
   }
 ]

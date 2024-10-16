@@ -10,9 +10,10 @@ use std::collections::HashSet;
 pub fn setup_fa_processor_config(
     test_context: &SdkTestContext,
     txn_version: u64,
+    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config = test_context.create_transaction_stream_config(txn_version);
+    let transaction_stream_config = test_context.create_transaction_stream_config(txn_version, txn_count as u64);
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -63,7 +64,7 @@ mod tests {
             .iter()
             .map(|txn| serde_json::from_slice(txn).unwrap())
             .collect::<Vec<Transaction>>();
-
+        println!("trasnaction-batch size is {}", transaction_batches.len());
         let (db, mut test_context) = setup_test_environment(ALL_IMPORTED_TESTNET_TXNS).await;
 
         // Step 2: Loop over each transaction and run the test for each
@@ -74,7 +75,7 @@ mod tests {
             let db_url = db.get_db_url();
 
             let (indexer_processor_config, processor_name) =
-                setup_fa_processor_config(&test_context, txn_version, &db_url);
+                setup_fa_processor_config(&test_context, txn_version, 1, &db_url);
 
             let fungible_asset_processor = FungibleAssetProcessor::new(indexer_processor_config)
                 .await
@@ -84,8 +85,9 @@ mod tests {
                 &mut test_context,
                 fungible_asset_processor,
                 load_data,
-                &db_url,
+                db_url,
                 txn_version,
+                1,
                 diff_flag,
                 output_path.clone(),
             )

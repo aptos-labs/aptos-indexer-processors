@@ -13,8 +13,7 @@
     "supply_aggregator_table_key_v1": null,
     "token_standard": "v1",
     "is_token_v2": null,
-    "inserted_at": "2024-10-15T04:55:33.624874",
-    "supply_v2": null,
-    "maximum_v2": null
+    "maximum_v2": null,
+    "supply_v2": null
   }
 ]

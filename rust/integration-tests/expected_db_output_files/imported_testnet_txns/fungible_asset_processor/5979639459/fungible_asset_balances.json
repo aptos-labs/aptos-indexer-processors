@@ -9,8 +9,7 @@
     "is_frozen": false,
     "amount": "16673484350",
     "transaction_timestamp": "2024-09-13T16:48:29",
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T05:15:48.523230"
+    "token_standard": "v1"
   },
   {
     "transaction_version": 5979639459,
@@ -22,7 +21,6 @@
     "is_frozen": false,
     "amount": "10",
     "transaction_timestamp": "2024-09-13T16:48:29",
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T05:15:48.523230"
+    "token_standard": "v1"
   }
 ]

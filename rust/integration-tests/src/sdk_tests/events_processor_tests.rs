@@ -6,13 +6,15 @@ use sdk_processor::config::{
     processor_config::{DefaultProcessorConfig, ProcessorConfig},
 };
 use std::collections::HashSet;
+use bigdecimal::ToPrimitive;
 
 pub fn setup_events_processor_config(
     test_context: &SdkTestContext,
     txn_version: u64,
+    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config = test_context.create_transaction_stream_config(txn_version);
+    let transaction_stream_config = test_context.create_transaction_stream_config(txn_version, txn_count as u64);
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -48,7 +50,7 @@ mod tests {
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::ALL_IMPORTED_TESTNET_TXNS;
+    use aptos_indexer_test_transactions::{ALL_IMPORTED_TESTNET_TXNS, IMPORTED_TESTNET_TXNS_1_GENESIS, IMPORTED_TESTNET_TXNS_2_GENESIS, IMPORTED_TESTNET_TXNS_3_GENESIS};
     use aptos_indexer_testing_framework::database::TestDatabase;
     use aptos_protos::transaction::v1::Transaction;
     use sdk_processor::processors::events_processor::EventsProcessor;
@@ -76,7 +78,7 @@ mod tests {
             let db_url = db.get_db_url();
 
             let (indexer_processor_config, processor_name) =
-                setup_events_processor_config(&test_context, txn_version, &db_url);
+                setup_events_processor_config(&test_context, txn_version, 1, &db_url);
 
             let events_processor = EventsProcessor::new(indexer_processor_config)
                 .await
@@ -86,8 +88,9 @@ mod tests {
                 &mut test_context,
                 events_processor,
                 load_data,
-                &db_url,
+                db_url,
                 txn_version,
+                1,
                 diff_flag,
                 output_path.clone(),
             )
