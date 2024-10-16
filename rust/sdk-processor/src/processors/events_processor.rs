@@ -4,9 +4,7 @@ use crate::{
         processor_config::ProcessorConfig,
     },
     steps::{
-        common::latest_processed_version_tracker::{
-            LatestVersionProcessedTracker, UPDATE_PROCESSOR_STATUS_SECS,
-        },
+        common::latest_processed_version_tracker::LatestVersionProcessedTracker,
         events_processor::{EventsExtractor, EventsStorer},
     },
     utils::{
@@ -19,10 +17,9 @@ use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
-    common_steps::{OrderByVersionStep, TransactionStreamStep},
+    common_steps::TransactionStreamStep,
     traits::IntoRunnableStep,
 };
-use std::time::Duration;
 use tracing::{debug, info};
 
 pub struct EventsProcessor {
