@@ -8,8 +8,7 @@
     "amount": "29450400",
     "last_transaction_timestamp": "2024-06-18T05:07:55",
     "last_transaction_version": 1255836496,
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T05:16:55.264297"
+    "token_standard": "v1"
   },
   {
     "storage_id": "0x56c216a20a151df2e917008e27f3b70250f1cbb80eeef24e64e2335630825fa3",
@@ -20,8 +19,7 @@
     "amount": "17374075418",
     "last_transaction_timestamp": "2024-06-18T05:07:55",
     "last_transaction_version": 1255836496,
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T05:16:55.264297"
+    "token_standard": "v1"
   },
   {
     "storage_id": "0x7ea259eaaacce518a7479baca008e17fab2d0267a16e11979d52eb6c5433aad6",
@@ -32,8 +30,7 @@
     "amount": "93054699",
     "last_transaction_timestamp": "2024-06-18T05:07:55",
     "last_transaction_version": 1255836496,
-    "token_standard": "v2",
-    "inserted_at": "2024-10-15T05:16:55.264297"
+    "token_standard": "v2"
   },
   {
     "storage_id": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
@@ -44,7 +41,6 @@
     "amount": "17272186129",
     "last_transaction_timestamp": "2024-06-18T05:07:55",
     "last_transaction_version": 1255836496,
-    "token_standard": "v2",
-    "inserted_at": "2024-10-15T05:16:55.264297"
+    "token_standard": "v2"
   }
 ]
