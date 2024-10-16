@@ -18,13 +18,12 @@ mod test {
         ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
     };
     use aptos_indexer_testing_framework::{
-        sdk_test_context::{generate_output_file},
+        cli_parser::get_test_config, sdk_test_context::generate_output_file,
     };
     use assert_json_diff::assert_json_eq;
     use diesel::pg::PgConnection;
     use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
     use std::fs;
-    use aptos_indexer_testing_framework::cli_parser::get_test_config;
 
     const DEFAULT_OUTPUT_FOLDER: &str = "expected_db_output_files";
 
