@@ -4,9 +4,7 @@ use crate::{
         processor_config::ProcessorConfig,
     },
     steps::{
-        common::latest_processed_version_tracker::{
-            LatestVersionProcessedTracker, UPDATE_PROCESSOR_STATUS_SECS,
-        },
+        common::latest_processed_version_tracker::LatestVersionProcessedTracker,
         fungible_asset_processor::{
             fungible_asset_extractor::FungibleAssetExtractor,
             fungible_asset_storer::FungibleAssetStorer,
@@ -22,11 +20,10 @@ use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
-    common_steps::{OrderByVersionStep, TransactionStreamStep},
+    common_steps::TransactionStreamStep,
     traits::IntoRunnableStep,
 };
 use processor::worker::TableFlags;
-use std::time::Duration;
 use tracing::{debug, info};
 
 pub struct FungibleAssetProcessor {
@@ -101,10 +98,6 @@ impl FungibleAssetProcessor {
             processor_config,
             deprecated_table_flags,
         );
-        let order_step = OrderByVersionStep::new(
-            starting_version,
-            Duration::from_secs(UPDATE_PROCESSOR_STATUS_SECS),
-        );
         let version_tracker =
             LatestVersionProcessedTracker::new(self.db_pool.clone(), processor_name.to_string());
 
@@ -114,7 +107,6 @@ impl FungibleAssetProcessor {
         )
         .connect_to(fa_extractor.into_runnable_step(), channel_size)
         .connect_to(fa_storer.into_runnable_step(), channel_size)
-        .connect_to(order_step.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
