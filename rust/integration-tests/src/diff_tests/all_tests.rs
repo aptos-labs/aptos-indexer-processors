@@ -194,24 +194,6 @@ mod test {
         }
     }
 
-    // fn get_processor_map() -> HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> {
-    //     let mut processor_map: HashMap<String, Arc<Box<dyn ProcessorTestHelper>>> = HashMap::new();
-    //     processor_map.insert(
-    //         "events_processor".to_string(),
-    //         Arc::new(Box::new(EventsProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-    //     );
-    //     processor_map.insert(
-    //         "fungible_asset_processor".to_string(),
-    //         Arc::new(Box::new(FungibleAssetProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-    //     );
-    //     processor_map.insert(
-    //         "token_v2_processor".to_string(),
-    //         Arc::new(Box::new(TokenV2ProcessorTestHelper) as Box<dyn ProcessorTestHelper>),
-    //     );
-    //
-    //     processor_map
-    // }
-
     fn get_processor_configs() -> Vec<TestProcessorConfig> {
         vec![
             TestProcessorConfig {
