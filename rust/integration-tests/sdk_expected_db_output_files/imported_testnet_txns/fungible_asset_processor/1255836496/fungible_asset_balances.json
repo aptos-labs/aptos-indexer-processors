@@ -9,8 +9,7 @@
     "is_frozen": false,
     "amount": "17374075418",
     "transaction_timestamp": "2024-06-18T05:07:55",
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T05:16:55.253856"
+    "token_standard": "v1"
   },
   {
     "transaction_version": 1255836496,
@@ -22,8 +21,7 @@
     "is_frozen": false,
     "amount": "93054699",
     "transaction_timestamp": "2024-06-18T05:07:55",
-    "token_standard": "v2",
-    "inserted_at": "2024-10-15T05:16:55.253856"
+    "token_standard": "v2"
   },
   {
     "transaction_version": 1255836496,
@@ -35,8 +33,7 @@
     "is_frozen": false,
     "amount": "17272186129",
     "transaction_timestamp": "2024-06-18T05:07:55",
-    "token_standard": "v2",
-    "inserted_at": "2024-10-15T05:16:55.253856"
+    "token_standard": "v2"
   },
   {
     "transaction_version": 1255836496,
@@ -48,7 +45,6 @@
     "is_frozen": false,
     "amount": "29450400",
     "transaction_timestamp": "2024-06-18T05:07:55",
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T05:16:55.253856"
+    "token_standard": "v1"
   }
 ]

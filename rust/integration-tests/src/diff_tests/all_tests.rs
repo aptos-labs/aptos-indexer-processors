@@ -113,7 +113,7 @@ mod test {
                         test_type,
                         move |conn: &mut PgConnection, txn_version: &str| {
 
-                            let mut db_values = match db_values_fn(conn, txn_version) {
+                            let mut db_values = match db_values_fn(conn, vec![txn_version.parse::<i64>().unwrap()]) {
                                 Ok(db_data) => db_data,
                                 Err(e) => {
                                     eprintln!(
@@ -136,6 +136,7 @@ mod test {
                                         txn_version,
                                         db_value,
                                         output_path.clone(),
+                                        None,
                                     )?;
                                 }
 
