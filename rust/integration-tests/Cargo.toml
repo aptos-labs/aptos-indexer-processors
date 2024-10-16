@@ -13,24 +13,42 @@ repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
+aptos-indexer-processor-sdk = { workspace = true }
 aptos-indexer-test-transactions  = { workspace = true }
+aptos-indexer-testing-framework = { workspace = true }
 aptos-protos = { workspace = true }
 assert-json-diff = { workspace = true }
 bigdecimal = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
 diesel = { workspace = true }
 dirs = { workspace = true }
 field_count = { workspace = true }
+futures = { workspace = true }
 itertools = { workspace = true }
 json-structural-diff = { workspace = true }
+once_cell = { workspace = true }
 processor = { workspace = true }
 prost = { workspace = true }
 regex = { workspace = true }
+sdk-processor = { workspace = true }
 serde = { workspace = true }
 serde_canonical_json = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 testcontainers = { workspace = true }
 testing-transactions = { workspace = true }
 tokio = { workspace = true }
+tonic = { workspace = true }
+url = { workspace = true }
+
 [dev-dependencies]
+ahash = { workspace = true }
+aptos-indexer-processor-sdk = { workspace = true }
+futures = { workspace = true }
+sdk-processor = { workspace = true }
+tempfile = { workspace = true }
+tonic = { workspace = true }
+url = { workspace = true }
