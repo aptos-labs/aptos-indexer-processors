@@ -5,7 +5,6 @@
     "coin_type": "0x1::aptos_coin::AptosCoin",
     "supply": "18446744073809350825",
     "transaction_timestamp": "2024-10-01T22:07:03",
-    "transaction_epoch": 2,
-    "inserted_at": "2024-10-15T04:55:33.424263"
+    "transaction_epoch": 2
   }
 ]

@@ -141,7 +141,7 @@ checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "ahash",
  "anyhow",
@@ -174,7 +174,7 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-processor-sdk-server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "anyhow",
  "aptos-indexer-processor-sdk",
@@ -207,7 +207,7 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-testing-framework"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "anyhow",
  "aptos-indexer-processor-sdk",
@@ -219,12 +219,14 @@ dependencies = [
  "futures",
  "futures-util",
  "native-tls",
+ "once_cell",
  "postgres-native-tls",
  "serde_json",
  "testcontainers",
  "tokio",
  "tokio-postgres",
  "tokio-retry",
+ "tokio-stream",
  "tonic 0.11.0",
  "url",
 ]
@@ -232,10 +234,10 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "chrono",
  "futures-util",
@@ -260,7 +262,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "chrono",
 ]
@@ -2244,7 +2246,7 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "delegate",
  "derive_builder",
@@ -4127,7 +4129,7 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 [[package]]
 name = "sample"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=2d17dd43e04a88aa26e299007868a51c67781fd0#2d17dd43e04a88aa26e299007868a51c67781fd0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=376647ed207aa05a5149dfb49a0ae6e2ca15aa32#376647ed207aa05a5149dfb49a0ae6e2ca15aa32"
 dependencies = [
  "tracing",
 ]

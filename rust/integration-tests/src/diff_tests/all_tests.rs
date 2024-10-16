@@ -3,30 +3,28 @@
 mod test {
 
     use crate::{
-        cli_parser::get_test_config,
         diff_test_helper::{
             event_processor::load_data as load_event_data,
             fungible_asset_processor::load_data as load_fungible_asset_data,
             token_v2_processor::load_data as load_token_v2_data,
         },
-        diff_tests::{
+        diff_tests::diff_tests_helper::{
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
             get_expected_scripted_txns, remove_inserted_at, remove_transaction_timestamp,
         },
         DiffTest, TestContext, TestProcessorConfig, TestType,
     };
-    use anyhow::Context;
     use aptos_indexer_test_transactions::{
         ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
+    };
+    use aptos_indexer_testing_framework::{
+        sdk_test_context::{generate_output_file},
     };
     use assert_json_diff::assert_json_eq;
     use diesel::pg::PgConnection;
     use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
-    use serde_json::to_string_pretty;
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-    };
+    use std::fs;
+    use aptos_indexer_testing_framework::cli_parser::get_test_config;
 
     const DEFAULT_OUTPUT_FOLDER: &str = "expected_db_output_files";
 
@@ -95,7 +93,7 @@ mod test {
         test_context: &TestContext,
         generate_output_flag: bool,
         output_path: String,
-        scripted: bool,
+        _scripted: bool,
         get_expected_json_path_fn: fn(&str, &str, &str) -> String,
     ) {
         for processor_config in processor_configs {
@@ -131,16 +129,14 @@ mod test {
                             for (table_name, db_value) in db_values.iter_mut() {
                                 if generate_output_flag {
                                     println!("[TEST] Generating output files for all tables.");
-
+                                    remove_inserted_at(db_value);
                                     // Iterate over each table's data in the HashMap and generate an output file
                                     generate_output_file(
                                         processor_name,
                                         table_name,
                                         txn_version,
                                         db_value,
-                                        &output_path,
-                                        scripted,
-                                        None,
+                                        output_path.clone(),
                                     )?;
                                 }
 
@@ -211,56 +207,5 @@ mod test {
                 ),
             },
         ]
-    }
-
-    // Helper function to generate output files for each table
-    fn generate_output_file(
-        processor_name: &str,
-        table_name: &str,
-        txn_version: &str,
-        db_values: &serde_json::Value,
-        output_path: &str,
-        _scripted: bool,
-        _txn_name: Option<String>,
-    ) -> anyhow::Result<()> {
-        // TODO: Handle scripted txn generation
-        // let file_path = if scripted {
-        //     construct_file_path(output_path, processor_name, txn_version, txn_name.unwrap())
-        // } else {
-        //     construct_file_path(output_path, processor_name, txn_version, table_name)
-        // };
-
-        let file_path = construct_file_path(output_path, processor_name, txn_version, table_name);
-
-        ensure_directory_exists(&file_path)?;
-
-        fs::write(&file_path, to_string_pretty(db_values)?)
-            .context(format!("Failed to write file to {:?}", file_path))?;
-        println!("[TEST] Generated output file at: {}", file_path.display());
-        Ok(())
-    }
-
-    /// Helper function to construct the output file path with the table name
-    /// naming convention:
-    /// imported txn -> <expected_db_output_files>/imported_testnet_txns/<processor_name>/<txn_version>/<table_name>.json
-    /// scripted txn -> <expected_db_output_files>/scripted_txns/<processor_name>/<txn_name>/<table_name>.json
-    fn construct_file_path(
-        output_dir: &str,
-        processor_name: &str,
-        folder_name: &str,
-        table_name: &str,
-    ) -> PathBuf {
-        Path::new(output_dir)
-            .join(processor_name)
-            .join(folder_name)
-            .join(format!("{}.json", table_name)) // Including table_name in the format
-    }
-
-    // Helper function to ensure the directory exists
-    fn ensure_directory_exists(path: &Path) -> anyhow::Result<()> {
-        if let Some(parent_dir) = path.parent() {
-            fs::create_dir_all(parent_dir).context("Failed to create directory")?;
-        }
-        Ok(())
     }
 }

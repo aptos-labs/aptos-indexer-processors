@@ -8,8 +8,7 @@
     "amount": "10041540182",
     "last_transaction_timestamp": "2022-10-13T01:46:57",
     "last_transaction_version": 278556781,
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T04:55:33.624870"
+    "token_standard": "v1"
   },
   {
     "storage_id": "0xfc6edbad85409914ab088b68fed0528e4d8e36dcee31075bb8252b4f426a6cff",
@@ -20,7 +19,6 @@
     "amount": "1000000000000000000",
     "last_transaction_timestamp": "2022-10-13T01:46:57",
     "last_transaction_version": 278556781,
-    "token_standard": "v1",
-    "inserted_at": "2024-10-15T04:55:33.624870"
+    "token_standard": "v1"
   }
 ]
