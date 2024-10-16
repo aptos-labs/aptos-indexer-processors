@@ -5,9 +5,9 @@ mod test {
     use crate::{
         cli_parser::get_test_config,
         diff_test_helper::{
-            event_processor::load_data as load_event_data,
-            fungible_asset_processor::load_data as load_fungible_asset_data,
-            token_v2_processor::load_data as load_token_v2_data,
+            event_processor::event_processor_helpers::load_data as load_event_data,
+            fungible_asset_processor::fa_test_helpers::load_data as load_fungible_asset_data,
+            token_v2_processor::token_v2_test_helpers::load_data as load_token_v2_data,
         },
         diff_tests::{
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,

@@ -43,7 +43,7 @@ pub fn setup_fa_processor_config(
 mod tests {
     use crate::{
         cli_parser::get_test_config,
-        diff_test_helper::fungible_asset_processor::load_data,
+        diff_test_helper::fungible_asset_processor::fa_test_helpers::load_data,
         sdk_tests::{
             fungible_asset_processor_tests::setup_fa_processor_config, run_processor_test,
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,

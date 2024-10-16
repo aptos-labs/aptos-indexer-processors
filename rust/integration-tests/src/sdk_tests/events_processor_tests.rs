@@ -42,7 +42,7 @@ pub fn setup_events_processor_config(
 mod tests {
     use crate::{
         cli_parser::get_test_config,
-        diff_test_helper::event_processor::load_data,
+        diff_test_helper::event_processor::event_processor_helpers::load_data,
         sdk_tests::{
             events_processor_tests::setup_events_processor_config, run_processor_test,
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
