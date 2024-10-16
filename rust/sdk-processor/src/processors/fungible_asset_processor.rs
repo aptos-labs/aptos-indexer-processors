@@ -27,6 +27,7 @@ use aptos_indexer_processor_sdk::{
 };
 use processor::worker::TableFlags;
 use std::time::Duration;
+use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
 use tracing::{debug, info};
 
 pub struct FungibleAssetProcessor {
@@ -57,8 +58,15 @@ impl FungibleAssetProcessor {
             },
         }
     }
+}
 
-    pub async fn run_processor(self) -> Result<()> {
+#[async_trait::async_trait]
+impl ProcessorTrait for FungibleAssetProcessor {
+    fn name(&self) -> &'static str {
+        self.config.processor_config.name()
+    }
+
+    async fn run_processor(&self) -> Result<()> {
         let processor_name = self.config.processor_config.name();
 
         //  Run migrations
@@ -68,7 +76,7 @@ impl FungibleAssetProcessor {
                     postgres_config.connection_string.clone(),
                     self.db_pool.clone(),
                 )
-                .await;
+                    .await;
             },
         }
 
@@ -82,7 +90,7 @@ impl FungibleAssetProcessor {
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
-        let processor_config = match self.config.processor_config {
+        let processor_config = match &self.config.processor_config {
             ProcessorConfig::FungibleAssetProcessor(processor_config) => processor_config,
             _ => return Err(anyhow::anyhow!("Processor config is wrong type")),
         };
@@ -92,13 +100,13 @@ impl FungibleAssetProcessor {
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
-            ..self.config.transaction_stream_config
+            ..self.config.transaction_stream_config.clone()
         })
-        .await?;
+            .await?;
         let fa_extractor = FungibleAssetExtractor {};
         let fa_storer = FungibleAssetStorer::new(
             self.db_pool.clone(),
-            processor_config,
+            processor_config.clone(),
             deprecated_table_flags,
         );
         let order_step = OrderByVersionStep::new(
@@ -112,20 +120,20 @@ impl FungibleAssetProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(fa_extractor.into_runnable_step(), channel_size)
-        .connect_to(fa_storer.into_runnable_step(), channel_size)
-        .connect_to(order_step.into_runnable_step(), channel_size)
-        .connect_to(version_tracker.into_runnable_step(), channel_size)
-        .end_and_return_output_receiver(channel_size);
+            .connect_to(fa_extractor.into_runnable_step(), channel_size)
+            .connect_to(fa_storer.into_runnable_step(), channel_size)
+            .connect_to(order_step.into_runnable_step(), channel_size)
+            .connect_to(version_tracker.into_runnable_step(), channel_size)
+            .end_and_return_output_receiver(channel_size);
 
         // (Optional) Parse the results
         loop {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
                     debug!(
-                        "Finished processing versions [{:?}, {:?}]",
-                        txn_context.metadata.start_version, txn_context.metadata.end_version,
-                    );
+                    "Finished processing versions [{:?}, {:?}]",
+                    txn_context.metadata.start_version, txn_context.metadata.end_version,
+                );
                 },
                 Err(e) => {
                     info!("No more transactions in channel: {:?}", e);
