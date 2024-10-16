@@ -37,7 +37,6 @@ mod test {
                 processor_config,
                 test_type,
                 move |conn: &mut PgConnection, version: &str| {
-                    println!("version: {}", version);
                     // Load and validate events
                     let withdraw_events = load_transaction_events(
                         conn,

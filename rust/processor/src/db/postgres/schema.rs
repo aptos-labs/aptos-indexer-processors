@@ -837,8 +837,8 @@ diesel::table! {
         supply_aggregator_table_key_v1 -> Nullable<Text>,
         #[max_length = 10]
         token_standard -> Varchar,
-        inserted_at -> Timestamp,
         is_token_v2 -> Nullable<Bool>,
+        inserted_at -> Timestamp,
         supply_v2 -> Nullable<Numeric>,
         maximum_v2 -> Nullable<Numeric>,
     }
