@@ -20,7 +20,7 @@ use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
     common_steps::{OrderByVersionStep, TransactionStreamStep},
-    traits::IntoRunnableStep,
+    traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
 use std::time::Duration;
 use tracing::{debug, info};
@@ -53,8 +53,15 @@ impl EventsProcessor {
             },
         }
     }
+}
 
-    pub async fn run_processor(self) -> Result<()> {
+#[async_trait::async_trait]
+impl ProcessorTrait for EventsProcessor {
+    fn name(&self) -> &'static str {
+        self.config.processor_config.name()
+    }
+
+    async fn run_processor(&self) -> Result<()> {
         let processor_name = self.config.processor_config.name();
 
         // Run migrations
@@ -78,7 +85,7 @@ impl EventsProcessor {
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
-        let processor_config = match self.config.processor_config {
+        let processor_config = match self.config.processor_config.clone() {
             ProcessorConfig::EventsProcessor(processor_config) => processor_config,
             _ => {
                 return Err(anyhow::anyhow!(
@@ -92,7 +99,7 @@ impl EventsProcessor {
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
-            ..self.config.transaction_stream_config
+            ..self.config.transaction_stream_config.clone()
         })
         .await?;
         let events_extractor = EventsExtractor {};
