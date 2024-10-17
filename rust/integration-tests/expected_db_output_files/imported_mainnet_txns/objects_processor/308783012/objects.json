@@ -1,0 +1,57 @@
+[
+  {
+    "transaction_version": 308783012,
+    "write_set_change_index": 2,
+    "object_address": "0x6fd8ee875fb55e03b1f9643d3f229f0b077a71cfe7ffc8ba7e09ff4392950e5c",
+    "owner_address": "0x9dbbb06745c8f0242199bf5ce60ace04ff3bad41a9c697440009c9689587e694",
+    "state_key_hash": "0xf45d26a295db9ee2d220932bfa9c535fba8fb2a1364dd834b31bec750088289f",
+    "guid_creation_num": "1125899906842626",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 308783012,
+    "write_set_change_index": 3,
+    "object_address": "0x6fd8ee875fb55e03b1f9643d3f229f0b077a71cfe7ffc8ba7e09ff4392950e5c",
+    "owner_address": "0x9dbbb06745c8f0242199bf5ce60ace04ff3bad41a9c697440009c9689587e694",
+    "state_key_hash": "0xf45d26a295db9ee2d220932bfa9c535fba8fb2a1364dd834b31bec750088289f",
+    "guid_creation_num": "1125899906842626",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 308783012,
+    "write_set_change_index": 5,
+    "object_address": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
+    "owner_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
+    "state_key_hash": "0x89831c962a6d8ef922a58688dd7b949b1b83557241b0de2b1daf874f590b5667",
+    "guid_creation_num": "1125899906842628",
+    "allow_ungated_transfer": false,
+    "is_deleted": false,
+    "untransferrable": true
+  },
+  {
+    "transaction_version": 308783012,
+    "write_set_change_index": 6,
+    "object_address": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
+    "owner_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
+    "state_key_hash": "0x89831c962a6d8ef922a58688dd7b949b1b83557241b0de2b1daf874f590b5667",
+    "guid_creation_num": "1125899906842628",
+    "allow_ungated_transfer": false,
+    "is_deleted": false,
+    "untransferrable": true
+  },
+  {
+    "transaction_version": 308783012,
+    "write_set_change_index": 7,
+    "object_address": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
+    "owner_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
+    "state_key_hash": "0x89831c962a6d8ef922a58688dd7b949b1b83557241b0de2b1daf874f590b5667",
+    "guid_creation_num": "1125899906842628",
+    "allow_ungated_transfer": false,
+    "is_deleted": false,
+    "untransferrable": true
+  }
+]

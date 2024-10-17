@@ -1,4 +1,4 @@
-use crate::models::queryable_models::Event;
+use crate::models::events_models::Event;
 use anyhow::Result;
 use diesel::{
     pg::PgConnection,
@@ -24,7 +24,6 @@ pub fn load_data(
 
     let all_events = events_result?;
 
-    println!("size of events: {}", all_events.len());
     let events_json_data = serde_json::to_string_pretty(&all_events)?;
 
     result_map.insert(
