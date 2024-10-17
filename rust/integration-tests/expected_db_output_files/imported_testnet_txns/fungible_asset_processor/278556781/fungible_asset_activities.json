@@ -15,6 +15,7 @@
     "block_height": 20040326,
     "token_standard": "v1",
     "transaction_timestamp": "2022-10-13T01:46:57",
+    "inserted_at": "2024-10-15T04:55:33.625216",
     "storage_refund_amount": "0"
   },
   {
@@ -33,6 +34,7 @@
     "block_height": 20040326,
     "token_standard": "v1",
     "transaction_timestamp": "2022-10-13T01:46:57",
+    "inserted_at": "2024-10-15T04:55:33.625216",
     "storage_refund_amount": "0"
   }
 ]
