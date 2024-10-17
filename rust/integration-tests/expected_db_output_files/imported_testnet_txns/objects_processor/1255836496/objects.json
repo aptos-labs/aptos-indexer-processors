@@ -1,0 +1,167 @@
+[
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 0,
+    "object_address": "0x4551f2167c446b219c4dee2aa5496395c82a465cd57c5b362621af451c5d062b",
+    "owner_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
+    "state_key_hash": "0x8ff4b48c6d27126305b642d060047913507760f89fed6e739b25495422da784e",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 1,
+    "object_address": "0x4551f2167c446b219c4dee2aa5496395c82a465cd57c5b362621af451c5d062b",
+    "owner_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
+    "state_key_hash": "0x8ff4b48c6d27126305b642d060047913507760f89fed6e739b25495422da784e",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 2,
+    "object_address": "0x4551f2167c446b219c4dee2aa5496395c82a465cd57c5b362621af451c5d062b",
+    "owner_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
+    "state_key_hash": "0x8ff4b48c6d27126305b642d060047913507760f89fed6e739b25495422da784e",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 3,
+    "object_address": "0x4551f2167c446b219c4dee2aa5496395c82a465cd57c5b362621af451c5d062b",
+    "owner_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
+    "state_key_hash": "0x8ff4b48c6d27126305b642d060047913507760f89fed6e739b25495422da784e",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 5,
+    "object_address": "0x7ea259eaaacce518a7479baca008e17fab2d0267a16e11979d52eb6c5433aad6",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xe65aa304842d45a8340c95cb41019ef4279bc7c54e86f628007303a7a9067e79",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 6,
+    "object_address": "0x7ea259eaaacce518a7479baca008e17fab2d0267a16e11979d52eb6c5433aad6",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xe65aa304842d45a8340c95cb41019ef4279bc7c54e86f628007303a7a9067e79",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 7,
+    "object_address": "0x7ea259eaaacce518a7479baca008e17fab2d0267a16e11979d52eb6c5433aad6",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xe65aa304842d45a8340c95cb41019ef4279bc7c54e86f628007303a7a9067e79",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 8,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 9,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 10,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 11,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 12,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 13,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 14,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 15,
+    "object_address": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "state_key_hash": "0xf605eda7943ebdfc4c931e8407e23dfa20288f91e191a7a58baf6363a6a2a139",
+    "guid_creation_num": "1125899906842625",
+    "allow_ungated_transfer": true,
+    "is_deleted": false,
+    "untransferrable": false
+  }
+]
