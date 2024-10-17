@@ -120,7 +120,6 @@ impl TestContext {
             processor
                 .process_transactions(vec![txn.clone()], version, version, None)
                 .await?;
-            // }
 
             last_version = Some(version);
 

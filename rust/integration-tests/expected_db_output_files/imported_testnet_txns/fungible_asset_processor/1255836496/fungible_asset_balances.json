@@ -1,0 +1,50 @@
+[
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 4,
+    "storage_id": "0x56c216a20a151df2e917008e27f3b70250f1cbb80eeef24e64e2335630825fa3",
+    "owner_address": "0x6cbd58aec3b1eb5aff37ece4dff62b829ecbc6b851ee94056e852bcde5690ab4",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "17374075418",
+    "transaction_timestamp": "2024-06-18T05:07:55",
+    "token_standard": "v1"
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 5,
+    "storage_id": "0x7ea259eaaacce518a7479baca008e17fab2d0267a16e11979d52eb6c5433aad6",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "asset_type": "0x4551f2167c446b219c4dee2aa5496395c82a465cd57c5b362621af451c5d062b",
+    "is_primary": false,
+    "is_frozen": false,
+    "amount": "93054699",
+    "transaction_timestamp": "2024-06-18T05:07:55",
+    "token_standard": "v2"
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 8,
+    "storage_id": "0x8f4f0991e18bd9620a4b3756dbe15afd20135eaaa93e0d0b82e6e2412a8e12b8",
+    "owner_address": "0xbe1390db94c2f8e83fd870c195656921ed4a2a5dee644c6d9c3168fea082a828",
+    "asset_type": "0x4551f2167c446b219c4dee2aa5496395c82a465cd57c5b362621af451c5d062b",
+    "is_primary": false,
+    "is_frozen": false,
+    "amount": "17272186129",
+    "transaction_timestamp": "2024-06-18T05:07:55",
+    "token_standard": "v2"
+  },
+  {
+    "transaction_version": 1255836496,
+    "write_set_change_index": 16,
+    "storage_id": "0x2086a7aaf18928233884d1725d4f92c5f26c67ac03cb98fe2dc40c99671282dc",
+    "owner_address": "0xf21d4c76354db6492841e31fefeaa5a3e8a1071d2bcbbdd1cf1cbc6fa3954b88",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "29450400",
+    "transaction_timestamp": "2024-06-18T05:07:55",
+    "token_standard": "v1"
+  }
+]
