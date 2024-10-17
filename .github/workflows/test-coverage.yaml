@@ -23,10 +23,6 @@ concurrency:
 
 jobs:
   rust-unit-coverage:
-    if: |
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
-      (github.event_name == 'schedule' && github.ref_name == 'main')
-    # Note the tests run slowly due to instrutmentation. It takes CI 10 hrs
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -41,7 +37,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info -vv --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases
+      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info -vv --ignore-run-fail --workspace
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: 33554432 # 32 MB of stack
@@ -51,3 +47,25 @@ jobs:
           CVC5_EXE: /home/runner/bin/cvc5
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+        working-directory: rust
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov_unit
+          path: lcov_unit.info
+
+  upload-to-codecov:
+    runs-on: ubuntu-latest
+    continue-on-error: true # Don't fail if the codecov upload fails
+#    env:
+#      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    needs: [ rust-unit-coverage ]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: lcov_unit
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        with:
+          files: lcov_unit.info,lcov_smoke.info
+          fail_ci_if_error: true
