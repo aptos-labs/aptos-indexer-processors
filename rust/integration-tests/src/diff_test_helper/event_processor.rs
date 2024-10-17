@@ -10,15 +10,21 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
-pub fn load_data(conn: &mut PgConnection, txn_version: &str) -> Result<HashMap<String, Value>> {
+pub fn load_data(
+    conn: &mut PgConnection,
+    txn_versions: Vec<i64>,
+) -> Result<HashMap<String, Value>> {
     let mut result_map: HashMap<String, Value> = HashMap::new();
 
     let events_result = events
-        .filter(transaction_version.eq(txn_version.parse::<i64>().unwrap()))
+        .filter(transaction_version.eq_any(txn_versions))
+        .then_order_by(transaction_version.asc())
         .then_order_by(event_index.asc())
         .load::<Event>(conn);
 
     let all_events = events_result?;
+
+    println!("size of events: {}", all_events.len());
     let events_json_data = serde_json::to_string_pretty(&all_events)?;
 
     result_map.insert(
