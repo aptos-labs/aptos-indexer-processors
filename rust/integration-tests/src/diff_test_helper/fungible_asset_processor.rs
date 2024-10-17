@@ -1,4 +1,4 @@
-use crate::models::queryable_models::{
+use crate::models::fa_v2_models::{
     CoinSupply, CurrentFungibleAssetBalance, FungibleAssetActivity, FungibleAssetBalance,
     FungibleAssetMetadataModel,
 };
@@ -23,7 +23,6 @@ pub fn load_data(
 ) -> Result<HashMap<String, Value>> {
     let mut result_map: HashMap<String, Value> = HashMap::new();
 
-    // Query from fungible_asset_activities
     let fungible_asset_activities_result = faa_dsl::fungible_asset_activities
         .filter(faa_dsl::transaction_version.eq_any(&txn_versions))
         .then_order_by(faa_dsl::transaction_version.asc())
@@ -37,7 +36,6 @@ pub fn load_data(
         serde_json::from_str(&fungible_asset_activities_json)?,
     );
 
-    // Query from fungible_asset_metadata
     let fungible_asset_metadata_result = fam_dsl::fungible_asset_metadata
         .filter(fam_dsl::last_transaction_version.eq_any(&txn_versions))
         .then_order_by(fam_dsl::last_transaction_version.asc())
@@ -49,7 +47,6 @@ pub fn load_data(
         serde_json::from_str(&fungible_asset_metadata_json)?,
     );
 
-    // Query from fungible_asset_balances
     let fungible_asset_balances_result = fab_dsl::fungible_asset_balances
         .filter(fab_dsl::transaction_version.eq_any(&txn_versions))
         .then_order_by(fab_dsl::transaction_version.asc())
@@ -61,7 +58,6 @@ pub fn load_data(
         serde_json::from_str(&fungible_asset_balances_json)?,
     );
 
-    // Query from current_fungible_asset_balances
     let current_fungible_asset_balances_result = cfab_dsl::current_fungible_asset_balances_legacy
         .filter(cfab_dsl::last_transaction_version.eq_any(&txn_versions))
         .then_order_by(cfab_dsl::last_transaction_version.asc())
@@ -74,7 +70,6 @@ pub fn load_data(
         serde_json::from_str(&current_fungible_asset_balances_json)?,
     );
 
-    // Query from coin_supply
     let coin_supply_result = cs_dsl::coin_supply
         .filter(cs_dsl::transaction_version.eq_any(&txn_versions))
         .then_order_by(cs_dsl::transaction_version.asc())
@@ -86,6 +81,5 @@ pub fn load_data(
         serde_json::from_str(&coin_supply_json)?,
     );
 
-    // Return the complete map containing all table data
     Ok(result_map)
 }

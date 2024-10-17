@@ -1,0 +1,22 @@
+[
+  {
+    "handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "key_type": "address",
+    "value_type": "u128"
+  },
+  {
+    "handle": "0x15ee8af17d949286d38de4eb223262852b6150022e25478ca31111d38939c7e9",
+    "key_type": "u64",
+    "value_type": "vector<0x1::smart_table::Entry<address, u64>>"
+  },
+  {
+    "handle": "0x5e32abbab0789e8f6c5f559946d0e77e2de62d76f878b77a8cbab5327dac1e0a",
+    "key_type": "u64",
+    "value_type": "vector<0x1::smart_table::Entry<address, u128>>"
+  },
+  {
+    "handle": "0xad589a70930e065131f7b748607ca8a3e998149c9e15134bcf2b608b7fca003e",
+    "key_type": "u64",
+    "value_type": "vector<0x1::smart_table::Entry<address, u64>>"
+  }
+]
