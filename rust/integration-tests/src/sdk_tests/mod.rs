@@ -9,12 +9,15 @@ use diesel::{Connection, PgConnection};
 use serde_json::Value;
 use std::{collections::HashMap, fs, path::Path};
 
-mod events_processor_tests;
-mod fungible_asset_processor_tests;
+#[cfg(test)]
+pub mod events_processor_tests;
+#[cfg(test)]
+pub mod fungible_asset_processor_tests;
 
 #[allow(dead_code)]
-const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
+pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
 
+#[allow(dead_code)]
 pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
     match fs::read_to_string(path) {
         Ok(content) => match serde_json::from_str::<Value>(&content) {
@@ -32,7 +35,10 @@ pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
 }
 
 // Common setup for database and test context
-async fn setup_test_environment(transactions: &[&[u8]]) -> (PostgresTestDatabase, SdkTestContext) {
+#[allow(dead_code)]
+pub async fn setup_test_environment(
+    transactions: &[&[u8]],
+) -> (PostgresTestDatabase, SdkTestContext) {
     let mut db = PostgresTestDatabase::new();
     db.setup().await.unwrap();
 
@@ -41,7 +47,8 @@ async fn setup_test_environment(transactions: &[&[u8]]) -> (PostgresTestDatabase
     (db, test_context)
 }
 
-fn validate_json(
+#[allow(dead_code)]
+pub fn validate_json(
     db_values: &mut HashMap<String, Value>,
     txn_version: u64,
     processor_name: &str,
@@ -77,52 +84,50 @@ fn validate_json(
 }
 
 // Helper function to configure and run the processor
-async fn run_processor_test<F>(
+#[allow(dead_code)]
+pub async fn run_processor_test<F>(
     test_context: &mut SdkTestContext,
     processor: impl ProcessorTrait,
     load_data: F,
-    db_url: &str,
-    txn_version: u64,
-    diff_flag: bool,
+    db_url: String,
+    txn_versions: Vec<i64>,
+    generate_file_flag: bool,
     output_path: String,
+    custom_file_name: Option<String>,
 ) -> anyhow::Result<HashMap<String, Value>>
 where
-    F: Fn(&mut PgConnection, &str) -> anyhow::Result<HashMap<String, Value>>
+    F: Fn(&mut PgConnection, Vec<i64>) -> anyhow::Result<HashMap<String, Value>>
         + Send
         + Sync
         + 'static,
 {
-    println!(
-        "[INFO] Running {} test for transaction version: {}",
-        processor.name(),
-        txn_version
-    );
-
-    let db_value = test_context
+    let db_values = test_context
         .run(
             &processor,
-            db_url,
-            txn_version,
-            diff_flag,
+            txn_versions[0] as u64,
+            generate_file_flag,
             output_path.clone(),
-            move |db_url| {
+            custom_file_name,
+            move || {
                 // TODO: might not need this.
                 let mut conn =
-                    PgConnection::establish(db_url).expect("Failed to establish DB connection");
+                    PgConnection::establish(&db_url).expect("Failed to establish DB connection");
 
-                let db_values = match load_data(&mut conn, &txn_version.to_string()) {
+                let starting_version = txn_versions[0];
+                let ending_version = txn_versions[txn_versions.len() - 1];
+
+                let db_values = match load_data(&mut conn, txn_versions) {
                     Ok(db_data) => db_data,
                     Err(e) => {
                         eprintln!(
-                            "[ERROR] Failed to load data for transaction version {}: {}",
-                            txn_version, e
+                            "[ERROR] Failed to load data {}", e
                         );
                         return Err(e);
                     },
                 };
 
                 if db_values.is_empty() {
-                    eprintln!("[WARNING] No data found for txn version: {}", txn_version);
+                    eprintln!("[WARNING] No data found for starting txn version: {} and ending txn version {}", starting_version, ending_version);
                 }
 
                 Ok(db_values)
@@ -130,5 +135,5 @@ where
         )
         .await?;
 
-    Ok(db_value)
+    Ok(db_values)
 }
