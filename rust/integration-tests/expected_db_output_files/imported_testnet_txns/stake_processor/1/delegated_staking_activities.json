@@ -1,0 +1,34 @@
+[
+  {
+    "transaction_version": 1,
+    "event_index": 1,
+    "delegator_address": "",
+    "pool_address": "0xb7c7d12080209e9dc14498c80200706e760363fb31782247e82cf57d1d6e5d6c",
+    "event_type": "0x1::stake::DistributeRewardsEvent",
+    "amount": "0"
+  },
+  {
+    "transaction_version": 1,
+    "event_index": 2,
+    "delegator_address": "",
+    "pool_address": "0xdffe3c93b756bf6fec59b052d6fe71b40c3f9b7899d69ab06ba385b1c6728d16",
+    "event_type": "0x1::stake::DistributeRewardsEvent",
+    "amount": "4566200000"
+  },
+  {
+    "transaction_version": 1,
+    "event_index": 3,
+    "delegator_address": "",
+    "pool_address": "0x828ca971e35c8b9a807439e5a328fdc9a5ed0efbfb12f40bc451d17f6998be3f",
+    "event_type": "0x1::stake::DistributeRewardsEvent",
+    "amount": "0"
+  },
+  {
+    "transaction_version": 1,
+    "event_index": 4,
+    "delegator_address": "",
+    "pool_address": "0xacb107b98cd634ca32d39d38ab13df8cbcd5fe7856ce2a3c3d123e53f95d0b6f",
+    "event_type": "0x1::stake::DistributeRewardsEvent",
+    "amount": "0"
+  }
+]
