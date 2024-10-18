@@ -51,7 +51,7 @@ mod tests {
     };
     use aptos_indexer_test_transactions::{
         ALL_IMPORTED_TESTNET_TXNS, IMPORTED_TESTNET_TXNS_1_GENESIS,
-        IMPORTED_TESTNET_TXNS_2_GENESIS, IMPORTED_TESTNET_TXNS_3_GENESIS,
+        IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT, IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use aptos_protos::transaction::v1::Transaction;
@@ -126,8 +126,8 @@ mod tests {
 
         let imported = [
             IMPORTED_TESTNET_TXNS_1_GENESIS,
-            IMPORTED_TESTNET_TXNS_2_GENESIS,
-            IMPORTED_TESTNET_TXNS_3_GENESIS,
+            IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT,
+            IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
         ];
 
         let (db, mut test_context) = setup_test_environment(&imported).await;
