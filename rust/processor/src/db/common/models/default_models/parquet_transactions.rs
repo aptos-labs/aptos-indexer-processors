@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
-    block_metadata_transactions::BlockMetadataTransaction,
+    block_metadata_transactions::BlockMetadataTransactionModel,
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
@@ -148,7 +148,7 @@ impl Transaction {
         transaction: &TransactionPB,
     ) -> (
         Self,
-        Option<BlockMetadataTransaction>,
+        Option<BlockMetadataTransactionModel>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
@@ -286,7 +286,7 @@ impl Transaction {
                         block_timestamp,
                         txn_size_info,
                     ),
-                    Some(BlockMetadataTransaction::from_transaction(
+                    Some(BlockMetadataTransactionModel::from_bmt_transaction(
                         block_metadata_txn,
                         txn_version,
                         block_height,
@@ -364,7 +364,7 @@ impl Transaction {
         transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
     ) -> (
         Vec<Self>,
-        Vec<BlockMetadataTransaction>,
+        Vec<BlockMetadataTransactionModel>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
