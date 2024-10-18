@@ -12,6 +12,7 @@ use testcontainers::{
     ContainerAsync, GenericImage, ImageExt,
 };
 
+mod cli_parser;
 mod diff_test_helper;
 mod diff_tests;
 mod models;
