@@ -23,7 +23,7 @@ use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
     common_steps::{OrderByVersionStep, TransactionStreamStep},
-    traits::IntoRunnableStep,
+    traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
 use processor::worker::TableFlags;
 use std::time::Duration;
@@ -57,8 +57,15 @@ impl FungibleAssetProcessor {
             },
         }
     }
+}
 
-    pub async fn run_processor(self) -> Result<()> {
+#[async_trait::async_trait]
+impl ProcessorTrait for FungibleAssetProcessor {
+    fn name(&self) -> &'static str {
+        self.config.processor_config.name()
+    }
+
+    async fn run_processor(&self) -> Result<()> {
         let processor_name = self.config.processor_config.name();
 
         //  Run migrations
@@ -82,7 +89,7 @@ impl FungibleAssetProcessor {
             .await?;
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
-        let processor_config = match self.config.processor_config {
+        let processor_config = match &self.config.processor_config {
             ProcessorConfig::FungibleAssetProcessor(processor_config) => processor_config,
             _ => return Err(anyhow::anyhow!("Processor config is wrong type")),
         };
@@ -92,13 +99,13 @@ impl FungibleAssetProcessor {
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
-            ..self.config.transaction_stream_config
+            ..self.config.transaction_stream_config.clone()
         })
         .await?;
         let fa_extractor = FungibleAssetExtractor {};
         let fa_storer = FungibleAssetStorer::new(
             self.db_pool.clone(),
-            processor_config,
+            processor_config.clone(),
             deprecated_table_flags,
         );
         let order_step = OrderByVersionStep::new(

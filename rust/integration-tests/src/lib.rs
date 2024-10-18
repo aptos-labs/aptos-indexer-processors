@@ -17,6 +17,9 @@ mod diff_tests;
 mod models;
 mod scenarios_tests;
 
+#[cfg(test)]
+mod sdk_tests;
+
 /// The test context struct holds the test name and the transaction batches.
 pub struct TestContext {
     pub transaction_batches: Vec<Transaction>,
