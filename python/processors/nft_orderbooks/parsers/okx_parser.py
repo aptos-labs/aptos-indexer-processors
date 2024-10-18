@@ -19,6 +19,8 @@ OKX_MARKETPLACE_EVENT_TYPES = set(
         "okx_listing_utils::CancelListingEvent",
     ]
 )
+DEPOSIT_EVENT_V1 = "0x3::token::DepositEvent"
+DEPOSIT_EVENT_V2 = "0x3::token::Deposit"
 
 
 def parse_marketplace_events(
@@ -141,8 +143,16 @@ def parse_marketplace_events(
 def get_token_data_from_deposit_events(user_transaction) -> Dict[str, TokenDataIdType]:
     # Extract deposit events, which contain token metadata
     deposit_events: Dict[str, TokenDataIdType] = {}
-    for event in user_transaction.events:
-        if event.type_str != "0x3::token::DepositEvent":
+    for idx, event in enumerate(user_transaction.events):
+        if event.type_str != DEPOSIT_EVENT_V1 and event.type_str != DEPOSIT_EVENT_V2:
+            continue
+        # Current event is either DEPOSIT_EVENT_V1 or DEPOSIT_EVENT_V2.
+        if (
+            idx > 0
+            # skip if prior event is V2 deposit event.
+            and user_transaction.events[idx - 1].type_str == DEPOSIT_EVENT_V2
+            and event.type_str == DEPOSIT_EVENT_V1
+        ):
             continue
         account_address = standardize_address(event_utils.get_account_address(event))
         data = json.loads(event.data)

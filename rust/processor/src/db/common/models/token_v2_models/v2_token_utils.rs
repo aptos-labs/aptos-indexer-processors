@@ -313,6 +313,16 @@ pub struct Mint {
 }
 
 impl Mint {
+    pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
+        if let Some(V2TokenEvent::Mint(inner)) =
+            V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_token_address(&self) -> String {
         standardize_address(&self.token)
     }
@@ -592,7 +602,7 @@ impl V2TokenEvent {
             "0x4::collection::MintEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::MintEvent(inner)))
             },
-            "0x4::token::MutationEvent" => {
+            "0x4::token::MutationEvent" | "0x4::token::Mutation" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
             },
             "0x4::collection::Burn" => {
@@ -601,7 +611,7 @@ impl V2TokenEvent {
             "0x4::collection::BurnEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
             },
-            "0x1::object::TransferEvent" => {
+            "0x1::object::TransferEvent" | "0x1::object::Transfer" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TransferEvent(inner)))
             },
             _ => Ok(None),

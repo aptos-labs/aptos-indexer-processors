@@ -5,6 +5,7 @@
 
 use super::stake_utils::StakeEvent;
 use crate::{
+    db::common::models::should_skip,
     schema::delegated_staking_activities,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
@@ -58,6 +59,16 @@ impl DelegatedStakingActivity {
             if let Some(staking_event) =
                 StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
             {
+                if should_skip(
+                    event,
+                    if index == 0 {
+                        None
+                    } else {
+                        Some(&events[index - 1])
+                    },
+                ) {
+                    continue;
+                }
                 let activity = match staking_event {
                     StakeEvent::AddStakeEvent(inner) => DelegatedStakingActivity {
                         transaction_version: txn_version,
