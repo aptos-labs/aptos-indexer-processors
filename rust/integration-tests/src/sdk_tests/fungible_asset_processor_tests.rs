@@ -60,7 +60,7 @@ mod tests {
     async fn fa_processor_db_output_diff_test() {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
-            .unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string() + "imported_testnet_txns");
+            .unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string() + "/imported_testnet_txns");
 
         let transaction_batches = ALL_IMPORTED_TESTNET_TXNS
             .iter()
@@ -70,8 +70,8 @@ mod tests {
         let (db, mut test_context) = setup_test_environment(ALL_IMPORTED_TESTNET_TXNS).await;
 
         // Step 2: Loop over each transaction and run the test for each
-        for txn in transaction_batches.iter() {
-            let txn_version = txn.version;
+        for (ind, _txn) in transaction_batches.iter().enumerate() {
+            let txn_version = (ind + 1) as u64;
 
             // Step 3: Run the processor
             let db_url = db.get_db_url();
@@ -101,6 +101,7 @@ mod tests {
                         txn_version,
                         processor_name,
                         output_path.clone(),
+                        None,
                     );
                 },
                 Err(e) => {

@@ -7,7 +7,11 @@ use aptos_indexer_testing_framework::{
 use assert_json_diff::assert_json_eq;
 use diesel::{Connection, PgConnection};
 use serde_json::Value;
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[cfg(test)]
 pub mod events_processor_tests;
@@ -15,7 +19,7 @@ pub mod events_processor_tests;
 pub mod fungible_asset_processor_tests;
 
 #[allow(dead_code)]
-pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
+pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files2";
 
 #[allow(dead_code)]
 pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
@@ -53,13 +57,23 @@ pub fn validate_json(
     txn_version: u64,
     processor_name: &str,
     output_path: String,
+    file_name: Option<String>,
 ) -> anyhow::Result<()> {
     for (table_name, db_value) in db_values.iter_mut() {
-        // Generate the expected JSON file path for each table
-        let expected_file_path = Path::new(&output_path)
-            .join(processor_name)
-            .join(txn_version.to_string())
-            .join(format!("{}.json", table_name)); // File name format: processor_table_txnVersion.json
+        let expected_file_path = match file_name.clone() {
+            Some(custom_name) => {
+                PathBuf::from(&output_path).join(processor_name).join(
+                    format!("{}.json", custom_name.clone()), // Including table_name in the format
+                )
+            },
+            None => {
+                // Default case: use table_name and txn_version to construct file name
+                Path::new(&output_path)
+                    .join(processor_name)
+                    .join(txn_version.to_string())
+                    .join(format!("{}.json", table_name)) // File name format: processor_table_txnVersion.json
+            },
+        };
 
         let mut expected_json = match read_and_parse_json(expected_file_path.to_str().unwrap()) {
             Ok(json) => json,
@@ -77,8 +91,13 @@ pub fn validate_json(
         remove_transaction_timestamp(db_value);
         remove_inserted_at(&mut expected_json);
         remove_transaction_timestamp(&mut expected_json);
-
+        println!(
+            "Diffing table: {}, diffing version: {}",
+            table_name, txn_version
+        );
         assert_json_eq!(db_value, expected_json);
+        println!("db value: {:#?}", db_value);
+        println!("expected json: {:#?}", expected_json);
     }
     Ok(())
 }

@@ -14,7 +14,7 @@ pub fn setup_events_processor_config(
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
     let transaction_stream_config =
-        test_context.create_transaction_stream_config(txn_version, txn_count as u64);
+        test_context.create_transaction_stream_config(txn_version, txn_count as u64); // since this will be always 1, we can remove from the arg list
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -49,23 +49,41 @@ mod tests {
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
+    use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
     use aptos_indexer_test_transactions::{
-        ALL_IMPORTED_TESTNET_TXNS, IMPORTED_TESTNET_TXNS_1_GENESIS,
+        IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_, IMPORTED_TESTNET_TXNS_1_GENESIS,
+        IMPORTED_TESTNET_TXNS_278556781_V1_COIN_REGISTER_FA_METADATA,
         IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT, IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
+        IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use aptos_protos::transaction::v1::Transaction;
     use sdk_processor::processors::events_processor::EventsProcessor;
+    use testing_transactions::{
+        IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
+        IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
+    };
 
     // TODO - Add more intentional tests to validate the processor with different scenarios
-    // This test cases runs the events processor and validates the output of all available transactions proto jsons
+    // Example test1: This test cases runs the events processor and validates the output of all available transactions proto jsons
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn testnet_events_processor_db_output_diff_test() {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
-            .unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string() + "imported_testnet_txns");
+            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
 
         // Step 1: set up an input transaction that will be used
+        pub const ALL_IMPORTED_TESTNET_TXNS: &[&[u8]] = &[
+            IMPORTED_TESTNET_TXNS_1_GENESIS,
+            IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT,
+            IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
+            IMPORTED_TESTNET_TXNS_278556781_V1_COIN_REGISTER_FA_METADATA,
+            IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_,
+            IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
+            IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
+            IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
+        ];
+
         let transaction_batches = ALL_IMPORTED_TESTNET_TXNS
             .iter()
             .map(|txn| serde_json::from_slice(txn).unwrap())
@@ -74,8 +92,8 @@ mod tests {
         let (db, mut test_context) = setup_test_environment(ALL_IMPORTED_TESTNET_TXNS).await;
 
         // Step 2: Loop over each transaction and run the test for each
-        for txn in transaction_batches.iter() {
-            let txn_version = txn.version;
+        for (ind, _txn) in transaction_batches.iter().enumerate() {
+            let txn_version = (ind + 1) as u64;
 
             // Step 3: Run the processor
             let db_url = db.get_db_url();
@@ -105,6 +123,7 @@ mod tests {
                         txn_version,
                         processor_name,
                         output_path.clone(),
+                        None,
                     );
                 },
                 Err(e) => {
@@ -118,6 +137,7 @@ mod tests {
         }
     }
 
+    // Example 2: Test for multiple transactions handling
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn testnet_events_processor_db_output_scenario_testing() {
         let (diff_flag, custom_output_path) = get_test_config();
@@ -125,9 +145,8 @@ mod tests {
             .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
 
         let imported = [
-            IMPORTED_TESTNET_TXNS_1_GENESIS,
-            IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT,
-            IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
+            IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
+            IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
         ];
 
         let (db, mut test_context) = setup_test_environment(&imported).await;
@@ -137,10 +156,7 @@ mod tests {
             .map(|txn| serde_json::from_slice(txn).expect("Failed to deserialize transaction"))
             .collect();
 
-        let starting_version = transaction_batches
-            .first()
-            .expect("No transactions found")
-            .version;
+        let starting_version = 1;
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, _processor_name) = setup_events_processor_config(
@@ -153,18 +169,35 @@ mod tests {
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
             .expect("Failed to create EventsProcessor");
-
-        // TODO: we can a validation here later.
-        let _ = run_processor_test(
+        let processor_name = events_processor.name();
+        match run_processor_test(
             &mut test_context,
             events_processor,
             load_data,
             db_url,
-            vec![starting_version as i64],
+            vec![(starting_version as i64), ((starting_version + 1) as i64)], // we can pass multiple versions,
             diff_flag,
-            output_path,
+            output_path.clone(),
             Some("multi_txns_handling_test".to_string()),
         )
-        .await;
+        .await
+        {
+            Ok(mut db_value) => {
+                let _ = validate_json(
+                    &mut db_value,
+                    starting_version,
+                    processor_name,
+                    output_path.clone(),
+                    Some("multi_txns_handling_test".to_string()),
+                );
+            },
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Failed to run processor for txn version {}: {}",
+                    starting_version, e
+                );
+                panic!("Test failed due to processor error");
+            },
+        }
     }
 }
