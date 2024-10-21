@@ -62,9 +62,12 @@ pub fn validate_json(
     for (table_name, db_value) in db_values.iter_mut() {
         let expected_file_path = match file_name.clone() {
             Some(custom_name) => {
-                PathBuf::from(&output_path).join(processor_name).join(
-                    format!("{}.json", custom_name.clone()), // Including table_name in the format
-                )
+                PathBuf::from(&output_path)
+                    .join(processor_name)
+                    .join(custom_name.clone())
+                    .join(
+                        format!("{}.json", table_name), // Including table_name in the format
+                    )
             },
             None => {
                 // Default case: use table_name and txn_version to construct file name
@@ -96,8 +99,6 @@ pub fn validate_json(
             table_name, txn_version
         );
         assert_json_eq!(db_value, expected_json);
-        println!("db value: {:#?}", db_value);
-        println!("expected json: {:#?}", expected_json);
     }
     Ok(())
 }
@@ -109,7 +110,7 @@ pub async fn run_processor_test<F>(
     processor: impl ProcessorTrait,
     load_data: F,
     db_url: String,
-    txn_versions: Vec<i64>,
+    txn_count: i64,
     generate_file_flag: bool,
     output_path: String,
     custom_file_name: Option<String>,
@@ -123,7 +124,7 @@ where
     let db_values = test_context
         .run(
             &processor,
-            txn_versions[0] as u64,
+            1,
             generate_file_flag,
             output_path.clone(),
             custom_file_name,
@@ -132,8 +133,9 @@ where
                 let mut conn =
                     PgConnection::establish(&db_url).expect("Failed to establish DB connection");
 
-                let starting_version = txn_versions[0];
-                let ending_version = txn_versions[txn_versions.len() - 1];
+                let starting_version = 1;
+                let ending_version = txn_count;
+                let txn_versions: Vec<i64> = (starting_version..=ending_version).collect();
 
                 let db_values = match load_data(&mut conn, txn_versions) {
                     Ok(db_data) => db_data,

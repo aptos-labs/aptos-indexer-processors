@@ -3,7 +3,7 @@
     "sequence_number": 2,
     "creation_number": 0,
     "account_address": "0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862",
-    "transaction_version": 4,
+    "transaction_version": 1,
     "transaction_block_height": 20040326,
     "type_": "0x1::account::CoinRegisterEvent",
     "data": {
@@ -20,7 +20,7 @@
     "sequence_number": 0,
     "creation_number": 10,
     "account_address": "0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862",
-    "transaction_version": 4,
+    "transaction_version": 1,
     "transaction_block_height": 20040326,
     "type_": "0x1::coin::DepositEvent",
     "data": {
