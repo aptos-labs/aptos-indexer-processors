@@ -50,6 +50,7 @@ pub fn load_data(
     let fungible_asset_balances_result = fab_dsl::fungible_asset_balances
         .filter(fab_dsl::transaction_version.eq_any(&txn_versions))
         .then_order_by(fab_dsl::transaction_version.asc())
+        .then_order_by(fab_dsl::write_set_change_index.asc())
         .load::<FungibleAssetBalance>(conn);
     let all_fungible_asset_balances = fungible_asset_balances_result?;
     let fungible_asset_balances_json = serde_json::to_string_pretty(&all_fungible_asset_balances)?;
