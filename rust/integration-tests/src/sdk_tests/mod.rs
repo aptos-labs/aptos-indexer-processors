@@ -19,7 +19,7 @@ pub mod events_processor_tests;
 pub mod fungible_asset_processor_tests;
 
 #[allow(dead_code)]
-pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files2";
+pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files";
 
 #[allow(dead_code)]
 pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
@@ -110,7 +110,7 @@ pub async fn run_processor_test<F>(
     processor: impl ProcessorTrait,
     load_data: F,
     db_url: String,
-    txn_count: i64,
+    txn_versions: Vec<i64>,
     generate_file_flag: bool,
     output_path: String,
     custom_file_name: Option<String>,
@@ -124,18 +124,16 @@ where
     let db_values = test_context
         .run(
             &processor,
-            1,
+            txn_versions[0] as u64,
             generate_file_flag,
             output_path.clone(),
             custom_file_name,
             move || {
-                // TODO: might not need this.
                 let mut conn =
                     PgConnection::establish(&db_url).expect("Failed to establish DB connection");
 
-                let starting_version = 1;
-                let ending_version = txn_count;
-                let txn_versions: Vec<i64> = (starting_version..=ending_version).collect();
+                let starting_version = txn_versions[0];
+                let ending_version = txn_versions[txn_versions.len() - 1];
 
                 let db_values = match load_data(&mut conn, txn_versions) {
                     Ok(db_data) => db_data,
@@ -155,6 +153,5 @@ where
             },
         )
         .await?;
-
     Ok(db_values)
 }

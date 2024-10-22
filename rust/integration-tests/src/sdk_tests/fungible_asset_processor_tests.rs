@@ -9,10 +9,12 @@ use std::collections::HashSet;
 
 pub fn setup_fa_processor_config(
     test_context: &SdkTestContext,
+    staring_version: u64,
     txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config = test_context.create_transaction_stream_config(txn_count as u64);
+    let transaction_stream_config =
+        test_context.create_transaction_stream_config(staring_version, txn_count as u64);
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -59,9 +61,10 @@ mod tests {
     // Test case for processing a specific testnet transaction (Validator Transaction)
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_fungible_asset_processor_validator_txn() {
-        process_single_testnet(
+        process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
-            "validator_txn_test",
+            5523474016,
+            Some("validator_txn_test".to_string()),
         )
         .await;
     }
@@ -69,24 +72,30 @@ mod tests {
     // Test case for processing another testnet transaction (Coin Register)
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_fungible_asset_processor_coin_register_txn() {
-        process_single_testnet(
+        process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
-            "coin_register_txn_test",
+            5979639459,
+            Some("coin_register_txn_test".to_string()),
         )
         .await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_fungible_asset_processor_fa_activities_txn() {
-        process_single_testnet(
+        process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
-            "fa_activities_txn_test",
+            5992795934,
+            Some("fa_activities_txn_test".to_string()),
         )
         .await;
     }
 
     // Helper function to abstract out the transaction processing
-    async fn process_single_testnet(txn: &[u8], test_case_name: &str) {
+    async fn process_single_testnet_fa_txns(
+        txn: &[u8],
+        txn_version: i64,
+        test_case_name: Option<String>,
+    ) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
             .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
@@ -95,7 +104,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_fa_processor_config(&test_context, 1, &db_url);
+            setup_fa_processor_config(&test_context, txn_version as u64, 1, &db_url);
 
         let fungible_asset_processor = FungibleAssetProcessor::new(indexer_processor_config)
             .await
@@ -106,20 +115,20 @@ mod tests {
             fungible_asset_processor,
             load_data,
             db_url,
-            1,
+            vec![txn_version],
             diff_flag,
             output_path.clone(),
-            Some(test_case_name.to_string()),
+            test_case_name.clone(),
         )
         .await
         {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    1,
+                    txn_version as u64,
                     processor_name,
                     output_path.clone(),
-                    Some(test_case_name.to_string()),
+                    test_case_name,
                 );
             },
             Err(e) => {
