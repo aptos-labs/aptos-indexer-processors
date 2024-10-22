@@ -1,9 +1,9 @@
 use super::database::ArcDbPool;
 use crate::{
     config::indexer_processor_config::IndexerProcessorConfig,
-    db::common::{
-        models::backfill_processor_status::{BackfillProcessorStatusQuery, BackfillStatus},
-        models::processor_status::ProcessorStatusQuery,
+    db::common::models::{
+        backfill_processor_status::{BackfillProcessorStatusQuery, BackfillStatus},
+        processor_status::ProcessorStatusQuery,
     },
 };
 use anyhow::{Context, Result};
@@ -91,9 +91,9 @@ mod tests {
             indexer_processor_config::{BackfillConfig, IndexerProcessorConfig},
             processor_config::{DefaultProcessorConfig, ProcessorConfig},
         },
-        db::common::{
-            models::backfill_processor_status::{self, BackfillProcessorStatus, BackfillStatus},
-            models::processor_status::ProcessorStatus,
+        db::common::models::{
+            backfill_processor_status::{BackfillProcessorStatus, BackfillStatus},
+            processor_status::ProcessorStatus,
         },
         utils::database::{new_db_pool, run_migrations},
     };
@@ -101,7 +101,7 @@ mod tests {
     use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
     use aptos_indexer_testing_framework::database::{PostgresTestDatabase, TestDatabase};
     use diesel_async::RunQueryDsl;
-    use processor::{db::common::models, schema::processor_status};
+    use processor::schema::processor_status;
     use std::collections::HashSet;
     use url::Url;
 
@@ -121,7 +121,7 @@ mod tests {
             db_pool_size: 100,
         };
         let db_config = DbConfig::PostgresConfig(postgres_config);
-        return IndexerProcessorConfig {
+        IndexerProcessorConfig {
             db_config,
             transaction_stream_config: TransactionStreamConfig {
                 indexer_grpc_data_service_address: Url::parse("https://test.com").unwrap(),
@@ -136,10 +136,11 @@ mod tests {
             },
             processor_config,
             backfill_config,
-        };
+        }
     }
 
     #[tokio::test]
+    #[allow(clippy::needless_return)]
     async fn test_get_starting_version_no_checkpoint() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
@@ -153,10 +154,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(starting_version, 0);
+        assert_eq!(starting_version, 0)
     }
 
     #[tokio::test]
+    #[allow(clippy::needless_return)]
     async fn test_get_starting_version_no_checkpoint_with_start_ver() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
@@ -170,12 +172,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(starting_version, 5);
+        assert_eq!(starting_version, 5)
     }
 
-    // ::processor_status::ProcessorStatus, schema::processor_status
-
     #[tokio::test]
+    #[allow(clippy::needless_return)]
     async fn test_get_starting_version_with_checkpoint() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
@@ -198,10 +199,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(starting_version, 11);
+        assert_eq!(starting_version, 11)
     }
 
     #[tokio::test]
+    #[allow(clippy::needless_return)]
     async fn test_backfill_get_starting_version_with_completed_checkpoint() {
         let mut db = PostgresTestDatabase::new();
         let backfill_alias = "backfill_processor".to_string();
@@ -234,10 +236,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(starting_version, 0);
+        assert_eq!(starting_version, 0)
     }
 
     #[tokio::test]
+    #[allow(clippy::needless_return)]
     async fn test_backfill_get_starting_version_with_inprogress_checkpoint() {
         let mut db = PostgresTestDatabase::new();
         let backfill_alias = "backfill_processor".to_string();
@@ -270,6 +273,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(starting_version, 11);
+        assert_eq!(starting_version, 11)
     }
 }

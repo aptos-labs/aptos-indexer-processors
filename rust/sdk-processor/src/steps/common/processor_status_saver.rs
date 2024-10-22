@@ -7,14 +7,14 @@ use crate::{
     utils::database::{execute_with_better_error, ArcDbPool},
 };
 use anyhow::Result;
-use aptos_indexer_processor_sdk::common_steps::ProcessorStatusSaver;
 use aptos_indexer_processor_sdk::{
+    common_steps::ProcessorStatusSaver,
     types::transaction_context::TransactionContext,
     utils::{errors::ProcessorError, time::parse_timestamp},
 };
 use async_trait::async_trait;
 use diesel::{upsert::excluded, ExpressionMethods};
-use processor::{schema::backfill_processor_status, schema::processor_status};
+use processor::schema::{backfill_processor_status, processor_status};
 
 pub fn get_processor_status_saver(
     conn_pool: ArcDbPool,

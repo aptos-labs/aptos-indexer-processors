@@ -4,14 +4,16 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::utils::database::DbPoolConnection;
-use diesel::deserialize;
-use diesel::deserialize::{FromSql, FromSqlRow};
-use diesel::expression::AsExpression;
-use diesel::pg::{Pg, PgValue};
-use diesel::serialize;
-use diesel::serialize::{IsNull, Output, ToSql};
-use diesel::sql_types::Text;
-use diesel::{AsChangeset, ExpressionMethods, Insertable, OptionalExtension, QueryDsl, Queryable};
+use diesel::{
+    deserialize,
+    deserialize::{FromSql, FromSqlRow},
+    expression::AsExpression,
+    pg::{Pg, PgValue},
+    serialize,
+    serialize::{IsNull, Output, ToSql},
+    sql_types::Text,
+    AsChangeset, ExpressionMethods, Insertable, OptionalExtension, QueryDsl, Queryable,
+};
 use diesel_async::RunQueryDsl;
 use processor::schema::backfill_processor_status;
 use std::io::Write;
