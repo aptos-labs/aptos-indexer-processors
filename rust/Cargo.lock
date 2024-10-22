@@ -4183,6 +4183,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-processor-sdk",
  "aptos-indexer-processor-sdk-server-framework",
+ "aptos-indexer-testing-framework",
  "async-trait",
  "bcs",
  "bigdecimal",

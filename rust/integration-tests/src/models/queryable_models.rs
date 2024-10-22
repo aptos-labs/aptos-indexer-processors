@@ -126,7 +126,7 @@ pub struct CurrentFungibleAssetBalance {
 //     pub amount: Option<BigDecimal>,  // Added amount field to match schema
 //     pub last_transaction_version_v1: Option<i64>,
 //     pub last_transaction_version_v2: Option<i64>,
-//     pub last_transaction_version: Option<i64>,  // Added to match schema
+//     pub last_transaction_version: Option<i64>,  // Added to match swchema
 //     pub last_transaction_timestamp_v1: Option<chrono::NaiveDateTime>,
 //     pub last_transaction_timestamp_v2: Option<chrono::NaiveDateTime>,
 //     pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,  // Added to match schema
@@ -149,8 +149,8 @@ pub struct FungibleAssetMetadataModel {
     pub supply_aggregator_table_handle_v1: Option<String>,
     pub supply_aggregator_table_key_v1: Option<String>,
     pub token_standard: String,
-    pub is_token_v2: Option<bool>,
     pub inserted_at: chrono::NaiveDateTime,
+    pub is_token_v2: Option<bool>,
     pub supply_v2: Option<BigDecimal>,
     pub maximum_v2: Option<BigDecimal>,
 }
