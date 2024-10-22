@@ -152,6 +152,9 @@ mod test {
                                 remove_inserted_at(&mut expected_json);
                                 remove_transaction_timestamp(&mut expected_json);
                                 // Validate the actual vs expected JSON for the current table
+                                println!( "[TEST] Validating JSON for processor {} table {} and transaction version {}", processor_name, table_name, txn_version);
+                                println!("DB Value: {:?}", db_value);
+                                println!("Expected JSON: {:?}", expected_json);
                                 assert_json_eq!(db_value, expected_json);
                             }
 
