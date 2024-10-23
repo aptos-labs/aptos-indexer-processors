@@ -18,12 +18,10 @@ use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
     common_steps::{
-        OrderByVersionStep, TransactionStreamStep, VersionTrackerStep,
-        DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
+        TransactionStreamStep, VersionTrackerStep, DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
     },
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
-use std::time::Duration;
 use tracing::{debug, info};
 
 pub struct EventsProcessor {
@@ -103,10 +101,6 @@ impl ProcessorTrait for EventsProcessor {
         .await?;
         let events_extractor = EventsExtractor {};
         let events_storer = EventsStorer::new(self.db_pool.clone(), processor_config);
-        let order_step = OrderByVersionStep::new(
-            starting_version,
-            Duration::from_secs(DEFAULT_UPDATE_PROCESSOR_STATUS_SECS),
-        );
         let version_tracker = VersionTrackerStep::new(
             get_processor_status_saver(self.db_pool.clone(), self.config.clone()),
             DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
@@ -118,7 +112,6 @@ impl ProcessorTrait for EventsProcessor {
         )
         .connect_to(events_extractor.into_runnable_step(), channel_size)
         .connect_to(events_storer.into_runnable_step(), channel_size)
-        .connect_to(order_step.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 

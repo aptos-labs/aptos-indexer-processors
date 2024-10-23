@@ -94,7 +94,7 @@ diesel::table! {
         last_updated -> Timestamp,
         last_transaction_timestamp -> Nullable<Timestamp>,
         backfill_start_version -> Int8,
-        backfill_end_version -> Int8,
+        backfill_end_version -> Nullable<Int8>,
     }
 }
 

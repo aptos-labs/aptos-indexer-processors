@@ -110,16 +110,14 @@ impl ProcessorStatusSaver for ProcessorStatusSaverEnum {
                 } else {
                     BackfillStatus::InProgress
                 };
+                let backfill_end_version_mapped = backfill_end_version.map(|v| v as i64);
                 let status = BackfillProcessorStatus {
                     backfill_alias: backfill_alias.clone(),
                     backfill_status,
                     last_success_version: lst_success_version,
                     last_transaction_timestamp: end_timestamp,
                     backfill_start_version: backfill_start_version.unwrap_or(0) as i64,
-
-                    backfill_end_version: backfill_end_version
-                        .unwrap_or(last_success_batch.metadata.end_version)
-                        as i64,
+                    backfill_end_version: backfill_end_version_mapped,
                 };
                 execute_with_better_error(
                     conn_pool.clone(),

@@ -24,7 +24,7 @@ pub async fn get_starting_version(
 ) -> Result<u64> {
     // Check if there's a checkpoint in the approrpiate processor status table.
     let latest_processed_version =
-        get_latest_processed_version_from_db(indexer_processor_config, conn_pool)
+        get_starting_version_from_db(indexer_processor_config, conn_pool)
             .await
             .context("Failed to get latest processed version from DB")?;
 
@@ -37,7 +37,7 @@ pub async fn get_starting_version(
     ))
 }
 
-async fn get_latest_processed_version_from_db(
+async fn get_starting_version_from_db(
     indexer_processor_config: &IndexerProcessorConfig,
     conn_pool: ArcDbPool,
 ) -> Result<Option<u64>> {
@@ -226,7 +226,7 @@ mod tests {
                 last_success_version: 10,
                 last_transaction_timestamp: None,
                 backfill_start_version: 0,
-                backfill_end_version: 10,
+                backfill_end_version: Some(10),
             })
             .execute(&mut conn_pool.clone().get().await.unwrap())
             .await
@@ -263,7 +263,7 @@ mod tests {
                 last_success_version: 10,
                 last_transaction_timestamp: None,
                 backfill_start_version: 0,
-                backfill_end_version: 10,
+                backfill_end_version: Some(10),
             })
             .execute(&mut conn_pool.clone().get().await.unwrap())
             .await
