@@ -149,8 +149,8 @@ pub struct FungibleAssetMetadataModel {
     pub supply_aggregator_table_handle_v1: Option<String>,
     pub supply_aggregator_table_key_v1: Option<String>,
     pub token_standard: String,
-    pub is_token_v2: Option<bool>,
     pub inserted_at: chrono::NaiveDateTime,
+    pub is_token_v2: Option<bool>,
     pub supply_v2: Option<BigDecimal>,
     pub maximum_v2: Option<BigDecimal>,
 }

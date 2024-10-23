@@ -34,6 +34,7 @@ pub async fn setup_events_processor_config(
             processor_config,
             transaction_stream_config,
             db_config,
+            backfill_config: None,
         },
         processor_name,
     )
