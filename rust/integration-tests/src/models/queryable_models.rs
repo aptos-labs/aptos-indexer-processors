@@ -126,7 +126,7 @@ pub struct CurrentFungibleAssetBalance {
 //     pub amount: Option<BigDecimal>,  // Added amount field to match schema
 //     pub last_transaction_version_v1: Option<i64>,
 //     pub last_transaction_version_v2: Option<i64>,
-//     pub last_transaction_version: Option<i64>,  // Added to match swchema
+//     pub last_transaction_version: Option<i64>,  // Added to match schema
 //     pub last_transaction_timestamp_v1: Option<chrono::NaiveDateTime>,
 //     pub last_transaction_timestamp_v2: Option<chrono::NaiveDateTime>,
 //     pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,  // Added to match schema
