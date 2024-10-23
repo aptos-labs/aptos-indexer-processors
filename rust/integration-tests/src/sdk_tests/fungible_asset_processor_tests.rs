@@ -52,12 +52,15 @@ mod tests {
         },
     };
     use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
         IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
         IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
         IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
+    use once_cell::sync::Lazy;
     use sdk_processor::processors::fungible_asset_processor::FungibleAssetProcessor;
+    use std::sync::Mutex;
 
     // Test case for processing a specific testnet transaction (Validator Transaction)
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -87,6 +90,24 @@ mod tests {
             IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
             5992795934,
             Some("fa_activities_txn_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following tables:
+     * - coin_supply
+     * - current_fungible_asset_balances
+     * - fungible_asset_balances
+     * - fungible_asset_activities
+     * - fungible_asset_metadata
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_coin_and_fa_transfers() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
+            999929475,
+            Some("coin_and_fa_transfers_test".to_string()),
         )
         .await;
     }
