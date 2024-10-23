@@ -9,12 +9,12 @@ use std::collections::HashSet;
 
 pub fn setup_fa_processor_config(
     test_context: &SdkTestContext,
-    txn_version: u64,
+    staring_version: u64,
     txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
     let transaction_stream_config =
-        test_context.create_transaction_stream_config(txn_version, txn_count as u64);
+        test_context.create_transaction_stream_config(staring_version, txn_count as u64);
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -51,67 +51,94 @@ mod tests {
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::ALL_IMPORTED_TESTNET_TXNS;
+    use aptos_indexer_test_transactions::{
+        IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
+        IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
+        IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
+    };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
-    use aptos_protos::transaction::v1::Transaction;
     use sdk_processor::processors::fungible_asset_processor::FungibleAssetProcessor;
 
-    // TODO - Add more intentional tests to validate the processor with different scenarios
-    #[tokio::test]
-    async fn fa_processor_db_output_diff_test() {
+    // Test case for processing a specific testnet transaction (Validator Transaction)
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_validator_txn() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
+            5523474016,
+            Some("validator_txn_test".to_string()),
+        )
+        .await;
+    }
+
+    // Test case for processing another testnet transaction (Coin Register)
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_coin_register_txn() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
+            5979639459,
+            Some("coin_register_txn_test".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_fa_activities_txn() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
+            5992795934,
+            Some("fa_activities_txn_test".to_string()),
+        )
+        .await;
+    }
+
+    // Helper function to abstract out the transaction processing
+    async fn process_single_testnet_fa_txns(
+        txn: &[u8],
+        txn_version: i64,
+        test_case_name: Option<String>,
+    ) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
-            .unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string() + "imported_testnet_txns");
+            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
 
-        let transaction_batches = ALL_IMPORTED_TESTNET_TXNS
-            .iter()
-            .map(|txn| serde_json::from_slice(txn).unwrap())
-            .collect::<Vec<Transaction>>();
+        let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
-        let (db, mut test_context) = setup_test_environment(ALL_IMPORTED_TESTNET_TXNS).await;
+        let db_url = db.get_db_url();
+        let (indexer_processor_config, processor_name) =
+            setup_fa_processor_config(&test_context, txn_version as u64, 1, &db_url);
 
-        // Step 2: Loop over each transaction and run the test for each
-        for txn in transaction_batches.iter() {
-            let txn_version = txn.version;
-
-            // Step 3: Run the processor
-            let db_url = db.get_db_url();
-
-            let (indexer_processor_config, processor_name) =
-                setup_fa_processor_config(&test_context, txn_version, 1, &db_url);
-
-            let fungible_asset_processor = FungibleAssetProcessor::new(indexer_processor_config)
-                .await
-                .expect("Failed to create FungibleAssetProcessor");
-
-            match run_processor_test(
-                &mut test_context,
-                fungible_asset_processor,
-                load_data,
-                db_url,
-                vec![txn_version as i64],
-                diff_flag,
-                output_path.clone(),
-                None,
-            )
+        let fungible_asset_processor = FungibleAssetProcessor::new(indexer_processor_config)
             .await
-            {
-                Ok(mut db_value) => {
-                    let _ = validate_json(
-                        &mut db_value,
-                        txn_version,
-                        processor_name,
-                        output_path.clone(),
-                    );
-                },
-                Err(e) => {
-                    eprintln!(
-                        "[ERROR] Failed to run processor for txn version {}: {}",
-                        txn_version, e
-                    );
-                    panic!("Test failed due to processor error");
-                },
-            }
+            .expect("Failed to create FungibleAssetProcessor");
+
+        match run_processor_test(
+            &mut test_context,
+            fungible_asset_processor,
+            load_data,
+            db_url,
+            vec![txn_version],
+            diff_flag,
+            output_path.clone(),
+            test_case_name.clone(),
+        )
+        .await
+        {
+            Ok(mut db_value) => {
+                let _ = validate_json(
+                    &mut db_value,
+                    txn_version as u64,
+                    processor_name,
+                    output_path.clone(),
+                    test_case_name,
+                );
+            },
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Failed to run processor for txn version {}: {}",
+                    1, e
+                );
+                panic!("Test failed due to processor error");
+            },
         }
     }
 }

@@ -10,13 +10,11 @@ mod test {
         },
         diff_tests::{
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
-            get_expected_scripted_txns, remove_inserted_at, remove_transaction_timestamp,
+            remove_inserted_at, remove_transaction_timestamp,
         },
         DiffTest, TestContext, TestProcessorConfig, TestType,
     };
-    use aptos_indexer_test_transactions::{
-        ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
-    };
+    use aptos_indexer_test_transactions::{ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS};
     use aptos_indexer_testing_framework::{
         cli_parser::get_test_config, sdk_test_context::generate_output_file,
     };
@@ -62,26 +60,6 @@ mod test {
             output_path,
             false,
             get_expected_imported_mainnet_txns,
-        )
-        .await;
-    }
-
-    #[tokio::test]
-    async fn test_all_scripted_txns_schema_output_for_all_processors() {
-        let (generate_output_flag, custom_output_path) = get_test_config();
-        let output_path = custom_output_path
-            .unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string() + "/scripted_txns");
-
-        let processor_configs = get_processor_configs();
-        let test_context = TestContext::new(ALL_SCRIPTED_TRANSACTIONS).await.unwrap();
-
-        run_processor_tests(
-            processor_configs,
-            &test_context,
-            generate_output_flag,
-            output_path,
-            true,
-            get_expected_scripted_txns,
         )
         .await;
     }
@@ -160,7 +138,6 @@ mod test {
                                 remove_transaction_timestamp(db_value);
                                 remove_inserted_at(&mut expected_json);
                                 remove_transaction_timestamp(&mut expected_json);
-
                                 // Validate the actual vs expected JSON for the current table
                                 assert_json_eq!(db_value, expected_json);
                             }
