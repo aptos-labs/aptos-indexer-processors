@@ -20,6 +20,7 @@ use processor::{
     processors::fungible_asset_processor::parse_v2_coin,
 };
 
+/// Extracts fungible asset events, metadata, balances, and v1 supply from transactions
 pub struct FungibleAssetExtractor
 where
     Self: Sized + Send + 'static, {}
