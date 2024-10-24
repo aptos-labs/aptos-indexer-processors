@@ -52,6 +52,7 @@ mod tests {
         },
     };
     use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
         IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
         IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
         IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
@@ -87,6 +88,29 @@ mod tests {
             IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
             5992795934,
             Some("fa_activities_txn_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Resources
+     *      - 0x1::fungible_asset::Supply
+     *      - 0x1::fungible_asset::Metadata
+     *      - 0x1::fungible_asset::FungibleStore
+     * - Events
+     *      - 0x1::coin::WithdrawEvent
+     *      - 0x1::coin::DepositEvents
+     *      - 0x1::aptos_coin::GasFeeEvent
+     *      - 0x1::fungible_asset::Deposit
+     *      - 0x1::fungible_asset::Withdraw
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_coin_and_fa_transfers() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
+            999929475,
+            Some("coin_and_fa_transfers_test".to_string()),
         )
         .await;
     }
