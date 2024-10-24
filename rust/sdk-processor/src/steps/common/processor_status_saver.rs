@@ -126,15 +126,23 @@ impl ProcessorStatusSaver for ProcessorStatusSaverEnum {
                         .on_conflict(backfill_processor_status::backfill_alias)
                         .do_update()
                         .set((
-                            backfill_processor_status::backfill_status.eq(excluded(backfill_processor_status::backfill_status)),
-                            backfill_processor_status::last_success_version.eq(excluded(backfill_processor_status::last_success_version)),
-                            backfill_processor_status::last_updated.eq(excluded(backfill_processor_status::last_updated)),
-                            backfill_processor_status::last_transaction_timestamp.eq(excluded(backfill_processor_status::last_transaction_timestamp)),
-                            backfill_processor_status::backfill_start_version.eq(excluded(backfill_processor_status::backfill_start_version)),
-                            backfill_processor_status::backfill_end_version.eq(excluded(backfill_processor_status::backfill_end_version)),
+                            backfill_processor_status::backfill_status
+                                .eq(excluded(backfill_processor_status::backfill_status)),
+                            backfill_processor_status::last_success_version
+                                .eq(excluded(backfill_processor_status::last_success_version)),
+                            backfill_processor_status::last_updated
+                                .eq(excluded(backfill_processor_status::last_updated)),
+                            backfill_processor_status::last_transaction_timestamp.eq(excluded(
+                                backfill_processor_status::last_transaction_timestamp,
+                            )),
+                            backfill_processor_status::backfill_start_version
+                                .eq(excluded(backfill_processor_status::backfill_start_version)),
+                            backfill_processor_status::backfill_end_version
+                                .eq(excluded(backfill_processor_status::backfill_end_version)),
                         )),
-                    Some(" WHERE backfill_processor_status.last_success_version <= EXCLUDED.last_success_version "),
-                ).await?;
+                    None,
+                )
+                .await?;
                 Ok(())
             },
         }
