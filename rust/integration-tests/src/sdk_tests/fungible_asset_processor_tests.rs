@@ -93,12 +93,17 @@ mod tests {
     }
 
     /**
-     * This test includes processing for the following tables:
-     * - coin_supply
-     * - current_fungible_asset_balances
-     * - fungible_asset_balances
-     * - fungible_asset_activities
-     * - fungible_asset_metadata
+     * This test includes processing for the following:
+     * - Resources
+     *      - 0x1::fungible_asset::Supply
+     *      - 0x1::fungible_asset::Metadata
+     *      - 0x1::fungible_asset::FungibleStore
+     * - Events
+     *      - 0x1::coin::WithdrawEvent
+     *      - 0x1::coin::DepositEvents
+     *      - 0x1::aptos_coin::GasFeeEvent
+     *      - 0x1::fungible_asset::Deposit
+     *      - 0x1::fungible_asset::Withdraw
      */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_fungible_asset_processor_coin_and_fa_transfers() {
