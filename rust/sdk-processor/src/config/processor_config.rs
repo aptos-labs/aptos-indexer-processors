@@ -37,6 +37,7 @@ use std::collections::HashSet;
 pub enum ProcessorConfig {
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
+    DefaultProcessor(DefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
