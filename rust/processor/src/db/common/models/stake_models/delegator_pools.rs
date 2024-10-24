@@ -4,7 +4,7 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::stake_utils::{StakeResource, StakeTableItem};
+use super::stake_utils::{StakeEvent, StakeResource, StakeTableItem};
 use crate::{
     schema::{
         current_delegated_staking_pool_balances, delegated_staking_pool_balances,
@@ -30,7 +30,10 @@ pub type DelegatorPoolBalanceMap = AHashMap<StakingPoolAddress, CurrentDelegator
 #[diesel(table_name = delegated_staking_pools)]
 pub struct DelegatorPool {
     pub staking_pool_address: String,
+    // We should add a new field like `last_transaction_version` to track the last transaction version
+    // that updated the pool
     pub first_transaction_version: i64,
+    pub allowlist_enabled: bool,
 }
 
 // Metadata to fill pool balances and delegator balance
@@ -136,6 +139,41 @@ impl DelegatorPool {
                     }
                 }
             }
+            let txn_version = transaction.version as i64;
+
+            let events = match txn_data {
+                TxnData::User(txn) => &txn.events,
+                TxnData::BlockMetadata(txn) => &txn.events,
+                _ => {
+                    return Ok((
+                        delegator_pool_map,
+                        delegator_pool_balances,
+                        delegator_pool_balances_map,
+                    ))
+                },
+            };
+
+            for event in events {
+                if let Some(StakeEvent::AllowlistingEvent(inner)) =
+                    StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
+                {
+                    let staking_pool_address = standardize_address(&inner.pool_address);
+                    let enabled = inner.enabled;
+                    if delegator_pool_map.contains_key(&staking_pool_address) {
+                        delegator_pool_map
+                            .get_mut(&staking_pool_address)
+                            .expect("Pool should exist")
+                            .allowlist_enabled = enabled;
+                    } else {
+                        let pool = DelegatorPool {
+                            staking_pool_address: staking_pool_address.clone(),
+                            first_transaction_version: txn_version,
+                            allowlist_enabled: enabled,
+                        };
+                        delegator_pool_map.insert(staking_pool_address.clone(), pool);
+                    }
+                }
+            }
         }
         Ok((
             delegator_pool_map,
@@ -211,6 +249,7 @@ impl DelegatorPool {
                 Self {
                     staking_pool_address: staking_pool_address.clone(),
                     first_transaction_version: transaction_version,
+                    allowlist_enabled: false,
                 },
                 DelegatorPoolBalance {
                     transaction_version,
