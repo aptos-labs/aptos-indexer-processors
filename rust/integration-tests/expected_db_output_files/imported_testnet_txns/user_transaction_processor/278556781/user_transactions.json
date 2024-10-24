@@ -1,0 +1,15 @@
+[
+  {
+    "version": 278556781,
+    "block_height": 20040326,
+    "parent_signature_type": "ed25519_signature",
+    "sender": "0x589dabf3b43ef5c331ea3c0f9b6b005860c1f0ef94a5948d133e051b20c22862",
+    "sequence_number": 12,
+    "max_gas_amount": "20000",
+    "expiration_timestamp_secs": "2022-10-13T01:47:04",
+    "gas_unit_price": "1000",
+    "timestamp": "2022-10-13T01:46:57.418916",
+    "entry_function_id_str": "0x1::code::publish_package_txn",
+    "epoch": 746
+  }
+]
