@@ -5,25 +5,18 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::transactions::Transaction;
 use crate::{
     schema::block_metadata_transactions,
     utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_protos::{
-    transaction::v1::BlockMetadataTransaction as BlockMetadataTransactionPB,
-    util::timestamp::Timestamp,
-};
+use aptos_protos::{transaction::v1::BlockMetadataTransaction, util::timestamp::Timestamp};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = block_metadata_transactions)]
-pub struct BlockMetadataTransaction {
+pub struct BlockMetadataTransactionPG {
     pub version: i64,
     pub block_height: i64,
     pub id: String,
@@ -35,9 +28,9 @@ pub struct BlockMetadataTransaction {
     pub timestamp: chrono::NaiveDateTime,
 }
 
-impl BlockMetadataTransaction {
-    pub fn from_transaction(
-        txn: &BlockMetadataTransactionPB,
+impl BlockMetadataTransactionPG {
+    pub fn from_bmt_transaction(
+        txn: &BlockMetadataTransaction,
         version: i64,
         block_height: i64,
         epoch: i64,
@@ -60,4 +53,4 @@ impl BlockMetadataTransaction {
 }
 
 // Prevent conflicts with other things named `Transaction`
-pub type BlockMetadataTransactionModel = BlockMetadataTransaction;
+pub type BlockMetadataTransactionModel = BlockMetadataTransactionPG;
