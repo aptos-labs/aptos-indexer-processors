@@ -7,14 +7,14 @@
 
 use crate::{
     db::common::models::{
-        default_models::move_resources::MoveResource,
         fungible_asset_models::v2_fungible_asset_utils::{
             ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FungibleAssetMetadata,
             FungibleAssetStore, FungibleAssetSupply,
         },
+        resources::FromWriteResource,
         token_v2_models::v2_token_utils::{
             AptosCollection, ConcurrentSupply, FixedSupply, PropertyMapModel, TokenIdentifiers,
-            TokenV2, TransferEvent, UnlimitedSupply, V2TokenResource,
+            TokenV2, TransferEvent, UnlimitedSupply,
         },
     },
     utils::util::{deserialize_from_string, standardize_address},
@@ -100,67 +100,49 @@ impl ObjectCore {
     }
 }
 
+impl TryFrom<&WriteResource> for ObjectCore {
+    type Error = anyhow::Error;
+
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectWithMetadata {
     pub object_core: ObjectCore,
     pub state_key_hash: String,
 }
 
-impl ObjectWithMetadata {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        if let V2TokenResource::ObjectCore(inner) = V2TokenResource::from_resource(
-            &type_str,
-            &serde_json::from_str(write_resource.data.as_str()).unwrap(),
-            txn_version,
-        )? {
-            Ok(Some(Self {
-                object_core: inner,
-                state_key_hash: standardize_address(
+impl FromWriteResource<'_> for ObjectWithMetadata {
+    fn from_write_resource(write_resource: &WriteResource) -> anyhow::Result<Option<Self>> {
+        Ok(
+            ObjectCore::from_write_resource(write_resource)?.map(|object_core| {
+                let state_key_hash = standardize_address(
                     hex::encode(write_resource.state_key_hash.as_slice()).as_str(),
-                ),
-            }))
-        } else {
-            Ok(None)
-        }
+                );
+                Self {
+                    object_core,
+                    state_key_hash,
+                }
+            }),
+        )
     }
+}
 
+impl ObjectWithMetadata {
     pub fn get_state_key_hash(&self) -> String {
         standardize_address(&self.state_key_hash)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Untransferable {}
+pub struct Untransferable;
 
-impl Untransferable {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
+impl TryFrom<&WriteResource> for Untransferable {
+    type Error = anyhow::Error;
 
-        if let V2TokenResource::Untransferable(inner) =
-            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
+    fn try_from(write_resource: &WriteResource) -> anyhow::Result<Self> {
+        serde_json::from_str(write_resource.data.as_str()).map_err(anyhow::Error::msg)
     }
 }
