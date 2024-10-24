@@ -996,10 +996,10 @@ diesel::table! {
 
 diesel::table! {
     table_items (transaction_version, write_set_change_index) {
-        key -> Text,
         transaction_version -> Int8,
         write_set_change_index -> Int8,
         transaction_block_height -> Int8,
+        key -> Text,
         #[max_length = 66]
         table_handle -> Varchar,
         decoded_key -> Jsonb,

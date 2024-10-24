@@ -19,6 +19,12 @@ mod scenarios_tests;
 #[cfg(test)]
 mod sdk_tests;
 
+use std::time::Duration;
+use tokio::time::sleep; // You can use tokio's async sleep for delay
+
+const MAX_RETRIES: u32 = 3;
+const RETRY_DELAY: Duration = Duration::from_secs(2);
+
 /// The test context struct holds the test name and the transaction batches.
 pub struct TestContext {
     pub transaction_batches: Vec<Transaction>,
@@ -125,19 +131,64 @@ impl TestContext {
 
             last_version = Some(version);
 
-            // For DiffTest, run verification after each transaction
+            // For DiffTest, run verification after each transaction with retry logic
             if matches!(test_type, TestType::Diff(_)) {
-                test_type.run_verification(&mut conn, &version.to_string(), &verification_f)?;
+                let mut attempts = 0;
+                loop {
+                    attempts += 1;
+                    match test_type.run_verification(
+                        &mut conn,
+                        &version.to_string(),
+                        &verification_f,
+                    ) {
+                        Ok(_) => break,
+                        Err(e) if attempts < MAX_RETRIES => {
+                            eprintln!(
+                                "Verification failed on attempt {}. Retrying... Error: {:?}",
+                                attempts, e
+                            );
+                            sleep(RETRY_DELAY).await;
+                        },
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Verification failed after {} attempts: {:?}",
+                                MAX_RETRIES,
+                                e
+                            ));
+                        },
+                    }
+                }
             }
         }
-        // For ScenarioTest, use the last transaction version if needed
+
+        // For ScenarioTest, use the last transaction version if needed with retry logic
         if matches!(test_type, TestType::Scenario(_)) {
             if let Some(last_version) = last_version {
-                test_type.run_verification(
-                    &mut conn,
-                    &last_version.to_string(),
-                    &verification_f,
-                )?;
+                let mut attempts = 0;
+                loop {
+                    attempts += 1;
+                    match test_type.run_verification(
+                        &mut conn,
+                        &last_version.to_string(),
+                        &verification_f,
+                    ) {
+                        Ok(_) => break,
+                        Err(e) if attempts < MAX_RETRIES => {
+                            eprintln!(
+                                "Verification failed on attempt {}. Retrying... Error: {:?}",
+                                attempts, e
+                            );
+                            sleep(RETRY_DELAY).await;
+                        },
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Verification failed after {} attempts: {:?}",
+                                MAX_RETRIES,
+                                e
+                            ));
+                        },
+                    }
+                }
             } else {
                 return Err(anyhow::anyhow!(
                     "No transactions found to get the last version"

@@ -4,9 +4,14 @@ mod test {
 
     use crate::{
         diff_test_helper::{
+            ans_processor::load_data as load_ans_data,
+            default_processor::load_data as load_default_data,
             event_processor::load_data as load_event_data,
             fungible_asset_processor::load_data as load_fungible_asset_data,
+            objects_processor::load_data as load_object_data,
+            stake_processor::load_data as load_stake_data,
             token_v2_processor::load_data as load_token_v2_data,
+            user_transaction_processor::load_data as load_ut_data,
         },
         diff_tests::{
             get_expected_imported_mainnet_txns, get_expected_imported_testnet_txns,
@@ -20,7 +25,10 @@ mod test {
     };
     use assert_json_diff::assert_json_eq;
     use diesel::pg::PgConnection;
-    use processor::processors::token_v2_processor::TokenV2ProcessorConfig;
+    use processor::processors::{
+        ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
+        stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+    };
     use std::fs;
 
     const DEFAULT_OUTPUT_FOLDER: &str = "expected_db_output_files";
@@ -82,6 +90,11 @@ mod test {
                 "events_processor" => load_event_data,
                 "fungible_asset_processor" => load_fungible_asset_data,
                 "token_v2_processor" => load_token_v2_data,
+                "ans_processor" => load_ans_data,
+                "default_processor" => load_default_data,
+                "objects_processor" => load_object_data,
+                "stake_processor" => load_stake_data,
+                "user_transaction_processor" => load_ut_data,
                 _ => panic!("Unknown processor: {}", processor_name),
             };
 
@@ -139,6 +152,9 @@ mod test {
                                 remove_inserted_at(&mut expected_json);
                                 remove_transaction_timestamp(&mut expected_json);
                                 // Validate the actual vs expected JSON for the current table
+                                println!( "[TEST] Validating JSON for processor {} table {} and transaction version {}", processor_name, table_name, txn_version);
+                                println!("DB Value: {:?}", db_value);
+                                println!("Expected JSON: {:?}", expected_json);
                                 assert_json_eq!(db_value, expected_json);
                             }
 
@@ -182,6 +198,35 @@ mod test {
                         query_retry_delay_ms: 1000,
                     },
                 ),
+            },
+            TestProcessorConfig {
+                config: processor::processors::ProcessorConfig::DefaultProcessor,
+            },
+            TestProcessorConfig {
+                config: processor::processors::ProcessorConfig::AnsProcessor(AnsProcessorConfig {
+                    ans_v1_primary_names_table_handle: "ans_v1_primary_names".to_string(),
+                    ans_v1_name_records_table_handle: "ans_v1_secondary_names".to_string(),
+                    ans_v2_contract_address: "ans_v1_primary_addresses".to_string(),
+                }),
+            },
+            TestProcessorConfig {
+                config: processor::processors::ProcessorConfig::ObjectsProcessor(
+                    ObjectsProcessorConfig {
+                        query_retries: 3,
+                        query_retry_delay_ms: 1000,
+                    },
+                ),
+            },
+            TestProcessorConfig {
+                config: processor::processors::ProcessorConfig::StakeProcessor(
+                    StakeProcessorConfig {
+                        query_retries: 3,
+                        query_retry_delay_ms: 1000,
+                    },
+                ),
+            },
+            TestProcessorConfig {
+                config: processor::processors::ProcessorConfig::UserTransactionProcessor,
             },
         ]
     }
