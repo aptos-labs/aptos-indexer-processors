@@ -58,9 +58,7 @@ mod tests {
         IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
-    use once_cell::sync::Lazy;
     use sdk_processor::processors::fungible_asset_processor::FungibleAssetProcessor;
-    use std::sync::Mutex;
 
     // Test case for processing a specific testnet transaction (Validator Transaction)
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
