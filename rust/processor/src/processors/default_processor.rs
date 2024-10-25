@@ -272,6 +272,26 @@ impl ProcessorTrait for DefaultProcessor {
     }
 }
 
+/// Processes a list of transactions and extracts relevant data into different models.
+///
+/// This function iterates over a list of transactions, extracting block metadata transactions,
+/// table items, current table items, and table metadata. It handles different types of
+/// transactions and write set changes, converting them into appropriate models. The function
+/// also sorts the extracted data to avoid PostgreSQL deadlocks during multi-threaded database
+/// writes.
+///
+/// # Arguments
+///
+/// * `transactions` - A vector of `Transaction` objects to be processed.
+/// * `flags` - A `TableFlags` object that determines which tables to clear after processing.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * `Vec<BlockMetadataTransactionModel>` - A vector of block metadata transaction models.
+/// * `Vec<TableItem>` - A vector of table items.
+/// * `Vec<CurrentTableItem>` - A vector of current table items, sorted by primary key.
+/// * `Vec<TableMetadata>` - A vector of table metadata, sorted by primary key.
 pub fn process_transactions(
     transactions: Vec<Transaction>,
     flags: TableFlags,

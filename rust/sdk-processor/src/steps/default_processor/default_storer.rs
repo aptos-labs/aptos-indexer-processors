@@ -1,6 +1,5 @@
 use crate::{
     config::processor_config::DefaultProcessorConfig,
-    db::common::models::events_models::events::EventModel,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -11,25 +10,16 @@ use aptos_indexer_processor_sdk::{
     utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
-use diesel::{
-    pg::{upsert::excluded, Pg},
-    query_builder::QueryFragment,
-    ExpressionMethods,
-};
 use processor::{
     db::common::models::default_models::{
-        block_metadata_transactions::{BlockMetadataTransaction, BlockMetadataTransactionModel},
+        block_metadata_transactions::BlockMetadataTransactionModel,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
     },
     processors::default_processor::{
-        insert_block_metadata_transactions_query, insert_table_metadata_query,
+        insert_block_metadata_transactions_query, insert_current_table_items_query,
+        insert_table_items_query, insert_table_metadata_query,
     },
 };
-use processor::{
-    processors::default_processor::insert_current_table_items_query, worker::TableFlags,
-};
-use processor::{processors::default_processor::insert_table_items_query, schema};
-use tracing::debug;
 
 pub struct DefaultStorer
 where
@@ -51,20 +41,44 @@ impl DefaultStorer {
 #[async_trait]
 impl Processable for DefaultStorer {
     type Input = (
-        Vec<BlockMetadataTransaction>,
-        (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
+        Vec<BlockMetadataTransactionModel>,
+        Vec<TableItem>,
+        Vec<CurrentTableItem>,
+        Vec<TableMetadata>,
     );
     type Output = ();
     type RunType = AsyncRunType;
 
+    /// Processes a batch of transactions and inserts the extracted data into the database.
+    ///
+    /// This function takes a `TransactionContext` containing vectors of block metadata transactions,
+    /// table items, current table items, and table metadata. It processes these vectors by executing
+    /// database insertion operations in chunks to handle large datasets efficiently. The function
+    /// uses `futures::try_join!` to run the insertion operations concurrently and ensures that all
+    /// operations complete successfully.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - A `TransactionContext` containing:
+    ///   * `Vec<BlockMetadataTransactionModel>` - A vector of block metadata transaction models.
+    ///   * `Vec<TableItem>` - A vector of table items.
+    ///   * `Vec<CurrentTableItem>` - A vector of current table items.
+    ///   * `Vec<TableMetadata>` - A vector of table metadata.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Option<TransactionContext<()>>, ProcessorError>` - Returns `Ok(Some(TransactionContext))`
+    ///   if all insertion operations complete successfully. Returns an error if any of the operations fail.
     async fn process(
         &mut self,
         input: TransactionContext<(
-            Vec<BlockMetadataTransaction>,
-            (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
+            Vec<BlockMetadataTransactionModel>,
+            Vec<TableItem>,
+            Vec<CurrentTableItem>,
+            Vec<TableMetadata>,
         )>,
     ) -> Result<Option<TransactionContext<()>>, ProcessorError> {
-        let (block_metadata_transactions, (table_items, current_table_items, table_metadata)) =
+        let (block_metadata_transactions, table_items, current_table_items, table_metadata) =
             input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
@@ -74,7 +88,7 @@ impl Processable for DefaultStorer {
             self.conn_pool.clone(),
             insert_block_metadata_transactions_query,
             &block_metadata_transactions,
-            get_config_table_chunk_size::<BlockMetadataTransaction>(
+            get_config_table_chunk_size::<BlockMetadataTransactionModel>(
                 "block_metadata_transactions",
                 &per_table_chunk_sizes,
             ),
