@@ -1,0 +1,24 @@
+[
+  {
+    "storage_id": "0x1fff287896925cd278649c9c18ccf22e8ee879964f0284f61df4fd811574cdb4",
+    "owner_address": "0xbc054b63705ba1440cd48527756adc0861310658dcb3b13b13f5193d447c1f1e",
+    "asset_type": "0xa0e8bee18e7ed6c7f52ff2708c367c7214083e16dc69827c0311dab87f17f554",
+    "is_primary": true,
+    "is_frozen": true,
+    "amount": "0",
+    "last_transaction_timestamp": "2024-05-22T05:52:52",
+    "last_transaction_version": 1200394037,
+    "token_standard": "v2"
+  },
+  {
+    "storage_id": "0x30ada02023d8f633496e5119bdf88f898ddb11e95bb2f1f73aedbf75b042e502",
+    "owner_address": "0x8a735d61f2c98aa97f62fa3c328b63fc97b8a7d50cd8eda633124137639ce4fc",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "99580400",
+    "last_transaction_timestamp": "2024-05-22T05:52:52",
+    "last_transaction_version": 1200394037,
+    "token_standard": "v1"
+  }
+]
