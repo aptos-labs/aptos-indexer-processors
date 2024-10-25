@@ -5,7 +5,7 @@ use crate::{
     },
     steps::{
         common::get_processor_status_saver,
-        events_processor::{EventsExtractor, EventsStorer},
+        default_processor::{default_extractor::DefaultExtractor, default_storer::DefaultStorer},
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -22,6 +22,7 @@ use aptos_indexer_processor_sdk::{
     },
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
+use processor::worker::TableFlags;
 use tracing::{debug, info};
 
 pub struct DefaultProcessor {
@@ -83,15 +84,16 @@ impl ProcessorTrait for DefaultProcessor {
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
         let processor_config = match self.config.processor_config.clone() {
-            ProcessorConfig::EventsProcessor(processor_config) => processor_config,
+            ProcessorConfig::DefaultProcessor(processor_config) => processor_config,
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid processor config for EventsProcessor: {:?}",
+                    "Invalid processor config for DefaultProcessor: {:?}",
                     self.config.processor_config
                 ))
             },
         };
         let channel_size = processor_config.channel_size;
+        let deprecated_table_flags = TableFlags::from_set(&processor_config.deprecated_tables);
 
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
@@ -99,8 +101,10 @@ impl ProcessorTrait for DefaultProcessor {
             ..self.config.transaction_stream_config.clone()
         })
         .await?;
-        let events_extractor = EventsExtractor {};
-        let events_storer = EventsStorer::new(self.db_pool.clone(), processor_config);
+        let default_extractor = DefaultExtractor {
+            deprecated_table_flags,
+        };
+        let default_storer = DefaultStorer::new(self.db_pool.clone(), processor_config);
         let version_tracker = VersionTrackerStep::new(
             get_processor_status_saver(self.db_pool.clone(), self.config.clone()),
             DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
@@ -110,8 +114,8 @@ impl ProcessorTrait for DefaultProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(events_extractor.into_runnable_step(), channel_size)
-        .connect_to(events_storer.into_runnable_step(), channel_size)
+        .connect_to(default_extractor.into_runnable_step(), channel_size)
+        .connect_to(default_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
@@ -120,7 +124,7 @@ impl ProcessorTrait for DefaultProcessor {
             match buffer_receiver.recv().await {
                 Ok(txn_context) => {
                     debug!(
-                        "Finished processing events from versions [{:?}, {:?}]",
+                        "Finished processing versions [{:?}, {:?}]",
                         txn_context.metadata.start_version, txn_context.metadata.end_version,
                     );
                 },

@@ -52,9 +52,7 @@ impl DefaultStorer {
 impl Processable for DefaultStorer {
     type Input = (
         Vec<BlockMetadataTransaction>,
-        Vec<TableItem>,
-        Vec<CurrentTableItem>,
-        Vec<TableMetadata>,
+        (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
     );
     type Output = ();
     type RunType = AsyncRunType;

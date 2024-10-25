@@ -19,7 +19,7 @@ pub struct DefaultExtractor
 where
     Self: Sized + Send + 'static,
 {
-    flags: TableFlags,
+    pub deprecated_table_flags: TableFlags,
 }
 
 #[async_trait]
@@ -43,7 +43,7 @@ impl Processable for DefaultExtractor {
         >,
         ProcessorError,
     > {
-        let flags = self.flags;
+        let flags = self.deprecated_table_flags;
         let (block_metadata_transactions, (table_items, current_table_items, table_metadata)) =
             tokio::task::spawn_blocking(move || process_transactions(transactions.data, flags))
                 .await
