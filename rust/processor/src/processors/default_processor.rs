@@ -121,7 +121,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_block_metadata_transactions_query(
+pub fn insert_block_metadata_transactions_query(
     items_to_insert: Vec<BlockMetadataTransactionModel>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -138,7 +138,7 @@ fn insert_block_metadata_transactions_query(
     )
 }
 
-fn insert_table_items_query(
+pub fn insert_table_items_query(
     items_to_insert: Vec<TableItem>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -155,7 +155,7 @@ fn insert_table_items_query(
     )
 }
 
-fn insert_current_table_items_query(
+pub fn insert_current_table_items_query(
     items_to_insert: Vec<CurrentTableItem>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -180,7 +180,7 @@ fn insert_current_table_items_query(
     )
 }
 
-fn insert_table_metadata_query(
+pub fn insert_table_metadata_query(
     items_to_insert: Vec<TableMetadata>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -269,7 +269,7 @@ impl ProcessorTrait for DefaultProcessor {
     }
 }
 
-fn process_transactions(
+pub fn process_transactions(
     transactions: Vec<Transaction>,
     flags: TableFlags,
 ) -> (

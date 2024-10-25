@@ -1,4 +1,5 @@
 use crate::db::common::models::events_models::events::EventModel;
+use ahash::AHashMap;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::{transaction::TxnData, Transaction},
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
@@ -6,112 +7,56 @@ use aptos_indexer_processor_sdk::{
     utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
-use rayon::prelude::*;
-use tracing::warn;
-
+use processor::db::common::models::default_models::{
+    block_metadata_transactions::BlockMetadataTransaction,
+    move_tables::{CurrentTableItem, TableItem, TableMetadata},
+};
+use processor::processors::default_processor::process_transactions;
+use processor::worker::TableFlags;
 pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
 
 pub struct DefaultExtractor
 where
-    Self: Sized + Send + 'static, {}
+    Self: Sized + Send + 'static,
+{
+    flags: TableFlags,
+}
 
 #[async_trait]
 impl Processable for DefaultExtractor {
     type Input = Vec<Transaction>;
-    type Output = Vec<EventModel>;
+    type Output = (
+        Vec<BlockMetadataTransaction>,
+        (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
+    );
     type RunType = AsyncRunType;
 
     async fn process(
         &mut self,
-        item: TransactionContext<Vec<Transaction>>,
-    ) -> Result<Option<TransactionContext<Vec<EventModel>>>, ProcessorError> {
-        let events = item
-            .data
-            .par_iter()
-            .with_min_len(MIN_TRANSACTIONS_PER_RAYON_JOB)
-            .map(|txn| {
-                let mut events = vec![];
-                let txn_version = txn.version as i64;
-                let block_height = txn.block_height as i64;
-                let txn_data = match txn.txn_data.as_ref() {
-                    Some(data) => data,
-                    None => {
-                        warn!(
-                            transaction_version = txn_version,
-                            "Transaction data doesn't exist"
-                        );
-                        // PROCESSOR_UNKNOWN_TYPE_COUNT
-                        //     .with_label_values(&["EventsProcessor"])
-                        //     .inc();
-                        return vec![];
-                    },
-                };
-                let default = vec![];
-                let raw_events = match txn_data {
-                    TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-                    TxnData::Genesis(tx_inner) => &tx_inner.events,
-                    TxnData::User(tx_inner) => &tx_inner.events,
-                    TxnData::Validator(tx_inner) => &tx_inner.events,
-                    _ => &default,
-                };
+        transactions: TransactionContext<Vec<Transaction>>,
+    ) -> Result<
+        Option<
+            TransactionContext<(
+                Vec<BlockMetadataTransaction>,
+                (Vec<TableItem>, Vec<CurrentTableItem>, Vec<TableMetadata>),
+            )>,
+        >,
+        ProcessorError,
+    > {
+        let flags = self.flags;
+        let (block_metadata_transactions, (table_items, current_table_items, table_metadata)) =
+            tokio::task::spawn_blocking(move || process_transactions(transactions.data, flags))
+                .await
+                .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
-                let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-                events.extend(txn_events);
-                events
-            })
-            .flatten()
-            .collect::<Vec<EventModel>>();
         Ok(Some(TransactionContext {
-            data: events,
-            metadata: item.metadata,
+            data: (
+                block_metadata_transactions,
+                (table_items, current_table_items, table_metadata),
+            ),
+            metadata: transactions.metadata,
         }))
     }
-    // process for events
-    // async fn process(
-    //     &mut self,
-    //     item: TransactionContext<Vec<Transaction>>,
-    // ) -> Result<Option<TransactionContext<Vec<EventModel>>>, ProcessorError> {
-    //     let events = item
-    //         .data
-    //         .par_iter()
-    //         .with_min_len(MIN_TRANSACTIONS_PER_RAYON_JOB)
-    //         .map(|txn| {
-    //             let mut events = vec![];
-    //             let txn_version = txn.version as i64;
-    //             let block_height = txn.block_height as i64;
-    //             let txn_data = match txn.txn_data.as_ref() {
-    //                 Some(data) => data,
-    //                 None => {
-    //                     warn!(
-    //                         transaction_version = txn_version,
-    //                         "Transaction data doesn't exist"
-    //                     );
-    //                     // PROCESSOR_UNKNOWN_TYPE_COUNT
-    //                     //     .with_label_values(&["EventsProcessor"])
-    //                     //     .inc();
-    //                     return vec![];
-    //                 },
-    //             };
-    //             let default = vec![];
-    //             let raw_events = match txn_data {
-    //                 TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-    //                 TxnData::Genesis(tx_inner) => &tx_inner.events,
-    //                 TxnData::User(tx_inner) => &tx_inner.events,
-    //                 TxnData::Validator(tx_inner) => &tx_inner.events,
-    //                 _ => &default,
-    //             };
-
-    //             let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-    //             events.extend(txn_events);
-    //             events
-    //         })
-    //         .flatten()
-    //         .collect::<Vec<EventModel>>();
-    //     Ok(Some(TransactionContext {
-    //         data: events,
-    //         metadata: item.metadata,
-    //     }))
-    // }
 }
 
 impl AsyncStep for DefaultExtractor {}
