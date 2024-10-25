@@ -24,7 +24,7 @@ pub struct MoveModule {
     pub block_height: i64,
     pub name: String,
     pub address: String,
-    pub bytecode: Option<Vec<u8>>,
+    pub bytecode: Vec<u8>,
     pub exposed_functions: Option<String>,
     pub friends: Option<String>,
     pub structs: Option<String>,
@@ -79,7 +79,7 @@ impl MoveModule {
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
             address: standardize_address(&write_module.address.to_string()),
-            bytecode: parsed_data.clone().map(|d| d.bytecode.clone()),
+            bytecode: write_module.data.as_ref().unwrap().bytecode.clone(),
             exposed_functions: parsed_data.clone().map(|d| d.exposed_functions.clone()),
             friends: parsed_data.clone().map(|d| d.friends.clone()),
             structs: parsed_data.map(|d| d.structs.clone()),
@@ -107,7 +107,7 @@ impl MoveModule {
                 .map(|d| d.name.clone())
                 .unwrap_or_default(),
             address: standardize_address(&delete_module.address.to_string()),
-            bytecode: None,
+            bytecode: vec![],
             exposed_functions: None,
             friends: None,
             structs: None,

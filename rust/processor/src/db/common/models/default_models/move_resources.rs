@@ -3,7 +3,6 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::transactions::Transaction;
 use crate::{schema::move_resources, utils::util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
@@ -12,10 +11,7 @@ use aptos_protos::transaction::v1::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Associations, Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = move_resources)]
 pub struct MoveResource {

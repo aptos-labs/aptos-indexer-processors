@@ -3,11 +3,10 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use diesel::{Associations, Identifiable, Insertable, Queryable};
+use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
-use processor::{
-    db::common::models::default_models::transactions::Transaction,
-    schema::{block_metadata_transactions, current_table_items, table_items, table_metadatas},
+use processor::schema::{
+    block_metadata_transactions, current_table_items, table_items, table_metadatas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -26,18 +25,7 @@ pub struct CurrentTableItem {
     pub inserted_at: chrono::NaiveDateTime,
 }
 
-#[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Serialize,
-    Queryable,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = transaction_version))]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = table_items)]
 pub struct TableItem {
@@ -62,18 +50,7 @@ pub struct TableMetadata {
     pub inserted_at: chrono::NaiveDateTime,
 }
 
-#[derive(
-    Associations,
-    Clone,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Serialize,
-    Queryable,
-)]
-#[diesel(belongs_to(Transaction, foreign_key = version))]
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = block_metadata_transactions)]
 pub struct BlockMetadataTransaction {
