@@ -22,6 +22,7 @@ use aptos_indexer_processor_sdk::{
     },
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
+use async_trait::async_trait;
 use processor::worker::TableFlags;
 use tracing::{debug, info};
 
@@ -55,7 +56,7 @@ impl DefaultProcessor {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl ProcessorTrait for DefaultProcessor {
     fn name(&self) -> &'static str {
         self.config.processor_config.name()
