@@ -43,7 +43,7 @@ pub fn setup_fa_processor_config(
 
 #[allow(clippy::needless_return)]
 #[cfg(test)]
-mod tests {
+mod sdk_fungible_asset_processor_tests {
     use crate::{
         diff_test_helper::fungible_asset_processor::load_data,
         sdk_tests::{
@@ -173,8 +173,7 @@ mod tests {
         test_case_name: Option<String>,
     ) {
         let (diff_flag, custom_output_path) = get_test_config();
-        let output_path = custom_output_path
-            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
+        let output_path = custom_output_path.unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string());
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
