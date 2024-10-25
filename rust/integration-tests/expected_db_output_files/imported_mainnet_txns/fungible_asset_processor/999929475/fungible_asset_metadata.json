@@ -1,0 +1,53 @@
+[
+  {
+    "asset_type": "0x234f0be57d6acfb2f0f19c17053617311a8d03c9ce358bdf9cd5c460e4a02b7c",
+    "creator_address": "0x4bf51972879e3b95c4781a5cdcb9e1ee24ef483e7d22f2d903626f126df62bd1",
+    "name": "LP-USDC-APT",
+    "symbol": "LP",
+    "decimals": 8,
+    "icon_uri": "",
+    "project_uri": "",
+    "last_transaction_version": 999929475,
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v2",
+    "maximum_v2": null,
+    "is_token_v2": null,
+    "supply_v2": "1597732577821"
+  },
+  {
+    "asset_type": "0x50fdfa97914bd00b656e3041e143f157c84931eb1ca7224b8a8570e7d5be70f2",
+    "creator_address": "0x3b38735644d0be8ac37ebd84a1e42fa5c2487495ef8782f6c694b1a147f82426",
+    "name": "USD Coin",
+    "symbol": "USDC",
+    "decimals": 6,
+    "icon_uri": "",
+    "project_uri": "",
+    "last_transaction_version": 999929475,
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v2",
+    "maximum_v2": null,
+    "is_token_v2": null,
+    "supply_v2": "2060898834867"
+  },
+  {
+    "asset_type": "0xedc2704f2cef417a06d1756a04a16a9fa6faaed13af469be9cdfcac5a21a8e2e",
+    "creator_address": "0x3b38735644d0be8ac37ebd84a1e42fa5c2487495ef8782f6c694b1a147f82426",
+    "name": "Aptos Coin",
+    "symbol": "APT",
+    "decimals": 8,
+    "icon_uri": "",
+    "project_uri": "",
+    "last_transaction_version": 999929475,
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v2",
+    "maximum_v2": null,
+    "is_token_v2": null,
+    "supply_v2": "111198107496469"
+  }
+]
