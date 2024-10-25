@@ -52,7 +52,10 @@ mod tests {
         },
     };
     use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
         IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
+        IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
+        IMPORTED_TESTNET_TXNS_2646510387_CONCURRENT_FA,
         IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
         IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
         IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
@@ -111,6 +114,54 @@ mod tests {
             IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
             999929475,
             Some("coin_and_fa_transfers_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Events
+     *      - 0x1::fungible_asset::DepositEvent
+     *      - 0x1::fungible_asset::WithdrawEvent
+     *      - 0x1::fungible_asset::FrozenEvent
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_v1_events() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
+            508365567,
+            Some("v1_events_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Events
+     *      - 0x1::fungible_asset::Frozen
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_v2_frozen_event() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
+            1200394037,
+            Some("v2_frozen_event_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Resources
+     *      - 0x1::fungible_asset::ConcurrentSupply
+     *      - 0x1::fungible_asset::ConcurrentFungibleBalance
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_concurrent_fa() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_2646510387_CONCURRENT_FA,
+            2646510387,
+            Some("concurrent_fa_test".to_string()),
         )
         .await;
     }
