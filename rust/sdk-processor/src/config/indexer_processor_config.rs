@@ -34,6 +34,11 @@ impl RunnableConfig for IndexerProcessorConfig {
                 let fungible_asset_processor = FungibleAssetProcessor::new(self.clone()).await?;
                 fungible_asset_processor.run_processor().await
             },
+            ProcessorConfig::AnsProcessor(_) => {
+                // let ans_processor = AnsProcessor::new(self.clone()).await?;
+                // ans_processor.run_processor().await
+                Ok(())
+            },
         }
     }
 
