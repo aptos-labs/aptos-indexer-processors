@@ -140,7 +140,7 @@ impl ProcessorStatusSaver for ProcessorStatusSaverEnum {
                             backfill_processor_status::backfill_end_version
                                 .eq(excluded(backfill_processor_status::backfill_end_version)),
                         )),
-                    None,
+                        Some(" WHERE backfill_processor_status.last_success_version <= EXCLUDED.last_success_version "),
                 )
                 .await?;
                 Ok(())
