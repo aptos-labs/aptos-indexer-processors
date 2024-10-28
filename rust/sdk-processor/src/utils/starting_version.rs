@@ -2,12 +2,11 @@ use super::database::ArcDbPool;
 use crate::{
     config::indexer_processor_config::IndexerProcessorConfig,
     db::common::models::{
-        backfill_processor_status::{BackfillProcessorStatusQuery, BackfillStatus},
+        backfill_processor_status::{
+            BackfillProcessorStatus, BackfillProcessorStatusQuery, BackfillStatus,
+        },
         processor_status::ProcessorStatusQuery,
     },
-};
-use crate::{
-    db::common::models::backfill_processor_status::BackfillProcessorStatus,
     utils::database::execute_with_better_error,
 };
 use anyhow::{Context, Result};
@@ -67,7 +66,7 @@ async fn get_starting_version_from_db(
                 // If status is Complete, this is the start of a new backfill job.
                 BackfillStatus::Complete => {
                     let backfill_alias = status.backfill_alias.clone();
-                    let backfill_end_version_mapped = status.backfill_end_version.map(|v| v as i64);
+                    let backfill_end_version_mapped = status.backfill_end_version;
                     let status = BackfillProcessorStatus {
                         backfill_alias,
                         backfill_status: BackfillStatus::InProgress,
