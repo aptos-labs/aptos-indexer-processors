@@ -123,7 +123,7 @@ pub struct CurrentTokenOwnershipV2Query {
 
 impl TokenOwnershipV2 {
     /// For nfts it's the same resources that we parse tokendatas from so we leverage the work done in there to get ownership data
-    /// Vecs are returned because there could be multiple transfers and we need to document each one here.
+    /// Vecs are returned because there could be multiple transfers in a single transaction and we need to document each one here.
     pub fn get_nft_v2_from_token_data(
         token_data: &TokenDataV2,
         object_metadatas: &ObjectAggregatedDataMapping,
