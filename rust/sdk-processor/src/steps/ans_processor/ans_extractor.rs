@@ -1,5 +1,6 @@
-use crate::config::processor_config::ProcessorConfig;
-use crate::processors::ans_processor::AnsProcessorConfig;
+use crate::{
+    config::processor_config::ProcessorConfig, processors::ans_processor::AnsProcessorConfig,
+};
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},

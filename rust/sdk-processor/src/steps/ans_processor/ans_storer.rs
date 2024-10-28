@@ -1,5 +1,7 @@
-use crate::processors::ans_processor::AnsProcessorConfig;
-use crate::utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool};
+use crate::{
+    processors::ans_processor::AnsProcessorConfig,
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+};
 use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
