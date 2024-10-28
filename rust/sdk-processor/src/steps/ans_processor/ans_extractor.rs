@@ -1,3 +1,5 @@
+use crate::config::processor_config::ProcessorConfig;
+use crate::processors::ans_processor::AnsProcessorConfig;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
@@ -12,7 +14,7 @@ use processor::{
             AnsLookupV2, AnsPrimaryNameV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2,
         },
     },
-    processors::ans_processor::{parse_ans, AnsProcessorConfig},
+    processors::ans_processor::parse_ans,
     worker::TableFlags,
 };
 
@@ -25,11 +27,24 @@ where
 }
 
 impl AnsExtractor {
-    pub fn new(deprecated_table_flags: TableFlags, config: AnsProcessorConfig) -> Self {
-        Self {
+    pub fn new(
+        deprecated_table_flags: TableFlags,
+        config: ProcessorConfig,
+    ) -> Result<Self, anyhow::Error> {
+        let processor_config = match config {
+            ProcessorConfig::AnsProcessor(processor_config) => processor_config,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Invalid processor config for ANS Processor: {:?}",
+                    config
+                ))
+            },
+        };
+
+        Ok(Self {
             deprecated_table_flags,
-            config,
-        }
+            config: processor_config,
+        })
     }
 }
 

@@ -1,9 +1,7 @@
+use crate::processors::ans_processor::AnsProcessorConfig;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
-use crate::processors::ans_processor::AnsProcessorConfig;
-
 /// This enum captures the configs for all the different processors that are defined.
 ///
 /// The configs for each processor should only contain configuration specific to that

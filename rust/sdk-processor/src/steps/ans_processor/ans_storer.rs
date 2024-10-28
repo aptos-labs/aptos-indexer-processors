@@ -1,7 +1,5 @@
-use crate::{
-    config::processor_config::DefaultProcessorConfig,
-    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
-};
+use crate::processors::ans_processor::AnsProcessorConfig;
+use crate::utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool};
 use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -30,11 +28,11 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    processor_config: DefaultProcessorConfig,
+    processor_config: AnsProcessorConfig,
 }
 
 impl AnsStorer {
-    pub fn new(conn_pool: ArcDbPool, processor_config: DefaultProcessorConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, processor_config: AnsProcessorConfig) -> Self {
         Self {
             conn_pool,
             processor_config,

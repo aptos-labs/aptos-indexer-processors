@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        db_config::DbConfig, indexer_processor_config::IndexerProcessorConfig,
+        db_config::DbConfig,
+        indexer_processor_config::IndexerProcessorConfig,
         processor_config::{DefaultProcessorConfig, ProcessorConfig},
     },
     steps::{
@@ -13,7 +14,7 @@ use crate::{
         starting_version::get_starting_version,
     },
 };
-use serde::{Deserialize, Serialize};
+use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
@@ -23,16 +24,28 @@ use aptos_indexer_processor_sdk::{
     },
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
+use processor::worker::TableFlags;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use tracing::{debug, info};
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnsProcessorConfig {
-    #[serde(flatten)]
-    pub default: DefaultProcessorConfig,
+    // #[serde(flatten)]
+    // pub default: DefaultProcessorConfig,
     pub ans_v1_primary_names_table_handle: String,
     pub ans_v1_name_records_table_handle: String,
     pub ans_v2_contract_address: String,
+
+    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
+    #[serde(default = "AHashMap::new")]
+    pub per_table_chunk_sizes: AHashMap<String, usize>,
+    // Size of channel between steps
+    #[serde(default = "DefaultProcessorConfig::default_channel_size")]
+    pub channel_size: usize,
+    // String vector for deprecated tables to skip db writes
+    #[serde(default)]
+    pub deprecated_tables: HashSet<String>,
 }
 pub struct AnsProcessor {
     pub config: IndexerProcessorConfig,
@@ -110,9 +123,8 @@ impl ProcessorTrait for AnsProcessor {
             ..self.config.transaction_stream_config.clone()
         })
         .await?;
-        let acc_txns_extractor = AnsExtractor {deprecated_table_flags, AnsProcessorConfig {
-
-        }};
+        let acc_txns_extractor =
+            AnsExtractor::new(deprecated_table_flags, self.config.processor_config.clone());
         let acc_txns_storer = AnsStorer::new(self.db_pool.clone(), processor_config);
         let version_tracker = VersionTrackerStep::new(
             get_processor_status_saver(self.db_pool.clone(), self.config.clone()),
@@ -123,7 +135,7 @@ impl ProcessorTrait for AnsProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(acc_txns_extractor.into_runnable_step(), channel_size)
+        .connect_to(acc_txns_extractor?.into_runnable_step(), channel_size)
         .connect_to(acc_txns_storer.into_runnable_step(), channel_size)
         .connect_to(version_tracker.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);

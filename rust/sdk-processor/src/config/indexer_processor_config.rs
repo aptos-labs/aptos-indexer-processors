@@ -3,7 +3,8 @@
 
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::{
-    events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
+    ans_processor::AnsProcessor, events_processor::EventsProcessor,
+    fungible_asset_processor::FungibleAssetProcessor,
 };
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -35,9 +36,8 @@ impl RunnableConfig for IndexerProcessorConfig {
                 fungible_asset_processor.run_processor().await
             },
             ProcessorConfig::AnsProcessor(_) => {
-                // let ans_processor = AnsProcessor::new(self.clone()).await?;
-                // ans_processor.run_processor().await
-                Ok(())
+                let ans_processor = AnsProcessor::new(self.clone()).await?;
+                ans_processor.run_processor().await
             },
         }
     }
