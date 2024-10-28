@@ -43,7 +43,7 @@ pub fn setup_fa_processor_config(
 
 #[allow(clippy::needless_return)]
 #[cfg(test)]
-mod tests {
+mod sdk_fungible_asset_processor_tests {
     use crate::{
         diff_test_helper::fungible_asset_processor::load_data,
         sdk_tests::{
@@ -52,7 +52,10 @@ mod tests {
         },
     };
     use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
         IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
+        IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
+        IMPORTED_TESTNET_TXNS_2646510387_CONCURRENT_FA,
         IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
         IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
         IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
@@ -115,6 +118,54 @@ mod tests {
         .await;
     }
 
+    /**
+     * This test includes processing for the following:
+     * - Events
+     *      - 0x1::fungible_asset::DepositEvent
+     *      - 0x1::fungible_asset::WithdrawEvent
+     *      - 0x1::fungible_asset::FrozenEvent
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_v1_events() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
+            508365567,
+            Some("v1_events_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Events
+     *      - 0x1::fungible_asset::Frozen
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_v2_frozen_event() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
+            1200394037,
+            Some("v2_frozen_event_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Resources
+     *      - 0x1::fungible_asset::ConcurrentSupply
+     *      - 0x1::fungible_asset::ConcurrentFungibleBalance
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_concurrent_fa() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_2646510387_CONCURRENT_FA,
+            2646510387,
+            Some("concurrent_fa_test".to_string()),
+        )
+        .await;
+    }
+
     // Helper function to abstract out the transaction processing
     async fn process_single_testnet_fa_txns(
         txn: &[u8],
@@ -122,8 +173,7 @@ mod tests {
         test_case_name: Option<String>,
     ) {
         let (diff_flag, custom_output_path) = get_test_config();
-        let output_path = custom_output_path
-            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
+        let output_path = custom_output_path.unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string());
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
