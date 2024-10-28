@@ -267,7 +267,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_collections_v2_query(
+pub fn insert_collections_v2_query(
     items_to_insert: Vec<CollectionV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -287,7 +287,7 @@ fn insert_collections_v2_query(
     )
 }
 
-fn insert_token_datas_v2_query(
+pub fn insert_token_datas_v2_query(
     items_to_insert: Vec<TokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -311,7 +311,7 @@ fn insert_token_datas_v2_query(
     )
 }
 
-fn insert_token_ownerships_v2_query(
+pub fn insert_token_ownerships_v2_query(
     items_to_insert: Vec<TokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -332,7 +332,7 @@ fn insert_token_ownerships_v2_query(
     )
 }
 
-fn insert_current_collections_v2_query(
+pub fn insert_current_collections_v2_query(
     items_to_insert: Vec<CurrentCollectionV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -366,7 +366,7 @@ fn insert_current_collections_v2_query(
      )
 }
 
-fn insert_current_token_datas_v2_query(
+pub fn insert_current_token_datas_v2_query(
     items_to_insert: Vec<CurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -401,7 +401,7 @@ fn insert_current_token_datas_v2_query(
     )
 }
 
-fn insert_current_deleted_token_datas_v2_query(
+pub fn insert_current_deleted_token_datas_v2_query(
     items_to_insert: Vec<CurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -424,7 +424,7 @@ fn insert_current_deleted_token_datas_v2_query(
     )
 }
 
-fn insert_current_token_ownerships_v2_query(
+pub fn insert_current_token_ownerships_v2_query(
     items_to_insert: Vec<CurrentTokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -453,7 +453,7 @@ fn insert_current_token_ownerships_v2_query(
     )
 }
 
-fn insert_current_deleted_token_ownerships_v2_query(
+pub fn insert_current_deleted_token_ownerships_v2_query(
     items_to_insert: Vec<CurrentTokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -477,7 +477,7 @@ fn insert_current_deleted_token_ownerships_v2_query(
     )
 }
 
-fn insert_token_activities_v2_query(
+pub fn insert_token_activities_v2_query(
     items_to_insert: Vec<TokenActivityV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -498,7 +498,7 @@ fn insert_token_activities_v2_query(
     )
 }
 
-fn insert_current_token_v2_metadatas_query(
+pub fn insert_current_token_v2_metadatas_query(
     items_to_insert: Vec<CurrentTokenV2Metadata>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -521,7 +521,7 @@ fn insert_current_token_v2_metadatas_query(
     )
 }
 
-fn insert_current_token_royalties_v1_query(
+pub fn insert_current_token_royalties_v1_query(
     items_to_insert: Vec<CurrentTokenRoyaltyV1>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -545,7 +545,7 @@ fn insert_current_token_royalties_v1_query(
     )
 }
 
-fn insert_current_token_claims_query(
+pub fn insert_current_token_claims_query(
     items_to_insert: Vec<CurrentTokenPendingClaim>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -697,7 +697,7 @@ impl ProcessorTrait for TokenV2Processor {
     }
 }
 
-async fn parse_v2_token(
+pub async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut DbPoolConnection<'_>,
