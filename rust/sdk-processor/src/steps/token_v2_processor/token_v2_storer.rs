@@ -32,7 +32,6 @@ use processor::{
         insert_token_activities_v2_query, insert_token_datas_v2_query,
         insert_token_ownerships_v2_query,
     },
-    worker::TableFlags,
 };
 
 pub struct TokenV2Storer
