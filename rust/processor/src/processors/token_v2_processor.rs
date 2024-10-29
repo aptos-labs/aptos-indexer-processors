@@ -267,7 +267,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_collections_v2_query(
+pub fn insert_collections_v2_query(
     items_to_insert: Vec<CollectionV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -287,7 +287,7 @@ fn insert_collections_v2_query(
     )
 }
 
-fn insert_token_datas_v2_query(
+pub fn insert_token_datas_v2_query(
     items_to_insert: Vec<TokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -311,7 +311,7 @@ fn insert_token_datas_v2_query(
     )
 }
 
-fn insert_token_ownerships_v2_query(
+pub fn insert_token_ownerships_v2_query(
     items_to_insert: Vec<TokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -332,7 +332,7 @@ fn insert_token_ownerships_v2_query(
     )
 }
 
-fn insert_current_collections_v2_query(
+pub fn insert_current_collections_v2_query(
     items_to_insert: Vec<CurrentCollectionV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -366,7 +366,7 @@ fn insert_current_collections_v2_query(
      )
 }
 
-fn insert_current_token_datas_v2_query(
+pub fn insert_current_token_datas_v2_query(
     items_to_insert: Vec<CurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -401,7 +401,7 @@ fn insert_current_token_datas_v2_query(
     )
 }
 
-fn insert_current_deleted_token_datas_v2_query(
+pub fn insert_current_deleted_token_datas_v2_query(
     items_to_insert: Vec<CurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -424,7 +424,7 @@ fn insert_current_deleted_token_datas_v2_query(
     )
 }
 
-fn insert_current_token_ownerships_v2_query(
+pub fn insert_current_token_ownerships_v2_query(
     items_to_insert: Vec<CurrentTokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -453,7 +453,7 @@ fn insert_current_token_ownerships_v2_query(
     )
 }
 
-fn insert_current_deleted_token_ownerships_v2_query(
+pub fn insert_current_deleted_token_ownerships_v2_query(
     items_to_insert: Vec<CurrentTokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -477,7 +477,7 @@ fn insert_current_deleted_token_ownerships_v2_query(
     )
 }
 
-fn insert_token_activities_v2_query(
+pub fn insert_token_activities_v2_query(
     items_to_insert: Vec<TokenActivityV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -498,7 +498,7 @@ fn insert_token_activities_v2_query(
     )
 }
 
-fn insert_current_token_v2_metadatas_query(
+pub fn insert_current_token_v2_metadatas_query(
     items_to_insert: Vec<CurrentTokenV2Metadata>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -521,7 +521,7 @@ fn insert_current_token_v2_metadatas_query(
     )
 }
 
-fn insert_current_token_royalties_v1_query(
+pub fn insert_current_token_royalties_v1_query(
     items_to_insert: Vec<CurrentTokenRoyaltyV1>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -545,7 +545,7 @@ fn insert_current_token_royalties_v1_query(
     )
 }
 
-fn insert_current_token_claims_query(
+pub fn insert_current_token_claims_query(
     items_to_insert: Vec<CurrentTokenPendingClaim>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -697,7 +697,7 @@ impl ProcessorTrait for TokenV2Processor {
     }
 }
 
-async fn parse_v2_token(
+pub async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     conn: &mut DbPoolConnection<'_>,
@@ -734,7 +734,7 @@ async fn parse_v2_token(
         CurrentTokenOwnershipV2,
     > = AHashMap::new();
     let mut current_deleted_token_ownerships_v2 = AHashMap::new();
-    // Tracks prior ownership in case a token gets burned
+    // Optimization to track prior ownership in case a token gets burned so we can lookup the ownership
     let mut prior_nft_ownership: AHashMap<String, NFTOwnershipV2> = AHashMap::new();
     // Get Metadata for token v2 by object
     // We want to persist this through the entire batch so that even if a token is burned,
@@ -784,7 +784,7 @@ async fn parse_v2_token(
             // Get mint events for token v2 by object
             let mut tokens_minted: TokenV2Minted = AHashSet::new();
 
-            // Need to do a first pass to get all the objects
+            // Loop 1: Need to do a first pass to get all the object addresses and insert them into the helper
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     if let Some(object) =
@@ -801,6 +801,7 @@ async fn parse_v2_token(
                 }
             }
 
+            // Loop 2: Get the metdata relevant to parse v1 and v2 tokens
             // Need to do a second pass to get all the structs related to the object
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
@@ -854,9 +855,9 @@ async fn parse_v2_token(
                 }
             }
 
-            // Pass through events to get the burn events and token activities v2
-            // This needs to be here because we need the metadata above for token activities
-            // and burn / transfer events need to come before the next section
+            // Loop 3: Pass through events to get the burn events and token activities v2
+            // This needs to be here because we need the metadata parsed in loop 2 for token activities
+            // and burn / transfer events need to come before the next loop
             for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address(), burn_event);
@@ -918,6 +919,7 @@ async fn parse_v2_token(
                 }
             }
 
+            // Loop 4: Pass through the changes for collection, token data, token ownership, and token royalties
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 let wsc_index = index as i64;
                 match wsc.change.as_ref().unwrap() {
@@ -1134,6 +1136,7 @@ async fn parse_v2_token(
                         }
 
                         // Add burned NFT handling for token datas (can probably be merged with below)
+                        // This handles the case where token is burned but objectCore is still there
                         if let Some(deleted_token_data) =
                             TokenDataV2::get_burned_nft_v2_from_write_resource(
                                 resource,
@@ -1150,6 +1153,7 @@ async fn parse_v2_token(
                             );
                         }
                         // Add burned NFT handling
+                        // This handles the case where token is burned but objectCore is still there
                         if let Some((nft_ownership, current_nft_ownership)) =
                             TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
                                 resource,

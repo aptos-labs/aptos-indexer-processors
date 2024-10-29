@@ -1,0 +1,19 @@
+[
+  {
+    "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+    "creator_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "name": "Aptos Coin",
+    "symbol": "APT",
+    "decimals": 8,
+    "icon_uri": "",
+    "project_uri": "",
+    "last_transaction_version": 2646510387,
+    "last_transaction_timestamp": "2024-07-01T22:15:07",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v2",
+    "maximum_v2": "340282366920938463463374607431768211455",
+    "is_token_v2": null,
+    "supply_v2": "126973053239"
+  }
+]
