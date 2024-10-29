@@ -53,16 +53,11 @@ jobs:
       # Show Cargo.toml after the update
       - name: Show Cargo.toml After Update
         run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
-
+          
       # Ensure Cargo.lock is updated with the latest dependencies
       - name: Update Dependencies
         run: cargo update
         working-directory: rust
-
-      - name: Install Dependencies and Run Linter
-        uses: ./.github/actions/dep_install_and_lint
-        with:
-          working-directory: rust
 
       # Cache Cargo
       - name: Cache cargo
@@ -75,6 +70,13 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Install Dependencies and Run Linter
+      - name: Install Dependencies and Run Linter
+        uses: ./.github/actions/dep_install_and_lint
+        with:
+          working-directory: rust
+
           
       # Run Integration Tests
       - name: Run Integration Tests
