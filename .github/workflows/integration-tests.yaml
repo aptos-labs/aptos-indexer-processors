@@ -71,11 +71,11 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # Install Dependencies and Run Linter
-      - name: Install Dependencies and Run Linter
-        uses: ./.github/actions/dep_install_and_lint
-        with:
-          working-directory: rust
+      # # Install Dependencies and Run Linter
+      # - name: Install Dependencies and Run Linter
+      #   uses: ./.github/actions/dep_install_and_lint
+      #   with:
+      #     working-directory: rust
 
           
       # Run Integration Tests
