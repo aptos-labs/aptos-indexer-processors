@@ -63,6 +63,10 @@ impl RunnableConfig for IndexerProcessorConfig {
                 let token_v2_processor = TokenV2Processor::new(self.clone()).await?;
                 token_v2_processor.run_processor().await
             },
+            ProcessorConfig::ObjectsProcessor(_) => {
+                let objects_processor = ObjectsProcessor::new(self.clone()).await?;
+                objects_processor.run_processor().await
+            },
             ProcessorConfig::ParquetDefaultProcessor(_) => {
                 let parquet_default_processor = ParquetDefaultProcessor::new(self.clone()).await?;
                 parquet_default_processor.run_processor().await
