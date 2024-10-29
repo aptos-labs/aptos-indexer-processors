@@ -1,3 +1,4 @@
+use crate::processors::token_v2_processor::TokenV2ProcessorConfig;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -37,6 +38,7 @@ use std::collections::HashSet;
 pub enum ProcessorConfig {
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
+    TokenV2Processor(TokenV2ProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -64,5 +66,15 @@ pub struct DefaultProcessorConfig {
 impl DefaultProcessorConfig {
     pub const fn default_channel_size() -> usize {
         10
+    }
+}
+
+impl Default for DefaultProcessorConfig {
+    fn default() -> Self {
+        Self {
+            per_table_chunk_sizes: AHashMap::new(),
+            channel_size: Self::default_channel_size(),
+            deprecated_tables: HashSet::new(),
+        }
     }
 }
