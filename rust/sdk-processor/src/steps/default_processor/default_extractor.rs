@@ -49,9 +49,7 @@ impl Processable for DefaultExtractor {
     > {
         let flags = self.deprecated_table_flags;
         let (block_metadata_transactions, table_items, current_table_items, table_metadata) =
-            tokio::task::spawn_blocking(move || process_transactions(transactions.data, flags))
-                .await
-                .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
+            process_transactions(transactions.data, flags);
 
         Ok(Some(TransactionContext {
             data: (
