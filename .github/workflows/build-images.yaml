@@ -20,7 +20,7 @@ env:
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
-
+      
 jobs:
   Build:
     strategy:
@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
         id: extract_branch
-      - name: Build and push images
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -47,7 +47,7 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build and push images
         run: ./scripts/build-and-push-images.sh ${{ matrix.example }}
         env:
           GIT_BRANCH: ${{ steps.extract_branch.outputs.branch }}
-      
