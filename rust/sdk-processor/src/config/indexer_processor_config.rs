@@ -3,6 +3,7 @@
 
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::{
+    account_transactions_processor::AccountTransactionsProcessor,
     default_processor::DefaultProcessor, events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor, token_v2_processor::TokenV2Processor,
 };
@@ -30,6 +31,10 @@ pub struct IndexerProcessorConfig {
 impl RunnableConfig for IndexerProcessorConfig {
     async fn run(&self) -> Result<()> {
         match self.processor_config {
+            ProcessorConfig::AccountTransactionsProcessor(_) => {
+                let acc_txns_processor = AccountTransactionsProcessor::new(self.clone()).await?;
+                acc_txns_processor.run_processor().await
+            },
             ProcessorConfig::EventsProcessor(_) => {
                 let events_processor = EventsProcessor::new(self.clone()).await?;
                 events_processor.run_processor().await
