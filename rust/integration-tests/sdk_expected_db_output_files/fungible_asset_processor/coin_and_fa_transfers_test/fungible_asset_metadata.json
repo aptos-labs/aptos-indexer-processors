@@ -12,8 +12,8 @@
     "supply_aggregator_table_handle_v1": null,
     "supply_aggregator_table_key_v1": null,
     "token_standard": "v2",
-    "is_token_v2": null,
     "maximum_v2": null,
+    "is_token_v2": null,
     "supply_v2": "1597732577821"
   },
   {
@@ -29,8 +29,8 @@
     "supply_aggregator_table_handle_v1": null,
     "supply_aggregator_table_key_v1": null,
     "token_standard": "v2",
-    "is_token_v2": null,
     "maximum_v2": null,
+    "is_token_v2": null,
     "supply_v2": "2060898834867"
   },
   {
@@ -46,8 +46,8 @@
     "supply_aggregator_table_handle_v1": null,
     "supply_aggregator_table_key_v1": null,
     "token_standard": "v2",
-    "is_token_v2": null,
     "maximum_v2": null,
+    "is_token_v2": null,
     "supply_v2": "111198107496469"
   }
 ]

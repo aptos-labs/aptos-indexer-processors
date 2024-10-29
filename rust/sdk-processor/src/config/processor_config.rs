@@ -1,4 +1,5 @@
 use crate::processors::ans_processor::AnsProcessorConfig;
+use crate::processors::token_v2_processor::TokenV2ProcessorConfig;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -35,9 +36,12 @@ use std::collections::HashSet;
     strum(serialize_all = "snake_case")
 )]
 pub enum ProcessorConfig {
+    AccountTransactionsProcessor(DefaultProcessorConfig),
+    AnsProcessor(AnsProcessorConfig),
+    DefaultProcessor(DefaultProcessorConfig),
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
-    AnsProcessor(AnsProcessorConfig),
+    TokenV2Processor(TokenV2ProcessorConfig),
 }
 
 impl ProcessorConfig {

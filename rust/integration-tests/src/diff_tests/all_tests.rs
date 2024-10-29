@@ -1,6 +1,6 @@
 #[allow(clippy::needless_return)]
 #[cfg(test)]
-mod test {
+mod tests {
 
     use crate::{
         diff_test_helper::{

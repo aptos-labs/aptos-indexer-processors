@@ -1,0 +1,13 @@
+[
+  {
+    "storage_id": "0x6999cbf188405f4732f0561e196c5fdde1e057415dd16c6c9e83e30c9a0e3019",
+    "owner_address": "0x75fc2a90fa8ef566ddc3d82e84944eb886415bc19226ae1d88d5e7577aec1be5",
+    "asset_type": "0x000000000000000000000000000000000000000000000000000000000000000a",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "398922140",
+    "last_transaction_timestamp": "2024-07-01T22:15:07",
+    "last_transaction_version": 2646510387,
+    "token_standard": "v2"
+  }
+]
