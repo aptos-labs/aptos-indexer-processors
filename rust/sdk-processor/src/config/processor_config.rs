@@ -1,8 +1,9 @@
-use crate::processors::token_v2_processor::TokenV2ProcessorConfig;
+use crate::processors::{
+    ans_processor::AnsProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+};
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
 /// This enum captures the configs for all the different processors that are defined.
 ///
 /// The configs for each processor should only contain configuration specific to that
@@ -37,6 +38,7 @@ use std::collections::HashSet;
 )]
 pub enum ProcessorConfig {
     AccountTransactionsProcessor(DefaultProcessorConfig),
+    AnsProcessor(AnsProcessorConfig),
     DefaultProcessor(DefaultProcessorConfig),
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
