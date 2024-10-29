@@ -185,6 +185,6 @@ impl AsyncStep for StakeStorer {}
 
 impl NamedStep for StakeStorer {
     fn name(&self) -> String {
-        "FungibleAssetStorer".to_string()
+        "StakeStorer".to_string()
     }
 }
