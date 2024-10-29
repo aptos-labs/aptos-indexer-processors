@@ -3,8 +3,10 @@
 
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::{
-    events_processor::EventsProcessor, fungible_asset_processor::FungibleAssetProcessor,
-    stake_processor::StakeProcessor,
+    account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
+    default_processor::DefaultProcessor, events_processor::EventsProcessor,
+    fungible_asset_processor::FungibleAssetProcessor, stake_processor::StakeProcessor,
+    token_v2_processor::TokenV2Processor,
 };
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -30,6 +32,18 @@ pub struct IndexerProcessorConfig {
 impl RunnableConfig for IndexerProcessorConfig {
     async fn run(&self) -> Result<()> {
         match self.processor_config {
+            ProcessorConfig::AccountTransactionsProcessor(_) => {
+                let acc_txns_processor = AccountTransactionsProcessor::new(self.clone()).await?;
+                acc_txns_processor.run_processor().await
+            },
+            ProcessorConfig::AnsProcessor(_) => {
+                let ans_processor = AnsProcessor::new(self.clone()).await?;
+                ans_processor.run_processor().await
+            },
+            ProcessorConfig::DefaultProcessor(_) => {
+                let default_processor = DefaultProcessor::new(self.clone()).await?;
+                default_processor.run_processor().await
+            },
             ProcessorConfig::EventsProcessor(_) => {
                 let events_processor = EventsProcessor::new(self.clone()).await?;
                 events_processor.run_processor().await
@@ -41,6 +55,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::StakeProcessor(_) => {
                 let stake_processor = StakeProcessor::new(self.clone()).await?;
                 stake_processor.run_processor().await
+            },
+            ProcessorConfig::TokenV2Processor(_) => {
+                let token_v2_processor = TokenV2Processor::new(self.clone()).await?;
+                token_v2_processor.run_processor().await
             },
         }
     }

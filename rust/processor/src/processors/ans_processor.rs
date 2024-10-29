@@ -186,7 +186,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_current_ans_lookups_query(
+pub fn insert_current_ans_lookups_query(
     item_to_insert: Vec<CurrentAnsLookup>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -211,7 +211,7 @@ fn insert_current_ans_lookups_query(
     )
 }
 
-fn insert_ans_lookups_query(
+pub fn insert_ans_lookups_query(
     item_to_insert: Vec<AnsLookup>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -228,7 +228,7 @@ fn insert_ans_lookups_query(
     )
 }
 
-fn insert_current_ans_primary_names_query(
+pub fn insert_current_ans_primary_names_query(
     item_to_insert: Vec<CurrentAnsPrimaryName>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -253,7 +253,7 @@ fn insert_current_ans_primary_names_query(
     )
 }
 
-fn insert_ans_primary_names_query(
+pub fn insert_ans_primary_names_query(
     item_to_insert: Vec<AnsPrimaryName>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -270,7 +270,7 @@ fn insert_ans_primary_names_query(
     )
 }
 
-fn insert_current_ans_lookups_v2_query(
+pub fn insert_current_ans_lookups_v2_query(
     item_to_insert: Vec<CurrentAnsLookupV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -296,7 +296,7 @@ fn insert_current_ans_lookups_v2_query(
     )
 }
 
-fn insert_ans_lookups_v2_query(
+pub fn insert_ans_lookups_v2_query(
     item_to_insert: Vec<AnsLookupV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -317,7 +317,7 @@ fn insert_ans_lookups_v2_query(
     )
 }
 
-fn insert_current_ans_primary_names_v2_query(
+pub fn insert_current_ans_primary_names_v2_query(
     item_to_insert: Vec<CurrentAnsPrimaryNameV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -342,7 +342,7 @@ fn insert_current_ans_primary_names_v2_query(
     )
 }
 
-fn insert_ans_primary_names_v2_query(
+pub fn insert_ans_primary_names_v2_query(
     items_to_insert: Vec<AnsPrimaryNameV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -470,7 +470,7 @@ impl ProcessorTrait for AnsProcessor {
     }
 }
 
-fn parse_ans(
+pub fn parse_ans(
     transactions: &[Transaction],
     ans_v1_primary_names_table_handle: String,
     ans_v1_name_records_table_handle: String,

@@ -29,10 +29,10 @@ pub struct CurrentTableItem {
 #[diesel(primary_key(transaction_version, write_set_change_index))]
 #[diesel(table_name = table_items)]
 pub struct TableItem {
+    pub key: String,
     pub transaction_version: i64,
     pub write_set_change_index: i64,
     pub transaction_block_height: i64,
-    pub key: String,
     pub table_handle: String,
     pub decoded_key: serde_json::Value,
     pub decoded_value: Option<serde_json::Value>,
