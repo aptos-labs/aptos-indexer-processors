@@ -55,9 +55,12 @@ jobs:
         run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
 
       # Ensure Cargo.lock is updated with the latest dependencies
-      - name: Update Dependencies
-        run: cargo update
-        working-directory: rust
+      - name: rust setup
+        run: |
+          sudo apt update && sudo apt install libdw-dev
+          cargo update
+        working-directory:
+          rust
 
       # Run Integration Tests
       - name: Run Integration Tests
