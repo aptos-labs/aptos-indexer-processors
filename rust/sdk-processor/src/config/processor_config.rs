@@ -1,8 +1,7 @@
+use crate::processors::stake_processor::StakeProcessorConfig;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
-use crate::processors::stake_processor::StakeProcessorConfig;
 
 /// This enum captures the configs for all the different processors that are defined.
 ///
