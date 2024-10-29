@@ -13,15 +13,12 @@ use async_trait::async_trait;
 use processor::{
     db::common::models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
-        ans_lookup_v2::{
-            AnsLookupV2, AnsPrimaryNameV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2,
-        },
+        ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2},
     },
     processors::ans_processor::{
         insert_ans_lookups_query, insert_ans_lookups_v2_query, insert_ans_primary_names_query,
-        insert_ans_primary_names_v2_query, insert_current_ans_lookups_query,
-        insert_current_ans_lookups_v2_query, insert_current_ans_primary_names_query,
-        insert_current_ans_primary_names_v2_query,
+        insert_current_ans_lookups_query, insert_current_ans_lookups_v2_query,
+        insert_current_ans_primary_names_query, insert_current_ans_primary_names_v2_query,
     },
 };
 
@@ -52,7 +49,6 @@ impl Processable for AnsStorer {
         Vec<CurrentAnsLookupV2>,
         Vec<AnsLookupV2>,
         Vec<CurrentAnsPrimaryNameV2>,
-        Vec<AnsPrimaryNameV2>,
     );
     type Output = ();
     type RunType = AsyncRunType;
@@ -67,7 +63,6 @@ impl Processable for AnsStorer {
             Vec<CurrentAnsLookupV2>,
             Vec<AnsLookupV2>,
             Vec<CurrentAnsPrimaryNameV2>,
-            Vec<AnsPrimaryNameV2>,
         )>,
     ) -> Result<Option<TransactionContext<()>>, ProcessorError> {
         let (
@@ -78,7 +73,6 @@ impl Processable for AnsStorer {
             current_ans_lookups_v2,
             ans_lookups_v2,
             current_ans_primary_names_v2,
-            ans_primary_names_v2,
         ) = input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
@@ -141,17 +135,8 @@ impl Processable for AnsStorer {
                 &per_table_chunk_sizes,
             ),
         );
-        let apn_v2 = execute_in_chunks(
-            self.conn_pool.clone(),
-            insert_ans_primary_names_v2_query,
-            &ans_primary_names_v2,
-            get_config_table_chunk_size::<AnsPrimaryNameV2>(
-                "ans_primary_name_v2",
-                &per_table_chunk_sizes,
-            ),
-        );
 
-        futures::try_join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2, apn_v2)?;
+        futures::try_join!(cal, al, capn, apn, cal_v2, al_v2, capn_v2)?;
 
         Ok(Some(TransactionContext {
             data: (),

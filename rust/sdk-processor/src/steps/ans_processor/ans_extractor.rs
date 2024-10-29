@@ -11,9 +11,7 @@ use async_trait::async_trait;
 use processor::{
     db::common::models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
-        ans_lookup_v2::{
-            AnsLookupV2, AnsPrimaryNameV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2,
-        },
+        ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2},
     },
     processors::ans_processor::parse_ans,
     worker::TableFlags,
@@ -60,7 +58,6 @@ impl Processable for AnsExtractor {
         Vec<CurrentAnsLookupV2>,
         Vec<AnsLookupV2>,
         Vec<CurrentAnsPrimaryNameV2>,
-        Vec<AnsPrimaryNameV2>,
     );
     type RunType = AsyncRunType;
 
@@ -77,7 +74,6 @@ impl Processable for AnsExtractor {
                 Vec<CurrentAnsLookupV2>,
                 Vec<AnsLookupV2>,
                 Vec<CurrentAnsPrimaryNameV2>,
-                Vec<AnsPrimaryNameV2>,
             )>,
         >,
         ProcessorError,
@@ -90,7 +86,7 @@ impl Processable for AnsExtractor {
             all_current_ans_lookups_v2,
             all_ans_lookups_v2,
             all_current_ans_primary_names_v2,
-            mut all_ans_primary_names_v2,
+            _, // AnsPrimaryNameV2 is deprecated.
         ) = parse_ans(
             &input.data,
             self.config.ans_v1_primary_names_table_handle.clone(),
@@ -103,12 +99,6 @@ impl Processable for AnsExtractor {
             .contains(TableFlags::ANS_PRIMARY_NAME)
         {
             all_ans_primary_names.clear();
-        }
-        if self
-            .deprecated_table_flags
-            .contains(TableFlags::ANS_PRIMARY_NAME_V2)
-        {
-            all_ans_primary_names_v2.clear();
         }
         if self.deprecated_table_flags.contains(TableFlags::ANS_LOOKUP) {
             all_ans_lookups.clear();
@@ -135,7 +125,6 @@ impl Processable for AnsExtractor {
                 all_current_ans_lookups_v2,
                 all_ans_lookups_v2,
                 all_current_ans_primary_names_v2,
-                all_ans_primary_names_v2,
             ),
             metadata: input.metadata,
         }))

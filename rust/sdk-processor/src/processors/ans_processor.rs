@@ -99,7 +99,7 @@ impl ProcessorTrait for AnsProcessor {
             ProcessorConfig::AnsProcessor(processor_config) => processor_config,
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid processor config for Account Transactions Processor: {:?}",
+                    "Invalid processor config for ANS Processor: {:?}",
                     self.config.processor_config
                 ))
             },

@@ -1,5 +1,6 @@
-use crate::processors::ans_processor::AnsProcessorConfig;
-use crate::processors::token_v2_processor::TokenV2ProcessorConfig;
+use crate::processors::{
+    ans_processor::AnsProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+};
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
