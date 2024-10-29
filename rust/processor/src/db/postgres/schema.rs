@@ -384,6 +384,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_delegated_staking_pool_allowlist (delegator_address, staking_pool_address) {
+        #[max_length = 66]
+        staking_pool_address -> Varchar,
+        #[max_length = 66]
+        delegator_address -> Varchar,
+        is_allowed -> Bool,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_delegated_staking_pool_balances (staking_pool_address) {
         #[max_length = 66]
         staking_pool_address -> Varchar,
@@ -709,6 +721,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    delegated_staking_pool_allowlist (transaction_version, delegator_address, staking_pool_address) {
+        #[max_length = 66]
+        staking_pool_address -> Varchar,
+        #[max_length = 66]
+        delegator_address -> Varchar,
+        is_allowed -> Bool,
+        transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     delegated_staking_pool_balances (transaction_version, staking_pool_address) {
         transaction_version -> Int8,
         #[max_length = 66]
@@ -730,6 +754,7 @@ diesel::table! {
         staking_pool_address -> Varchar,
         first_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        allowlist_enabled -> Bool,
     }
 }
 
@@ -1314,6 +1339,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_coin_balances,
     current_collection_datas,
     current_collections_v2,
+    current_delegated_staking_pool_allowlist,
     current_delegated_staking_pool_balances,
     current_delegated_voter,
     current_delegator_balances,
@@ -1330,6 +1356,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_royalty_v1,
     current_token_v2_metadata,
     delegated_staking_activities,
+    delegated_staking_pool_allowlist,
     delegated_staking_pool_balances,
     delegated_staking_pools,
     delegator_balances,
