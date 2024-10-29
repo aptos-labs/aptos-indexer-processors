@@ -67,3 +67,13 @@ impl DefaultProcessorConfig {
         10
     }
 }
+
+impl Default for DefaultProcessorConfig {
+    fn default() -> Self {
+        Self {
+            per_table_chunk_sizes: AHashMap::new(),
+            channel_size: Self::default_channel_size(),
+            deprecated_tables: HashSet::new(),
+        }
+    }
+}

@@ -82,7 +82,7 @@ impl Processable for AnsStorer {
         ) = input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
-            self.processor_config.per_table_chunk_sizes.clone();
+            self.processor_config.default.per_table_chunk_sizes.clone();
 
         let cal = execute_in_chunks(
             self.conn_pool.clone(),

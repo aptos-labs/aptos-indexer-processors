@@ -14,7 +14,6 @@ use crate::{
         starting_version::get_starting_version,
     },
 };
-use ahash::AHashMap;
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
@@ -26,27 +25,18 @@ use aptos_indexer_processor_sdk::{
 };
 use processor::worker::TableFlags;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use tracing::{debug, info};
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnsProcessorConfig {
-    // #[serde(flatten)]
-    // pub default: DefaultProcessorConfig,
+    #[serde(flatten)]
+    pub default: DefaultProcessorConfig,
     pub ans_v1_primary_names_table_handle: String,
     pub ans_v1_name_records_table_handle: String,
     pub ans_v2_contract_address: String,
-
-    // Number of rows to insert, per chunk, for each DB table. Default per table is ~32,768 (2**16/2)
-    #[serde(default = "AHashMap::new")]
-    pub per_table_chunk_sizes: AHashMap<String, usize>,
-    // Size of channel between steps
-    #[serde(default = "DefaultProcessorConfig::default_channel_size")]
-    pub channel_size: usize,
-    // String vector for deprecated tables to skip db writes
-    #[serde(default)]
-    pub deprecated_tables: HashSet<String>,
 }
+
 pub struct AnsProcessor {
     pub config: IndexerProcessorConfig,
     pub db_pool: ArcDbPool,
@@ -114,8 +104,9 @@ impl ProcessorTrait for AnsProcessor {
                 ))
             },
         };
-        let channel_size = processor_config.channel_size;
-        let deprecated_table_flags = TableFlags::from_set(&processor_config.deprecated_tables);
+        let channel_size = processor_config.default.channel_size;
+        let deprecated_table_flags =
+            TableFlags::from_set(&processor_config.default.deprecated_tables);
 
         // Define processor steps.
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
