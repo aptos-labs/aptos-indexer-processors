@@ -36,6 +36,7 @@ use std::collections::HashSet;
     strum(serialize_all = "snake_case")
 )]
 pub enum ProcessorConfig {
+    DefaultProcessor(DefaultProcessorConfig),
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),

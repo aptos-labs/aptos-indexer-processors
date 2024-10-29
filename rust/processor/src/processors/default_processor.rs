@@ -124,7 +124,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_block_metadata_transactions_query(
+pub fn insert_block_metadata_transactions_query(
     items_to_insert: Vec<BlockMetadataTransactionModel>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -141,7 +141,7 @@ fn insert_block_metadata_transactions_query(
     )
 }
 
-fn insert_table_items_query(
+pub fn insert_table_items_query(
     items_to_insert: Vec<TableItem>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -158,7 +158,7 @@ fn insert_table_items_query(
     )
 }
 
-fn insert_current_table_items_query(
+pub fn insert_current_table_items_query(
     items_to_insert: Vec<CurrentTableItem>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -183,7 +183,7 @@ fn insert_current_table_items_query(
     )
 }
 
-fn insert_table_metadata_query(
+pub fn insert_table_metadata_query(
     items_to_insert: Vec<TableMetadata>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -272,7 +272,27 @@ impl ProcessorTrait for DefaultProcessor {
     }
 }
 
-fn process_transactions(
+/// Processes a list of transactions and extracts relevant data into different models.
+///
+/// This function iterates over a list of transactions, extracting block metadata transactions,
+/// table items, current table items, and table metadata. It handles different types of
+/// transactions and write set changes, converting them into appropriate models. The function
+/// also sorts the extracted data to avoid PostgreSQL deadlocks during multi-threaded database
+/// writes.
+///
+/// # Arguments
+///
+/// * `transactions` - A vector of `Transaction` objects to be processed.
+/// * `flags` - A `TableFlags` object that determines which tables to clear after processing.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * `Vec<BlockMetadataTransactionModel>` - A vector of block metadata transaction models.
+/// * `Vec<TableItem>` - A vector of table items.
+/// * `Vec<CurrentTableItem>` - A vector of current table items, sorted by primary key.
+/// * `Vec<TableMetadata>` - A vector of table metadata, sorted by primary key.
+pub fn process_transactions(
     transactions: Vec<Transaction>,
     flags: TableFlags,
 ) -> (
