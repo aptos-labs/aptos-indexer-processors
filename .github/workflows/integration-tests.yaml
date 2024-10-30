@@ -55,16 +55,17 @@ jobs:
         run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
 
       # Ensure Cargo.lock is updated with the latest dependencies
-      - name: Update Dependencies
-        run: cargo update
+      - name: rust setup
+        run: |
+          sudo apt update && sudo apt install libdw-dev
+          cargo update
         working-directory: rust
-
-      - name: Install Dependencies and Run Linter
-        uses: ./.github/actions/dep_install_and_lint
-        with:
-          working-directory: rust
 
       # Run Integration Tests
       - name: Run Integration Tests
-        run: cargo test --manifest-path integration-tests/Cargo.toml -- --nocapture
-        working-directory: rust
+        # we want to generate output so that all_tests doesn't fail when new transaction is added
+        run: |
+          # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
+          cargo test all_tests -- --nocapture generate-output
+          cargo test sdk_tests -- --nocapture generate-output
+        working-directory: rust/integration-tests
