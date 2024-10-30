@@ -7,8 +7,8 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         default_processor::DefaultProcessor, events_processor::EventsProcessor,
-        fungible_asset_processor::FungibleAssetProcessor, stake_processor::StakeProcessor,
-        token_v2_processor::TokenV2Processor,
+        fungible_asset_processor::FungibleAssetProcessor, objects_processor::ObjectsProcessor,
+        stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
     },
 };
 use anyhow::Result;
@@ -62,6 +62,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::TokenV2Processor(_) => {
                 let token_v2_processor = TokenV2Processor::new(self.clone()).await?;
                 token_v2_processor.run_processor().await
+            },
+            ProcessorConfig::ObjectsProcessor(_) => {
+                let objects_processor = ObjectsProcessor::new(self.clone()).await?;
+                objects_processor.run_processor().await
             },
             ProcessorConfig::ParquetDefaultProcessor(_) => {
                 let parquet_default_processor = ParquetDefaultProcessor::new(self.clone()).await?;
