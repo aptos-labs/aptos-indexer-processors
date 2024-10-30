@@ -10,7 +10,7 @@ use crate::{
     utils::database::execute_with_better_error,
 };
 use anyhow::{Context, Result};
-use diesel::{upsert::excluded, ExpressionMethods};
+use diesel::{result::Error as DieselError, upsert::excluded, ExpressionMethods};
 use processor::schema::backfill_processor_status;
 
 /// Get the appropriate starting version for the processor.
@@ -40,6 +40,77 @@ pub async fn get_starting_version(
             .starting_version
             .unwrap_or(0),
     ))
+}
+
+pub async fn get_minimum_last_success_version(
+    indexer_processor_config: &IndexerProcessorConfig,
+    conn_pool: ArcDbPool,
+    processor_names: Vec<String>,
+) -> Result<u64> {
+    let min_processed_version = get_processed_version_from_db(conn_pool.clone(), processor_names)
+        .await
+        .context("Failed to get minimum last success version from DB")?;
+
+    // If nothing checkpointed, return the `starting_version` from the config, or 0 if not set.
+    Ok(min_processed_version.unwrap_or(
+        indexer_processor_config
+            .transaction_stream_config
+            .starting_version
+            .unwrap_or(0),
+    ))
+}
+
+async fn get_processed_version_from_db(
+    conn_pool: ArcDbPool,
+    processor_names: Vec<String>,
+) -> Result<Option<u64>> {
+    let mut queries = Vec::new();
+
+    // Spawn all queries concurrently with separate connections
+    for processor_name in processor_names {
+        let conn_pool = conn_pool.clone();
+        let processor_name = processor_name.clone();
+
+        let query = async move {
+            let mut conn = conn_pool.get().await.map_err(|err| {
+                // the type returned by conn_pool.get().await? does not have an appropriate error type that can be converted into diesel::result::Error.
+                // In this case, the error type is bb8::api::RunError<PoolError>, but the ? operator is trying to convert it to diesel::result::Error, which fails because there's no conversion implemented between those types.
+                // so we convert the error type from connection pool into a type that Diesel API expects.
+                DieselError::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UnableToSendCommand,
+                    Box::new(err.to_string()),
+                )
+            })?;
+            ProcessorStatusQuery::get_by_processor(&processor_name, &mut conn).await
+        };
+
+        queries.push(query);
+    }
+
+    let results = futures::future::join_all(queries).await;
+
+    // Collect results and find the minimum processed version
+    let min_processed_version = results
+        .into_iter()
+        .filter_map(|res| {
+            match res {
+                // If the result is `Ok`, proceed to check the status
+                Ok(Some(status)) => {
+                    // Return the version if the status contains a version
+                    Some(status.last_success_version as u64)
+                },
+                // Handle specific cases where `Ok` contains `None` (no status found)
+                Ok(None) => Some(0),
+                // TODO: If the result is an `Err`, what should we do?
+                Err(e) => {
+                    eprintln!("Error fetching processor status: {:?}", e);
+                    None
+                },
+            }
+        })
+        .min();
+
+    Ok(min_processed_version)
 }
 
 async fn get_starting_version_from_db(
@@ -323,5 +394,101 @@ mod tests {
             .unwrap();
 
         assert_eq!(starting_version, 11)
+    }
+
+    #[tokio::test]
+    #[allow(clippy::needless_return)]
+    async fn test_get_minimum_last_success_version_no_checkpoints() {
+        let mut db = PostgresTestDatabase::new();
+        db.setup().await.unwrap();
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
+        let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
+            .await
+            .expect("Failed to create connection pool");
+        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+
+        let processor_names = vec!["processor_1".to_string(), "processor_2".to_string()];
+
+        let min_version =
+            get_minimum_last_success_version(&indexer_processor_config, conn_pool, processor_names)
+                .await
+                .unwrap();
+
+        assert_eq!(min_version, 0);
+    }
+
+    #[tokio::test]
+    #[allow(clippy::needless_return)]
+    async fn test_get_minimum_last_success_version_with_checkpoints() {
+        let mut db = PostgresTestDatabase::new();
+        db.setup().await.unwrap();
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
+        let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
+            .await
+            .expect("Failed to create connection pool");
+        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+
+        // Insert processor statuses with different last_success_version values
+        diesel::insert_into(processor::schema::processor_status::table)
+            .values(vec![
+                ProcessorStatus {
+                    processor: "processor_1".to_string(),
+                    last_success_version: 10,
+                    last_transaction_timestamp: None,
+                },
+                ProcessorStatus {
+                    processor: "processor_2".to_string(),
+                    last_success_version: 5,
+                    last_transaction_timestamp: None,
+                },
+            ])
+            .execute(&mut conn_pool.clone().get().await.unwrap())
+            .await
+            .expect("Failed to insert processor status");
+
+        let processor_names = vec!["processor_1".to_string(), "processor_2".to_string()];
+
+        let min_version =
+            get_minimum_last_success_version(&indexer_processor_config, conn_pool, processor_names)
+                .await
+                .unwrap();
+
+        assert_eq!(min_version, 5);
+    }
+
+    #[tokio::test]
+    #[allow(clippy::needless_return)]
+    async fn test_get_minimum_last_success_version_with_partial_checkpoints() {
+        let mut db = PostgresTestDatabase::new();
+        db.setup().await.unwrap();
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
+        let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
+            .await
+            .expect("Failed to create connection pool");
+        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+
+        // Insert processor statuses with different last_success_version values
+        diesel::insert_into(processor::schema::processor_status::table)
+            .values(vec![ProcessorStatus {
+                processor: "processor_1".to_string(),
+                last_success_version: 15,
+                last_transaction_timestamp: None,
+            }])
+            .execute(&mut conn_pool.clone().get().await.unwrap())
+            .await
+            .expect("Failed to insert processor status");
+
+        let processor_names = vec![
+            "processor_1".to_string(),
+            "processor_2".to_string(), // No checkpoint for processor_2
+        ];
+
+        let min_version =
+            get_minimum_last_success_version(&indexer_processor_config, conn_pool, processor_names)
+                .await
+                .unwrap();
+
+        // Since processor_2 has no checkpoint, the minimum version should be the starting version of processor_1
+        assert_eq!(min_version, 0);
     }
 }
