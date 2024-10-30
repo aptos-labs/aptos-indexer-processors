@@ -7,8 +7,8 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         default_processor::DefaultProcessor, events_processor::EventsProcessor,
-        fungible_asset_processor::FungibleAssetProcessor, stake_processor::StakeProcessor,
-        token_v2_processor::TokenV2Processor,
+        fungible_asset_processor::FungibleAssetProcessor, objects_processor::ObjectsProcessor,
+        stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
     },
 };
 use anyhow::Result;

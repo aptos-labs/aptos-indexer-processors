@@ -21,14 +21,14 @@ where
     Self: Sized + Send + 'static,
 {
     conn_pool: ArcDbPool,
-    processor_config: ObjectsProcessorConfig,
+    per_table_chunk_sizes: AHashMap<String, usize>,
 }
 
 impl ObjectsStorer {
-    pub fn new(conn_pool: ArcDbPool, processor_config: ObjectsProcessorConfig) -> Self {
+    pub fn new(conn_pool: ArcDbPool, per_table_chunk_sizes: AHashMap<String, usize>) -> Self {
         Self {
             conn_pool,
-            processor_config,
+            per_table_chunk_sizes,
         }
     }
 }
@@ -45,23 +45,20 @@ impl Processable for ObjectsStorer {
     ) -> Result<Option<TransactionContext<Self::Output>>, ProcessorError> {
         let (objects, current_objects) = input.data;
 
-        let per_table_chunk_sizes: AHashMap<String, usize> = self
-            .processor_config
-            .default_config
-            .per_table_chunk_sizes
-            .clone();
-
         let io = execute_in_chunks(
             self.conn_pool.clone(),
             insert_objects_query,
             &objects,
-            get_config_table_chunk_size::<Object>("objects", &per_table_chunk_sizes),
+            get_config_table_chunk_size::<Object>("objects", &self.per_table_chunk_sizes),
         );
         let co = execute_in_chunks(
             self.conn_pool.clone(),
             insert_current_objects_query,
             &current_objects,
-            get_config_table_chunk_size::<CurrentObject>("current_objects", &per_table_chunk_sizes),
+            get_config_table_chunk_size::<CurrentObject>(
+                "current_objects",
+                &self.per_table_chunk_sizes,
+            ),
         );
         let (io_res, co_res) = tokio::join!(io, co);
         for res in [io_res, co_res] {

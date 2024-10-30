@@ -113,6 +113,7 @@ impl ProcessorTrait for ObjectsProcessor {
         };
         let channel_size = processor_config.default_config.channel_size;
         let table_flags = TableFlags::from_set(&processor_config.default_config.deprecated_tables);
+        let per_table_chunk_sizes = &processor_config.default_config.per_table_chunk_sizes;
 
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
@@ -126,7 +127,8 @@ impl ProcessorTrait for ObjectsProcessor {
             self.db_pool.clone(),
             table_flags,
         );
-        let objects_storer = ObjectsStorer::new(self.db_pool.clone(), processor_config.clone());
+        let objects_storer =
+            ObjectsStorer::new(self.db_pool.clone(), per_table_chunk_sizes.clone());
 
         let version_tracker = VersionTrackerStep::new(
             get_processor_status_saver(self.db_pool.clone(), self.config.clone()),
