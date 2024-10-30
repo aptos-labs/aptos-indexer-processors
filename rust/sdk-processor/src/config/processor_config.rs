@@ -45,6 +45,8 @@ pub enum ProcessorConfig {
     FungibleAssetProcessor(DefaultProcessorConfig),
     StakeProcessor(StakeProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
+    // ParquetProcessor
+    ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -82,5 +84,46 @@ impl Default for DefaultProcessorConfig {
             channel_size: Self::default_channel_size(),
             deprecated_tables: HashSet::new(),
         }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParquetDefaultProcessorConfig {
+    // Optional Google application credentials for authentication
+    #[serde(default)]
+    pub google_application_credentials: Option<String>,
+    #[serde(default)]
+    pub bucket_name: String,
+    #[serde(default)]
+    pub bucket_root: String,
+    #[serde(
+        default = "ParquetDefaultProcessorConfig::default_parquet_handler_response_channel_size"
+    )]
+    pub parquet_handler_response_channel_size: usize,
+    #[serde(default = "ParquetDefaultProcessorConfig::default_max_buffer_size")]
+    pub max_buffer_size: usize,
+    #[serde(default = "ParquetDefaultProcessorConfig::default_parquet_upload_interval")]
+    pub parquet_upload_interval: u64,
+    // list of table names to backfill. Using HashSet for fast lookups, and for future extensibility.
+    #[serde(default)]
+    pub tables: HashSet<String>,
+}
+
+impl ParquetDefaultProcessorConfig {
+    /// Make the default very large on purpose so that by default it's not chunked
+    /// This prevents any unexpected changes in behavior
+    pub const fn default_parquet_handler_response_channel_size() -> usize {
+        100_000
+    }
+
+    /// Default maximum buffer size for parquet files in bytes
+    pub const fn default_max_buffer_size() -> usize {
+        1024 * 1024 * 100 // 100 MB
+    }
+
+    /// Default upload interval for parquet files in seconds
+    pub const fn default_parquet_upload_interval() -> u64 {
+        1800 // 30 minutes
     }
 }

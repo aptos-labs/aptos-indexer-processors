@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
-use crate::processors::{
-    account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-    default_processor::DefaultProcessor, events_processor::EventsProcessor,
-    fungible_asset_processor::FungibleAssetProcessor, stake_processor::StakeProcessor,
-    token_v2_processor::TokenV2Processor,
+use crate::{
+    parquet_processors::parquet_default_processor::ParquetDefaultProcessor,
+    processors::{
+        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
+        default_processor::DefaultProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor, stake_processor::StakeProcessor,
+        token_v2_processor::TokenV2Processor,
+    },
 };
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -59,6 +62,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::TokenV2Processor(_) => {
                 let token_v2_processor = TokenV2Processor::new(self.clone()).await?;
                 token_v2_processor.run_processor().await
+            },
+            ProcessorConfig::ParquetDefaultProcessor(_) => {
+                let parquet_default_processor = ParquetDefaultProcessor::new(self.clone()).await?;
+                parquet_default_processor.run_processor().await
             },
         }
     }
