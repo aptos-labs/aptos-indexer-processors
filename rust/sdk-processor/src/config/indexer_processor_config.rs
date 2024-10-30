@@ -5,7 +5,8 @@ use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::processors::{
     account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
     default_processor::DefaultProcessor, events_processor::EventsProcessor,
-    fungible_asset_processor::FungibleAssetProcessor, token_v2_processor::TokenV2Processor,
+    fungible_asset_processor::FungibleAssetProcessor, stake_processor::StakeProcessor,
+    token_v2_processor::TokenV2Processor,
 };
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -50,6 +51,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::FungibleAssetProcessor(_) => {
                 let fungible_asset_processor = FungibleAssetProcessor::new(self.clone()).await?;
                 fungible_asset_processor.run_processor().await
+            },
+            ProcessorConfig::StakeProcessor(_) => {
+                let stake_processor = StakeProcessor::new(self.clone()).await?;
+                stake_processor.run_processor().await
             },
             ProcessorConfig::TokenV2Processor(_) => {
                 let token_v2_processor = TokenV2Processor::new(self.clone()).await?;

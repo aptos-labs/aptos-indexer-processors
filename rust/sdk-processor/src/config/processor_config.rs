@@ -1,5 +1,6 @@
 use crate::processors::{
-    ans_processor::AnsProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+    ans_processor::AnsProcessorConfig, stake_processor::StakeProcessorConfig,
+    token_v2_processor::TokenV2ProcessorConfig,
 };
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,7 @@ pub enum ProcessorConfig {
     DefaultProcessor(DefaultProcessorConfig),
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
+    StakeProcessor(StakeProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
 }
 
