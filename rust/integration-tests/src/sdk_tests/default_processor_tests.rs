@@ -50,29 +50,53 @@ mod tests {
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::IMPORTED_TESTNET_TXNS_1_GENESIS;
+    use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_155112189_DEFAULT_TABLE_ITEMS,
+        IMPORTED_MAINNET_TXNS_1845035942_DEFAULT_CURRENT_TABLE_ITEMS,
+        IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
+    };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::default_processor::DefaultProcessor;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_events_processor_genesis_txn() {
-        process_single_testnet_event_txn(
-            IMPORTED_TESTNET_TXNS_1_GENESIS,
-            1,
-            Some("genesis_txn_test".to_string()),
+    async fn mainnet_table_items() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_155112189_DEFAULT_TABLE_ITEMS,
+            155112189,
+            Some("test_table_items".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_current_table_items() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_1845035942_DEFAULT_CURRENT_TABLE_ITEMS,
+            1845035942,
+            Some("test_current_table_items".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_block_metadata_txns() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
+            513424821,
+            Some("block_metadata_transactions".to_string()),
         )
         .await;
     }
 
     // Helper function to abstract out the single transaction processing
-    async fn process_single_testnet_event_txn(
+    async fn process_single_mainnet_event_txn(
         txn: &[u8],
         txn_version: i64,
         test_case_name: Option<String>,
     ) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
-            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
+            .unwrap_or_else(|| format!("{}/imported_mainnet_txns", DEFAULT_OUTPUT_FOLDER));
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 

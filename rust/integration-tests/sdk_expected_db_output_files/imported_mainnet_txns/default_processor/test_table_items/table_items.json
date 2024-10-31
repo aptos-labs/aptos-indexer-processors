@@ -1,0 +1,201 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 155112189,
+    "write_set_change_index": 14,
+    "transaction_block_height": 59919203,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "103836940792330456",
+    "is_deleted": false
+  },
+  {
+    "key": "0x00000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e",
+    "transaction_version": 155112189,
+    "write_set_change_index": 15,
+    "transaction_block_height": 59919203,
+    "table_handle": "0x2a9e47281386b48ff3105c76729ea64ed352a6ae8c37f5698377260be90db8f2",
+    "decoded_key": {
+      "module_name": "0x6170746f735f636f696e",
+      "struct_name": "0x4170746f73436f696e",
+      "account_address": "0x1"
+    },
+    "decoded_value": {
+      "val": {
+        "weight": "1000",
+        "coin_decimals": 8,
+        "coin_type_info": {
+          "module_name": "0x6170746f735f636f696e",
+          "struct_name": "0x4170746f73436f696e",
+          "account_address": "0x1"
+        },
+        "reserve_amount": "181260818176",
+        "aggregator_addr": "0xb8f20223af69dcbc33d29e8555e46d031915fc38cb1a4fff5d5167a1e08e8367",
+        "max_long_oi_in_m_usd": "12000000000",
+        "max_short_oi_in_m_usd": "12000000000",
+        "margin_occupied_amount": "98145335830",
+        "collateral_factor_in_bps": "11000",
+        "collateral_occupied_amount": "28356341215",
+        "max_allowed_reserve_amount": "1000000000000",
+        "max_size_per_order_in_m_usd": "20000000000",
+        "is_approved_short_collateral": false,
+        "current_long_oi_in_coin_amount": "69788994615",
+        "current_short_oi_in_coin_amount": "15827808000",
+        "last_epoch_timestamp_in_seconds": "1686136144",
+        "cumulative_funding_rate_in_hundredths_of_bps": "36295",
+        "base_epoch_funding_rate_fee_in_hundreths_of_bps": "100"
+      },
+      "next": {
+        "vec": [
+          {
+            "module_name": "0x6173736574",
+            "struct_name": "0x57455448",
+            "account_address": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa"
+          }
+        ]
+      },
+      "prev": {
+        "vec": []
+      }
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa0561737365740455534443",
+    "transaction_version": 155112189,
+    "write_set_change_index": 16,
+    "transaction_block_height": 59919203,
+    "table_handle": "0x2a9e47281386b48ff3105c76729ea64ed352a6ae8c37f5698377260be90db8f2",
+    "decoded_key": {
+      "module_name": "0x6173736574",
+      "struct_name": "0x55534443",
+      "account_address": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa"
+    },
+    "decoded_value": {
+      "val": {
+        "weight": "4500",
+        "coin_decimals": 6,
+        "coin_type_info": {
+          "module_name": "0x6173736574",
+          "struct_name": "0x55534443",
+          "account_address": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa"
+        },
+        "reserve_amount": "230090765027",
+        "aggregator_addr": "0xdc1045b4d9fd1f4221fc2f91b2090d88483ba9745f29cf2d96574611204659a5",
+        "max_long_oi_in_m_usd": "23000000000",
+        "max_short_oi_in_m_usd": "23000000000",
+        "margin_occupied_amount": "28577669105",
+        "collateral_factor_in_bps": "11000",
+        "collateral_occupied_amount": "14699287204",
+        "max_allowed_reserve_amount": "300000000000",
+        "max_size_per_order_in_m_usd": "20000000000",
+        "is_approved_short_collateral": true,
+        "current_long_oi_in_coin_amount": "21640720",
+        "current_short_oi_in_coin_amount": "225000000",
+        "last_epoch_timestamp_in_seconds": "1686136144",
+        "cumulative_funding_rate_in_hundredths_of_bps": "13677",
+        "base_epoch_funding_rate_fee_in_hundreths_of_bps": "100"
+      },
+      "next": {
+        "vec": [
+          {
+            "module_name": "0x6173736574",
+            "struct_name": "0x55534454",
+            "account_address": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa"
+          }
+        ]
+      },
+      "prev": {
+        "vec": [
+          {
+            "module_name": "0x6173736574",
+            "struct_name": "0x57455448",
+            "account_address": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa"
+          }
+        ]
+      }
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0x0000000000000000",
+    "transaction_version": 155112189,
+    "write_set_change_index": 17,
+    "transaction_block_height": 59919203,
+    "table_handle": "0x7312d049c9df2da4408bd784dfd1e0ed4cd806c9b06235dd0049c24b1feae9eb",
+    "decoded_key": "0",
+    "decoded_value": {
+      "pnl_m_usd": "2110525",
+      "season_id": "0",
+      "total_points": "8212",
+      "is_pnl_profit": false,
+      "start_timestamp": "1685033058",
+      "total_fees_m_usd": "389368367",
+      "total_volume_m_usd": "113452604131",
+      "are_points_positive": false
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0x0129000000000000",
+    "transaction_version": 155112189,
+    "write_set_change_index": 18,
+    "transaction_block_height": 59919203,
+    "table_handle": "0x8f2d13ce09fb28ff74cdf031906e101bbe444e927053fd9578ad408e200865dd",
+    "decoded_key": "10497",
+    "decoded_value": null,
+    "is_deleted": true
+  },
+  {
+    "key": "0x0129000000000000",
+    "transaction_version": 155112189,
+    "write_set_change_index": 19,
+    "transaction_block_height": 59919203,
+    "table_handle": "0x913b9c9139088de319da05fe4b333fbf8bb4dec956c90fc6eae3ec6310299436",
+    "decoded_key": "10497",
+    "decoded_value": {
+      "val": {
+        "order_id": "10497",
+        "order_type": {
+          "module_name": "0x6f72646572",
+          "struct_name": "0x53776170",
+          "account_address": "0x1786191d0ce793debfdef9890868abdcdc7053f982ccdd102a72732b3082f31d"
+        },
+        "cancel_code": "0",
+        "input_amount": "201426774",
+        "order_status": "2",
+        "output_amount": "2527965600",
+        "min_output_amount": "2503548362",
+        "order_basket_type": {
+          "module_name": "0x6261736b657473",
+          "struct_name": "0x4261736b657431",
+          "account_address": "0x1786191d0ce793debfdef9890868abdcdc7053f982ccdd102a72732b3082f31d"
+        },
+        "order_time_placed": "1686144556",
+        "order_season_points": "151",
+        "oder_creator_address": "0xaf2ddc14d06dcb2684d06e545d82342916d7d956ada77721b2d10fb7650c17d6",
+        "order_input_coin_type": {
+          "module_name": "0x6173736574",
+          "struct_name": "0x55534443",
+          "account_address": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa"
+        },
+        "order_output_coin_type": {
+          "module_name": "0x6170746f735f636f696e",
+          "struct_name": "0x4170746f73436f696e",
+          "account_address": "0x1"
+        },
+        "order_season_points_are_positive": false,
+        "worst_acceptable_price_of_position_coin_m_usd": "0"
+      },
+      "next": {
+        "vec": []
+      },
+      "prev": {
+        "vec": [
+          "10496"
+        ]
+      }
+    },
+    "is_deleted": false
+  }
+]
