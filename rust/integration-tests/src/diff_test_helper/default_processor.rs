@@ -44,13 +44,5 @@ pub fn load_data(
         serde_json::to_value(&cti_result)?,
     );
 
-    // TODO: revisit we need to find out a way to find correct table metadata
-    // let tm_result = tm_dsl::table_metadatas
-    //     .load::<TableMetadata>(conn)?;
-    // result_map.insert(
-    //     "table_metadatas".to_string(),
-    //     serde_json::to_value(&tm_result)?,
-    // );
-
     Ok(result_map)
 }
