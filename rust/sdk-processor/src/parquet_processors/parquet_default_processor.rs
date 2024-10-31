@@ -6,7 +6,7 @@ use crate::{
     utils::{
         chain_id::check_or_update_chain_id,
         database::{new_db_pool, run_migrations, ArcDbPool},
-        starting_version::{get_minimum_last_success_version, get_starting_version},
+        starting_version::{get_min_last_success_version_parquet, get_starting_version},
     },
 };
 use anyhow::Context;
@@ -62,7 +62,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             },
         }
 
-        // TODO: Starting version from config. 0 if not set.
         // Determine the processing mode (backfill or regular)
         let is_backfill = self.config.backfill_config.is_some();
 
@@ -79,7 +78,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                     "Failed to get table names for the processor {}",
                     self.config.processor_config.name()
                 ))?;
-            get_minimum_last_success_version(&self.config, self.db_pool.clone(), table_names)
+            get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
                 .await?;
         };
 

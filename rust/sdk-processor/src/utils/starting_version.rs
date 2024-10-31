@@ -42,14 +42,19 @@ pub async fn get_starting_version(
     ))
 }
 
-pub async fn get_minimum_last_success_version(
+/// Get the appropriate minimum last success version for the parquet processors.
+///
+/// This will return the minimum of the last success version of the processors in the list.
+/// If no processor has a checkpoint, this will return the `starting_version` from the config, or 0 if not set.
+pub async fn get_min_last_success_version_parquet(
     indexer_processor_config: &IndexerProcessorConfig,
     conn_pool: ArcDbPool,
     processor_names: Vec<String>,
 ) -> Result<u64> {
-    let min_processed_version = get_processed_version_from_db(conn_pool.clone(), processor_names)
-        .await
-        .context("Failed to get minimum last success version from DB")?;
+    let min_processed_version =
+        get_min_processed_version_from_db(conn_pool.clone(), processor_names)
+            .await
+            .context("Failed to get minimum last success version from DB")?;
 
     // If nothing checkpointed, return the `starting_version` from the config, or 0 if not set.
     Ok(min_processed_version.unwrap_or(
@@ -60,7 +65,7 @@ pub async fn get_minimum_last_success_version(
     ))
 }
 
-async fn get_processed_version_from_db(
+async fn get_min_processed_version_from_db(
     conn_pool: ArcDbPool,
     processor_names: Vec<String>,
 ) -> Result<Option<u64>> {
@@ -398,7 +403,7 @@ mod tests {
 
     #[tokio::test]
     #[allow(clippy::needless_return)]
-    async fn test_get_minimum_last_success_version_no_checkpoints() {
+    async fn test_get_min_last_success_version_parquet_no_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
         let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
@@ -409,17 +414,20 @@ mod tests {
 
         let processor_names = vec!["processor_1".to_string(), "processor_2".to_string()];
 
-        let min_version =
-            get_minimum_last_success_version(&indexer_processor_config, conn_pool, processor_names)
-                .await
-                .unwrap();
+        let min_version = get_min_last_success_version_parquet(
+            &indexer_processor_config,
+            conn_pool,
+            processor_names,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(min_version, 0);
     }
 
     #[tokio::test]
     #[allow(clippy::needless_return)]
-    async fn test_get_minimum_last_success_version_with_checkpoints() {
+    async fn test_get_min_last_success_version_parquet_with_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
         let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
@@ -448,17 +456,20 @@ mod tests {
 
         let processor_names = vec!["processor_1".to_string(), "processor_2".to_string()];
 
-        let min_version =
-            get_minimum_last_success_version(&indexer_processor_config, conn_pool, processor_names)
-                .await
-                .unwrap();
+        let min_version = get_min_last_success_version_parquet(
+            &indexer_processor_config,
+            conn_pool,
+            processor_names,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(min_version, 5);
     }
 
     #[tokio::test]
     #[allow(clippy::needless_return)]
-    async fn test_get_minimum_last_success_version_with_partial_checkpoints() {
+    async fn test_get_min_last_success_version_parquet_with_partial_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
         let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
@@ -483,10 +494,13 @@ mod tests {
             "processor_2".to_string(), // No checkpoint for processor_2
         ];
 
-        let min_version =
-            get_minimum_last_success_version(&indexer_processor_config, conn_pool, processor_names)
-                .await
-                .unwrap();
+        let min_version = get_min_last_success_version_parquet(
+            &indexer_processor_config,
+            conn_pool,
+            processor_names,
+        )
+        .await
+        .unwrap();
 
         // Since processor_2 has no checkpoint, the minimum version should be the starting version of processor_1
         assert_eq!(min_version, 0);
