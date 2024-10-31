@@ -56,6 +56,28 @@ impl ProcessorConfig {
     pub fn name(&self) -> &'static str {
         self.into()
     }
+
+    /// Get the Vec of table names for parquet processors only.
+    ///
+    /// This is a convenience method to map the table names to include the processor name as a prefix, which
+    /// is useful for querying the status from the processor status table in the database.
+    pub fn get_table_names(&self) -> Option<Vec<String>> {
+        match self {
+            ProcessorConfig::ParquetDefaultProcessor(config) => {
+                // Get the processor name as a prefix
+                let prefix = self.name();
+                // Use the tables from the config and map them to include the prefix
+                Some(
+                    config
+                        .tables
+                        .iter()
+                        .map(|table_name| format!("{}_{}", prefix, table_name))
+                        .collect(),
+                )
+            },
+            _ => None, // For all other processor types, return None
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
