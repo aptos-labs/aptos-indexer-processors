@@ -233,10 +233,9 @@ mod sdk_token_v2_processor_tests {
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
-        let txn_version = get_transaction_version_from_test_context(&test_context)
+        let txn_version = *get_transaction_version_from_test_context(&test_context)
             .first()
-            .unwrap()
-            .clone();
+            .unwrap();
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
             setup_token_v2_processor_config(&test_context, txn_version, 1, &db_url);
