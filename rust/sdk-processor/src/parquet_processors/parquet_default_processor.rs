@@ -62,7 +62,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             },
         }
 
-        // TODO: Starting version from config. 0 if not set.
         // Determine the processing mode (backfill or regular)
         let is_backfill = self.config.backfill_config.is_some();
 
