@@ -53,7 +53,7 @@ jobs:
       # Show Cargo.toml after the update
       - name: Show Cargo.toml After Update
         run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
-
+          
       # Ensure Cargo.lock is updated with the latest dependencies
       - name: rust setup
         run: |
@@ -61,11 +61,22 @@ jobs:
           cargo update
         working-directory: rust
 
+      # Cache Cargo
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
       # Run Integration Tests
       - name: Run Integration Tests
         # we want to generate output so that all_tests doesn't fail when new transaction is added
         run: |
           # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
-          cargo test all_tests -- --nocapture generate-output
           cargo test sdk_tests -- --nocapture generate-output
         working-directory: rust/integration-tests

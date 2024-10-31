@@ -1,4 +1,6 @@
-use crate::db::common::models::events_models::events::EventModel;
+use crate::{
+    db::common::models::events_models::events::EventModel, steps::MIN_TRANSACTIONS_PER_RAYON_JOB,
+};
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::{transaction::TxnData, Transaction},
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
@@ -8,8 +10,6 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use rayon::prelude::*;
 use tracing::warn;
-
-pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
 
 pub struct EventsExtractor
 where

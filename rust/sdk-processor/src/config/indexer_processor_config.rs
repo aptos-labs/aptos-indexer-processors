@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
-use crate::processors::{
-    account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
-    default_processor::DefaultProcessor, events_processor::EventsProcessor,
-    fungible_asset_processor::FungibleAssetProcessor, token_v2_processor::TokenV2Processor,
+use crate::{
+    parquet_processors::parquet_default_processor::ParquetDefaultProcessor,
+    processors::{
+        account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
+        default_processor::DefaultProcessor, events_processor::EventsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor, objects_processor::ObjectsProcessor,
+        stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
+    },
 };
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -51,9 +55,21 @@ impl RunnableConfig for IndexerProcessorConfig {
                 let fungible_asset_processor = FungibleAssetProcessor::new(self.clone()).await?;
                 fungible_asset_processor.run_processor().await
             },
+            ProcessorConfig::StakeProcessor(_) => {
+                let stake_processor = StakeProcessor::new(self.clone()).await?;
+                stake_processor.run_processor().await
+            },
             ProcessorConfig::TokenV2Processor(_) => {
                 let token_v2_processor = TokenV2Processor::new(self.clone()).await?;
                 token_v2_processor.run_processor().await
+            },
+            ProcessorConfig::ObjectsProcessor(_) => {
+                let objects_processor = ObjectsProcessor::new(self.clone()).await?;
+                objects_processor.run_processor().await
+            },
+            ProcessorConfig::ParquetDefaultProcessor(_) => {
+                let parquet_default_processor = ParquetDefaultProcessor::new(self.clone()).await?;
+                parquet_default_processor.run_processor().await
             },
         }
     }

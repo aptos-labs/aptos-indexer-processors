@@ -106,7 +106,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_objects_query(
+pub fn insert_objects_query(
     items_to_insert: Vec<Object>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -123,7 +123,7 @@ fn insert_objects_query(
     )
 }
 
-fn insert_current_objects_query(
+pub fn insert_current_objects_query(
     items_to_insert: Vec<CurrentObject>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -164,7 +164,7 @@ impl ProcessorTrait for ObjectsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let processing_start = std::time::Instant::now();
+        let processing_start: std::time::Instant = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let mut conn = self.get_conn().await;
