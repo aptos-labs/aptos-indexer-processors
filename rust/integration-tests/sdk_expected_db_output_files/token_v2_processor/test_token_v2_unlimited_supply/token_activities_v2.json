@@ -1,0 +1,36 @@
+[
+  {
+    "transaction_version": 325355235,
+    "event_index": 0,
+    "event_account_address": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
+    "token_data_id": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "property_version_v1": "0",
+    "type_": "0x4::collection::MintEvent",
+    "from_address": "0xa281f5b2d909bfadf70099f6b9c24369e12c49f9035437526c53cd3e75d6f08f",
+    "to_address": null,
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609::mint::resource_mint_token_memo",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2023-11-09T23:58:14.442073"
+  },
+  {
+    "transaction_version": 325355235,
+    "event_index": 1,
+    "event_account_address": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "token_data_id": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "property_version_v1": "0",
+    "type_": "0x1::object::TransferEvent",
+    "from_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
+    "to_address": "0xa281f5b2d909bfadf70099f6b9c24369e12c49f9035437526c53cd3e75d6f08f",
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0x8d2d7bcde13b2513617df3f98cdd5d0e4b9f714c6308b9204fe18ad900d92609::mint::resource_mint_token_memo",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2023-11-09T23:58:14.442073"
+  }
+]

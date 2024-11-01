@@ -1,0 +1,19 @@
+[
+  {
+    "token_data_id": "0xeaa02d37c4896e95813543a3df80d09863d1a4d91f3f14c02db033f2f7a3f665",
+    "collection_id": "0x30e2f18b1f9c447e7dadd7a05966e721ab6512b81ee977cb053edb86cc1b1d65",
+    "token_name": "veCELL",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "https://api.cellana.finance/api/v1/ve-nft/uri/@0xeaa02d37c4896e95813543a3df80d09863d1a4d91f3f14c02db033f2f7a3f665",
+    "description": "NFT representing voting power in Cellana corresponding to $CELL locked up",
+    "token_properties": null,
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "last_transaction_version": 508365567,
+    "last_transaction_timestamp": "2024-03-19T08:05:56.983680",
+    "is_deleted_v2": false,
+    "decimals": 0
+  }
+]

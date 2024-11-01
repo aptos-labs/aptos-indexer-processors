@@ -1,0 +1,20 @@
+[
+  {
+    "transaction_version": 308783012,
+    "write_set_change_index": 3,
+    "token_data_id": "0x6fd8ee875fb55e03b1f9643d3f229f0b077a71cfe7ffc8ba7e09ff4392950e5c",
+    "collection_id": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
+    "token_name": "Lollipop",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "https://ipfs.io/ipfs/bafybeib5uyxz5ycvakfjjq3zj2qknb2go4fgnqo67snrj6aecjlg4cmwrq/Lollipop.json",
+    "token_properties": null,
+    "description": "Lollipop NFT Gift",
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "transaction_timestamp": "2023-10-24T09:08:03.606880",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

@@ -1,0 +1,19 @@
+[
+  {
+    "transaction_version": 578366445,
+    "event_index": 0,
+    "event_account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "token_data_id": "0x57a56bff4472da6c2b28149d192ef0186ff6647bc3c2ba5c28439662fdaa284d",
+    "property_version_v1": "0",
+    "type_": "0x4::collection::Burn",
+    "from_address": "0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763",
+    "to_address": null,
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0x4::aptos_token::burn",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-04-30T23:50:44.443590"
+  }
+]

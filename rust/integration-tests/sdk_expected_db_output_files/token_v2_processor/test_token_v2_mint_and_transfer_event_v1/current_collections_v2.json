@@ -1,0 +1,19 @@
+[
+  {
+    "collection_id": "0xbd0ac9755fe762df448ee99e356ebe262c3ec535c2c7d0b835da3709cb22df97",
+    "creator_address": "0x40fc28526d4c093fac5cd2bb43e7adf41a48dbbe5edf7a1dd57a3a89c627d17a",
+    "collection_name": "NFT Name",
+    "description": "NFT Description",
+    "uri": "https://media.tenor.com/BzQbr22cbwIAAAAi/1inch-1inch-exchange.gif",
+    "current_supply": "2",
+    "max_supply": "1000000000",
+    "total_minted_v2": "2",
+    "mutable_description": false,
+    "mutable_uri": false,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "last_transaction_version": 453498957,
+    "last_transaction_timestamp": "2024-02-16T00:04:25.089448",
+    "collection_properties": null
+  }
+]

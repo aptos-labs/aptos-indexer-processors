@@ -1,0 +1,19 @@
+[
+  {
+    "transaction_version": 537250181,
+    "event_index": 0,
+    "event_account_address": "0x2bed7aeca079697ec1700cc48bee658b2331d80996b05e56dfcb39fae22cbb63",
+    "token_data_id": "0x88fbd363b60336c664a3114000d723efffa6f745be049e42ca98aa631b018ac9",
+    "property_version_v1": "0",
+    "type_": "0x4::collection::MintEvent",
+    "from_address": "0xb82a0077ab08cc414bd283aefe62e6dd42311150ed851ccd307d02a0f765bff2",
+    "to_address": null,
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0x4::aptos_token::mint",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-04-04T22:38:56.926423"
+  }
+]

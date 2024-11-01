@@ -1,0 +1,20 @@
+[
+  {
+    "transaction_version": 1080786089,
+    "event_index": -1,
+    "owner_address": "0x8eb76c7294a50b594c48ef13c7ce0a953320c9b25cdf1dd681fbeb9937524703",
+    "storage_id": "0x35f3a343895ccc3e5418955c311bdd3f09cbd56730b5132585bb799f1c729d49",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "1700",
+    "type_": "0x1::aptos_coin::GasFeeEvent",
+    "is_gas_fee": true,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6::sidekick_capsule::delete",
+    "block_height": 210969872,
+    "token_standard": "v1",
+    "transaction_timestamp": "2024-08-07T09:56:34",
+    "storage_refund_amount": "0"
+  }
+]

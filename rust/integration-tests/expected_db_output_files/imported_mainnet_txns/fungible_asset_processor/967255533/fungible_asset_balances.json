@@ -1,0 +1,14 @@
+[
+  {
+    "transaction_version": 967255533,
+    "write_set_change_index": 0,
+    "storage_id": "0x1775ebfaab20c03d727afb3753513ae1a8fc2b35807d262658b3b5abe9c78863",
+    "owner_address": "0x08c9f3cc69b110791747d4d2be794bd2cdc003d1fc50af399bf4aabfde8aafc9",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "87281131",
+    "transaction_timestamp": "2024-06-06T04:43:15",
+    "token_standard": "v1"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "storage_id": "0x33c6e7b8c756d53f34390f3932eef245f708e0d21e72f1b9fae787a41242d0d5",
+    "owner_address": "0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "1222553200",
+    "last_transaction_timestamp": "2024-04-30T23:50:44",
+    "last_transaction_version": 578366445,
+    "token_standard": "v1"
+  }
+]

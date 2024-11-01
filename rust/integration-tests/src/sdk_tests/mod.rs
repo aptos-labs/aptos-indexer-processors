@@ -17,6 +17,8 @@ use std::{
 pub mod events_processor_tests;
 #[cfg(test)]
 pub mod fungible_asset_processor_tests;
+#[cfg(test)]
+pub mod token_v2_processor_tests;
 
 #[cfg(test)]
 pub mod account_transaction_processor_tests;
@@ -39,6 +41,15 @@ pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
             Err(anyhow::anyhow!("Failed to read file: {}", e))
         },
     }
+}
+
+#[allow(dead_code)]
+pub fn get_transaction_version_from_test_context(test_context: &SdkTestContext) -> Vec<u64> {
+    test_context
+        .transaction_batches
+        .iter()
+        .map(|txn| txn.version)
+        .collect()
 }
 
 // Common setup for database and test context

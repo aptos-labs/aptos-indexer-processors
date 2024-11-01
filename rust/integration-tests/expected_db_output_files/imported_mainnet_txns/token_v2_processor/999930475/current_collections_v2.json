@@ -1,0 +1,19 @@
+[
+  {
+    "collection_id": "0x0a79561c62c2eac5f008e13aa4c2e13f67c9bd538ef7d9df54fe9215da0a0bc0",
+    "creator_address": "0xf31b3dac60ad3ee27399f14984d634ae5d0fd060a5b4ec30b0e4207d60cdc458",
+    "collection_name": "STAN EsportsElite Collection V15",
+    "description": "Welcome to the EsportsElite Collection, where every NFT is a gateway to unparalleled gaming benefits and exclusive experiences. Unleash the full potential of your collection as each NFT comes packed with a multitude of perks, unlocking new levels of excitement and rewards as you ascend from Level 1 to 100. Whether you're a seasoned gamer or a collector seeking the ultimate thrill, the EsportsElite Collection offers an immersive journey through the world of esports, where each NFT upgrade brings you closer to gaming greatness. Join the ranks of the elite and elevate your gaming experience with the EsportsElite Collection.",
+    "uri": " ",
+    "current_supply": "85328",
+    "max_supply": null,
+    "total_minted_v2": "85328",
+    "mutable_description": true,
+    "mutable_uri": true,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "last_transaction_version": 999930475,
+    "last_transaction_timestamp": "2024-06-25T23:56:58.254577",
+    "collection_properties": null
+  }
+]
