@@ -1,0 +1,44 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 1845035942,
+    "write_set_change_index": 5,
+    "transaction_block_height": 244136188,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "112277115393076001",
+    "is_deleted": false
+  },
+  {
+    "key": "0x128b657b70be52e3f5a7e998d4ca7d1bca886394c5ccf24036d2171368599f212547726f77666974746572204669746e657373204163746976697479204d6564616c732076331e47726f776669747465722052756e2042726f6e7a65204d6564616c2076330000000000000000",
+    "transaction_version": 1845035942,
+    "write_set_change_index": 6,
+    "transaction_block_height": 244136188,
+    "table_handle": "0xe5f482394040569082220b42ee87f8a626bbaa81f3aebd004322b7d81a75382f",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "Growfitter Run Bronze Medal v3",
+        "creator": "0x128b657b70be52e3f5a7e998d4ca7d1bca886394c5ccf24036d2171368599f21",
+        "collection": "Growfitter Fitness Activity Medals v3"
+      },
+      "property_version": "0"
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "Growfitter Run Bronze Medal v3",
+          "creator": "0x128b657b70be52e3f5a7e998d4ca7d1bca886394c5ccf24036d2171368599f21",
+          "collection": "Growfitter Fitness Activity Medals v3"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": []
+        }
+      }
+    },
+    "is_deleted": false
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "transaction_version": 145959468,
+    "write_set_change_index": 5,
+    "token_data_id": "0x9228cfc074cf073bf0687e558ba8cdce6f8c311269774a856d7fc87ac3c70141",
+    "collection_id": "0x139e21974cb4ee185b95708bebd571d77cec25e51df5ebd242712ed09bda8ca4",
+    "token_name": "",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "https://arweave.net/Nx1YbpdKDS98x_JE0iuaNSAnwZ1rcf2r4MMvbjz_8uA",
+    "token_properties": {},
+    "description": "",
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "transaction_timestamp": "2023-05-22T20:59:44.834006",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

@@ -20,6 +20,9 @@ pub mod fungible_asset_processor_tests;
 #[cfg(test)]
 pub mod token_v2_processor_tests;
 
+#[cfg(test)]
+pub mod default_processor_tests;
+
 #[allow(dead_code)]
 pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files";
 
