@@ -17,7 +17,6 @@ use processor::schema::account_transactions;
 use processor::utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT;
 use processor::utils::util::standardize_address;
 use serde::{Deserialize, Serialize};
-pub type AccountTransactionPK = (String, i64);
 
 #[derive(
     Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable,
@@ -28,6 +27,7 @@ pub type AccountTransactionPK = (String, i64);
 pub struct AccountTransaction {
     pub transaction_version: i64,
     pub account_address: String,
+    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl AccountTransaction {

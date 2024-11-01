@@ -18,6 +18,9 @@ pub mod events_processor_tests;
 #[cfg(test)]
 pub mod fungible_asset_processor_tests;
 
+#[cfg(test)]
+pub mod account_transaction_processor_tests;
+
 #[allow(dead_code)]
 pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files";
 
