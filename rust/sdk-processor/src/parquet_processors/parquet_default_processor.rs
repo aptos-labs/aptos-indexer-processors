@@ -6,8 +6,10 @@ use crate::{
     utils::{
         chain_id::check_or_update_chain_id,
         database::{new_db_pool, run_migrations, ArcDbPool},
+        starting_version::{get_min_last_success_version_parquet, get_starting_version},
     },
 };
+use anyhow::Context;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::TransactionStream, traits::processor_trait::ProcessorTrait,
 };
@@ -60,7 +62,25 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             },
         }
 
-        // TODO: Starting version from config. 0 if not set.
+        // Determine the processing mode (backfill or regular)
+        let is_backfill = self.config.backfill_config.is_some();
+
+        // Query the starting version
+        let _starting_version = if is_backfill {
+            get_starting_version(&self.config, self.db_pool.clone()).await?;
+        } else {
+            // Regular mode logic: Fetch the minimum last successful version across all relevant tables
+            let table_names = self
+                .config
+                .processor_config
+                .get_table_names()
+                .context(format!(
+                    "Failed to get table names for the processor {}",
+                    self.config.processor_config.name()
+                ))?;
+            get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
+                .await?;
+        };
 
         // Check and update the ledger chain id to ensure we're indexing the correct chain
         let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())

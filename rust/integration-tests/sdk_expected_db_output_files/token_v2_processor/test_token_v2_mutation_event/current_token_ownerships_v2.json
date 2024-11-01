@@ -1,0 +1,17 @@
+[
+  {
+    "token_data_id": "0x1910ed3769bf094c43cf0c81470265304014c4ae7cbb4991fcc194f2c42bb4b4",
+    "property_version_v1": "0",
+    "owner_address": "0x23246b2ad4ea793d6c061f415c58f9c442f434a9a888b2f6bd73e6b611e6774b",
+    "storage_id": "0x1910ed3769bf094c43cf0c81470265304014c4ae7cbb4991fcc194f2c42bb4b4",
+    "amount": "1",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": false,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "last_transaction_version": 967255533,
+    "last_transaction_timestamp": "2024-06-06T04:43:15.798869",
+    "non_transferrable_by_owner": false
+  }
+]

@@ -1,0 +1,19 @@
+[
+  {
+    "collection_id": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
+    "creator_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
+    "collection_name": "Lollipop",
+    "description": "Lollipop NFT Gift",
+    "uri": "https://chingari.io",
+    "current_supply": "4392522",
+    "max_supply": null,
+    "total_minted_v2": "4392522",
+    "mutable_description": null,
+    "mutable_uri": null,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "last_transaction_version": 325355235,
+    "last_transaction_timestamp": "2023-11-09T23:58:14.442073",
+    "collection_properties": null
+  }
+]

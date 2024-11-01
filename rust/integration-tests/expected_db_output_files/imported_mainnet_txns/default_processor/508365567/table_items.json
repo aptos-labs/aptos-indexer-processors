@@ -1,19 +1,19 @@
 [
   {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
     "transaction_version": 508365567,
     "write_set_change_index": 18,
     "transaction_block_height": 159068756,
-    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
     "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
     "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
     "decoded_value": "108655487588791357",
     "is_deleted": false
   },
   {
+    "key": "0x0000000000000000",
     "transaction_version": 508365567,
     "write_set_change_index": 19,
     "transaction_block_height": 159068756,
-    "key": "0x0000000000000000",
     "table_handle": "0x635198ef8a973c8da529ca94a6b564706137eb6c95976ba9be1144408fe300dd",
     "decoded_key": "0",
     "decoded_value": [
@@ -101,10 +101,10 @@
     "is_deleted": false
   },
   {
+    "key": "0x0100000000000000",
     "transaction_version": 508365567,
     "write_set_change_index": 20,
     "transaction_block_height": 159068756,
-    "key": "0x0100000000000000",
     "table_handle": "0x635198ef8a973c8da529ca94a6b564706137eb6c95976ba9be1144408fe300dd",
     "decoded_key": "1",
     "decoded_value": [
@@ -237,10 +237,10 @@
     "is_deleted": false
   },
   {
+    "key": "0x0200000000000000",
     "transaction_version": 508365567,
     "write_set_change_index": 21,
     "transaction_block_height": 159068756,
-    "key": "0x0200000000000000",
     "table_handle": "0x635198ef8a973c8da529ca94a6b564706137eb6c95976ba9be1144408fe300dd",
     "decoded_key": "2",
     "decoded_value": [
@@ -368,10 +368,10 @@
     "is_deleted": false
   },
   {
+    "key": "0x0300000000000000",
     "transaction_version": 508365567,
     "write_set_change_index": 22,
     "transaction_block_height": 159068756,
-    "key": "0x0300000000000000",
     "table_handle": "0x635198ef8a973c8da529ca94a6b564706137eb6c95976ba9be1144408fe300dd",
     "decoded_key": "3",
     "decoded_value": [
@@ -519,10 +519,10 @@
     "is_deleted": false
   },
   {
+    "key": "0x0400000000000000",
     "transaction_version": 508365567,
     "write_set_change_index": 23,
     "transaction_block_height": 159068756,
-    "key": "0x0400000000000000",
     "table_handle": "0x635198ef8a973c8da529ca94a6b564706137eb6c95976ba9be1144408fe300dd",
     "decoded_key": "4",
     "decoded_value": [

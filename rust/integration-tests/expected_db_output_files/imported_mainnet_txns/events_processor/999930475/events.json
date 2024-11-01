@@ -1,0 +1,36 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 999930475,
+    "transaction_block_height": 194509179,
+    "type_": "0x4::collection::Mint",
+    "data": {
+      "index": {
+        "value": "85328"
+      },
+      "token": "0x175d46f34304375e44870e953b5f4d34fb5b3f6dbf47a9ecc7fdfc7ee3b3e1c9",
+      "collection": "0xa79561c62c2eac5f008e13aa4c2e13f67c9bd538ef7d9df54fe9215da0a0bc0"
+    },
+    "indexed_type": "0x4::collection::Mint",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 999930475,
+    "transaction_block_height": 194509179,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "5",
+      "storage_fee_octas": "72480",
+      "execution_gas_units": "7",
+      "total_charge_gas_units": "736",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 1
+  }
+]

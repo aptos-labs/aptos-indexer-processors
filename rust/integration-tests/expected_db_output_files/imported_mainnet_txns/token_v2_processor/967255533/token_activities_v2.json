@@ -1,0 +1,19 @@
+[
+  {
+    "transaction_version": 967255533,
+    "event_index": 0,
+    "event_account_address": "0x1910ed3769bf094c43cf0c81470265304014c4ae7cbb4991fcc194f2c42bb4b4",
+    "token_data_id": "0x1910ed3769bf094c43cf0c81470265304014c4ae7cbb4991fcc194f2c42bb4b4",
+    "property_version_v1": "0",
+    "type_": "0x4::token::MutationEvent",
+    "from_address": "0x23246b2ad4ea793d6c061f415c58f9c442f434a9a888b2f6bd73e6b611e6774b",
+    "to_address": null,
+    "token_amount": "0",
+    "before_value": "",
+    "after_value": "https://arweave.net/-_cc-_HbzDofAF1_WkfGMfyJyejqU64ZdZmGFahNZlg",
+    "entry_function_id_str": "0xa8a3cdff3068ee47cb0419cbd93ad1f71bdabb50431fc0f5b971a00c613b13d2::odyssey_v2::update_token_uri",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-06-06T04:43:15.798869"
+  }
+]
