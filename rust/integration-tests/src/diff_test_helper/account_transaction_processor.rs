@@ -20,6 +20,7 @@ pub fn load_data(
         .filter(transaction_version.eq_any(&txn_versions))
         .then_order_by(transaction_version.asc())
         .then_order_by(inserted_at.asc())
+        .then_order_by(account_address.asc())
         .load::<AccountTransaction>(conn)?;
 
     result_map.insert(
