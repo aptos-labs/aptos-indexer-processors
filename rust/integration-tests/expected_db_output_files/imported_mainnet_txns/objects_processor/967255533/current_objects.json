@@ -1,0 +1,12 @@
+[
+  {
+    "object_address": "0x1910ed3769bf094c43cf0c81470265304014c4ae7cbb4991fcc194f2c42bb4b4",
+    "owner_address": "0x23246b2ad4ea793d6c061f415c58f9c442f434a9a888b2f6bd73e6b611e6774b",
+    "state_key_hash": "0x46062b050b32127b0939f63ea81c9d1529131721f32b43afbf08ff72b9ad1766",
+    "allow_ungated_transfer": true,
+    "last_guid_creation_num": "1125899906842626",
+    "last_transaction_version": 967255533,
+    "is_deleted": false,
+    "untransferrable": false
+  }
+]

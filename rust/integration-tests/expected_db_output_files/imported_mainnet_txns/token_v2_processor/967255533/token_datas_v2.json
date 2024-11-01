@@ -1,0 +1,20 @@
+[
+  {
+    "transaction_version": 967255533,
+    "write_set_change_index": 4,
+    "token_data_id": "0x1910ed3769bf094c43cf0c81470265304014c4ae7cbb4991fcc194f2c42bb4b4",
+    "collection_id": "0x3d1b16f4597bdf5f385dbbedf21c4dae7198c00af8933bea87b947658af92d65",
+    "token_name": "Aptomojis #373",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "https://arweave.net/-_cc-_HbzDofAF1_WkfGMfyJyejqU64ZdZmGFahNZlg",
+    "token_properties": {},
+    "description": "",
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "transaction_timestamp": "2024-06-06T04:43:15.798869",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

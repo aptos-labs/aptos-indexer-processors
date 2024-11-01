@@ -1,0 +1,19 @@
+[
+  {
+    "transaction_version": 1080786089,
+    "event_index": 0,
+    "event_account_address": "0x21d71e37dd165ee34e44086bed0832d9b30941e58f0b50beee8b5772e51ae2e8",
+    "token_data_id": "0xf90eabf85b23988baf34872795c9cdd4ad777126d572e6befaa519b0effc2db6",
+    "property_version_v1": "0",
+    "type_": "0x4::collection::BurnEvent",
+    "from_address": "0x7e387de2b7e8a29914dc6712cf745de00c7932adcc5fe2316976e48bdf23bb77",
+    "to_address": null,
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0x9d518b9b84f327eafc5f6632200ea224a818a935ffd6be5d78ada250bbc44a6::sidekick_capsule::delete",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-08-07T09:56:34.211969"
+  }
+]
