@@ -9,13 +9,14 @@ use ahash::AHashSet;
 use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Change, Transaction};
 use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
-use processor::db::common::models::{
-    object_models::v2_object_utils::ObjectWithMetadata,
-    user_transactions_models::user_transactions::UserTransaction,
+use processor::{
+    db::common::models::{
+        object_models::v2_object_utils::ObjectWithMetadata,
+        user_transactions_models::user_transactions::UserTransaction,
+    },
+    schema::account_transactions,
+    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };
-use processor::schema::account_transactions;
-use processor::utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT;
-use processor::utils::util::standardize_address;
 use serde::{Deserialize, Serialize};
 
 #[derive(
