@@ -1,0 +1,31 @@
+[
+  {
+    "version": 513424821,
+    "block_height": 160013523,
+    "id": "0xd1725984e19ce9934848108b187705f4eabfa4c178b21daa385d75ff1baa153b",
+    "round": 13705,
+    "epoch": 6336,
+    "previous_block_votes_bitvec": [
+      135,
+      27,
+      222,
+      199,
+      119,
+      93,
+      255,
+      189,
+      58,
+      255,
+      237,
+      125,
+      43,
+      158,
+      206,
+      172,
+      224
+    ],
+    "proposer": "0x0324df1e27c4129a58d73851ae0e9366064dc666a73e747051e203694a4cb257",
+    "failed_proposer_indices": [],
+    "timestamp": "2024-03-21T19:50:52.758797"
+  }
+]
