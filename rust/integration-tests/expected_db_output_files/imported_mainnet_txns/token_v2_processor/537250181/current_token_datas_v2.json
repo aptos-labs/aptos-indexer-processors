@@ -1,0 +1,19 @@
+[
+  {
+    "token_data_id": "0x88fbd363b60336c664a3114000d723efffa6f745be049e42ca98aa631b018ac9",
+    "collection_id": "0x2bed7aeca079697ec1700cc48bee658b2331d80996b05e56dfcb39fae22cbb63",
+    "token_name": "TSG Legend",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "https://bafybeierhssqdg7fv64xkkjuvsq4bikj2yfmuxm4dvb6jxb2un4yw37ohi.ipfs.w3s.link/83.webp",
+    "description": "This is TSG Legend NFT",
+    "token_properties": {},
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "last_transaction_version": 537250181,
+    "last_transaction_timestamp": "2024-04-04T22:38:56.926423",
+    "is_deleted_v2": false,
+    "decimals": 0
+  }
+]

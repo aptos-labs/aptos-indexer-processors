@@ -1,0 +1,19 @@
+[
+  {
+    "token_data_id": "0xf90eabf85b23988baf34872795c9cdd4ad777126d572e6befaa519b0effc2db6",
+    "collection_id": "0x21d71e37dd165ee34e44086bed0832d9b30941e58f0b50beee8b5772e51ae2e8",
+    "token_name": "",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "",
+    "description": "",
+    "token_properties": null,
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "last_transaction_version": 1080786089,
+    "last_transaction_timestamp": "2024-08-07T09:56:34.211969",
+    "is_deleted_v2": true,
+    "decimals": 0
+  }
+]

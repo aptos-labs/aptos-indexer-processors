@@ -1,0 +1,20 @@
+[
+  {
+    "transaction_version": 578366445,
+    "write_set_change_index": 2,
+    "collection_id": "0x1ac3cb52493947623cd727e2db9e4cfd828d5f9cd264920d253828276a5e314e",
+    "creator_address": "0x3fda2b751a0d209e17069ae72ccde256efeaad39e5403ea0e65ef5dcebdf6763",
+    "collection_name": "Aptos Airdrop",
+    "description": "Congratulations, your account is eligible to receive airdrop tokens!",
+    "uri": "https://pwncdn.com/nft/img/collection",
+    "current_supply": "137694",
+    "max_supply": "1000000000",
+    "total_minted_v2": "137696",
+    "mutable_description": false,
+    "mutable_uri": false,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "transaction_timestamp": "2024-04-30T23:50:44.443590",
+    "collection_properties": null
+  }
+]

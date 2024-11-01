@@ -8,15 +8,5 @@
     "last_transaction_version": 308783012,
     "is_deleted": false,
     "untransferrable": false
-  },
-  {
-    "object_address": "0xc791df699189a8fdfb4faaacf834f036d37670d6fd1ef06d3efb2d14c081512a",
-    "owner_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
-    "state_key_hash": "0x89831c962a6d8ef922a58688dd7b949b1b83557241b0de2b1daf874f590b5667",
-    "allow_ungated_transfer": false,
-    "last_guid_creation_num": "1125899906842628",
-    "last_transaction_version": 308783012,
-    "is_deleted": false,
-    "untransferrable": true
   }
 ]
