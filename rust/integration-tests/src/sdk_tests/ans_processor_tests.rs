@@ -54,7 +54,7 @@ pub async fn setup_ans_processor_config(
 #[cfg(test)]
 mod tests {
     use crate::{
-        diff_test_helper::default_processor::load_data,
+        diff_test_helper::ans_processor::load_data,
         sdk_tests::{
             ans_processor_tests::setup_ans_processor_config, run_processor_test,
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
@@ -76,7 +76,7 @@ mod tests {
     async fn mainnet_ans_primary_name() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_92331132_ANS_PRIMARY_NAME,
-            1056780409,
+            92331132,
             Some("test_ans_primary_name".to_string()),
         )
         .await;
@@ -96,17 +96,17 @@ mod tests {
     async fn mainnet_ans_lookup_v2() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2,
-            1056780409,
+            303690531,
             Some("test_ans_lookup_v2".to_string()),
         )
         .await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mainnet_currentans_lookup_v2() {
+    async fn mainnet_current_ans_lookup_v2() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_438536688_ANS_CURRENT_ANS_LOOKUP_V2,
-            1056780409,
+            438536688,
             Some("test_current_ans_lookup_v2".to_string()),
         )
         .await;
