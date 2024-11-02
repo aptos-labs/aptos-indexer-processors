@@ -162,17 +162,12 @@ impl ProcessorTrait for NftMetadataProcessor {
 fn extract_configs(
     config: &IndexerProcessorConfig,
 ) -> anyhow::Result<(&NftMetadataProcessorConfig, &PostgresConfig)> {
-    let ProcessorConfig::NftMetadataProcessor(nft_metadata_processor_config) =
-        &config.processor_config
+    let (
+        ProcessorConfig::NftMetadataProcessor(nft_metadata_processor_config),
+        DbConfig::PostgresConfig(db_config),
+    ) = (&config.processor_config, &config.db_config)
     else {
-        anyhow::bail!("Invalid processor config")
-    };
-
-    // TODO: Remove this when there are other DbConfig variants
-    #[allow(irrefutable_let_patterns)]
-    let DbConfig::PostgresConfig(db_config) = &config.db_config
-    else {
-        anyhow::bail!("Invalid db config")
+        anyhow::bail!("Invalid config")
     };
 
     Ok((nft_metadata_processor_config, db_config))
