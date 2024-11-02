@@ -1,4 +1,3 @@
-use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
     types::transaction_context::TransactionContext,
