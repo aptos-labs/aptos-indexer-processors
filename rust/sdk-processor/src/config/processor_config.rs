@@ -1,6 +1,7 @@
 use crate::processors::{
-    ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
-    stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+    ans_processor::AnsProcessorConfig, nft_metadata_processor::NftMetadataProcessorConfig,
+    objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
+    token_v2_processor::TokenV2ProcessorConfig,
 };
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,7 @@ pub enum ProcessorConfig {
     DefaultProcessor(DefaultProcessorConfig),
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
+    NftMetadataProcessor(NftMetadataProcessorConfig),
     StakeProcessor(StakeProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
     ObjectsProcessor(ObjectsProcessorConfig),

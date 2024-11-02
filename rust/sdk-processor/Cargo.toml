@@ -21,6 +21,8 @@ diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
+google-cloud-googleapis = { workspace = true }
+google-cloud-pubsub = { workspace = true }
 hex = { workspace = true }
 jemallocator = { workspace = true }
 kanal = { workspace = true }

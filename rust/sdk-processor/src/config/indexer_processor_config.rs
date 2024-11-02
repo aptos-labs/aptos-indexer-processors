@@ -7,7 +7,8 @@ use crate::{
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         default_processor::DefaultProcessor, events_processor::EventsProcessor,
-        fungible_asset_processor::FungibleAssetProcessor, objects_processor::ObjectsProcessor,
+        fungible_asset_processor::FungibleAssetProcessor,
+        nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor,
         stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
     },
 };
@@ -54,6 +55,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::FungibleAssetProcessor(_) => {
                 let fungible_asset_processor = FungibleAssetProcessor::new(self.clone()).await?;
                 fungible_asset_processor.run_processor().await
+            },
+            ProcessorConfig::NftMetadataProcessor(_) => {
+                let nft_metadata_processor = NftMetadataProcessor::new(self.clone()).await?;
+                nft_metadata_processor.run_processor().await
             },
             ProcessorConfig::StakeProcessor(_) => {
                 let stake_processor = StakeProcessor::new(self.clone()).await?;

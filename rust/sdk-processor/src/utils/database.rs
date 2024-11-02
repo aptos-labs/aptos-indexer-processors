@@ -277,13 +277,12 @@ pub fn run_pending_migrations<DB: diesel::backend::Backend>(conn: &mut impl Migr
 // feature enabled (which uses libpq under the hood, hence why we named the feature
 // this way).
 #[cfg(feature = "libpq")]
-pub async fn run_migrations(postgres_connection_string: String, _conn_pool: ArcDbPool) {
+pub async fn run_migrations(postgres_connection_string: &str, _conn_pool: ArcDbPool) {
     use diesel::{Connection, PgConnection};
 
     info!("Running migrations: {:?}", postgres_connection_string);
     let migration_time = std::time::Instant::now();
-    let mut conn =
-        PgConnection::establish(&postgres_connection_string).expect("migrations failed!");
+    let mut conn = PgConnection::establish(postgres_connection_string).expect("migrations failed!");
     run_pending_migrations(&mut conn);
     info!(
         duration_in_secs = migration_time.elapsed().as_secs_f64(),

@@ -273,7 +273,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
 
         let starting_version = get_starting_version(&indexer_processor_config, conn_pool)
             .await
@@ -291,7 +291,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
 
         let starting_version = get_starting_version(&indexer_processor_config, conn_pool)
             .await
@@ -309,7 +309,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor_status::table)
             .values(ProcessorStatus {
                 processor: indexer_processor_config.processor_config.name().to_string(),
@@ -343,7 +343,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor::schema::backfill_processor_status::table)
             .values(BackfillProcessorStatus {
                 backfill_alias: backfill_alias.clone(),
@@ -380,7 +380,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor::schema::backfill_processor_status::table)
             .values(BackfillProcessorStatus {
                 backfill_alias: backfill_alias.clone(),
@@ -410,7 +410,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
 
         let processor_names = vec!["processor_1".to_string(), "processor_2".to_string()];
 
@@ -434,7 +434,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
 
         // Insert processor statuses with different last_success_version values
         diesel::insert_into(processor::schema::processor_status::table)
@@ -476,7 +476,7 @@ mod tests {
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
-        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        run_migrations(&db.get_db_url(), conn_pool.clone()).await;
 
         // Insert processor statuses with different last_success_version values
         diesel::insert_into(processor::schema::processor_status::table)
