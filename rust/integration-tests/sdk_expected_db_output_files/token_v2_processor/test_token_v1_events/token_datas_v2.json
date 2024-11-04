@@ -1,0 +1,22 @@
+[
+  {
+    "transaction_version": 1058723093,
+    "write_set_change_index": 7,
+    "token_data_id": "0xc00d409177c3265544651b938d857a7675afe57fb4d276a37bcc18ecbecd0dac",
+    "collection_id": "0x2ae74f6f02bb77746263f3f32b17a4ea3196b467029c588b323d136af0c45cd4",
+    "token_name": "Aptos CIS x Joule Finance",
+    "maximum": "10000000000",
+    "supply": "2893",
+    "largest_property_version_v1": "0",
+    "token_uri": "https://graphigo.prd.galaxy.eco/metadata/aptos/0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8/GCoqbtkpAd.json",
+    "token_properties": {
+      "Galxe Campaign": "GCoqbtkpAd"
+    },
+    "description": "",
+    "token_standard": "v1",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-07-29T17:42:38.476025",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]
