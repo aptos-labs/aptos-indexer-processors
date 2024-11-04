@@ -53,6 +53,19 @@ mod tests {
     use aptos_indexer_test_transactions::IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION;
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::account_transactions_processor::AccountTransactionsProcessor;
+
+    /**
+     * This test includes processing for the following:
+     * - Resources
+     *      - 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+     *      - 0x1::account::Account
+     *      - 0x4::aptos_token::AptosToken
+     *      - 0x4::property_map::PropertyMap
+     *      - 0x4::token::Token
+     * - Events
+     *      - 0x4::token::MutationEvent
+     *      - 0x1::object::TransferEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_acc_txns_processor() {
         process_single_mainnet_txn(
