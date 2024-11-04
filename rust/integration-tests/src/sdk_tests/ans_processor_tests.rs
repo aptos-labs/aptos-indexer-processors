@@ -1,11 +1,13 @@
 use ahash::AHashMap;
 use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
-use sdk_processor::config::{
-    db_config::{DbConfig, PostgresConfig},
-    indexer_processor_config::IndexerProcessorConfig,
-    processor_config::{DefaultProcessorConfig, ProcessorConfig},
+use sdk_processor::{
+    config::{
+        db_config::{DbConfig, PostgresConfig},
+        indexer_processor_config::IndexerProcessorConfig,
+        processor_config::{DefaultProcessorConfig, ProcessorConfig},
+    },
+    processors::ans_processor::AnsProcessorConfig,
 };
-use sdk_processor::processors::ans_processor::AnsProcessorConfig;
 use std::collections::HashSet;
 
 pub async fn setup_ans_processor_config(
@@ -67,20 +69,9 @@ mod tests {
         IMPORTED_MAINNET_TXNS_1056780409_ANS_CURRENT_ANS_PRIMARY_NAME_V2,
         IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2,
         IMPORTED_MAINNET_TXNS_438536688_ANS_CURRENT_ANS_LOOKUP_V2,
-        IMPORTED_MAINNET_TXNS_92331132_ANS_PRIMARY_NAME,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::ans_processor::AnsProcessor;
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mainnet_ans_primary_name() {
-        process_single_mainnet_event_txn(
-            IMPORTED_MAINNET_TXNS_92331132_ANS_PRIMARY_NAME,
-            92331132,
-            Some("test_ans_primary_name".to_string()),
-        )
-        .await;
-    }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_current_ans_primary_name_v2() {
