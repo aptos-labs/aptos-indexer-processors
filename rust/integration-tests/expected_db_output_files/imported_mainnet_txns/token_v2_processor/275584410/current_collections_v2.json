@@ -1,0 +1,19 @@
+[
+  {
+    "collection_id": "0x63d26a4e3a8aeececf9b878e46bad78997fb38e50936efeabb2c4453f4d7f746",
+    "creator_address": "0x14464c04472a91941854ba9ffc48691e071874a1bcb51b89ff15afa5f80b76df",
+    "collection_name": "Aptos Domain Names V2",
+    "description": ".apt names from Aptos Labs",
+    "uri": "https://aptosnames.com",
+    "current_supply": "242",
+    "max_supply": null,
+    "total_minted_v2": "242",
+    "mutable_description": null,
+    "mutable_uri": null,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "last_transaction_version": 275584410,
+    "last_transaction_timestamp": "2023-09-26T04:38:34.096497",
+    "collection_properties": null
+  }
+]

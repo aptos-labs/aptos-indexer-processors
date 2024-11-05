@@ -192,14 +192,6 @@ mod tests {
                 config: processor::processors::ProcessorConfig::FungibleAssetProcessor,
             },
             TestProcessorConfig {
-                config: processor::processors::ProcessorConfig::TokenV2Processor(
-                    TokenV2ProcessorConfig {
-                        query_retries: 3,
-                        query_retry_delay_ms: 1000,
-                    },
-                ),
-            },
-            TestProcessorConfig {
                 config: processor::processors::ProcessorConfig::DefaultProcessor,
             },
             TestProcessorConfig {

@@ -1,0 +1,38 @@
+[
+  {
+    "transaction_version": 1056780409,
+    "event_index": -1,
+    "owner_address": "0x18a88b9722c7af62308e79b713710876156c68c3e3fdbd408294af6b16dc046a",
+    "storage_id": "0x2715098810e6a1074bf83ce26ffa9d76fdb5a77465c1374a6a2815c4ddf30c88",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "237000",
+    "type_": "0x1::aptos_coin::GasFeeEvent",
+    "is_gas_fee": true,
+    "gas_fee_payer_address": "0x011a5783e7b353bb3d66aba3f853418dd975e2a109b81ea05070319fdbf8aedd",
+    "is_transaction_success": true,
+    "entry_function_id_str": "0xfe2ffdb3a74307f7314a1c8ab3762b6b5869a3c1278cdd5d230249453e15a1db::petra_names::claim_petra_name",
+    "block_height": 207170162,
+    "token_standard": "v1",
+    "transaction_timestamp": "2024-07-28T17:32:30",
+    "storage_refund_amount": "0"
+  },
+  {
+    "transaction_version": 1056780409,
+    "event_index": 1,
+    "owner_address": "0x78ee3915e67ef5d19fa91d1e05e60ae08751efd12ce58e23fc1109de87ea7865",
+    "storage_id": "0xaf6e1b88e8f24203ccf89292cd5534144731f55426c46b26f1a28f0d32071222",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "0",
+    "type_": "0x1::coin::DepositEvent",
+    "is_gas_fee": false,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0xfe2ffdb3a74307f7314a1c8ab3762b6b5869a3c1278cdd5d230249453e15a1db::petra_names::claim_petra_name",
+    "block_height": 207170162,
+    "token_standard": "v1",
+    "transaction_timestamp": "2024-07-28T17:32:30",
+    "storage_refund_amount": "0"
+  }
+]

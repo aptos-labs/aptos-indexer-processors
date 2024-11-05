@@ -1,0 +1,45 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 4,
+    "account_address": "0x62367f3fa5c24c07a9ebe41a5f008327dae19e10b1aa6878aa2ee1183dd983ae",
+    "transaction_version": 84023785,
+    "transaction_block_height": 31443230,
+    "type_": "0x3::token::DepositEvent",
+    "data": {
+      "id": {
+        "token_data_id": {
+          "name": "Easter-AI #265",
+          "creator": "0x1592786351606410ce368d6c58bc56f4573ed82cdc092bd16089b9eae370211",
+          "collection": "Easter-AI"
+        },
+        "property_version": "0"
+      },
+      "amount": "1"
+    },
+    "indexed_type": "0x3::token::DepositEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 17,
+    "account_address": "0x02018f7b38b9c783d6385ec722490082425dc43d3a5e4afac4ebb9cfe92033e9",
+    "transaction_version": 84023785,
+    "transaction_block_height": 31443230,
+    "type_": "0x3::token_transfers::TokenClaimEvent",
+    "data": {
+      "amount": "1",
+      "token_id": {
+        "token_data_id": {
+          "name": "Easter-AI #265",
+          "creator": "0x1592786351606410ce368d6c58bc56f4573ed82cdc092bd16089b9eae370211",
+          "collection": "Easter-AI"
+        },
+        "property_version": "0"
+      },
+      "to_address": "0x62367f3fa5c24c07a9ebe41a5f008327dae19e10b1aa6878aa2ee1183dd983ae"
+    },
+    "indexed_type": "0x3::token_transfers::TokenClaimEvent",
+    "event_index": 1
+  }
+]
