@@ -1,0 +1,214 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 178179220,
+    "write_set_change_index": 7,
+    "transaction_block_height": 68127082,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "104394269633475578",
+    "is_deleted": false
+  },
+  {
+    "key": "0x7a370c1993c5517868b93004f1f72853160e758fa30de2edfec2574237bf9a8307572657204547470b5726572045474720233635",
+    "transaction_version": 178179220,
+    "write_set_change_index": 8,
+    "transaction_block_height": 68127082,
+    "table_handle": "0x59be6698e4e2da85f7780bf1c74f30951fc71c21a370ea1f25889b574e237e38",
+    "decoded_key": {
+      "name": "W&W EGG #65",
+      "creator": "0x7a370c1993c5517868b93004f1f72853160e758fa30de2edfec2574237bf9a83",
+      "collection": "W&W EGG"
+    },
+    "decoded_value": {
+      "uri": "https://werewolfandwitch-beast-collection.s3.ap-northeast-2.amazonaws.com/egg/egg_common.png",
+      "name": "W&W EGG #65",
+      "supply": "1",
+      "maximum": "1",
+      "royalty": {
+        "payee_address": "0x55f710b0b0330e060c41f731ffdd61b846910576bacd0a87be9fd37172012e08",
+        "royalty_points_numerator": "4000",
+        "royalty_points_denominator": "100000"
+      },
+      "description": "https://beast.werewolfandwitch.xyz/ / Eggs are the key to obtaining Beasts through hatching. There exists a diverse array of eggs, each representing a different species or variation. Rare eggs hold the promise of acquiring even rarer and more extraordinary Beasts. ",
+      "mutability_config": {
+        "uri": true,
+        "maximum": false,
+        "royalty": true,
+        "properties": true,
+        "description": true
+      },
+      "default_properties": {
+        "map": {
+          "data": [
+            {
+              "key": "TOKEN_BURNABLE_BY_OWNER",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "TOKEN_BURNABLE_BY_CREATOR",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "TOKEN_PROPERTY_MUTATBLE",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "W_RARITY",
+              "value": {
+                "type": "u64",
+                "value": "0x0100000000000000"
+              }
+            }
+          ]
+        }
+      },
+      "largest_property_version": "0"
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0x0757265720454747",
+    "transaction_version": 178179220,
+    "write_set_change_index": 9,
+    "transaction_block_height": 68127082,
+    "table_handle": "0xbb26ae908fcb19ba5bb8353ce7599be7330cfa20f0c8081d7f0e8c608311962b",
+    "decoded_key": "W&W EGG",
+    "decoded_value": {
+      "uri": "https://werewolfandwitch-beast-collection.s3.ap-northeast-2.amazonaws.com/egg/egg_epic.png",
+      "name": "W&W EGG",
+      "supply": "66",
+      "maximum": "99999",
+      "description": "https://beast.werewolfandwitch.xyz/ / Eggs are the key to obtaining Beasts through hatching. There exists a diverse array of eggs, each representing a different species or variation. Rare eggs hold the promise of acquiring even rarer and more extraordinary Beasts. ",
+      "mutability_config": {
+        "uri": true,
+        "maximum": true,
+        "description": true
+      }
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0x7a370c1993c5517868b93004f1f72853160e758fa30de2edfec2574237bf9a8307572657204547470b57265720454747202336350000000000000000",
+    "transaction_version": 178179220,
+    "write_set_change_index": 10,
+    "transaction_block_height": 68127082,
+    "table_handle": "0xf94282998db494e309eb57cd121b3d220c50aeb7fda750fa3dd4f106f9bfaf19",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "W&W EGG #65",
+        "creator": "0x7a370c1993c5517868b93004f1f72853160e758fa30de2edfec2574237bf9a83",
+        "collection": "W&W EGG"
+      },
+      "property_version": "0"
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "W&W EGG #65",
+          "creator": "0x7a370c1993c5517868b93004f1f72853160e758fa30de2edfec2574237bf9a83",
+          "collection": "W&W EGG"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": []
+        }
+      }
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0xcf2d3d6e933f23bf9e2d27961be088370b1787db05324d5ccbe12eb776952f271357265720426561737420436f6c6c6563746f721857265720426561737420436f6c6c6563746f7220233133340100000000000000",
+    "transaction_version": 178179220,
+    "write_set_change_index": 11,
+    "transaction_block_height": 68127082,
+    "table_handle": "0xf94282998db494e309eb57cd121b3d220c50aeb7fda750fa3dd4f106f9bfaf19",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "W&W Beast Collector #134",
+        "creator": "0xcf2d3d6e933f23bf9e2d27961be088370b1787db05324d5ccbe12eb776952f27",
+        "collection": "W&W Beast Collector"
+      },
+      "property_version": "1"
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "W&W Beast Collector #134",
+          "creator": "0xcf2d3d6e933f23bf9e2d27961be088370b1787db05324d5ccbe12eb776952f27",
+          "collection": "W&W Beast Collector"
+        },
+        "property_version": "1"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": [
+            {
+              "key": "TOKEN_BURNABLE_BY_OWNER",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "TOKEN_BURNABLE_BY_CREATOR",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "TOKEN_PROPERTY_MUTATBLE",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "W_EXP",
+              "value": {
+                "type": "u64",
+                "value": "0x0900000000000000"
+              }
+            },
+            {
+              "key": "W_LEVEL",
+              "value": {
+                "type": "u64",
+                "value": "0x0200000000000000"
+              }
+            },
+            {
+              "key": "W_NEXT_EXPLORATION_TIME",
+              "value": {
+                "type": "u64",
+                "value": "0x5f1aae6400000000"
+              }
+            },
+            {
+              "key": "W_GRADE",
+              "value": {
+                "type": "u64",
+                "value": "0x0100000000000000"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "is_deleted": false
+  }
+]
