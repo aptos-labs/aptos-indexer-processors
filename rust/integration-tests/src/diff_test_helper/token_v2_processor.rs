@@ -8,8 +8,9 @@ use diesel::{
 use processor::schema::{
     collections_v2::dsl as cv2_dsl, current_collections_v2::dsl as ccv2_dsl,
     current_token_datas_v2::dsl as ctdv2_dsl, current_token_ownerships_v2::dsl as ctov2_dsl,
-    current_token_v2_metadata::dsl as ctmv2_dsl, token_activities_v2::dsl as tav2_dsl,
-    token_datas_v2::dsl as tdv2_dsl, token_ownerships_v2::dsl as tov2_dsl,
+    current_token_pending_claims::dsl as ctpc_dsl, current_token_v2_metadata::dsl as ctmv2_dsl,
+    token_activities_v2::dsl as tav2_dsl, token_datas_v2::dsl as tdv2_dsl,
+    token_ownerships_v2::dsl as tov2_dsl,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -131,6 +132,20 @@ pub fn load_data(
     result_map.insert(
         "current_token_ownerships_v2".to_string(),
         serde_json::from_str(&current_token_ownerships_v2_json_data)?,
+    );
+
+    let current_token_pending_claims_result = ctpc_dsl::current_token_pending_claims
+        .filter(ctpc_dsl::last_transaction_version.eq_any(&txn_versions))
+        .then_order_by(ctpc_dsl::last_transaction_version.asc())
+        .load::<CurrentTokenPendingClaim>(conn);
+
+    let all_current_token_pending_claims = current_token_pending_claims_result?;
+    let current_token_pending_claims_json_data =
+        serde_json::to_string_pretty(&all_current_token_pending_claims)?;
+
+    result_map.insert(
+        "current_token_pending_claims".to_string(),
+        serde_json::from_str(&current_token_pending_claims_json_data)?,
     );
 
     Ok(result_map)

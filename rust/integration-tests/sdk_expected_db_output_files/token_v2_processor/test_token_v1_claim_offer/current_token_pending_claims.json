@@ -1,0 +1,18 @@
+[
+  {
+    "token_data_id_hash": "8b5bf15b19557d943ec8af90b4f874138de7e5fd125fa7ccf28d85a49e33bf0c",
+    "property_version": "0",
+    "from_address": "0x02018f7b38b9c783d6385ec722490082425dc43d3a5e4afac4ebb9cfe92033e9",
+    "to_address": "0x62367f3fa5c24c07a9ebe41a5f008327dae19e10b1aa6878aa2ee1183dd983ae",
+    "collection_data_id_hash": "acf73ef1391408374882ee764d2ec113529c486a7fbeb6fbabe36ba995ad0dfe",
+    "creator_address": "0x01592786351606410ce368d6c58bc56f4573ed82cdc092bd16089b9eae370211",
+    "collection_name": "Easter-AI",
+    "name": "Easter-AI #265",
+    "amount": "0",
+    "table_handle": "0xf7fc9be5db4893f6cd86e7fc163ad8fba05828b1fce16a995fb01ff028d65bb2",
+    "last_transaction_version": 84023785,
+    "collection_id": "0xacf73ef1391408374882ee764d2ec113529c486a7fbeb6fbabe36ba995ad0dfe",
+    "last_transaction_timestamp": "2023-02-08T13:41:41.695045",
+    "token_data_id": "0x8b5bf15b19557d943ec8af90b4f874138de7e5fd125fa7ccf28d85a49e33bf0c"
+  }
+]

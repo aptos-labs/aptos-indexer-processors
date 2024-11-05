@@ -61,12 +61,18 @@ mod sdk_token_v2_processor_tests {
         },
     };
     use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_1058723093_TOKEN_V1_MINT_WITHDRAW_DEPOSIT_EVENTS,
         IMPORTED_MAINNET_TXNS_1080786089_TOKEN_V2_BURN_EVENT_V1,
+        IMPORTED_MAINNET_TXNS_11648867_TOKEN_V1_BURN_EVENT,
+        IMPORTED_MAINNET_TXNS_141135867_TOKEN_V1_OFFER,
+        IMPORTED_MAINNET_TXNS_178179220_TOKEN_V1_MUTATE_EVENT,
         IMPORTED_MAINNET_TXNS_325355235_TOKEN_V2_UNLIMITED_SUPPLY_MINT,
         IMPORTED_MAINNET_TXNS_453498957_TOKEN_V2_MINT_AND_TRANSFER_EVENT_V1,
         IMPORTED_MAINNET_TXNS_537250181_TOKEN_V2_FIXED_SUPPLY_MINT,
         IMPORTED_MAINNET_TXNS_578366445_TOKEN_V2_BURN_EVENT_V2,
+        IMPORTED_MAINNET_TXNS_84023785_TOKEN_V2_CLAIM_OFFER,
         IMPORTED_MAINNET_TXNS_967255533_TOKEN_V2_MUTATION_EVENT,
+        IMPORTED_MAINNET_TXNS_97963136_TOKEN_V2_CANCEL_OFFER,
         IMPORTED_MAINNET_TXNS_999930475_TOKEN_V2_CONCURRENT_MINT,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
@@ -97,15 +103,11 @@ mod sdk_token_v2_processor_tests {
     /**
     * This test includes processing for the following:
     * - Resources
-    *      - 0x4::aptos_token::AptosCollection
     *      - 0x4::collection::Collection
-    *      - 0x4::collection::ConcurrentSupply
-    *      - 0x4::aptos_token::AptosToken
-    *      - 0x4::property_map::PropertyMap
-    *      - 0x4::token::Token
-
+    *      - 0x4::collection::UnlimitedSupply
     * - Events
-    *      - 0x4::collection::Mint
+    *      - 0x4::collection::BurnEvent
+
     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_burn_event_v1() {
@@ -117,18 +119,15 @@ mod sdk_token_v2_processor_tests {
     }
 
     /**
-    * This test includes processing for the following:
-    * - Resources
-    *      - 0x4::aptos_token::AptosCollection
-    *      - 0x4::collection::Collection
-    *      - 0x4::collection::ConcurrentSupply
-    *      - 0x4::aptos_token::AptosToken
-    *      - 0x4::property_map::PropertyMap
-    *      - 0x4::token::Token
-
-    * - Events
-    *      - 0x4::collection::Mint
-    */
+     * This test includes processing for the following:
+     * - Resources
+     *      - 0x4::collection::UnlimitedSupply
+     *      - 0x4::collection::Collection
+     *      - 0x4::token::Token
+     * - Events
+     *      - 0x4::collection::MintEvent
+     *      - 0x1::object::TransferEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_unlimited_supply() {
         process_single_transaction(
@@ -143,13 +142,14 @@ mod sdk_token_v2_processor_tests {
     * - Resources
     *      - 0x4::aptos_token::AptosCollection
     *      - 0x4::collection::Collection
-    *      - 0x4::collection::ConcurrentSupply
+    *      - 0x4::collection::FixedSupply
     *      - 0x4::aptos_token::AptosToken
     *      - 0x4::property_map::PropertyMap
     *      - 0x4::token::Token
 
     * - Events
-    *      - 0x4::collection::Mint
+     *      - 0x4::collection::MintEvent
+     *      - 0x1::object::TransferEvent
     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_mint_and_transfer_event_v1() {
@@ -165,13 +165,13 @@ mod sdk_token_v2_processor_tests {
     * - Resources
     *      - 0x4::aptos_token::AptosCollection
     *      - 0x4::collection::Collection
-    *      - 0x4::collection::ConcurrentSupply
+    *      - 0x4::collection::FixedSupply
     *      - 0x4::aptos_token::AptosToken
     *      - 0x4::property_map::PropertyMap
     *      - 0x4::token::Token
 
     * - Events
-    *      - 0x4::collection::Mint
+    *      - 0x4::collection::MintEvent
     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_fixed_supply() {
@@ -188,12 +188,9 @@ mod sdk_token_v2_processor_tests {
     *      - 0x4::aptos_token::AptosCollection
     *      - 0x4::collection::Collection
     *      - 0x4::collection::ConcurrentSupply
-    *      - 0x4::aptos_token::AptosToken
-    *      - 0x4::property_map::PropertyMap
-    *      - 0x4::token::Token
-
     * - Events
-    *      - 0x4::collection::Mint
+    *      - 0x4::collection::Burn
+
     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_burn_event_v2() {
@@ -207,21 +204,132 @@ mod sdk_token_v2_processor_tests {
     /**
     * This test includes processing for the following:
     * - Resources
-    *      - 0x4::aptos_token::AptosCollection
-    *      - 0x4::collection::Collection
-    *      - 0x4::collection::ConcurrentSupply
-    *      - 0x4::aptos_token::AptosToken
     *      - 0x4::property_map::PropertyMap
     *      - 0x4::token::Token
-
+    *      - 0x4::token::TokenIdentifiers
     * - Events
-    *      - 0x4::collection::Mint
+    *      - 0x4::token::MutationEvent
+
     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_mutation_event() {
         process_single_transaction(
             IMPORTED_MAINNET_TXNS_967255533_TOKEN_V2_MUTATION_EVENT,
             Some("test_token_v2_mutation_event".to_string()),
+        )
+        .await;
+    }
+
+    /**
+    * This test includes processing for the following:
+    * - Resources
+    *      - 0x4::property_map::PropertyMap
+    *      - 0x4::token::Token
+    *      - 0x4::token::TokenIdentifiers
+    * - Events
+    *      - 0x4::token::MutationEvent
+
+    */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_events() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_1058723093_TOKEN_V1_MINT_WITHDRAW_DEPOSIT_EVENTS,
+            Some("test_token_v1_events".to_string()),
+        )
+        .await;
+    }
+
+    /**
+    * This test includes processing for the following:
+    * - Resources
+    *      - 0x4::property_map::PropertyMap
+    *      - 0x4::token::Token
+    *      - 0x4::token::TokenIdentifiers
+    * - Events
+    *      - 0x4::token::MutationEvent
+
+    */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_burn_event() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_11648867_TOKEN_V1_BURN_EVENT,
+            Some("test_token_v1_burn_event".to_string()),
+        )
+        .await;
+    }
+
+    /**
+    * This test includes processing for the following:
+    * - Resources
+    *      - 0x4::property_map::PropertyMap
+    *      - 0x4::token::Token
+    *      - 0x4::token::TokenIdentifiers
+    * - Events
+    *      - 0x4::token::MutationEvent
+
+    */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_offer() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_141135867_TOKEN_V1_OFFER,
+            Some("test_token_v1_offer".to_string()),
+        )
+        .await;
+    }
+
+    /**
+    * This test includes processing for the following:
+    * - Resources
+    *      - 0x4::property_map::PropertyMap
+    *      - 0x4::token::Token
+    *      - 0x4::token::TokenIdentifiers
+    * - Events
+    *      - 0x4::token::MutationEvent
+
+    */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_mutate_event() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_178179220_TOKEN_V1_MUTATE_EVENT,
+            Some("test_token_v1_mutate_event".to_string()),
+        )
+        .await;
+    }
+
+    /**
+    * This test includes processing for the following:
+    * - Resources
+    *      - 0x4::property_map::PropertyMap
+    *      - 0x4::token::Token
+    *      - 0x4::token::TokenIdentifiers
+    * - Events
+    *      - 0x4::token::MutationEvent
+
+    */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_claim_offer() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_84023785_TOKEN_V2_CLAIM_OFFER,
+            Some("test_token_v1_claim_offer".to_string()),
+        )
+        .await;
+    }
+
+    /**
+    * This test includes processing for the following:
+    * - Resources
+    *      - 0x4::property_map::PropertyMap
+    *      - 0x4::token::Token
+    *      - 0x4::token::TokenIdentifiers
+    * - Events
+    *      - 0x4::token::MutationEvent
+
+    */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_cancel_offer() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_97963136_TOKEN_V2_CANCEL_OFFER,
+            Some("test_token_v1_cancel_offer".to_string()),
         )
         .await;
     }

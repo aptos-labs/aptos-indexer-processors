@@ -1,0 +1,100 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 1058723093,
+    "write_set_change_index": 6,
+    "transaction_block_height": 207536557,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "110825801751155699",
+    "is_deleted": false
+  },
+  {
+    "key": "0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f80947616c7865204f4154194170746f73204349532078204a6f756c652046696e616e6365",
+    "transaction_version": 1058723093,
+    "write_set_change_index": 7,
+    "transaction_block_height": 207536557,
+    "table_handle": "0x28418760527ca583ca1dea9807b21574952f9eac6f2cbef9369f0c87f1940497",
+    "decoded_key": {
+      "name": "Aptos CIS x Joule Finance",
+      "creator": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+      "collection": "Galxe OAT"
+    },
+    "decoded_value": {
+      "uri": "https://graphigo.prd.galaxy.eco/metadata/aptos/0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8/GCoqbtkpAd.json",
+      "name": "Aptos CIS x Joule Finance",
+      "supply": "2893",
+      "maximum": "10000000000",
+      "royalty": {
+        "payee_address": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+        "royalty_points_numerator": "0",
+        "royalty_points_denominator": "0"
+      },
+      "description": "",
+      "mutability_config": {
+        "uri": true,
+        "maximum": true,
+        "royalty": true,
+        "properties": false,
+        "description": false
+      },
+      "default_properties": {
+        "map": {
+          "data": [
+            {
+              "key": "Galxe Campaign",
+              "value": {
+                "type": "0x1::string::String",
+                "value": "0x0a47436f7162746b704164"
+              }
+            }
+          ]
+        }
+      },
+      "largest_property_version": "0"
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0xc5f39f3500000000",
+    "transaction_version": 1058723093,
+    "write_set_change_index": 8,
+    "transaction_block_height": 207536557,
+    "table_handle": "0x9005cc042f0a553e12e63d2e67da6e4522dbec500eb798ff3199066f3590a03e",
+    "decoded_key": "899675077",
+    "decoded_value": true,
+    "is_deleted": false
+  },
+  {
+    "key": "0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f80947616c7865204f4154194170746f73204349532078204a6f756c652046696e616e63650000000000000000",
+    "transaction_version": 1058723093,
+    "write_set_change_index": 9,
+    "transaction_block_height": 207536557,
+    "table_handle": "0xe2d4df48ee30234ecfd2e53216b000e485a304809099f77af060fb4a31153e77",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "Aptos CIS x Joule Finance",
+        "creator": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+        "collection": "Galxe OAT"
+      },
+      "property_version": "0"
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "Aptos CIS x Joule Finance",
+          "creator": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+          "collection": "Galxe OAT"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": []
+        }
+      }
+    },
+    "is_deleted": false
+  }
+]
