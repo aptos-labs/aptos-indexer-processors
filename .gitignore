@@ -2,6 +2,7 @@ config.yaml
 cursor.txt
 build
 node_modules/
+lcov.info
 
 # Rust specific ignores
 # Please follow https://help.github.com/en/articles/ignoring-files to create a global
