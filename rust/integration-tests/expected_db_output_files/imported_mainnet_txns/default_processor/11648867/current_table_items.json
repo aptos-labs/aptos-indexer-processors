@@ -1,0 +1,149 @@
+[
+  {
+    "table_handle": "0x220fcbceea542f3d660a9064b9b526a5b9d55476ce475ca4bd6df695b756f8a1",
+    "key_hash": "81162b4aef63df503a5370b406e76383bd6b4d5b2a430589b825a28bec45b2e0",
+    "key": "0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926054150617373066b7573616d61",
+    "decoded_key": {
+      "name": "kusama",
+      "creator": "0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926",
+      "collection": "APass"
+    },
+    "decoded_value": {
+      "uri": "https://aptpp.com/namepic/main/kusama",
+      "name": "kusama",
+      "supply": "1",
+      "maximum": "1",
+      "royalty": {
+        "payee_address": "0x777821c78442e17d82c3d7a371f42de7189e4248e529fe6eee6bca40ddbb",
+        "royalty_points_numerator": "0",
+        "royalty_points_denominator": "0"
+      },
+      "description": "APass Name",
+      "mutability_config": {
+        "uri": true,
+        "maximum": true,
+        "royalty": true,
+        "properties": true,
+        "description": true
+      },
+      "default_properties": {
+        "map": {
+          "data": [
+            {
+              "key": "TOKEN_PROPERTY_MUTABLE",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            },
+            {
+              "key": "TOKEN_BURNABLE_BY_OWNER",
+              "value": {
+                "type": "bool",
+                "value": "0x01"
+              }
+            }
+          ]
+        }
+      },
+      "largest_property_version": "0"
+    },
+    "is_deleted": false,
+    "last_transaction_version": 11648867
+  },
+  {
+    "table_handle": "0x60a5cc08464436cf702049e5727a0fd55964a0422425f1a65ae5b30f60ea264d",
+    "key_hash": "0b1dc7e87e70e3c14facaebddf6c3d8dd2d10eaf237c37f9d516418c809fd7d8",
+    "key": "0x066b7573616d61",
+    "decoded_key": "0x6b7573616d61",
+    "decoded_value": "0x262662203c5ca539061e8644b8124bd6e9d475d9ab181d0674c72e8067752a1e",
+    "is_deleted": false,
+    "last_transaction_version": 11648867
+  },
+  {
+    "table_handle": "0xa68b3ef96b68f4b8fb3fb5c686138e1f1996aa9f2bf6daed12e41bb2b78f1ffc",
+    "key_hash": "0b1dc7e87e70e3c14facaebddf6c3d8dd2d10eaf237c37f9d516418c809fd7d8",
+    "key": "0x066b7573616d61",
+    "decoded_key": "0x6b7573616d61",
+    "decoded_value": {
+      "data": {
+        "data": [
+          {
+            "key": "1",
+            "value": "0x307832363236363232303363356361353339303631653836343462383132346264366539643437356439616231383164303637346337326538303637373532613165"
+          }
+        ]
+      },
+      "domain": "kusama",
+      "creator": "0x262662203c5ca539061e8644b8124bd6e9d475d9ab181d0674c72e8067752a1e",
+      "regtime": "1666656981",
+      "tokenid": {
+        "token_data_id": {
+          "name": "kusama",
+          "creator": "0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926",
+          "collection": "APass"
+        },
+        "property_version": "0"
+      },
+      "expiration": "1698192981"
+    },
+    "is_deleted": false,
+    "last_transaction_version": 11648867
+  },
+  {
+    "table_handle": "0xbcc63037e21f85eed097fe75243e0131015d8c44f9dfb99d185813f4d1fb7524",
+    "key_hash": "2906a7bbf2d20a4b914dc799866e6e9b2df96e920a26dc87c0ac3e8e43f179f2",
+    "key": "0x262662203c5ca539061e8644b8124bd6e9d475d9ab181d0674c72e8067752a1e",
+    "decoded_key": "0x262662203c5ca539061e8644b8124bd6e9d475d9ab181d0674c72e8067752a1e",
+    "decoded_value": "0x6b7573616d61",
+    "is_deleted": false,
+    "last_transaction_version": 11648867
+  },
+  {
+    "table_handle": "0xfe4bf4bb39ba78b9b87a4bd5d0b2116fa33dece102ec39992c55fd1941b338db",
+    "key_hash": "754f16a856473d77b8a9c5821c26f917d7e79b86f174a360a0528d41773c9962",
+    "key": "0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926054150617373066b7573616d610000000000000000",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "kusama",
+        "creator": "0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926",
+        "collection": "APass"
+      },
+      "property_version": "0"
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "kusama",
+          "creator": "0xb731146f64e49695f67ec7d7cd11b58a94194c897a5c2a1fea6e00d36e220926",
+          "collection": "APass"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": []
+        }
+      }
+    },
+    "is_deleted": false,
+    "last_transaction_version": 11648867
+  },
+  {
+    "table_handle": "0xfe4bf4bb39ba78b9b87a4bd5d0b2116fa33dece102ec39992c55fd1941b338db",
+    "key_hash": "d2fbeb272f2904de3793db2c56ae6d3b4a3cd911daf4b438fe78afe45b060532",
+    "key": "0x42c289240fd449c03479f18abe739999e6aa5b6ceed0819026f6b597ca0d0d0d0c417074657220436f75706f6e174150617373203541505420436f75706f6e2023323034320000000000000000",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "APass 5APT Coupon #2042",
+        "creator": "0x42c289240fd449c03479f18abe739999e6aa5b6ceed0819026f6b597ca0d0d0d",
+        "collection": "Apter Coupon"
+      },
+      "property_version": "0"
+    },
+    "decoded_value": null,
+    "is_deleted": true,
+    "last_transaction_version": 11648867
+  }
+]

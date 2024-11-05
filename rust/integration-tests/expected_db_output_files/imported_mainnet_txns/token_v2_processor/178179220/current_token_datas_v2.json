@@ -1,0 +1,24 @@
+[
+  {
+    "token_data_id": "0x6a0c359c0f404a9975dc97bcbba2be53937295fa555ea08a59b7c8accd8bdcbd",
+    "collection_id": "0x370e2acd14849283ce83a963d5d6263d4dcf451c8d7a7d5213412bf211787a12",
+    "token_name": "W&W EGG #65",
+    "maximum": "1",
+    "supply": "1",
+    "largest_property_version_v1": "0",
+    "token_uri": "https://werewolfandwitch-beast-collection.s3.ap-northeast-2.amazonaws.com/egg/egg_common.png",
+    "description": "https://beast.werewolfandwitch.xyz/ / Eggs are the key to obtaining Beasts through hatching. There exists a diverse array of eggs, each representing a different species or variation. Rare eggs hold the promise of acquiring even rarer and more extraordinary Beasts. ",
+    "token_properties": {
+      "W_RARITY": "1",
+      "TOKEN_BURNABLE_BY_OWNER": "true",
+      "TOKEN_PROPERTY_MUTATBLE": "true",
+      "TOKEN_BURNABLE_BY_CREATOR": "true"
+    },
+    "token_standard": "v1",
+    "is_fungible_v2": null,
+    "last_transaction_version": 178179220,
+    "last_transaction_timestamp": "2023-07-11T03:13:35.970315",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

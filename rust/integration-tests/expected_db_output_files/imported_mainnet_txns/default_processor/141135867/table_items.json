@@ -1,0 +1,64 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 141135867,
+    "write_set_change_index": 4,
+    "transaction_block_height": 54943661,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "103422835322352575",
+    "is_deleted": false
+  },
+  {
+    "key": "0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f80947616c7865204f41542b4772616e20536167613a20556e6c696d69746564205469746c6520416e6e6f756e63656d656e74204f41540000000000000000",
+    "transaction_version": 141135867,
+    "write_set_change_index": 5,
+    "transaction_block_height": 54943661,
+    "table_handle": "0x9a6bdbe18a85fbe456660ae68a7e64e1d186b242bfe3c940d47643044e489d65",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "Gran Saga: Unlimited Title Announcement OAT",
+        "creator": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+        "collection": "Galxe OAT"
+      },
+      "property_version": "0"
+    },
+    "decoded_value": null,
+    "is_deleted": true
+  },
+  {
+    "key": "0x15ca0ddee3416b0d8177c0cce554f140c99a94b72e02a55a55fd2d717999c39f092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f80947616c7865204f41542b4772616e20536167613a20556e6c696d69746564205469746c6520416e6e6f756e63656d656e74204f41540000000000000000",
+    "transaction_version": 141135867,
+    "write_set_change_index": 6,
+    "transaction_block_height": 54943661,
+    "table_handle": "0xe67fe5afafcffe75ac55e33067d32c2a962435053d769a0ab4e476030a4de753",
+    "decoded_key": {
+      "to_addr": "0x15ca0ddee3416b0d8177c0cce554f140c99a94b72e02a55a55fd2d717999c39f",
+      "token_id": {
+        "token_data_id": {
+          "name": "Gran Saga: Unlimited Title Announcement OAT",
+          "creator": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+          "collection": "Galxe OAT"
+        },
+        "property_version": "0"
+      }
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "Gran Saga: Unlimited Title Announcement OAT",
+          "creator": "0x92d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+          "collection": "Galxe OAT"
+        },
+        "property_version": "0"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": []
+        }
+      }
+    },
+    "is_deleted": false
+  }
+]

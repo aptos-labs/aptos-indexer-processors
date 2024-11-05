@@ -50,18 +50,17 @@ mod tests {
             run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION;
+    use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION,
+        IMPORTED_MAINNET_TXNS_423176063_ACCOUNT_TRANSACTION_DELETE,
+    };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::account_transactions_processor::AccountTransactionsProcessor;
 
     /**
      * This test includes processing for the following:
      * - Resources
-     *      - 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
-     *      - 0x1::account::Account
-     *      - 0x4::aptos_token::AptosToken
-     *      - 0x4::property_map::PropertyMap
-     *      - 0x4::token::Token
+     *      - write_resource on 0x1::account::Account
      * - Events
      *      - 0x4::token::MutationEvent
      *      - 0x1::object::TransferEvent
@@ -72,6 +71,20 @@ mod tests {
             IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION,
             145959468,
             Some("account_transaction_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     *  - delete_resource
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_acc_txns_processor_delete() {
+        process_single_mainnet_txn(
+            IMPORTED_MAINNET_TXNS_423176063_ACCOUNT_TRANSACTION_DELETE,
+            423176063,
+            Some("account_transaction_delete_test".to_string()),
         )
         .await;
     }
