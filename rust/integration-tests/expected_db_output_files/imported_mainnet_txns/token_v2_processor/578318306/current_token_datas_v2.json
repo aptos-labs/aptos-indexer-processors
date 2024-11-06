@@ -11,9 +11,9 @@
     "token_properties": {},
     "token_standard": "v2",
     "is_fungible_v2": false,
-    "last_transaction_version": 578366445,
-    "last_transaction_timestamp": "2024-04-30T23:50:44.443590",
-    "is_deleted_v2": true,
+    "last_transaction_version": 578318306,
+    "last_transaction_timestamp": "2024-04-30T22:55:03.868021",
+    "is_deleted_v2": false,
     "decimals": 0
   }
 ]

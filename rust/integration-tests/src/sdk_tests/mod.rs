@@ -26,6 +26,9 @@ pub mod token_v2_processor_tests;
 #[cfg(test)]
 pub mod default_processor_tests;
 
+#[cfg(test)]
+pub mod objects_processor_tests;
+
 #[allow(dead_code)]
 pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files";
 
@@ -52,6 +55,15 @@ pub fn get_transaction_version_from_test_context(test_context: &SdkTestContext) 
         .transaction_batches
         .iter()
         .map(|txn| txn.version)
+        .collect()
+}
+
+#[allow(dead_code)]
+pub fn get_all_version_from_test_context(test_context: &SdkTestContext) -> Vec<i64> {
+    test_context
+        .transaction_batches
+        .iter()
+        .map(|txn| txn.version as i64)
         .collect()
 }
 

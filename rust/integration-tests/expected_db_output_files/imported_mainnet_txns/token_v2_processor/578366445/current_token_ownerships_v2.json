@@ -7,11 +7,11 @@
     "amount": "0",
     "table_type_v1": null,
     "token_properties_mutated_v1": null,
-    "is_soulbound_v2": null,
+    "is_soulbound_v2": false,
     "token_standard": "v2",
     "is_fungible_v2": null,
     "last_transaction_version": 578366445,
     "last_transaction_timestamp": "2024-04-30T23:50:44.443590",
-    "non_transferrable_by_owner": null
+    "non_transferrable_by_owner": false
   }
 ]
