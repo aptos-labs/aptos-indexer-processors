@@ -1,0 +1,12 @@
+[
+  {
+    "transaction_version": 139449359,
+    "write_set_change_index": 6,
+    "delegator_address": "0x095cdd904dc1d91736019a3fe149488072f87690a210b3b35f87ea0f6898ac15",
+    "pool_address": "0xe7fb0815dbe9d687a911ef6950f4ad53fed1980a99569e589e42a25f55c72ad2",
+    "pool_type": "inactive_shares",
+    "table_handle": "0x987303c1020f9fcfc436059708bf9280e54bf819471b119e8c553b6b06b04e71",
+    "shares": "0",
+    "parent_table_handle": "0xc00ee123b3e8468df4ef1dd4bb82b1cf52584df49de7ec458e89f57a6ad80a72"
+  }
+]

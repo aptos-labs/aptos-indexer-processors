@@ -1,0 +1,34 @@
+[
+  {
+    "key": "0x0000000000000000",
+    "transaction_version": 125600867,
+    "write_set_change_index": 9,
+    "transaction_block_height": 48784225,
+    "table_handle": "0x05fcc4bcab9aa598fad4bff10390484a76ab7fceca29e7a78c00ff145db7eb39",
+    "decoded_key": {
+      "index": "0"
+    },
+    "decoded_value": {
+      "shares": {
+        "inner": {
+          "handle": "0xdbbf37c232ea1e07604611d594f32d361b13726c89cf25665019621cccf9586a"
+        },
+        "length": "0"
+      },
+      "total_coins": "0",
+      "total_shares": "0",
+      "scaling_factor": "10000000000000000"
+    },
+    "is_deleted": false
+  },
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 125600867,
+    "write_set_change_index": 10,
+    "transaction_block_height": 48784225,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "103028171374127440",
+    "is_deleted": false
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "transaction_version": 125600867,
+    "staking_pool_address": "0x335212a907e882a69017e81d26fa09eca892c8a53725f8c5b1d9b8bc262384e4",
+    "total_coins": "0",
+    "total_shares": "0",
+    "active_table_handle": "0x1d87974d5168c69f150c66e839082357c3577e45bfec4af7ba484c96b812e725",
+    "operator_commission_percentage": "1200",
+    "inactive_table_handle": "0x05fcc4bcab9aa598fad4bff10390484a76ab7fceca29e7a78c00ff145db7eb39"
+  }
+]

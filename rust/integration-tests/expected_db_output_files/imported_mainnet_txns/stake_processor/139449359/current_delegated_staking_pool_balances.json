@@ -1,0 +1,11 @@
+[
+  {
+    "staking_pool_address": "0xe7fb0815dbe9d687a911ef6950f4ad53fed1980a99569e589e42a25f55c72ad2",
+    "total_coins": "0",
+    "total_shares": "0",
+    "last_transaction_version": 139449359,
+    "active_table_handle": "0xf37b3765ef3a923bc2ec8cdce7147843312fc36629def066fe9723601169bbbd",
+    "operator_commission_percentage": "1000",
+    "inactive_table_handle": "0xc00ee123b3e8468df4ef1dd4bb82b1cf52584df49de7ec458e89f57a6ad80a72"
+  }
+]

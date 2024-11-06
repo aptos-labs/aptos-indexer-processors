@@ -1,0 +1,52 @@
+[
+  {
+    "transaction_version": 1831971037,
+    "write_set_change_index": 6,
+    "delegator_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "active_shares",
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "shares": "0",
+    "parent_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3"
+  },
+  {
+    "transaction_version": 1831971037,
+    "write_set_change_index": 7,
+    "delegator_address": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "active_shares",
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "shares": "1674642417.9286651224455123",
+    "parent_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3"
+  },
+  {
+    "transaction_version": 1831971037,
+    "write_set_change_index": 8,
+    "delegator_address": "0xface9c7372f35fa461ad168cb1094e523a0a89f8e2796b0e21c217c85e19d71a",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "active_shares",
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "shares": "0",
+    "parent_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3"
+  },
+  {
+    "transaction_version": 1831971037,
+    "write_set_change_index": 9,
+    "delegator_address": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "inactive_shares",
+    "table_handle": "0x65740a31c67d4505fc8b5ffcb1c1a80686f24fe24926500754078d23caeea61f",
+    "shares": "94718680472.4602951002921336",
+    "parent_table_handle": "0xd5d080845aad4a0e20ad583dac7e2e0119ce534a313a0cfd939dd11b5acb111e"
+  },
+  {
+    "transaction_version": 1831971037,
+    "write_set_change_index": 14,
+    "delegator_address": "0xface9c7372f35fa461ad168cb1094e523a0a89f8e2796b0e21c217c85e19d71a",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "inactive_shares",
+    "table_handle": "0xfffc3802cd3b421aebb2b49bef3e7edf01bf0f0d145b40c898a5aa369a7fb955",
+    "shares": "2322495300",
+    "parent_table_handle": "0xd5d080845aad4a0e20ad583dac7e2e0119ce534a313a0cfd939dd11b5acb111e"
+  }
+]

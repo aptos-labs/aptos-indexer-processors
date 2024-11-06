@@ -1,0 +1,14 @@
+[
+  {
+    "transaction_version": 4827964,
+    "write_set_change_index": 0,
+    "storage_id": "0x1f387b4e76b06a17e3b55b2d69783879bc86b4b74999206d72235b39ae6a6434",
+    "owner_address": "0x8bc790b05b8b8654af04286019920a516ffd007ff2a5d9c1a940b0f400b50f8b",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "143700",
+    "transaction_timestamp": "2022-10-20T02:32:49",
+    "token_standard": "v1"
+  }
+]

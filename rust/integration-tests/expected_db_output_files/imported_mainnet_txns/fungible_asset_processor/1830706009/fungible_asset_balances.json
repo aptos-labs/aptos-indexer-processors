@@ -1,0 +1,26 @@
+[
+  {
+    "transaction_version": 1830706009,
+    "write_set_change_index": 1,
+    "storage_id": "0x14bd24f2ab8f289db4cc7c674c081877e6d9f46cc379c89c0c5f6556880bb7ae",
+    "owner_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "0",
+    "transaction_timestamp": "2024-10-23T13:36:22",
+    "token_standard": "v1"
+  },
+  {
+    "transaction_version": 1830706009,
+    "write_set_change_index": 5,
+    "storage_id": "0xa7a3c329938315fe29bbcd83943e5d6ead323f4fad9eae410b9ad294fa5eaae4",
+    "owner_address": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "1586515",
+    "transaction_timestamp": "2024-10-23T13:36:22",
+    "token_standard": "v1"
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "table_handle": "0x987303c1020f9fcfc436059708bf9280e54bf819471b119e8c553b6b06b04e71",
+    "key_hash": "d41576b7f24769586df1e95bcf43a66d2c4833a2f48f584eb1b1e2913ead10b5",
+    "key": "0x095cdd904dc1d91736019a3fe149488072f87690a210b3b35f87ea0f6898ac15",
+    "decoded_key": "0x95cdd904dc1d91736019a3fe149488072f87690a210b3b35f87ea0f6898ac15",
+    "decoded_value": null,
+    "is_deleted": true,
+    "last_transaction_version": 139449359
+  },
+  {
+    "table_handle": "0x9bfc843710ea105b4be2aa06e2483ab622c00f54390cf93ad2c52a130a270b8c",
+    "key_hash": "d41576b7f24769586df1e95bcf43a66d2c4833a2f48f584eb1b1e2913ead10b5",
+    "key": "0x095cdd904dc1d91736019a3fe149488072f87690a210b3b35f87ea0f6898ac15",
+    "decoded_key": "0x95cdd904dc1d91736019a3fe149488072f87690a210b3b35f87ea0f6898ac15",
+    "decoded_value": null,
+    "is_deleted": true,
+    "last_transaction_version": 139449359
+  },
+  {
+    "table_handle": "0xc00ee123b3e8468df4ef1dd4bb82b1cf52584df49de7ec458e89f57a6ad80a72",
+    "key_hash": "3b8386b8fac31732b9b0d3f2d03a4c1e5d3186a9d905fe4482b77e54bcebde08",
+    "key": "0x0000000000000000",
+    "decoded_key": {
+      "index": "0"
+    },
+    "decoded_value": {
+      "shares": {
+        "inner": {
+          "handle": "0x987303c1020f9fcfc436059708bf9280e54bf819471b119e8c553b6b06b04e71"
+        },
+        "length": "0"
+      },
+      "total_coins": "0",
+      "total_shares": "0",
+      "scaling_factor": "10000000000000000"
+    },
+    "is_deleted": false,
+    "last_transaction_version": 139449359
+  }
+]

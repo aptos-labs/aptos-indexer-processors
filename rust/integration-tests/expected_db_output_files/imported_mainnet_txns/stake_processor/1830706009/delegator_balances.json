@@ -1,0 +1,42 @@
+[
+  {
+    "transaction_version": 1830706009,
+    "write_set_change_index": 9,
+    "delegator_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "active_shares",
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "shares": "15334.7327463767236913",
+    "parent_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3"
+  },
+  {
+    "transaction_version": 1830706009,
+    "write_set_change_index": 10,
+    "delegator_address": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "active_shares",
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "shares": "558213794.8565788303757553",
+    "parent_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3"
+  },
+  {
+    "transaction_version": 1830706009,
+    "write_set_change_index": 11,
+    "delegator_address": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "active_shares",
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "shares": "1086880887.7242081379810636",
+    "parent_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3"
+  },
+  {
+    "transaction_version": 1830706009,
+    "write_set_change_index": 12,
+    "delegator_address": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "pool_type": "inactive_shares",
+    "table_handle": "0x65740a31c67d4505fc8b5ffcb1c1a80686f24fe24926500754078d23caeea61f",
+    "shares": "94718272982.0001472840909746",
+    "parent_table_handle": "0xd5d080845aad4a0e20ad583dac7e2e0119ce534a313a0cfd939dd11b5acb111e"
+  }
+]

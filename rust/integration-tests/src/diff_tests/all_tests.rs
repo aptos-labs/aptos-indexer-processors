@@ -190,9 +190,6 @@ mod tests {
                 config: processor::processors::ProcessorConfig::FungibleAssetProcessor,
             },
             TestProcessorConfig {
-                config: processor::processors::ProcessorConfig::DefaultProcessor,
-            },
-            TestProcessorConfig {
                 config: processor::processors::ProcessorConfig::AnsProcessor(AnsProcessorConfig {
                     ans_v1_primary_names_table_handle: "ans_v1_primary_names".to_string(),
                     ans_v1_name_records_table_handle: "ans_v1_secondary_names".to_string(),
