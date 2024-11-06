@@ -1,0 +1,11 @@
+[
+  {
+    "table_handle": "0x1d5f57aa505a2fa463b7a46341913b65757e3177c46a5e483a29d953627bee62",
+    "key_hash": "c496608a0e88b53338dec9d3c26d8719427fe302ea3d2b309e306e575eb37afd",
+    "key": "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493",
+    "decoded_key": "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493",
+    "decoded_value": null,
+    "is_deleted": true,
+    "last_transaction_version": 303690531
+  }
+]

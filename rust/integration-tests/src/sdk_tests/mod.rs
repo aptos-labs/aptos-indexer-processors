@@ -14,6 +14,9 @@ use std::{
 };
 
 #[cfg(test)]
+pub mod ans_processor_tests;
+
+#[cfg(test)]
 pub mod events_processor_tests;
 #[cfg(test)]
 pub mod fungible_asset_processor_tests;
