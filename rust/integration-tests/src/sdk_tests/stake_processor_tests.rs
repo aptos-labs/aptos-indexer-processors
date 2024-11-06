@@ -1,11 +1,13 @@
 use ahash::AHashMap;
 use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
-use sdk_processor::config::{
-    db_config::{DbConfig, PostgresConfig},
-    indexer_processor_config::IndexerProcessorConfig,
-    processor_config::{DefaultProcessorConfig, ProcessorConfig},
+use sdk_processor::{
+    config::{
+        db_config::{DbConfig, PostgresConfig},
+        indexer_processor_config::IndexerProcessorConfig,
+        processor_config::{DefaultProcessorConfig, ProcessorConfig},
+    },
+    processors::stake_processor::StakeProcessorConfig,
 };
-use sdk_processor::processors::stake_processor::StakeProcessorConfig;
 use std::collections::HashSet;
 
 pub async fn setup_stake_processor_config(
@@ -58,17 +60,18 @@ mod tests {
     };
     use aptos_indexer_test_transactions::{
         IMPORTED_MAINNET_TXNS_121508544_STAKE_DISTRIBUTE,
-        IMPORTED_MAINNET_TXNS_125600867_STAKE_DELEGATION_POOL,
-        IMPORTED_MAINNET_TXNS_126043288_STAKE_DELEGRATION_WITHDRAW,
         IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
         IMPORTED_MAINNET_TXNS_1830706009_STAKER_GOVERNANCE_RECORD,
         IMPORTED_MAINNET_TXNS_1831971037_STAKE_DELEGATION_POOL,
         IMPORTED_MAINNET_TXNS_4827964_STAKE_INITIALIZE,
-        IMPORTED_MAINNET_TXNS_83883373_STAKE_WITHDRAW,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::stake_processor::StakeProcessor;
 
+    /**
+     * - 0x1::delegation_pool::DelegationPool
+     * - 0x1::delegation_pool::UnlockStakeEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_stake_pool_delegation_txn() {
         process_single_mainnet_event_txn(
@@ -79,6 +82,10 @@ mod tests {
         .await;
     }
 
+    /**
+     * - 0x1::delegation_pool::GovernanceRecords
+     * - 0x1::delegation_pool::AddStakeEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_stake_gov_record_txn() {
         process_single_mainnet_event_txn(
@@ -89,6 +96,10 @@ mod tests {
         .await;
     }
 
+    /**
+     * - 0x1::stake::WithdrawStakeEvent
+     * - 0x1::staking_contract::DistributeEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_stake_processor_genesis_txn() {
         process_single_mainnet_event_txn(
@@ -99,26 +110,9 @@ mod tests {
         .await;
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mainnet_stake_processor_new_block_event() {
-        process_single_mainnet_event_txn(
-            IMPORTED_MAINNET_TXNS_125600867_STAKE_DELEGATION_POOL,
-            125600867,
-            Some("stake_delegation_pool_test".to_string()),
-        )
-        .await;
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mainnet_stake_processor_empty_txn() {
-        process_single_mainnet_event_txn(
-            IMPORTED_MAINNET_TXNS_126043288_STAKE_DELEGRATION_WITHDRAW,
-            126043288,
-            Some("stake_delegation_withdraw".to_string()),
-        )
-        .await;
-    }
-
+    /**
+     * - 0x1::stake::ReactivateStakeEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_stake_processor_fa_metadata() {
         process_single_mainnet_event_txn(
@@ -129,23 +123,15 @@ mod tests {
         .await;
     }
 
+    /**
+     * - 0x1::stake::AddStakeEvent
+     */
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mainnet_stake_processor_fa_activities() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_4827964_STAKE_INITIALIZE,
             4827964,
             Some("stake_initialize_test".to_string()),
-        )
-        .await;
-    }
-
-    /// Example test case of not using custom name
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mainnet_stake_processor_coin_register() {
-        process_single_mainnet_event_txn(
-            IMPORTED_MAINNET_TXNS_83883373_STAKE_WITHDRAW,
-            83883373,
-            None,
         )
         .await;
     }
