@@ -24,6 +24,9 @@ pub mod fungible_asset_processor_tests;
 pub mod token_v2_processor_tests;
 
 #[cfg(test)]
+pub mod account_transaction_processor_tests;
+
+#[cfg(test)]
 pub mod default_processor_tests;
 
 #[cfg(test)]
