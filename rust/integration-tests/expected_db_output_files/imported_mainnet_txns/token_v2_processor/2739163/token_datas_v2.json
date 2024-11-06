@@ -1,0 +1,23 @@
+[
+  {
+    "transaction_version": 2739163,
+    "write_set_change_index": 10,
+    "token_data_id": "0xe15502bb2460d681e2129e5f1a538cb778ffc67ab1f68707c64038bcd3072056",
+    "collection_id": "0x09e63a48047b1c2bc51c0abc4b67ffcd9922e0adc99a6cc36532662172976a4b",
+    "token_name": "0-0.apt",
+    "maximum": "0",
+    "supply": "0",
+    "largest_property_version_v1": "1",
+    "token_uri": "https://www.aptosnames.com/api/mainnet/v1/metadata/0-0.apt",
+    "token_properties": {
+      "type": "domain",
+      "creation_time_sec": "1666161427"
+    },
+    "description": "This is an official Aptos Labs Name Service Name",
+    "token_standard": "v1",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2022-10-19T06:37:07.319022",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

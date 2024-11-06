@@ -1,0 +1,22 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 303690531,
+    "write_set_change_index": 9,
+    "transaction_block_height": 104789939,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "106102627722374012",
+    "is_deleted": false
+  },
+  {
+    "key": "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493",
+    "transaction_version": 303690531,
+    "write_set_change_index": 10,
+    "transaction_block_height": 104789939,
+    "table_handle": "0x1d5f57aa505a2fa463b7a46341913b65757e3177c46a5e483a29d953627bee62",
+    "decoded_key": "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493",
+    "decoded_value": null,
+    "is_deleted": true
+  }
+]

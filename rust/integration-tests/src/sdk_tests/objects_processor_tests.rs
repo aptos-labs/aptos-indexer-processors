@@ -57,36 +57,51 @@ mod sdk_objects_processor_tests {
     use crate::{
         diff_test_helper::objects_processor::load_data,
         sdk_tests::{
-            get_transaction_version_from_test_context, run_processor_test, setup_test_environment,
-            validate_json, DEFAULT_OUTPUT_FOLDER,
+            get_all_version_from_test_context, get_transaction_version_from_test_context,
+            run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::IMPORTED_MAINNET_TXNS_578366445_TOKEN_V2_BURN_EVENT_V2;
+    use aptos_indexer_test_transactions::{
+        IMPORTED_MAINNET_TXNS_578318306_OBJECTS_WRITE_RESOURCE,
+        IMPORTED_MAINNET_TXNS_578366445_TOKEN_V2_BURN_EVENT_V2,
+    };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::objects_processor::ObjectsProcessor;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_objects_write_and_delete_resource() {
-        process_single_transaction(
+        // Need two transactions because the processor performs a lookup on previous transaction's
+        // object address when parsing delete resource
+        let txns = &[
+            IMPORTED_MAINNET_TXNS_578318306_OBJECTS_WRITE_RESOURCE,
             IMPORTED_MAINNET_TXNS_578366445_TOKEN_V2_BURN_EVENT_V2,
+        ];
+        process_multiple_transactions(
+            txns,
             Some("test_objects_write_and_delete_resource".to_string()),
         )
         .await;
     }
 
     // Helper function to abstract out the transaction processing
-    async fn process_single_transaction(txn: &[u8], test_case_name: Option<String>) {
+    async fn process_multiple_transactions(txns: &[&[u8]], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path.unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string());
 
-        let (db, mut test_context) = setup_test_environment(&[txn]).await;
+        let (db, mut test_context) = setup_test_environment(txns).await;
 
-        let txn_version = *get_transaction_version_from_test_context(&test_context)
+        let starting_version = *get_transaction_version_from_test_context(&test_context)
             .first()
             .unwrap();
+        let all_txn_versions = get_all_version_from_test_context(&test_context);
+
         let db_url = db.get_db_url();
-        let (indexer_processor_config, processor_name) =
-            setup_objects_processor_config(&test_context, txn_version, 1, &db_url);
+        let (indexer_processor_config, processor_name) = setup_objects_processor_config(
+            &test_context,
+            starting_version,
+            all_txn_versions.len(),
+            &db_url,
+        );
 
         let objects_processor = ObjectsProcessor::new(indexer_processor_config)
             .await
@@ -97,7 +112,7 @@ mod sdk_objects_processor_tests {
             objects_processor,
             load_data,
             db_url,
-            vec![txn_version as i64],
+            all_txn_versions,
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -107,7 +122,7 @@ mod sdk_objects_processor_tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    starting_version as u64,
                     processor_name,
                     output_path.clone(),
                     test_case_name,

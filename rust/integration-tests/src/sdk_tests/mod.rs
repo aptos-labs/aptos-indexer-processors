@@ -55,6 +55,15 @@ pub fn get_transaction_version_from_test_context(test_context: &SdkTestContext) 
         .collect()
 }
 
+#[allow(dead_code)]
+pub fn get_all_version_from_test_context(test_context: &SdkTestContext) -> Vec<i64> {
+    test_context
+        .transaction_batches
+        .iter()
+        .map(|txn| txn.version as i64)
+        .collect()
+}
+
 // Common setup for database and test context
 #[allow(dead_code)]
 pub async fn setup_test_environment(
