@@ -56,13 +56,13 @@ mod tests {
             DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
     use aptos_indexer_test_transactions::{
         IMPORTED_MAINNET_TXNS_121508544_STAKE_DISTRIBUTE,
         IMPORTED_MAINNET_TXNS_125600867_STAKE_DELEGATION_POOL,
         IMPORTED_MAINNET_TXNS_126043288_STAKE_DELEGRATION_WITHDRAW,
-        IMPORTED_MAINNET_TXNS_139442597_STAKE_UNLOCK,
         IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
+        IMPORTED_MAINNET_TXNS_1830706009_STAKER_GOVERNANCE_RECORD,
+        IMPORTED_MAINNET_TXNS_1831971037_STAKE_DELEGATION_POOL,
         IMPORTED_MAINNET_TXNS_4827964_STAKE_INITIALIZE,
         IMPORTED_MAINNET_TXNS_83883373_STAKE_WITHDRAW,
     };
@@ -70,7 +70,27 @@ mod tests {
     use sdk_processor::processors::stake_processor::StakeProcessor;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_genesis_txn() {
+    async fn mainnet_stake_pool_delegation_txn() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_1831971037_STAKE_DELEGATION_POOL,
+            1831971037,
+            Some("stake_pool_del_test".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_stake_gov_record_txn() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_1830706009_STAKER_GOVERNANCE_RECORD,
+            1830706009,
+            Some("stake_gov_record_test".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_stake_processor_genesis_txn() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_121508544_STAKE_DISTRIBUTE,
             121508544,
@@ -80,7 +100,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_new_block_event() {
+    async fn mainnet_stake_processor_new_block_event() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_125600867_STAKE_DELEGATION_POOL,
             125600867,
@@ -90,7 +110,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_empty_txn() {
+    async fn mainnet_stake_processor_empty_txn() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_126043288_STAKE_DELEGRATION_WITHDRAW,
             126043288,
@@ -100,17 +120,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_coin_register_fa_metadata() {
-        process_single_mainnet_event_txn(
-            IMPORTED_MAINNET_TXNS_139442597_STAKE_UNLOCK,
-            139442597,
-            Some("stake_unlock_test".to_string()),
-        )
-        .await;
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_fa_metadata() {
+    async fn mainnet_stake_processor_fa_metadata() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
             139449359,
@@ -120,7 +130,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_fa_activities() {
+    async fn mainnet_stake_processor_fa_activities() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_4827964_STAKE_INITIALIZE,
             4827964,
@@ -131,7 +141,7 @@ mod tests {
 
     /// Example test case of not using custom name
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn testnet_stake_processor_coin_register() {
+    async fn mainnet_stake_processor_coin_register() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_83883373_STAKE_WITHDRAW,
             83883373,
@@ -148,7 +158,7 @@ mod tests {
     ) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
-            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
+            .unwrap_or_else(|| format!("{}/imported_mainnet_txns", DEFAULT_OUTPUT_FOLDER));
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
