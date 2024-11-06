@@ -45,36 +45,6 @@
     "non_transferrable_by_owner": null
   },
   {
-    "token_data_id": "0xb9f07b6bdeb1ab7f106ebe49c1544121929b388e1c0171eda06143d8c2fce7dc",
-    "property_version_v1": "0",
-    "owner_address": "unknown",
-    "storage_id": "0xb9f07b6bdeb1ab7f106ebe49c1544121929b388e1c0171eda06143d8c2fce7dc",
-    "amount": "0",
-    "table_type_v1": null,
-    "token_properties_mutated_v1": null,
-    "is_soulbound_v2": null,
-    "token_standard": "v2",
-    "is_fungible_v2": null,
-    "last_transaction_version": 423176063,
-    "last_transaction_timestamp": "2024-01-28T00:50:32.552696",
-    "non_transferrable_by_owner": null
-  },
-  {
-    "token_data_id": "0xd5060832312d097bccfbacf10f361758c066f6f6a18fa3a14e69b0142d663e8a",
-    "property_version_v1": "0",
-    "owner_address": "unknown",
-    "storage_id": "0xd5060832312d097bccfbacf10f361758c066f6f6a18fa3a14e69b0142d663e8a",
-    "amount": "0",
-    "table_type_v1": null,
-    "token_properties_mutated_v1": null,
-    "is_soulbound_v2": null,
-    "token_standard": "v2",
-    "is_fungible_v2": null,
-    "last_transaction_version": 423176063,
-    "last_transaction_timestamp": "2024-01-28T00:50:32.552696",
-    "non_transferrable_by_owner": null
-  },
-  {
     "token_data_id": "0x9f387c30bad7e61f9039e108acd92825b65547a46b213dfde3495b0f1ee69423",
     "property_version_v1": "0",
     "owner_address": "0x51941247df7eed74d4c2c12fc3e370fd8685e966ecc2296240632702b7e8fe01",
@@ -135,6 +105,21 @@
     "non_transferrable_by_owner": false
   },
   {
+    "token_data_id": "0xb9f07b6bdeb1ab7f106ebe49c1544121929b388e1c0171eda06143d8c2fce7dc",
+    "property_version_v1": "0",
+    "owner_address": "unknown",
+    "storage_id": "0xb9f07b6bdeb1ab7f106ebe49c1544121929b388e1c0171eda06143d8c2fce7dc",
+    "amount": "0",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": null,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "last_transaction_version": 423176063,
+    "last_transaction_timestamp": "2024-01-28T00:50:32.552696",
+    "non_transferrable_by_owner": null
+  },
+  {
     "token_data_id": "0xbcb216aa0f66fc94068718ce725105af04d6553a97e75271dee12d0034f623d0",
     "property_version_v1": "0",
     "owner_address": "0xadeb45c274f9f4f535afe8957a8cf9ffecbd2b79026fba6c207111136d963f14",
@@ -163,5 +148,20 @@
     "last_transaction_version": 423176063,
     "last_transaction_timestamp": "2024-01-28T00:50:32.552696",
     "non_transferrable_by_owner": false
+  },
+  {
+    "token_data_id": "0xd5060832312d097bccfbacf10f361758c066f6f6a18fa3a14e69b0142d663e8a",
+    "property_version_v1": "0",
+    "owner_address": "unknown",
+    "storage_id": "0xd5060832312d097bccfbacf10f361758c066f6f6a18fa3a14e69b0142d663e8a",
+    "amount": "0",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": null,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "last_transaction_version": 423176063,
+    "last_transaction_timestamp": "2024-01-28T00:50:32.552696",
+    "non_transferrable_by_owner": null
   }
 ]
