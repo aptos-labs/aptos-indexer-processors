@@ -51,6 +51,7 @@ pub enum ProcessorStatusSaverEnum {
         backfill_start_version: Option<u64>,
         backfill_end_version: Option<u64>,
     },
+    // Parquet {}
 }
 
 #[async_trait]

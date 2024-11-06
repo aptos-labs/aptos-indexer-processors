@@ -4,9 +4,11 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+
     utils::util::{hash_str, standardize_address},
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;

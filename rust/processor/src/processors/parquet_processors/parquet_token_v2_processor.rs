@@ -346,6 +346,9 @@ async fn parse_v2_token(
                             )
                             .unwrap()
                         {
+                            if txn_version == 11648867 {
+                                println!("Token Ownership: {:?}", token_ownership);
+                            }
                             token_ownerships_v2.push(token_ownership);
                             if let Some(cto) = current_token_ownership {
                                 prior_nft_ownership.insert(
@@ -374,7 +377,11 @@ async fn parse_v2_token(
                             )
                             .unwrap()
                         {
+                            if txn_version == 11648867 {
+                                println!("Token Ownership: {:?}", token_ownership);
+                            }
                             token_ownerships_v2.push(token_ownership);
+                            
                             transaction_version_to_struct_count
                                 .entry(txn_version)
                                 .and_modify(|e| *e += 1)
@@ -428,7 +435,11 @@ async fn parse_v2_token(
                                 .entry(txn_version)
                                 .and_modify(|e| *e += ownerships.len() as i64 + 1)
                                 .or_insert(ownerships.len() as i64 + 1);
+                            if txn_version == 11648867 {
+                                println!("Token Ownership: {:?}", ownerships);
+                            }
                             token_ownerships_v2.append(&mut ownerships);
+                           
                             token_datas_v2.push(token_data);
                         }
                         // Add burned NFT handling
@@ -445,7 +456,11 @@ async fn parse_v2_token(
                             .await
                             .unwrap()
                         {
+                            if txn_version == 11648867 {
+                                println!("Token Ownership: {:?}", nft_ownership);
+                            }
                             token_ownerships_v2.push(nft_ownership);
+                            
                             transaction_version_to_struct_count
                                 .entry(txn_version)
                                 .and_modify(|e| *e += 1)
@@ -472,7 +487,11 @@ async fn parse_v2_token(
                             )
                             .unwrap()
                         {
+                            if txn_version == 11648867 {
+                                println!("Token Ownership: {:?}", nft_ownership);
+                            }
                             token_ownerships_v2.push(nft_ownership);
+                            
                             transaction_version_to_struct_count
                                 .entry(txn_version)
                                 .and_modify(|e| *e += 1)

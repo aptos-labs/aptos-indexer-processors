@@ -4,9 +4,10 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+
     utils::util::standardize_address,
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 use allocative_derive::Allocative;
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
-)]
+ )]
 pub struct MoveResource {
     pub txn_version: i64,
     pub write_set_change_index: i64,

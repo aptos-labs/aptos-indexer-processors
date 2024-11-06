@@ -3,12 +3,14 @@ pub mod generic_parquet_processor;
 
 use crate::{
     bq_analytics::generic_parquet_processor::{
-        GetTimeStamp, HasParquetSchema, HasVersion, NamedTable, ParquetDataGeneric,
+        HasParquetSchema, ParquetDataGeneric,
         ParquetHandler as GenericParquetHandler,
     },
     gap_detectors::ProcessingResult,
     worker::PROCESSOR_SERVICE_TYPE,
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use ahash::AHashMap;
 use allocative::Allocative;
 use google_cloud_storage::{

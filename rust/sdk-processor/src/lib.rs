@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod config;
 mod db;
 pub mod parquet_processors;

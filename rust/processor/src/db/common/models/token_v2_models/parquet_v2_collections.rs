@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    
     db::common::models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
         token_models::{
@@ -30,6 +30,7 @@ use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,

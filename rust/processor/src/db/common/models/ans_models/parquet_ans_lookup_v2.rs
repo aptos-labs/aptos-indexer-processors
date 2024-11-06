@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    
     db::common::models::{
         ans_models::{
             ans_lookup::{AnsPrimaryName, CurrentAnsPrimaryName},
@@ -20,6 +20,7 @@ use aptos_protos::transaction::v1::Event;
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 
 #[derive(
     Allocative, Clone, Default, Debug, Deserialize, FieldCount, ParquetRecordWriter, Serialize,

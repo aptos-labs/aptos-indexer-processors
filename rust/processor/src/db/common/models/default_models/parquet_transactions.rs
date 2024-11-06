@@ -10,12 +10,13 @@ use super::{
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         util::{get_clean_payload, get_clean_writeset, get_payload_type, standardize_address},
     },
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use ahash::AHashMap;
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{
@@ -377,6 +378,7 @@ impl Transaction {
             let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
                 Self::from_transaction(txn);
             txns.push(txn.clone());
+            // TODO: Remove once fully migrated
             transaction_version_to_struct_count
                 .entry(txn.txn_version)
                 .and_modify(|e| *e += 1)
@@ -385,7 +387,8 @@ impl Transaction {
             if let Some(a) = block_metadata {
                 block_metadata_txns.push(a.clone());
             }
-
+            
+            // TODO: Remove once fully migrated
             if !wsc_list.is_empty() {
                 transaction_version_to_struct_count
                     .entry(txn.txn_version)
@@ -393,7 +396,6 @@ impl Transaction {
                     .or_insert(wsc_list.len() as i64);
             }
             wscs.append(&mut wsc_list);
-
             wsc_details.append(&mut wsc_detail_list);
         }
         (txns, block_metadata_txns, wscs, wsc_details)

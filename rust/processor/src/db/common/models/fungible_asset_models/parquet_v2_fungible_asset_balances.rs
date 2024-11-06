@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    
     db::common::models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
         fungible_asset_models::{
@@ -29,6 +29,7 @@ use field_count::FieldCount;
 use lazy_static::lazy_static;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 
 lazy_static! {
     pub static ref DEFAULT_AMOUNT_VALUE: String = "0".to_string();

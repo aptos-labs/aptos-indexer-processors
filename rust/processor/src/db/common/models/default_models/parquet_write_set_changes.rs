@@ -8,8 +8,9 @@ use super::{
     parquet_move_resources::MoveResource,
     parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     utils::util::{standardize_address, standardize_address_from_bytes},
 };
 use allocative_derive::Allocative;

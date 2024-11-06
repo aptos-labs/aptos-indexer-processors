@@ -7,7 +7,7 @@
 
 use super::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent};
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    
     db::common::models::{
         coin_models::{
             coin_activities::CoinActivity,
@@ -18,6 +18,8 @@ use crate::{
     },
     utils::util::{bigdecimal_to_u64, standardize_address},
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use ahash::AHashMap;
 use allocative::Allocative;
 use anyhow::Context;

@@ -9,7 +9,7 @@
 
 use super::parquet_signatures::Signature;
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+
     db::common::models::fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
     utils::util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
 };
@@ -23,6 +23,7 @@ use aptos_protos::{
 };
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 
 #[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct UserTransaction {

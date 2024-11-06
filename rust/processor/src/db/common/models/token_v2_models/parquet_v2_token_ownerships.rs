@@ -6,7 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    
     db::common::models::{
         fungible_asset_models::parquet_v2_fungible_asset_balances::DEFAULT_AMOUNT_VALUE,
         object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
@@ -29,6 +29,7 @@ use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 
 const LEGACY_DEFAULT_PROPERTY_VERSION: u64 = 0;
 

@@ -144,10 +144,8 @@ pub struct ParquetDefaultProcessorConfig {
     pub bucket_name: String,
     #[serde(default)]
     pub bucket_root: String,
-    #[serde(
-        default = "ParquetDefaultProcessorConfig::default_parquet_handler_response_channel_size"
-    )]
-    pub parquet_handler_response_channel_size: usize,
+    #[serde(default = "ParquetDefaultProcessorConfig::default_channel_size")]
+    pub channel_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_max_buffer_size")]
     pub max_buffer_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_parquet_upload_interval")]
@@ -160,7 +158,7 @@ pub struct ParquetDefaultProcessorConfig {
 impl ParquetDefaultProcessorConfig {
     /// Make the default very large on purpose so that by default it's not chunked
     /// This prevents any unexpected changes in behavior
-    pub const fn default_parquet_handler_response_channel_size() -> usize {
+    pub const fn default_channel_size() -> usize {
         100_000
     }
 

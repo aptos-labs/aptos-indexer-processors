@@ -6,10 +6,11 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::default_models::move_tables::TableItem,
     utils::util::{hash_str, APTOS_COIN_TYPE_STR},
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use allocative_derive::Allocative;
 use anyhow::Context;
 use aptos_protos::transaction::v1::WriteTableItem;

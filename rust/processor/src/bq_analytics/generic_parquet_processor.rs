@@ -7,6 +7,7 @@ use crate::{
         util::naive_datetime_to_timestamp,
     },
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
 use ahash::AHashMap;
 use allocative::Allocative;
 use anyhow::{Context, Result};
@@ -25,20 +26,8 @@ pub struct ParquetDataGeneric<ParquetType> {
     pub data: Vec<ParquetType>,
 }
 
-pub trait NamedTable {
-    const TABLE_NAME: &'static str;
-}
-
-pub trait HasVersion {
-    fn version(&self) -> i64;
-}
-
 pub trait HasParquetSchema {
     fn schema() -> Arc<parquet::schema::types::Type>;
-}
-
-pub trait GetTimeStamp {
-    fn get_timestamp(&self) -> chrono::NaiveDateTime;
 }
 
 /// Auto-implement this for all types that implement `Default` and `RecordWriter`
@@ -54,10 +43,10 @@ where
 }
 
 pub struct ParquetHandler<ParquetType>
-where
+    where
     ParquetType: NamedTable + NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
-{
+    {
     pub schema: Arc<Type>,
     pub writer: SerializedFileWriter<Vec<u8>>,
     pub buffer: Vec<ParquetType>,
@@ -72,7 +61,8 @@ where
     pub last_upload_time: Instant,
     pub processor_name: String,
 }
-fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
+
+pub fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
     let props = WriterProperties::builder()
         .set_compression(parquet::basic::Compression::LZ4)
         .build();
@@ -83,7 +73,8 @@ fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>>
 
 impl<ParquetType> ParquetHandler<ParquetType>
 where
-    ParquetType: Allocative + GetTimeStamp + HasVersion + HasParquetSchema + 'static + NamedTable,
+    ParquetType: Allocative +
+    GetTimeStamp + HasVersion + HasParquetSchema + 'static + NamedTable,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     fn create_new_writer(&self) -> Result<SerializedFileWriter<Vec<u8>>> {

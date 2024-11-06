@@ -4,9 +4,10 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     utils::util::{standardize_address, truncate_str},
 };
+use aptos_indexer_processor_sdk::traits::parquet_extract_trait::{GetTimeStamp, HasVersion, NamedTable};
+
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{Event as EventPB, EventSizeInfo};
 use lazy_static::lazy_static;
