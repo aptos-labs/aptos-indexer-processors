@@ -23,6 +23,7 @@ pub fn load_data(
 
     let cal_v2_result = cal_v2_dsl::current_ans_lookup_v2
         .filter(cal_v2_dsl::last_transaction_version.eq_any(&txn_versions))
+        .then_order_by(cal_v2_dsl::registered_address.asc())
         .then_order_by(cal_v2_dsl::token_standard.asc())
         .load::<CurrentAnsLookupV2>(conn)?;
     result_map.insert(
@@ -32,6 +33,7 @@ pub fn load_data(
 
     let al_v2_result = al_v2_dsl::ans_lookup_v2
         .filter(al_v2_dsl::transaction_version.eq_any(&txn_versions))
+        .then_order_by(al_v2_dsl::registered_address.asc())
         .then_order_by(al_v2_dsl::token_standard.asc())
         .load::<AnsLookupV2>(conn)?;
     result_map.insert(
@@ -41,6 +43,7 @@ pub fn load_data(
 
     let capn_v2_result = capn_v2_dsl::current_ans_primary_name_v2
         .filter(capn_v2_dsl::last_transaction_version.eq_any(&txn_versions))
+        .then_order_by(capn_v2_dsl::registered_address.asc())
         .then_order_by(capn_v2_dsl::token_standard.asc())
         .load::<CurrentAnsPrimaryNameV2>(conn)?;
     result_map.insert(

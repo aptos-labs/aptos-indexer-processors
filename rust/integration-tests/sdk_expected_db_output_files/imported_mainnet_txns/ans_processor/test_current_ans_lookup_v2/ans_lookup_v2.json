@@ -1,0 +1,14 @@
+[
+  {
+    "transaction_version": 438536688,
+    "write_set_change_index": 7,
+    "domain": "003",
+    "subdomain": "",
+    "token_standard": "v2",
+    "registered_address": "0x761e4e45d8c6d56fb9fab4ebd865ce4a3dfe3a7bea3956158b4be07f268bcff5",
+    "expiration_timestamp": "2024-11-19T13:31:40",
+    "token_name": "003.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  }
+]

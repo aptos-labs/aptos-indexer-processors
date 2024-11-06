@@ -1,0 +1,22 @@
+[
+  {
+    "object_address": "0x63d26a4e3a8aeececf9b878e46bad78997fb38e50936efeabb2c4453f4d7f746",
+    "owner_address": "0x14464c04472a91941854ba9ffc48691e071874a1bcb51b89ff15afa5f80b76df",
+    "state_key_hash": "0x40f1009525b29e096c89d1a4cdb3ffff8562b5cbe122b2aeac050ed3e4ad91f3",
+    "allow_ungated_transfer": false,
+    "last_guid_creation_num": "1125899906842628",
+    "last_transaction_version": 275584410,
+    "is_deleted": false,
+    "untransferrable": true
+  },
+  {
+    "object_address": "0xf04d6f00aa820b0662de65df585879539497c1f79718193d99db2de3d7cecd20",
+    "owner_address": "0x000000007c9f6724cfc3ead36713389148bbeb48a310dacd43a767b52ada4be7",
+    "state_key_hash": "0x769c849cc5c8c73ac64017b2ef088708ebd7487967aaef0eebbde85e32d6827f",
+    "allow_ungated_transfer": true,
+    "last_guid_creation_num": "1125899906842626",
+    "last_transaction_version": 275584410,
+    "is_deleted": false,
+    "untransferrable": false
+  }
+]

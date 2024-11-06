@@ -1,0 +1,108 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 275584410,
+    "write_set_change_index": 16,
+    "transaction_block_height": 96498487,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "105701978080613442",
+    "is_deleted": false
+  },
+  {
+    "key": "0x305a97874974fdb9a7ba59dc7cab7714c8e8e00004ac887b6e348496e19818380e4170746f73204e616d65732056310a6775677572752e6170740100000000000000",
+    "transaction_version": 275584410,
+    "write_set_change_index": 17,
+    "transaction_block_height": 96498487,
+    "table_handle": "0x1c03e426986f58abcd452520ade9e325948f5bd068f9292f0c705d78cf249a0e",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "guguru.apt",
+        "creator": "0x305a97874974fdb9a7ba59dc7cab7714c8e8e00004ac887b6e348496e1981838",
+        "collection": "Aptos Names V1"
+      },
+      "property_version": "1"
+    },
+    "decoded_value": null,
+    "is_deleted": true
+  },
+  {
+    "key": "0x000000007c9f6724cfc3ead36713389148bbeb48a310dacd43a767b52ada4be7",
+    "transaction_version": 275584410,
+    "write_set_change_index": 18,
+    "transaction_block_height": 96498487,
+    "table_handle": "0x1d5f57aa505a2fa463b7a46341913b65757e3177c46a5e483a29d953627bee62",
+    "decoded_key": "0x7c9f6724cfc3ead36713389148bbeb48a310dacd43a767b52ada4be7",
+    "decoded_value": null,
+    "is_deleted": true
+  },
+  {
+    "key": "0x0006677567757275",
+    "transaction_version": 275584410,
+    "write_set_change_index": 19,
+    "transaction_block_height": 96498487,
+    "table_handle": "0x21a0fd41330f3a0a38173c7c0e4ac59cd51505f0594f64d3d637c12425c3c155",
+    "decoded_key": {
+      "domain_name": "guguru",
+      "subdomain_name": {
+        "vec": []
+      }
+    },
+    "decoded_value": null,
+    "is_deleted": true
+  },
+  {
+    "key": "0x305a97874974fdb9a7ba59dc7cab7714c8e8e00004ac887b6e348496e19818380e4170746f73204e616d65732056310a6775677572752e6170740100000000000000",
+    "transaction_version": 275584410,
+    "write_set_change_index": 20,
+    "transaction_block_height": 96498487,
+    "table_handle": "0x9fdd179360735701130d02f5573569a8cdfdc2612b038ec188c8f5aaa6b7634c",
+    "decoded_key": {
+      "token_data_id": {
+        "name": "guguru.apt",
+        "creator": "0x305a97874974fdb9a7ba59dc7cab7714c8e8e00004ac887b6e348496e1981838",
+        "collection": "Aptos Names V1"
+      },
+      "property_version": "1"
+    },
+    "decoded_value": {
+      "id": {
+        "token_data_id": {
+          "name": "guguru.apt",
+          "creator": "0x305a97874974fdb9a7ba59dc7cab7714c8e8e00004ac887b6e348496e1981838",
+          "collection": "Aptos Names V1"
+        },
+        "property_version": "1"
+      },
+      "amount": "1",
+      "token_properties": {
+        "map": {
+          "data": [
+            {
+              "key": "type",
+              "value": {
+                "type": "0x1::string::String",
+                "value": "0x06646f6d61696e"
+              }
+            },
+            {
+              "key": "creation_time_sec",
+              "value": {
+                "type": "u64",
+                "value": "0x66e34e6300000000"
+              }
+            },
+            {
+              "key": "expiration_time_sec",
+              "value": {
+                "type": "u64",
+                "value": "0xe616306500000000"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "is_deleted": false
+  }
+]

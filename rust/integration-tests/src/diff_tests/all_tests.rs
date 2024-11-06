@@ -10,7 +10,6 @@ mod tests {
             fungible_asset_processor::load_data as load_fungible_asset_data,
             objects_processor::load_data as load_object_data,
             stake_processor::load_data as load_stake_data,
-            token_v2_processor::load_data as load_token_v2_data,
             user_transaction_processor::load_data as load_ut_data,
         },
         diff_tests::{
@@ -27,7 +26,7 @@ mod tests {
     use diesel::pg::PgConnection;
     use processor::processors::{
         ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
-        stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+        stake_processor::StakeProcessorConfig,
     };
     use std::fs;
 
@@ -89,7 +88,6 @@ mod tests {
             let db_values_fn = match processor_name {
                 "events_processor" => load_event_data,
                 "fungible_asset_processor" => load_fungible_asset_data,
-                "token_v2_processor" => load_token_v2_data,
                 "ans_processor" => load_ans_data,
                 "default_processor" => load_default_data,
                 "objects_processor" => load_object_data,
@@ -190,6 +188,9 @@ mod tests {
             },
             TestProcessorConfig {
                 config: processor::processors::ProcessorConfig::FungibleAssetProcessor,
+            },
+            TestProcessorConfig {
+                config: processor::processors::ProcessorConfig::DefaultProcessor,
             },
             TestProcessorConfig {
                 config: processor::processors::ProcessorConfig::AnsProcessor(AnsProcessorConfig {

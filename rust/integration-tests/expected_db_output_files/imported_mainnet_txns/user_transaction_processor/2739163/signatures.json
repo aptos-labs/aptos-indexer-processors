@@ -1,0 +1,15 @@
+[
+  {
+    "transaction_version": 2739163,
+    "multi_agent_index": 0,
+    "multi_sig_index": 0,
+    "transaction_block_height": 1181280,
+    "signer": "0x36e993c5c2a55c82915ef398d844dd62be64cb42d69ec4f80000cbb09919add0",
+    "is_sender_primary": true,
+    "type_": "ed25519_signature",
+    "public_key": "0xf8dff4c5be4d09cce98a64849288c42a7341789e69230807ae7d79839302118a",
+    "signature": "0xe4132e90e29b441da57f5a281e7b7c0ee54d48bb42ec39c76a32d5836c0db4595e52faf954f5930eeb630bf3640f1afad1bee033db84e3d6d8cdd18893fc4f02",
+    "threshold": 1,
+    "public_key_indices": []
+  }
+]

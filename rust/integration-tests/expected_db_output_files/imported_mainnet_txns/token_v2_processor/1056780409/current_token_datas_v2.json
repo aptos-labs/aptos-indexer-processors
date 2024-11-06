@@ -1,0 +1,19 @@
+[
+  {
+    "token_data_id": "0x313f04ead8fa66e70f23ea26ef3ec7fbce485f776986a06302e6283c7e2bc2f8",
+    "collection_id": "0x30fbc956f0f38db2d314bd9c018d34be3e047a804a71e30a4e5d43d8b7c539eb",
+    "token_name": "abwehr1225.petra.apt",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "https://www.aptosnames.com/api/mainnet/v2/metadata/abwehr1225.petra.apt",
+    "description": "This is an official Aptos Labs Name Service Name",
+    "token_properties": null,
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "last_transaction_version": 1056780409,
+    "last_transaction_timestamp": "2024-07-28T17:32:30.947056",
+    "is_deleted_v2": false,
+    "decimals": 0
+  }
+]
