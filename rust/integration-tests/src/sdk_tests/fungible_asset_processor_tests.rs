@@ -47,8 +47,9 @@ mod sdk_fungible_asset_processor_tests {
     use crate::{
         diff_test_helper::fungible_asset_processor::load_data,
         sdk_tests::{
-            fungible_asset_processor_tests::setup_fa_processor_config, run_processor_test,
-            setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
+            fungible_asset_processor_tests::setup_fa_processor_config,
+            get_all_version_from_test_context, run_processor_test, setup_test_environment,
+            validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use aptos_indexer_test_transactions::{
@@ -68,7 +69,6 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_validator_txn() {
         process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
-            5523474016,
             Some("validator_txn_test".to_string()),
         )
         .await;
@@ -79,7 +79,6 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_coin_register_txn() {
         process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
-            5979639459,
             Some("coin_register_txn_test".to_string()),
         )
         .await;
@@ -89,7 +88,6 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_fa_activities_txn() {
         process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
-            5992795934,
             Some("fa_activities_txn_test".to_string()),
         )
         .await;
@@ -112,7 +110,6 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_coin_and_fa_transfers() {
         process_single_testnet_fa_txns(
             IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
-            999929475,
             Some("coin_and_fa_transfers_test".to_string()),
         )
         .await;
@@ -129,7 +126,6 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_v1_events() {
         process_single_testnet_fa_txns(
             IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
-            508365567,
             Some("v1_events_test".to_string()),
         )
         .await;
@@ -144,7 +140,6 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_v2_frozen_event() {
         process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
-            1200394037,
             Some("v2_frozen_event_test".to_string()),
         )
         .await;
@@ -160,26 +155,24 @@ mod sdk_fungible_asset_processor_tests {
     async fn test_fungible_asset_processor_concurrent_fa() {
         process_single_testnet_fa_txns(
             IMPORTED_TESTNET_TXNS_2646510387_CONCURRENT_FA,
-            2646510387,
             Some("concurrent_fa_test".to_string()),
         )
         .await;
     }
 
     // Helper function to abstract out the transaction processing
-    async fn process_single_testnet_fa_txns(
-        txn: &[u8],
-        txn_version: i64,
-        test_case_name: Option<String>,
-    ) {
+    async fn process_single_testnet_fa_txns(txn: &[u8], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path.unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string());
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
         let db_url = db.get_db_url();
+        let txn_versions = get_all_version_from_test_context(&test_context);
+        let starting_version = *txn_versions.first().unwrap();
+
         let (indexer_processor_config, processor_name) =
-            setup_fa_processor_config(&test_context, txn_version as u64, 1, &db_url);
+            setup_fa_processor_config(&test_context, starting_version as u64, 1, &db_url);
 
         let fungible_asset_processor = FungibleAssetProcessor::new(indexer_processor_config)
             .await
@@ -190,7 +183,7 @@ mod sdk_fungible_asset_processor_tests {
             fungible_asset_processor,
             load_data,
             db_url,
-            vec![txn_version],
+            txn_versions.clone(),
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -200,18 +193,17 @@ mod sdk_fungible_asset_processor_tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    starting_version as u64,
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    txn_versions, e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }

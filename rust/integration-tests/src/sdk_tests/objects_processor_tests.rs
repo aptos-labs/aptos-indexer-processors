@@ -112,7 +112,7 @@ mod sdk_objects_processor_tests {
             objects_processor,
             load_data,
             db_url,
-            all_txn_versions,
+            all_txn_versions.clone(),
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -129,11 +129,10 @@ mod sdk_objects_processor_tests {
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    all_txn_versions, e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }

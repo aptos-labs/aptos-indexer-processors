@@ -56,8 +56,8 @@ mod sdk_token_v2_processor_tests {
     use crate::{
         diff_test_helper::token_v2_processor::load_data,
         sdk_tests::{
-            get_transaction_version_from_test_context, run_processor_test, setup_test_environment,
-            validate_json, DEFAULT_OUTPUT_FOLDER,
+            get_all_version_from_test_context, get_transaction_version_from_test_context,
+            run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use aptos_indexer_test_transactions::{
@@ -340,13 +340,16 @@ mod sdk_token_v2_processor_tests {
         let output_path = custom_output_path.unwrap_or_else(|| DEFAULT_OUTPUT_FOLDER.to_string());
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
+        let txn_versions = get_all_version_from_test_context(&test_context);
+        let starting_version = *txn_versions.first().unwrap();
 
-        let txn_version = *get_transaction_version_from_test_context(&test_context)
-            .first()
-            .unwrap();
         let db_url = db.get_db_url();
-        let (indexer_processor_config, processor_name) =
-            setup_token_v2_processor_config(&test_context, txn_version, 1, &db_url);
+        let (indexer_processor_config, processor_name) = setup_token_v2_processor_config(
+            &test_context,
+            starting_version as u64,
+            txn_versions.len(),
+            &db_url,
+        );
 
         let token_v2_processor = TokenV2Processor::new(indexer_processor_config)
             .await
@@ -357,7 +360,7 @@ mod sdk_token_v2_processor_tests {
             token_v2_processor,
             load_data,
             db_url,
-            vec![txn_version as i64],
+            txn_versions.clone(),
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -367,18 +370,17 @@ mod sdk_token_v2_processor_tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    starting_version as u64,
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    txn_versions, e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }

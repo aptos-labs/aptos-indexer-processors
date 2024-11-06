@@ -46,8 +46,9 @@ mod tests {
     use crate::{
         diff_test_helper::default_processor::load_data,
         sdk_tests::{
-            default_processor_tests::setup_default_processor_config, run_processor_test,
-            setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
+            default_processor_tests::setup_default_processor_config,
+            get_all_version_from_test_context, get_transaction_version_from_test_context,
+            run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use aptos_indexer_test_transactions::{
@@ -62,7 +63,6 @@ mod tests {
     async fn mainnet_table_items() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_155112189_DEFAULT_TABLE_ITEMS,
-            155112189,
             Some("test_table_items".to_string()),
         )
         .await;
@@ -72,7 +72,6 @@ mod tests {
     async fn mainnet_current_table_items() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_1845035942_DEFAULT_CURRENT_TABLE_ITEMS,
-            1845035942,
             Some("test_current_table_items".to_string()),
         )
         .await;
@@ -82,27 +81,29 @@ mod tests {
     async fn mainnet_block_metadata_txns() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
-            513424821,
             Some("block_metadata_transactions".to_string()),
         )
         .await;
     }
 
     // Helper function to abstract out the single transaction processing
-    async fn process_single_mainnet_event_txn(
-        txn: &[u8],
-        txn_version: i64,
-        test_case_name: Option<String>,
-    ) {
+    async fn process_single_mainnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
             .unwrap_or_else(|| format!("{}/imported_mainnet_txns", DEFAULT_OUTPUT_FOLDER));
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
+        let txn_versions = get_all_version_from_test_context(&test_context);
+        let starting_version = *txn_versions.first().unwrap();
 
         let db_url = db.get_db_url();
-        let (indexer_processor_config, processor_name) =
-            setup_default_processor_config(&test_context, txn_version as u64, 1, &db_url).await;
+        let (indexer_processor_config, processor_name) = setup_default_processor_config(
+            &test_context,
+            starting_version as u64,
+            txn_versions.len(),
+            &db_url,
+        )
+        .await;
 
         let default_processor = DefaultProcessor::new(indexer_processor_config)
             .await
@@ -113,7 +114,7 @@ mod tests {
             default_processor,
             load_data,
             db_url,
-            vec![txn_version],
+            txn_versions.clone(),
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -123,18 +124,17 @@ mod tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    starting_version as u64,
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    txn_versions, e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }
