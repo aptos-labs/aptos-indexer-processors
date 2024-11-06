@@ -1,0 +1,11 @@
+[
+  {
+    "delegation_pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "delegator_address": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "table_handle": null,
+    "voter": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "pending_voter": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "last_transaction_version": 1831971037,
+    "last_transaction_timestamp": "2024-10-23T20:05:35.969701"
+  }
+]

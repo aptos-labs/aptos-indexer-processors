@@ -1,0 +1,10 @@
+[
+  {
+    "transaction_version": 1830706009,
+    "event_index": 6,
+    "delegator_address": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+    "pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "event_type": "0x1::delegation_pool::AddStakeEvent",
+    "amount": "1109100000"
+  }
+]

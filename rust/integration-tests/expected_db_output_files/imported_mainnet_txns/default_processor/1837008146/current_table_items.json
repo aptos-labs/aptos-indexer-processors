@@ -1,0 +1,264 @@
+[
+  {
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "key_hash": "6aed34e6bddff5e1d872b5d7d5698a7b73abd6f3b33402732edc73ab9ffb9c70",
+    "key": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "decoded_key": "0x0",
+    "decoded_value": "152470119682369959286",
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0x2d4a524628268af00d4b0fa8aaf8e84fb58d6f0d7972a951ebbafc7e2042d006",
+    "key_hash": "3b8386b8fac31732b9b0d3f2d03a4c1e5d3186a9d905fe4482b77e54bcebde08",
+    "key": "0x0000000000000000",
+    "decoded_key": "0",
+    "decoded_value": [
+      {
+        "key": "0x29e6421074d0f8c1c076d6563a1de662946c9b0a441cabdd76b4ae9379c513b9",
+        "hash": "6979483115129658744",
+        "value": {
+          "voter": "0x29e6421074d0f8c1c076d6563a1de662946c9b0a441cabdd76b4ae9379c513b9",
+          "pending_voter": "0x29e6421074d0f8c1c076d6563a1de662946c9b0a441cabdd76b4ae9379c513b9",
+          "last_locked_until_secs": "0"
+        }
+      },
+      {
+        "key": "0x98fe3070c497cd7e52c7e0b6eeb18a0b910604124e7c739a4896653be44e9781",
+        "hash": "16375248214741987812",
+        "value": {
+          "voter": "0x98fe3070c497cd7e52c7e0b6eeb18a0b910604124e7c739a4896653be44e9781",
+          "pending_voter": "0x98fe3070c497cd7e52c7e0b6eeb18a0b910604124e7c739a4896653be44e9781",
+          "last_locked_until_secs": "1722089485"
+        }
+      },
+      {
+        "key": "0x896ef68e5eee178faf74122e3b7b48b74290d2e1c40dde50728e10ef503da119",
+        "hash": "930222532477502732",
+        "value": {
+          "voter": "0x896ef68e5eee178faf74122e3b7b48b74290d2e1c40dde50728e10ef503da119",
+          "pending_voter": "0x896ef68e5eee178faf74122e3b7b48b74290d2e1c40dde50728e10ef503da119",
+          "last_locked_until_secs": "1722089485"
+        }
+      },
+      {
+        "key": "0xc02c84f869b1a5172f21ce56b4733ae2fca8aa14b57e5e8f00db790ea285fd9b",
+        "hash": "6031278649259050940",
+        "value": {
+          "voter": "0xc02c84f869b1a5172f21ce56b4733ae2fca8aa14b57e5e8f00db790ea285fd9b",
+          "pending_voter": "0xc02c84f869b1a5172f21ce56b4733ae2fca8aa14b57e5e8f00db790ea285fd9b",
+          "last_locked_until_secs": "1724682896"
+        }
+      },
+      {
+        "key": "0xd394ba7a55f6d0cb4952679fac1db53926869ed975d3fdcf8fedcbbb7480b952",
+        "hash": "664909098963046500",
+        "value": {
+          "voter": "0xd394ba7a55f6d0cb4952679fac1db53926869ed975d3fdcf8fedcbbb7480b952",
+          "pending_voter": "0xd394ba7a55f6d0cb4952679fac1db53926869ed975d3fdcf8fedcbbb7480b952",
+          "last_locked_until_secs": "1730915993"
+        }
+      }
+    ],
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "key_hash": "cce0fd47f36bf01503651dc371feeebc745e8e6aa87b36f3a7fea5b4b7dfd145",
+    "key": "0xd394ba7a55f6d0cb4952679fac1db53926869ed975d3fdcf8fedcbbb7480b952",
+    "decoded_key": "0xd394ba7a55f6d0cb4952679fac1db53926869ed975d3fdcf8fedcbbb7480b952",
+    "decoded_value": "10806591008202773939813398",
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "key_hash": "eac0332718d94f1db0ac5975da402c865fb633629a7cc4739d9b2e2ccfa8f0c5",
+    "key": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "decoded_key": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "decoded_value": "25118843728449721241657181",
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0xb87334b5be84b86399a779e0e9a9487caad7e6bd37a7ae59c05c5676764820eb",
+    "key_hash": "3b8386b8fac31732b9b0d3f2d03a4c1e5d3186a9d905fe4482b77e54bcebde08",
+    "key": "0x0000000000000000",
+    "decoded_key": "0",
+    "decoded_value": [
+      {
+        "key": "0x29e6421074d0f8c1c076d6563a1de662946c9b0a441cabdd76b4ae9379c513b9",
+        "hash": "6979483115129658744",
+        "value": {
+          "active_shares": "2000000000000000000000000000000",
+          "last_locked_until_secs": "0",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "2000000000000000000000000000000"
+        }
+      },
+      {
+        "key": "0x98fe3070c497cd7e52c7e0b6eeb18a0b910604124e7c739a4896653be44e9781",
+        "hash": "16375248214741987812",
+        "value": {
+          "active_shares": "13262685066752048172324252",
+          "last_locked_until_secs": "1722089485",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "13262685066752048172324252"
+        }
+      },
+      {
+        "key": "0x896ef68e5eee178faf74122e3b7b48b74290d2e1c40dde50728e10ef503da119",
+        "hash": "930222532477502732",
+        "value": {
+          "active_shares": "34877401591671454671104304",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "34877401591671454671104304"
+        }
+      },
+      {
+        "key": "0xc02c84f869b1a5172f21ce56b4733ae2fca8aa14b57e5e8f00db790ea285fd9b",
+        "hash": "6031278649259050940",
+        "value": {
+          "active_shares": "10938777059257542029402807",
+          "last_locked_until_secs": "1724682896",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10938777059257542029402807"
+        }
+      },
+      {
+        "key": "0xd394ba7a55f6d0cb4952679fac1db53926869ed975d3fdcf8fedcbbb7480b952",
+        "hash": "664909098963046500",
+        "value": {
+          "active_shares": "10806591008202773939813398",
+          "last_locked_until_secs": "1730915993",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10806591008202773939813398"
+        }
+      }
+    ],
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0xb87334b5be84b86399a779e0e9a9487caad7e6bd37a7ae59c05c5676764820eb",
+    "key_hash": "907103cd0a58d7eae5a00a3ecc27381b973be22b829dfef35ace51db57f8ca03",
+    "key": "0x0100000000000000",
+    "decoded_key": "1",
+    "decoded_value": [
+      {
+        "key": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+        "hash": "12736911355601039089",
+        "value": {
+          "active_shares": "25118843728449721241657181",
+          "last_locked_until_secs": "1730915993",
+          "pending_inactive_shares": "25639851983718399220760460",
+          "active_shares_next_lockup": "25118843728449721241657181"
+        }
+      },
+      {
+        "key": "0x0",
+        "hash": "7797948686568424061",
+        "value": {
+          "active_shares": "152470119682369959286",
+          "last_locked_until_secs": "1730915993",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "152470119682369959286"
+        }
+      },
+      {
+        "key": "0x94ee9966a3d69705eaae29ef5b5f38747c8eaaa65c8b680db8ac0bce5dae282a",
+        "hash": "13858633305312752977",
+        "value": {
+          "active_shares": "0",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "26213571470000000000000000",
+          "active_shares_next_lockup": "0"
+        }
+      },
+      {
+        "key": "0x76f2dbf501c514f3dd6e96f9b511f2cbd20fac265cf44d185268c7cf367c814b",
+        "hash": "8609209306266606137",
+        "value": {
+          "active_shares": "12927830795544929564501625",
+          "last_locked_until_secs": "1724682896",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "12927830795544929564501625"
+        }
+      },
+      {
+        "key": "0x6cdd2e750e1188d98f644e6628d1ac399b74cb2ce0b6b84fb696c044e567c60d",
+        "hash": "11590363594355174939",
+        "value": {
+          "active_shares": "10784956641648224341898476",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10784956641648224341898476"
+        }
+      },
+      {
+        "key": "0xface9c7372f35fa461ad168cb1094e523a0a89f8e2796b0e21c217c85e19d71a",
+        "hash": "15216442237181271931",
+        "value": {
+          "active_shares": "22758713397477337947993963",
+          "last_locked_until_secs": "1730915993",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "22758713397477337947993963"
+        }
+      },
+      {
+        "key": "0xa64189d523f0084ef7c24a7b950ac1123732d79efd543954b4e83aeafabaac42",
+        "hash": "2932381372283928247",
+        "value": {
+          "active_shares": "10791010049065335484646666",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10791010049065335484646666"
+        }
+      },
+      {
+        "key": "0x252c3c3f676bb41e37ae79ef4efe3dd4802c7a175e68819e73af37f55200fdfc",
+        "hash": "9092696905113526367",
+        "value": {
+          "active_shares": "10864889004782414356809020",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10864889004782414356809020"
+        }
+      }
+    ],
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0xd5d080845aad4a0e20ad583dac7e2e0119ce534a313a0cfd939dd11b5acb111e",
+    "key_hash": "fc63037a80c3542516a1b146df801dcc26c026111454fadd4820a287174e24f8",
+    "key": "0x0400000000000000",
+    "decoded_key": {
+      "index": "4"
+    },
+    "decoded_value": {
+      "shares": {
+        "inner": {
+          "handle": "0xfffc3802cd3b421aebb2b49bef3e7edf01bf0f0d145b40c898a5aa369a7fb955"
+        },
+        "length": "1"
+      },
+      "total_coins": "2563903267",
+      "total_shares": "25635777079116921058748870",
+      "scaling_factor": "10000000000000000"
+    },
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  },
+  {
+    "table_handle": "0xfffc3802cd3b421aebb2b49bef3e7edf01bf0f0d145b40c898a5aa369a7fb955",
+    "key_hash": "eac0332718d94f1db0ac5975da402c865fb633629a7cc4739d9b2e2ccfa8f0c5",
+    "key": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "decoded_key": "0xb1a1d4624c5163445c993d9db9cd5bd3fc6b2c5e85a14216c3781d04d4f92d08",
+    "decoded_value": "25635777079116921058748870",
+    "is_deleted": false,
+    "last_transaction_version": 1837008146
+  }
+]

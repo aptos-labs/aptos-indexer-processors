@@ -1,0 +1,107 @@
+[
+  {
+    "table_handle": "0x2d4a524628268af00d4b0fa8aaf8e84fb58d6f0d7972a951ebbafc7e2042d006",
+    "key_hash": "f9255e5701bb574046bfe9404e6ec70ce2c5a0cdac59adcafd27b2351630a00a",
+    "key": "0x0200000000000000",
+    "decoded_key": "2",
+    "decoded_value": [
+      {
+        "key": "0x5ac1982e6804615ab36034dcf0a4f20f9e1d0403c76baa60dcca30fe767dca8f",
+        "hash": "7731521210953552338",
+        "value": {
+          "voter": "0x5ac1982e6804615ab36034dcf0a4f20f9e1d0403c76baa60dcca30fe767dca8f",
+          "pending_voter": "0x5ac1982e6804615ab36034dcf0a4f20f9e1d0403c76baa60dcca30fe767dca8f",
+          "last_locked_until_secs": "1729703448"
+        }
+      },
+      {
+        "key": "0x8ebfeff39bedc124305fced9fa67ab9bd3a048d6b38fe84cfc000c76bd5956fc",
+        "hash": "5938554663847763462",
+        "value": {
+          "voter": "0x8ebfeff39bedc124305fced9fa67ab9bd3a048d6b38fe84cfc000c76bd5956fc",
+          "pending_voter": "0x8ebfeff39bedc124305fced9fa67ab9bd3a048d6b38fe84cfc000c76bd5956fc",
+          "last_locked_until_secs": "1724682896"
+        }
+      },
+      {
+        "key": "0xbb3c6f6d1cf7082781bd81e9db75fe3e7d9c5da1c72a6da2e5c46e46514382b4",
+        "hash": "87019340021843486",
+        "value": {
+          "voter": "0xbb3c6f6d1cf7082781bd81e9db75fe3e7d9c5da1c72a6da2e5c46e46514382b4",
+          "pending_voter": "0xbb3c6f6d1cf7082781bd81e9db75fe3e7d9c5da1c72a6da2e5c46e46514382b4",
+          "last_locked_until_secs": "1722089485"
+        }
+      },
+      {
+        "key": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+        "hash": "4171659591141844146",
+        "value": {
+          "voter": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+          "pending_voter": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+          "last_locked_until_secs": "1729703448"
+        }
+      }
+    ],
+    "is_deleted": false,
+    "last_transaction_version": 1830706009
+  },
+  {
+    "table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "key_hash": "44dd4046e6f1093c3da35bf37345abe49cacde4baa5db9b20a1b94f8572092bb",
+    "key": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+    "decoded_key": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+    "decoded_value": "10868808877242081379810636",
+    "is_deleted": false,
+    "last_transaction_version": 1830706009
+  },
+  {
+    "table_handle": "0xb87334b5be84b86399a779e0e9a9487caad7e6bd37a7ae59c05c5676764820eb",
+    "key_hash": "f9255e5701bb574046bfe9404e6ec70ce2c5a0cdac59adcafd27b2351630a00a",
+    "key": "0x0200000000000000",
+    "decoded_key": "2",
+    "decoded_value": [
+      {
+        "key": "0xb6a515d19935353f9120cfcb33fd730683108a112f19a7c50d52044bb9619f06",
+        "hash": "4171659591141844146",
+        "value": {
+          "active_shares": "10868808877242081379810636",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10868808877242081379810636"
+        }
+      },
+      {
+        "key": "0x5ac1982e6804615ab36034dcf0a4f20f9e1d0403c76baa60dcca30fe767dca8f",
+        "hash": "7731521210953552338",
+        "value": {
+          "active_shares": "10982691948321922727831566",
+          "last_locked_until_secs": "1729703448",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "10982691948321922727831566"
+        }
+      },
+      {
+        "key": "0x8ebfeff39bedc124305fced9fa67ab9bd3a048d6b38fe84cfc000c76bd5956fc",
+        "hash": "5938554663847763462",
+        "value": {
+          "active_shares": "0",
+          "last_locked_until_secs": "1724682896",
+          "pending_inactive_shares": "119987968031233258051008287",
+          "active_shares_next_lockup": "0"
+        }
+      },
+      {
+        "key": "0xbb3c6f6d1cf7082781bd81e9db75fe3e7d9c5da1c72a6da2e5c46e46514382b4",
+        "hash": "87019340021843486",
+        "value": {
+          "active_shares": "20722666829722722761620304",
+          "last_locked_until_secs": "1722089485",
+          "pending_inactive_shares": "0",
+          "active_shares_next_lockup": "20722666829722722761620304"
+        }
+      }
+    ],
+    "is_deleted": false,
+    "last_transaction_version": 1830706009
+  }
+]

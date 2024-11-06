@@ -1,0 +1,11 @@
+[
+  {
+    "transaction_version": 1830706009,
+    "staking_pool_address": "0x001232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
+    "total_coins": "204102507554263",
+    "total_shares": "200016449783356.3041960759668088",
+    "active_table_handle": "0x47da3279e65643854e3abb7af1fd2a9082dda18f10c469759e2b3cd964044ab3",
+    "operator_commission_percentage": "900",
+    "inactive_table_handle": "0xd5d080845aad4a0e20ad583dac7e2e0119ce534a313a0cfd939dd11b5acb111e"
+  }
+]
