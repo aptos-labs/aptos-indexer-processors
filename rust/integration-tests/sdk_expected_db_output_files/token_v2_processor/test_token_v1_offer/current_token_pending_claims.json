@@ -1,0 +1,18 @@
+[
+  {
+    "token_data_id_hash": "fbfd7848ba09f6ef63498de614844339efc9264cc41b0e50f2e3ca1dca3b0802",
+    "property_version": "0",
+    "from_address": "0x12e0de4f294305602939ebfdbcd5b267493ae1255776e7749db177bdb7148d01",
+    "to_address": "0x15ca0ddee3416b0d8177c0cce554f140c99a94b72e02a55a55fd2d717999c39f",
+    "collection_data_id_hash": "2ae74f6f02bb77746263f3f32b17a4ea3196b467029c588b323d136af0c45cd4",
+    "creator_address": "0x092d2f7ad00630e4dfffcca01bee12c84edf004720347fb1fd57016d2cc8d3f8",
+    "collection_name": "Galxe OAT",
+    "name": "Gran Saga: Unlimited Title Announcement OAT",
+    "amount": "1",
+    "table_handle": "0xe67fe5afafcffe75ac55e33067d32c2a962435053d769a0ab4e476030a4de753",
+    "last_transaction_version": 141135867,
+    "collection_id": "0x2ae74f6f02bb77746263f3f32b17a4ea3196b467029c588b323d136af0c45cd4",
+    "last_transaction_timestamp": "2023-05-14T02:08:22.327431",
+    "token_data_id": "0xfbfd7848ba09f6ef63498de614844339efc9264cc41b0e50f2e3ca1dca3b0802"
+  }
+]

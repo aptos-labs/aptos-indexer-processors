@@ -1,0 +1,97 @@
+[
+  {
+    "sequence_number": 120995,
+    "creation_number": 6,
+    "account_address": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c",
+    "transaction_version": 303690531,
+    "transaction_block_height": 104789939,
+    "type_": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c::domains::SetReverseLookupEventV1",
+    "data": {
+      "domain_name": "pepapati",
+      "subdomain_name": {
+        "vec": [
+          "gem"
+        ]
+      },
+      "target_address": {
+        "vec": []
+      }
+    },
+    "indexed_type": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c::domains::SetReverseLookupEventV1",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 42527,
+    "creation_number": 4,
+    "account_address": "0x14464c04472a91941854ba9ffc48691e071874a1bcb51b89ff15afa5f80b76df",
+    "transaction_version": 303690531,
+    "transaction_block_height": 104789939,
+    "type_": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c::v2_1_domains::SetTargetAddressEvent",
+    "data": {
+      "domain_name": "pepapati",
+      "new_address": {
+        "vec": [
+          "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493"
+        ]
+      },
+      "subdomain_name": {
+        "vec": []
+      },
+      "expiration_time_secs": "1723309056"
+    },
+    "indexed_type": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c::v2_1_domains::SetTargetAddressEvent",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 21513,
+    "creation_number": 7,
+    "account_address": "0x14464c04472a91941854ba9ffc48691e071874a1bcb51b89ff15afa5f80b76df",
+    "transaction_version": 303690531,
+    "transaction_block_height": 104789939,
+    "type_": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c::v2_1_domains::SetReverseLookupEvent",
+    "data": {
+      "account_addr": "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493",
+      "curr_domain_name": {
+        "vec": [
+          "pepapati"
+        ]
+      },
+      "prev_domain_name": {
+        "vec": []
+      },
+      "curr_subdomain_name": {
+        "vec": []
+      },
+      "prev_subdomain_name": {
+        "vec": []
+      },
+      "curr_expiration_time_secs": {
+        "vec": [
+          "1723309056"
+        ]
+      },
+      "prev_expiration_time_secs": {
+        "vec": []
+      }
+    },
+    "indexed_type": "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c::v2_1_domains::SetReverseLookupEvent",
+    "event_index": 2
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 303690531,
+    "transaction_block_height": 104789939,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "5",
+      "storage_fee_octas": "50000",
+      "execution_gas_units": "172",
+      "total_charge_gas_units": "677",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 3
+  }
+]

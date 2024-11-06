@@ -1,0 +1,10 @@
+[
+  {
+    "transaction_version": 303690531,
+    "coin_type_hash": "91ceb1308a98389691e05158b07ed5f079ab78461a6bb8d5a4054b1bb5cb8bb6",
+    "coin_type": "0x1::aptos_coin::AptosCoin",
+    "supply": "106102627722374012",
+    "transaction_timestamp": "2023-10-19T18:36:22",
+    "transaction_epoch": 4479
+  }
+]

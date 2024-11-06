@@ -1,0 +1,14 @@
+[
+  {
+    "transaction_version": 1056780409,
+    "write_set_change_index": 13,
+    "domain": "petra",
+    "subdomain": "abwehr1225",
+    "token_standard": "v2",
+    "registered_address": "0x18a88b9722c7af62308e79b713710876156c68c3e3fdbd408294af6b16dc046a",
+    "expiration_timestamp": "2024-07-29T17:32:30",
+    "token_name": "abwehr1225.petra.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": 1
+  }
+]
