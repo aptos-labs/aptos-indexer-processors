@@ -1,0 +1,10 @@
+[
+  {
+    "transaction_version": 139449359,
+    "event_index": 6,
+    "delegator_address": "0x095cdd904dc1d91736019a3fe149488072f87690a210b3b35f87ea0f6898ac15",
+    "pool_address": "0xe7fb0815dbe9d687a911ef6950f4ad53fed1980a99569e589e42a25f55c72ad2",
+    "event_type": "0x1::delegation_pool::WithdrawStakeEvent",
+    "amount": "1442697999999998"
+  }
+]

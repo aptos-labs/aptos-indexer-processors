@@ -1,0 +1,12 @@
+[
+  {
+    "key": "0x0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "transaction_version": 423176063,
+    "write_set_change_index": 29,
+    "transaction_block_height": 139029912,
+    "table_handle": "0x1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca",
+    "decoded_key": "0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935",
+    "decoded_value": "107797085162400187",
+    "is_deleted": false
+  }
+]

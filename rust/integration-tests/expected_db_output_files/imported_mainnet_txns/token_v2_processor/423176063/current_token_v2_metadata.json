@@ -1,0 +1,29 @@
+[
+  {
+    "object_address": "0x9f387c30bad7e61f9039e108acd92825b65547a46b213dfde3495b0f1ee69423",
+    "resource_type": "0x1fc2f33ab6b624e3e632ba861b755fd8e61d2c2e6cf8292e415880b4c198224d::inscription::InscriptionMetadata",
+    "data": {
+      "inscription_id": "1201557"
+    },
+    "state_key_hash": "0xbbb6528a4ab90cc3924f4e3f75631334c5d8cef07e6b0cb49eba6cb1073297a4",
+    "last_transaction_version": 423176063
+  },
+  {
+    "object_address": "0x9f41d314d043ba08ec319a6e5353c63716149855aa2258a65bdbd5a9462f6c36",
+    "resource_type": "0x1fc2f33ab6b624e3e632ba861b755fd8e61d2c2e6cf8292e415880b4c198224d::inscription::InscriptionMetadata",
+    "data": {
+      "inscription_id": "1201558"
+    },
+    "state_key_hash": "0x4ed41b0285ab2330db8a1437339a9002b019a291021fe5971c49e781d748568d",
+    "last_transaction_version": 423176063
+  },
+  {
+    "object_address": "0xbcb216aa0f66fc94068718ce725105af04d6553a97e75271dee12d0034f623d0",
+    "resource_type": "0x1fc2f33ab6b624e3e632ba861b755fd8e61d2c2e6cf8292e415880b4c198224d::inscription::InscriptionMetadata",
+    "data": {
+      "inscription_id": "1201556"
+    },
+    "state_key_hash": "0x28ba1a771d570f713e2f95d06d5e1a9bbaa0002165c558ccd4ae5cc327c1e46a",
+    "last_transaction_version": 423176063
+  }
+]

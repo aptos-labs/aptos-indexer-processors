@@ -1,0 +1,29 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 14,
+    "account_address": "0xb7ad608a12c20efa02482aaa783ee4986fd5510e8ca678307534469b2c28297a",
+    "transaction_version": 83883373,
+    "transaction_block_height": 31382696,
+    "type_": "0x1::stake::WithdrawStakeEvent",
+    "data": {
+      "pool_address": "0xb7ad608a12c20efa02482aaa783ee4986fd5510e8ca678307534469b2c28297a",
+      "amount_withdrawn": "10000000"
+    },
+    "indexed_type": "0x1::stake::WithdrawStakeEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 2,
+    "creation_number": 2,
+    "account_address": "0xb7ad608a12c20efa02482aaa783ee4986fd5510e8ca678307534469b2c28297a",
+    "transaction_version": 83883373,
+    "transaction_block_height": 31382696,
+    "type_": "0x1::coin::DepositEvent",
+    "data": {
+      "amount": "10000000"
+    },
+    "indexed_type": "0x1::coin::DepositEvent",
+    "event_index": 1
+  }
+]

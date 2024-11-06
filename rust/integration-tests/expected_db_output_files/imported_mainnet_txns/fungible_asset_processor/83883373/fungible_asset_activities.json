@@ -1,0 +1,38 @@
+[
+  {
+    "transaction_version": 83883373,
+    "event_index": -1,
+    "owner_address": "0xb7ad608a12c20efa02482aaa783ee4986fd5510e8ca678307534469b2c28297a",
+    "storage_id": "0x1540d656974dd9c95a7bb561118343807b734a089c5dd1dcf2f87efb797dbd61",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "305634",
+    "type_": "0x1::aptos_coin::GasFeeEvent",
+    "is_gas_fee": true,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x1::stake::withdraw",
+    "block_height": 31382696,
+    "token_standard": "v1",
+    "transaction_timestamp": "2023-02-08T07:31:32",
+    "storage_refund_amount": "0"
+  },
+  {
+    "transaction_version": 83883373,
+    "event_index": 1,
+    "owner_address": "0xb7ad608a12c20efa02482aaa783ee4986fd5510e8ca678307534469b2c28297a",
+    "storage_id": "0x1540d656974dd9c95a7bb561118343807b734a089c5dd1dcf2f87efb797dbd61",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "10000000",
+    "type_": "0x1::coin::DepositEvent",
+    "is_gas_fee": false,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x1::stake::withdraw",
+    "block_height": 31382696,
+    "token_standard": "v1",
+    "transaction_timestamp": "2023-02-08T07:31:32",
+    "storage_refund_amount": "0"
+  }
+]

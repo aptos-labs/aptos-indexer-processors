@@ -1,0 +1,34 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x335212a907e882a69017e81d26fa09eca892c8a53725f8c5b1d9b8bc262384e4",
+    "transaction_version": 125600867,
+    "transaction_block_height": 48784225,
+    "type_": "0x1::account::CoinRegisterEvent",
+    "data": {
+      "type_info": {
+        "module_name": "0x6170746f735f636f696e",
+        "struct_name": "0x4170746f73436f696e",
+        "account_address": "0x1"
+      }
+    },
+    "indexed_type": "0x1::account::CoinRegisterEvent",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 5,
+    "account_address": "0x335212a907e882a69017e81d26fa09eca892c8a53725f8c5b1d9b8bc262384e4",
+    "transaction_version": 125600867,
+    "transaction_block_height": 48784225,
+    "type_": "0x1::stake::SetOperatorEvent",
+    "data": {
+      "new_operator": "0x4cd02b0a3cbbd4986463a44dfff86d7dac10dd9b6a09aad06b9c7d74f4acacbd",
+      "old_operator": "0x335212a907e882a69017e81d26fa09eca892c8a53725f8c5b1d9b8bc262384e4",
+      "pool_address": "0x335212a907e882a69017e81d26fa09eca892c8a53725f8c5b1d9b8bc262384e4"
+    },
+    "indexed_type": "0x1::stake::SetOperatorEvent",
+    "event_index": 1
+  }
+]
