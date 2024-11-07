@@ -96,7 +96,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_user_transactions_query(
+pub fn insert_user_transactions_query(
     items_to_insert: Vec<UserTransactionModel>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -116,7 +116,7 @@ fn insert_user_transactions_query(
     )
 }
 
-fn insert_signatures_query(
+pub fn insert_signatures_query(
     items_to_insert: Vec<Signature>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
