@@ -9,12 +9,9 @@ use std::collections::HashSet;
 
 pub async fn setup_events_processor_config(
     test_context: &SdkTestContext,
-    staring_version: u64,
-    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config =
-        test_context.create_transaction_stream_config(staring_version, txn_count as u64); // since this will be always 1, we can remove from the arg list
+    let transaction_stream_config = test_context.create_transaction_stream_config(); // since this will be always 1, we can remove from the arg list
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -46,9 +43,8 @@ mod tests {
     use crate::{
         diff_test_helper::event_processor::load_data,
         sdk_tests::{
-            events_processor_tests::setup_events_processor_config,
-            get_all_version_from_test_context, run_processor_test, setup_test_environment,
-            validate_json, DEFAULT_OUTPUT_FOLDER,
+            events_processor_tests::setup_events_processor_config, run_processor_test,
+            setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
@@ -147,13 +143,8 @@ mod tests {
         let starting_version = transaction_batches[0].version;
 
         let db_url = db.get_db_url();
-        let (indexer_processor_config, _processor_name) = setup_events_processor_config(
-            &test_context,
-            starting_version,
-            transaction_batches.len(),
-            &db_url,
-        )
-        .await;
+        let (indexer_processor_config, _processor_name) =
+            setup_events_processor_config(&test_context, &db_url).await;
 
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
@@ -164,7 +155,6 @@ mod tests {
             events_processor,
             load_data,
             db_url,
-            vec![5523474016, 5979639459],
             diff_flag,
             output_path.clone(),
             Some("multi_txns_handling_test".to_string()),
@@ -197,17 +187,10 @@ mod tests {
             .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
-        let txn_versions = get_all_version_from_test_context(&test_context);
-        let starting_version = *txn_versions.first().unwrap();
 
         let db_url = db.get_db_url();
-        let (indexer_processor_config, processor_name) = setup_events_processor_config(
-            &test_context,
-            starting_version as u64,
-            txn_versions.len(),
-            &db_url,
-        )
-        .await;
+        let (indexer_processor_config, processor_name) =
+            setup_events_processor_config(&test_context, &db_url).await;
 
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
@@ -218,7 +201,6 @@ mod tests {
             events_processor,
             load_data,
             db_url,
-            txn_versions.clone(),
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -228,7 +210,7 @@ mod tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    starting_version as u64,
+                    test_context.get_request_start_version(),
                     processor_name,
                     output_path.clone(),
                     test_case_name,
@@ -237,7 +219,8 @@ mod tests {
             Err(e) => {
                 panic!(
                     "Test failed on transactions {:?} due to processor error: {}",
-                    txn_versions, e
+                    test_context.get_test_transaction_versions(),
+                    e
                 );
             },
         }

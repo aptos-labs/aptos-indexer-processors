@@ -12,12 +12,9 @@ use std::collections::HashSet;
 
 pub async fn setup_ans_processor_config(
     test_context: &SdkTestContext,
-    staring_version: u64,
-    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config =
-        test_context.create_transaction_stream_config(staring_version, txn_count as u64); // since this will be always 1, we can remove from the arg list
+    let transaction_stream_config = test_context.create_transaction_stream_config(); // since this will be always 1, we can remove from the arg list
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -82,7 +79,6 @@ mod tests {
     async fn mainnet_current_ans_primary_name_v2() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_1056780409_ANS_CURRENT_ANS_PRIMARY_NAME_V2,
-            1056780409,
             Some("test_current_ans_primary_name_v2".to_string()),
         )
         .await;
@@ -98,7 +94,6 @@ mod tests {
     async fn mainnet_ans_lookup_v2() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2,
-            303690531,
             Some("test_ans_lookup_v2".to_string()),
         )
         .await;
@@ -114,17 +109,12 @@ mod tests {
     async fn mainnet_current_ans_lookup_v2() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_438536688_ANS_CURRENT_ANS_LOOKUP_V2,
-            438536688,
             Some("test_current_ans_lookup_v2".to_string()),
         )
         .await;
     }
     // Helper function to abstract out the single transaction processing
-    async fn process_single_mainnet_event_txn(
-        txn: &[u8],
-        txn_version: i64,
-        test_case_name: Option<String>,
-    ) {
+    async fn process_single_mainnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
             .unwrap_or_else(|| format!("{}/imported_mainnet_txns", DEFAULT_OUTPUT_FOLDER));
@@ -133,7 +123,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_ans_processor_config(&test_context, txn_version as u64, 1, &db_url).await;
+            setup_ans_processor_config(&test_context, &db_url).await;
 
         let ans_processor = AnsProcessor::new(indexer_processor_config)
             .await
@@ -144,7 +134,6 @@ mod tests {
             ans_processor,
             load_data,
             db_url,
-            vec![txn_version],
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -154,18 +143,18 @@ mod tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    test_context.get_request_start_version(),
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    test_context.get_test_transaction_versions(),
+                    e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }

@@ -9,12 +9,9 @@ use std::collections::HashSet;
 
 pub fn setup_fa_processor_config(
     test_context: &SdkTestContext,
-    staring_version: u64,
-    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config =
-        test_context.create_transaction_stream_config(staring_version, txn_count as u64);
+    let transaction_stream_config = test_context.create_transaction_stream_config();
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -47,9 +44,8 @@ mod sdk_fungible_asset_processor_tests {
     use crate::{
         diff_test_helper::fungible_asset_processor::load_data,
         sdk_tests::{
-            fungible_asset_processor_tests::setup_fa_processor_config,
-            get_all_version_from_test_context, run_processor_test, setup_test_environment,
-            validate_json, DEFAULT_OUTPUT_FOLDER,
+            fungible_asset_processor_tests::setup_fa_processor_config, run_processor_test,
+            setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use aptos_indexer_test_transactions::{
@@ -168,11 +164,8 @@ mod sdk_fungible_asset_processor_tests {
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
         let db_url = db.get_db_url();
-        let txn_versions = get_all_version_from_test_context(&test_context);
-        let starting_version = *txn_versions.first().unwrap();
-
         let (indexer_processor_config, processor_name) =
-            setup_fa_processor_config(&test_context, starting_version as u64, 1, &db_url);
+            setup_fa_processor_config(&test_context, &db_url);
 
         let fungible_asset_processor = FungibleAssetProcessor::new(indexer_processor_config)
             .await
@@ -183,7 +176,6 @@ mod sdk_fungible_asset_processor_tests {
             fungible_asset_processor,
             load_data,
             db_url,
-            txn_versions.clone(),
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -193,7 +185,7 @@ mod sdk_fungible_asset_processor_tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    starting_version as u64,
+                    test_context.get_request_start_version(),
                     processor_name,
                     output_path.clone(),
                     test_case_name,
@@ -202,7 +194,8 @@ mod sdk_fungible_asset_processor_tests {
             Err(e) => {
                 panic!(
                     "Test failed on transactions {:?} due to processor error: {}",
-                    txn_versions, e
+                    test_context.get_test_transaction_versions(),
+                    e
                 );
             },
         }
