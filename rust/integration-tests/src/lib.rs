@@ -13,7 +13,6 @@ use testcontainers::{
 };
 
 mod diff_test_helper;
-mod diff_tests;
 mod models;
 mod scenarios_tests;
 #[cfg(test)]
