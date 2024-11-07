@@ -4196,6 +4196,8 @@ dependencies = [
  "field_count",
  "futures",
  "futures-util",
+ "google-cloud-googleapis",
+ "google-cloud-pubsub",
  "hex",
  "jemallocator",
  "kanal",

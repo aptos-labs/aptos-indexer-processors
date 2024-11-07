@@ -68,11 +68,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
         //  Run migrations
         match self.config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
-                run_migrations(
-                    postgres_config.connection_string.clone(),
-                    self.db_pool.clone(),
-                )
-                .await;
+                run_migrations(&postgres_config.connection_string, self.db_pool.clone()).await;
             },
         }
 
