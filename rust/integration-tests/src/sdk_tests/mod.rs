@@ -152,8 +152,10 @@ where
             output_path.clone(),
             custom_file_name,
             move || {
-                let mut conn =
-                    PgConnection::establish(&db_url).expect("Failed to establish DB connection");
+                let mut conn = PgConnection::establish(&db_url).unwrap_or_else(|e| {
+                    eprintln!("[ERROR] Failed to establish DB connection: {:?}", e);
+                    panic!("Failed to establish DB connection: {:?}", e);
+                });
 
                 let db_values = match load_data(&mut conn, txn_versions.clone()) {
                     Ok(db_data) => db_data,
