@@ -29,8 +29,9 @@ pub fn setup_objects_processor_config(
 
     let objects_processor_config = ObjectsProcessorConfig {
         default_config: default_processor_config,
-        query_retries: ObjectsProcessorConfig::default_query_retries(),
-        query_retry_delay_ms: ObjectsProcessorConfig::default_query_retry_delay_ms(),
+        // Avoid doing long lookups in tests
+        query_retries: 1,
+        query_retry_delay_ms: 100,
     };
 
     let processor_config = ProcessorConfig::ObjectsProcessor(objects_processor_config);

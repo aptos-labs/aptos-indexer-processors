@@ -27,8 +27,9 @@ pub async fn setup_stake_processor_config(
             channel_size: 100,
             deprecated_tables: HashSet::new(),
         },
-        query_retries: 10,
-        query_retry_delay_ms: 1000,
+        // Avoid doing long lookups in tests
+        query_retries: 1,
+        query_retry_delay_ms: 100,
     };
 
     let processor_config = ProcessorConfig::StakeProcessor(default_processor_config);
