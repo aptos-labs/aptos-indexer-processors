@@ -28,8 +28,9 @@ pub fn setup_token_v2_processor_config(
     };
     let token_v2_processor_config = TokenV2ProcessorConfig {
         default_config: default_processor_config,
-        query_retries: TokenV2ProcessorConfig::default_query_retries(),
-        query_retry_delay_ms: TokenV2ProcessorConfig::default_query_retry_delay_ms(),
+        // Avoid doing long lookups in tests
+        query_retries: 1,
+        query_retry_delay_ms: 100,
     };
 
     let processor_config = ProcessorConfig::TokenV2Processor(token_v2_processor_config);
