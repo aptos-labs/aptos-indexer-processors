@@ -57,6 +57,7 @@ impl ProcessorTrait for MonitoringProcessor {
         self.config.processor_config.name()
     }
 
+    /// This processor no-ops and is used for monitoring purposes.
     async fn run_processor(&self) -> Result<()> {
         // Run migrations
         match self.config.db_config {

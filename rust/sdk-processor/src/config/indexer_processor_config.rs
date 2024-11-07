@@ -10,6 +10,7 @@ use crate::{
         fungible_asset_processor::FungibleAssetProcessor,
         monitoring_processor::MonitoringProcessor, objects_processor::ObjectsProcessor,
         stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
+        user_transaction_processor::UserTransactionProcessor,
     },
 };
 use anyhow::Result;
@@ -57,7 +58,7 @@ impl RunnableConfig for IndexerProcessorConfig {
                 fungible_asset_processor.run_processor().await
             },
             ProcessorConfig::UserTransactionProcessor(_) => {
-                let user_txns_processor = DefaultProcessor::new(self.clone()).await?;
+                let user_txns_processor = UserTransactionProcessor::new(self.clone()).await?;
                 user_txns_processor.run_processor().await
             },
             ProcessorConfig::StakeProcessor(_) => {
