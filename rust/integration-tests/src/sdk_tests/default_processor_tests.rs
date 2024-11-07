@@ -9,12 +9,9 @@ use std::collections::HashSet;
 
 pub async fn setup_default_processor_config(
     test_context: &SdkTestContext,
-    staring_version: u64,
-    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config =
-        test_context.create_transaction_stream_config(staring_version, txn_count as u64); // since this will be always 1, we can remove from the arg list
+    let transaction_stream_config = test_context.create_transaction_stream_config(); // since this will be always 1, we can remove from the arg list
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -62,7 +59,6 @@ mod tests {
     async fn mainnet_table_items() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_155112189_DEFAULT_TABLE_ITEMS,
-            155112189,
             Some("test_table_items".to_string()),
         )
         .await;
@@ -72,7 +68,6 @@ mod tests {
     async fn mainnet_current_table_items() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_1845035942_DEFAULT_CURRENT_TABLE_ITEMS,
-            1845035942,
             Some("test_current_table_items".to_string()),
         )
         .await;
@@ -82,18 +77,13 @@ mod tests {
     async fn mainnet_block_metadata_txns() {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
-            513424821,
             Some("block_metadata_transactions".to_string()),
         )
         .await;
     }
 
     // Helper function to abstract out the single transaction processing
-    async fn process_single_mainnet_event_txn(
-        txn: &[u8],
-        txn_version: i64,
-        test_case_name: Option<String>,
-    ) {
+    async fn process_single_mainnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
             .unwrap_or_else(|| format!("{}/imported_mainnet_txns", DEFAULT_OUTPUT_FOLDER));
@@ -102,7 +92,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_default_processor_config(&test_context, txn_version as u64, 1, &db_url).await;
+            setup_default_processor_config(&test_context, &db_url).await;
 
         let default_processor = DefaultProcessor::new(indexer_processor_config)
             .await
@@ -113,7 +103,6 @@ mod tests {
             default_processor,
             load_data,
             db_url,
-            vec![txn_version],
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -123,18 +112,18 @@ mod tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    test_context.get_request_start_version(),
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    test_context.get_test_transaction_versions(),
+                    e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }

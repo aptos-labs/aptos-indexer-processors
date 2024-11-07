@@ -12,12 +12,9 @@ use std::collections::HashSet;
 
 pub fn setup_token_v2_processor_config(
     test_context: &SdkTestContext,
-    staring_version: u64,
-    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config =
-        test_context.create_transaction_stream_config(staring_version, txn_count as u64);
+    let transaction_stream_config = test_context.create_transaction_stream_config();
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -56,8 +53,7 @@ mod sdk_token_v2_processor_tests {
     use crate::{
         diff_test_helper::token_v2_processor::load_data,
         sdk_tests::{
-            get_transaction_version_from_test_context, run_processor_test, setup_test_environment,
-            validate_json, DEFAULT_OUTPUT_FOLDER,
+            run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
     use aptos_indexer_test_transactions::{
@@ -341,12 +337,9 @@ mod sdk_token_v2_processor_tests {
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 
-        let txn_version = *get_transaction_version_from_test_context(&test_context)
-            .first()
-            .unwrap();
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_token_v2_processor_config(&test_context, txn_version, 1, &db_url);
+            setup_token_v2_processor_config(&test_context, &db_url);
 
         let token_v2_processor = TokenV2Processor::new(indexer_processor_config)
             .await
@@ -357,7 +350,6 @@ mod sdk_token_v2_processor_tests {
             token_v2_processor,
             load_data,
             db_url,
-            vec![txn_version as i64],
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -367,18 +359,18 @@ mod sdk_token_v2_processor_tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    test_context.get_request_start_version(),
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    test_context.get_test_transaction_versions(),
+                    e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }
