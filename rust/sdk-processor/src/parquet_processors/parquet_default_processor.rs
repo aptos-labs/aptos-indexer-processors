@@ -32,6 +32,14 @@ use processor::db::common::models::default_models::{
 };
 use std::{sync::Arc, time::Duration};
 use tracing::{debug, info};
+use std::collections::HashMap;
+use crate::parquet_processors::ParquetTypeEnum;
+use parquet::schema::types::Type;
+use crate::steps::parquet_default_processor::gcs_handler::create_new_writer;
+use crate::steps::parquet_default_processor::gcs_handler::GCSUploader;
+use processor::bq_analytics::generic_parquet_processor::HasParquetSchema;
+use crate::steps::parquet_default_processor::size_buffer::SizeBufferStep;
+
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -164,181 +172,42 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let gcs_client = Arc::new(GCSClient::new(gcs_config));
 
-        let generic_parquet_buffer_handler = GenericParquetBufferHandler::new(
-            parquet_processor_config.bucket_name.clone(),
-            parquet_processor_config.bucket_root.clone(),
-            [ParquetTransaction::default()].as_slice().schema().unwrap(),
-            self.name().to_string(),
-        )
-        .unwrap();
+        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
+            (ParquetTypeEnum::MoveResource, MoveResource::schema()),
+            (ParquetTypeEnum::WriteSetChange, WriteSetChangeModel::schema()),
+            (ParquetTypeEnum::Transaction, ParquetTransaction::schema()),
+            (ParquetTypeEnum::TableItem, TableItem::schema()),
+            (ParquetTypeEnum::MoveModule, MoveModule::schema()),
+        ].into_iter().collect();
 
-        let transaction_step = TimedSizeBufferStep::<
-            Input,
-            ParquetTransaction,
-            GenericParquetBufferHandler<ParquetTransaction>,
-        >::new(
-            Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-            TableConfig {
-                table_name: "transactions".to_string(),
-                bucket_name: parquet_processor_config.bucket_name.clone(),
-                bucket_root: parquet_processor_config.bucket_root.clone(),
-                max_size: parquet_processor_config.max_buffer_size,
-            },
+        let parquet_type_to_writer = parquet_type_to_schemas.iter().map(|(key, schema)| {
+            let writer = create_new_writer(schema.clone()).expect("Failed to create writer");
+            (*key, writer)
+        }).collect();
+
+        let buffer_uploader = GCSUploader::new(
             gcs_client.clone(),
-            self.name(),
-            generic_parquet_buffer_handler,
-        );
-
-        let move_resource_generic_parquet_buffer_handler = GenericParquetBufferHandler::new(
+            parquet_type_to_schemas,
+            parquet_type_to_writer,
             parquet_processor_config.bucket_name.clone(),
             parquet_processor_config.bucket_root.clone(),
-            [MoveResource::default()].as_slice().schema().unwrap(),
             self.name().to_string(),
-        )
-        .unwrap();
-
-        let move_resource_step = TimedSizeBufferStep::<
-            Input,
-            MoveResource,
-            GenericParquetBufferHandler<MoveResource>,
-        >::new(
-            Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-            TableConfig {
-                table_name: "move_resources".to_string(),
-                bucket_name: parquet_processor_config.bucket_name.clone(),
-                bucket_root: parquet_processor_config.bucket_root.clone(),
-                max_size: parquet_processor_config.max_buffer_size,
-            },
-            gcs_client.clone(),
-            self.name(),
-            move_resource_generic_parquet_buffer_handler,
-        );
-
-        let wsc_generic_parquet_buffer_handler = GenericParquetBufferHandler::new(
-            parquet_processor_config.bucket_name.clone(),
-            parquet_processor_config.bucket_root.clone(),
-            [WriteSetChangeModel::default()]
-                .as_slice()
-                .schema()
-                .unwrap(),
-            self.name().to_string(),
-        )
-        .unwrap();
-
-        let write_set_change_step = TimedSizeBufferStep::<
-            Input,
-            WriteSetChangeModel,
-            GenericParquetBufferHandler<WriteSetChangeModel>,
-        >::new(
-            Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-            TableConfig {
-                table_name: "write_set_changes".to_string(),
-                bucket_name: parquet_processor_config.bucket_name.clone(),
-                bucket_root: parquet_processor_config.bucket_root.clone(),
-                max_size: parquet_processor_config.max_buffer_size,
-            },
-            gcs_client.clone(),
-            self.name(),
-            wsc_generic_parquet_buffer_handler,
-        );
-
-        let table_items_generic_parquet_buffer_handler = GenericParquetBufferHandler::new(
-            parquet_processor_config.bucket_name.clone(),
-            parquet_processor_config.bucket_root.clone(),
-            [TableItem::default()].as_slice().schema().unwrap(),
-            self.name().to_string(),
-        )
-        .unwrap();
-
-        let table_item_step =
-            TimedSizeBufferStep::<Input, TableItem, GenericParquetBufferHandler<TableItem>>::new(
-                Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-                TableConfig {
-                    table_name: "table_items".to_string(),
-                    bucket_name: parquet_processor_config.bucket_name.clone(),
-                    bucket_root: parquet_processor_config.bucket_root.clone(),
-                    max_size: parquet_processor_config.max_buffer_size,
-                },
-                gcs_client.clone(),
-                self.name(),
-                table_items_generic_parquet_buffer_handler,
-            );
-
-        let move_module_generic_parquet_buffer_handler = GenericParquetBufferHandler::new(
-            parquet_processor_config.bucket_name.clone(),
-            parquet_processor_config.bucket_root.clone(),
-            [MoveModule::default()].as_slice().schema().unwrap(),
-            self.name().to_string(),
-        )
-        .unwrap();
-
-        let move_module_step =
-            TimedSizeBufferStep::<Input, MoveModule, GenericParquetBufferHandler<MoveModule>>::new(
-                Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-                TableConfig {
-                    table_name: "move_modules".to_string(),
-                    bucket_name: parquet_processor_config.bucket_name.clone(),
-                    bucket_root: parquet_processor_config.bucket_root.clone(),
-                    max_size: parquet_processor_config.max_buffer_size,
-                },
-                gcs_client.clone(),
-                self.name(),
-                move_module_generic_parquet_buffer_handler,
-            );
+        )?;
 
         let channel_size = parquet_processor_config.channel_size;
 
-        let builder = ProcessorBuilder::new_with_inputless_first_step(
-            transaction_stream.into_runnable_step(),
+        let default_size_buffer_step = SizeBufferStep::new(
+            Duration::from_secs(parquet_processor_config.parquet_upload_interval),
+            buffer_uploader
         );
 
-        let builder =
-            builder.connect_to(parquet_default_extractor.into_runnable_step(), channel_size);
-        let mut fanout_builder = builder.fanout_broadcast(5);
-
-        let (first_builder, first_output_receiver) = fanout_builder
-            .get_processor_builder()
-            .unwrap()
-            .connect_to(transaction_step.into_runnable_step(), channel_size)
-            .end_and_return_output_receiver(channel_size);
-
-        let (second_builder, second_output_receiver) = fanout_builder
-            .get_processor_builder()
-            .unwrap()
-            .connect_to(move_resource_step.into_runnable_step(), channel_size)
-            .end_and_return_output_receiver(channel_size);
-
-        let (third_builder, third_output_receiver) = fanout_builder
-            .get_processor_builder()
-            .unwrap()
-            .connect_to(write_set_change_step.into_runnable_step(), channel_size)
-            .end_and_return_output_receiver(channel_size);
-
-        let (fourth_builder, fourth_output_receiver) = fanout_builder
-            .get_processor_builder()
-            .unwrap()
-            .connect_to(table_item_step.into_runnable_step(), channel_size)
-            .end_and_return_output_receiver(channel_size);
-
-        let (fifth_builder, fifth_output_receiver) = fanout_builder
-            .get_processor_builder()
-            .unwrap()
-            .connect_to(move_module_step.into_runnable_step(), channel_size)
-            .end_and_return_output_receiver(channel_size);
-
-        let (_, buffer_receiver) = ProcessorBuilder::new_with_fanin_step_with_receivers(
-            vec![
-                (first_output_receiver, first_builder.graph),
-                (second_output_receiver, second_builder.graph),
-                (third_output_receiver, third_builder.graph),
-                (fourth_output_receiver, fourth_builder.graph),
-                (fifth_output_receiver, fifth_builder.graph),
-            ],
-            // TODO: Replace with parquet version tracker
-            RunnableAsyncStep::new(PassThroughStep::new_named("FaninStep".to_string())),
-            channel_size,
+        // Connect processor steps together
+        let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
+            transaction_stream.into_runnable_step(),
         )
-        .end_and_return_output_receiver(channel_size);
+            .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
+            .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
+            .end_and_return_output_receiver(channel_size);
 
         // (Optional) Parse the results
         loop {

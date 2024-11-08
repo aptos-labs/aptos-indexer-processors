@@ -1,3 +1,4 @@
+use crate::parquet_processors::ParquetTypeEnum;
 use ahash::AHashMap;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
@@ -13,7 +14,10 @@ use processor::db::common::models::default_models::{
     parquet_transactions::{Transaction as ParquetTransaction, TransactionModel},
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
+use std::collections::HashMap;
+use crate::parquet_processors::ParquetTypeStructs;
 
+/// Extracts parquet data from transactions, allowing optional selection of specific tables.
 pub struct ParquetDefaultExtractor
 where
     Self: Processable + Send + Sized + 'static,
@@ -21,62 +25,79 @@ where
     pub opt_in_tables: Option<Vec<String>>,
 }
 
+impl ParquetDefaultExtractor {
+    fn add_if_opted_in(
+        &self,
+        map: &mut HashMap<ParquetTypeEnum, ParquetTypeStructs>,
+        enum_type: ParquetTypeEnum,
+        data: ParquetTypeStructs,
+    ) {
+        if let Some(ref opt_in_tables) = self.opt_in_tables {
+            let table_name = enum_type.to_string();
+            if opt_in_tables.contains(&table_name) {
+                map.insert(enum_type, data);
+            }
+        } else {
+            // If there's no opt-in table, include all data
+            map.insert(enum_type, data);
+        }
+    }
+}
+
+type ParquetTypeMap = HashMap<ParquetTypeEnum, ParquetTypeStructs>;
+
 #[async_trait]
 impl Processable for ParquetDefaultExtractor {
     type Input = Vec<Transaction>;
-    type Output = (
-        Vec<ParquetTransaction>,
-        Vec<MoveResource>,
-        Vec<WriteSetChangeModel>,
-        Vec<TableItem>,
-        Vec<MoveModule>,
-    );
+    type Output = ParquetTypeMap;
     type RunType = AsyncRunType;
 
     async fn process(
         &mut self,
         transactions: TransactionContext<Self::Input>,
-    ) -> anyhow::Result<
-        Option<
-            TransactionContext<(
-                Vec<ParquetTransaction>,
-                Vec<MoveResource>,
-                Vec<WriteSetChangeModel>,
-                Vec<TableItem>,
-                Vec<MoveModule>,
-            )>,
-        >,
-        ProcessorError,
-    > {
-        let backfill_mode = self.opt_in_tables.is_some();
+    ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
+        let (move_resources, write_set_changes, parquet_transactions, table_items, move_modules) =
+            process_transactions(transactions.data);
 
-        let (
-            mut move_resources,
-            mut write_set_changes,
-            mut parquet_transactions,
-            mut table_items,
-            mut move_modules,
-        ) = process_transactions(transactions.data);
+        // Print the size of each extracted data type
+        println!("Processed data sizes:");
+        println!(" - MoveResources: {}", move_resources.len());
+        println!(" - WriteSetChanges: {}", write_set_changes.len());
+        println!(" - ParquetTransactions: {}", parquet_transactions.len());
+        println!(" - TableItems: {}", table_items.len());
+        println!(" - MoveModules: {}", move_modules.len());
 
-        if backfill_mode {
-            clear_unselected_data(
-                &self.opt_in_tables,
-                &mut move_resources,
-                &mut write_set_changes,
-                &mut parquet_transactions,
-                &mut table_items,
-                &mut move_modules,
-            );
-        }
+        let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
+        // Populate the map based on opt-in tables
+        self.add_if_opted_in(
+            &mut map,
+            ParquetTypeEnum::MoveResource,
+            ParquetTypeStructs::MoveResource(move_resources),
+        );
+        self.add_if_opted_in(
+            &mut map,
+            ParquetTypeEnum::WriteSetChange,
+            ParquetTypeStructs::WriteSetChange(write_set_changes),
+        );
+        self.add_if_opted_in(
+            &mut map,
+            ParquetTypeEnum::Transaction,
+            ParquetTypeStructs::Transaction(parquet_transactions),
+        );
+        self.add_if_opted_in(
+            &mut map,
+            ParquetTypeEnum::TableItem,
+            ParquetTypeStructs::TableItem(table_items),
+        );
+        self.add_if_opted_in(
+            &mut map,
+            ParquetTypeEnum::MoveModule,
+            ParquetTypeStructs::MoveModule(move_modules),
+        );
+        println!("Map populated with data for the following tables: {:?}", map.keys().collect::<Vec<_>>());
 
         Ok(Some(TransactionContext {
-            data: (
-                parquet_transactions,
-                move_resources,
-                write_set_changes,
-                table_items,
-                move_modules,
-            ),
+            data: map,
             metadata: transactions.metadata,
         }))
     }
@@ -139,7 +160,7 @@ pub fn process_transactions(
             WriteSetChangeDetail::Resource(resource) => {
                 move_resources.push(resource);
             },
-            WriteSetChangeDetail::Table(item, _current_item, _) => {
+            WriteSetChangeDetail::Table(item, _, _) => {
                 table_items.push(item);
             },
         }
