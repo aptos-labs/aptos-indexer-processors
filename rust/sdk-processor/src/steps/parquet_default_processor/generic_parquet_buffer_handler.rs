@@ -152,7 +152,7 @@ where
         let bucket_root = PathBuf::from(&self.bucket_root);
 
         upload_parquet_to_gcs(
-            &gcs_client,
+            gcs_client,
             upload_buffer,
             ParquetType::TABLE_NAME,
             &self.bucket_name,

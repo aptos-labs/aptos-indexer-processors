@@ -1,4 +1,4 @@
-use crate::parquet_processors::ParquetTypeEnum;
+use crate::parquet_processors::{ParquetTypeEnum, ParquetTypeStructs};
 use ahash::AHashMap;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
@@ -11,11 +11,10 @@ use processor::db::common::models::default_models::{
     parquet_move_modules::MoveModule,
     parquet_move_resources::MoveResource,
     parquet_move_tables::TableItem,
-    parquet_transactions::{Transaction as ParquetTransaction, TransactionModel},
+    parquet_transactions::TransactionModel,
     parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
 };
 use std::collections::HashMap;
-use crate::parquet_processors::ParquetTypeStructs;
 
 /// Extracts parquet data from transactions, allowing optional selection of specific tables.
 pub struct ParquetDefaultExtractor
@@ -94,40 +93,15 @@ impl Processable for ParquetDefaultExtractor {
             ParquetTypeEnum::MoveModule,
             ParquetTypeStructs::MoveModule(move_modules),
         );
-        println!("Map populated with data for the following tables: {:?}", map.keys().collect::<Vec<_>>());
+        println!(
+            "Map populated with data for the following tables: {:?}",
+            map.keys().collect::<Vec<_>>()
+        );
 
         Ok(Some(TransactionContext {
             data: map,
             metadata: transactions.metadata,
         }))
-    }
-}
-
-fn clear_unselected_data(
-    opt_in_tables: &Option<Vec<String>>,
-    move_resources: &mut Vec<MoveResource>,
-    write_set_changes: &mut Vec<WriteSetChangeModel>,
-    parquet_transactions: &mut Vec<ParquetTransaction>,
-    table_items: &mut Vec<TableItem>,
-    move_modules: &mut Vec<MoveModule>,
-) {
-    if let Some(opt_in_tables) = opt_in_tables {
-        // Clear vectors only if they are not included in `opt_in_tables`
-        if !opt_in_tables.contains(&"move-resources".to_string()) {
-            move_resources.clear();
-        }
-        if !opt_in_tables.contains(&"write-set-changes".to_string()) {
-            write_set_changes.clear();
-        }
-        if !opt_in_tables.contains(&"parquet-transactions".to_string()) {
-            parquet_transactions.clear();
-        }
-        if !opt_in_tables.contains(&"move-modules".to_string()) {
-            move_modules.clear();
-        }
-        if !opt_in_tables.contains(&"table-items".to_string()) {
-            table_items.clear();
-        }
     }
 }
 
@@ -142,11 +116,10 @@ pub fn process_transactions(
 ) {
     // this will be removed in the future.
     let mut transaction_version_to_struct_count = AHashMap::new();
-    let (txns, _block_metadata_txns, write_set_changes, wsc_details) =
-        TransactionModel::from_transactions(
-            &transactions,
-            &mut transaction_version_to_struct_count,
-        );
+    let (txns, _, write_set_changes, wsc_details) = TransactionModel::from_transactions(
+        &transactions,
+        &mut transaction_version_to_struct_count,
+    );
 
     let mut move_modules = vec![];
     let mut move_resources = vec![];

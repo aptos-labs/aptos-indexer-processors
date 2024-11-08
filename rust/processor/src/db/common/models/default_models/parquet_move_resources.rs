@@ -18,7 +18,7 @@ use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter, 
  )]
 pub struct MoveResource {
     pub txn_version: i64,

@@ -3,9 +3,11 @@ use crate::{
         db_config::DbConfig, indexer_processor_config::IndexerProcessorConfig,
         processor_config::ProcessorConfig,
     },
+    parquet_processors::ParquetTypeEnum,
     steps::parquet_default_processor::{
-        generic_parquet_buffer_handler::GenericParquetBufferHandler,
+        gcs_handler::{create_new_writer, GCSUploader},
         parquet_default_extractor::ParquetDefaultExtractor,
+        size_buffer::SizeBufferStep,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -16,30 +18,21 @@ use crate::{
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
-    common_steps::{
-        timed_size_buffer_step::{TableConfig, TimedSizeBufferStep},
-        TransactionStreamStep,
-    },
-    test::steps::pass_through_step::PassThroughStep,
-    traits::{processor_trait::ProcessorTrait, IntoRunnableStep, RunnableAsyncStep},
+    common_steps::TransactionStreamStep,
+    traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
-use parquet::record::RecordWriter;
-use processor::db::common::models::default_models::{
-    parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-    parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
-    parquet_write_set_changes::WriteSetChangeModel,
-};
-use std::{sync::Arc, time::Duration};
-use tracing::{debug, info};
-use std::collections::HashMap;
-use crate::parquet_processors::ParquetTypeEnum;
 use parquet::schema::types::Type;
-use crate::steps::parquet_default_processor::gcs_handler::create_new_writer;
-use crate::steps::parquet_default_processor::gcs_handler::GCSUploader;
-use processor::bq_analytics::generic_parquet_processor::HasParquetSchema;
-use crate::steps::parquet_default_processor::size_buffer::SizeBufferStep;
-
+use processor::{
+    bq_analytics::generic_parquet_processor::HasParquetSchema,
+    db::common::models::default_models::{
+        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
+        parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
+        parquet_write_set_changes::WriteSetChangeModel,
+    },
+};
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use tracing::{debug, info};
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -73,14 +66,6 @@ impl ParquetDefaultProcessor {
     }
 }
 
-type Input = (
-    Vec<ParquetTransaction>,
-    Vec<MoveResource>,
-    Vec<WriteSetChangeModel>,
-    Vec<TableItem>,
-    Vec<MoveModule>,
-);
-
 #[async_trait::async_trait]
 impl ProcessorTrait for ParquetDefaultProcessor {
     fn name(&self) -> &'static str {
@@ -102,6 +87,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         // Determine the processing mode (backfill or regular)
         let is_backfill = self.config.backfill_config.is_some();
 
+        // TODO: Revisit when parquet verstion tracker is available.
         // Query the starting version
         let starting_version = if is_backfill {
             get_starting_version(&self.config, self.db_pool.clone()).await?
@@ -117,6 +103,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                         self.config.processor_config.name()
                     )
                 })?;
+
             get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
                 .await?
         };
@@ -174,16 +161,24 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
             (ParquetTypeEnum::MoveResource, MoveResource::schema()),
-            (ParquetTypeEnum::WriteSetChange, WriteSetChangeModel::schema()),
+            (
+                ParquetTypeEnum::WriteSetChange,
+                WriteSetChangeModel::schema(),
+            ),
             (ParquetTypeEnum::Transaction, ParquetTransaction::schema()),
             (ParquetTypeEnum::TableItem, TableItem::schema()),
             (ParquetTypeEnum::MoveModule, MoveModule::schema()),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
-        let parquet_type_to_writer = parquet_type_to_schemas.iter().map(|(key, schema)| {
-            let writer = create_new_writer(schema.clone()).expect("Failed to create writer");
-            (*key, writer)
-        }).collect();
+        let parquet_type_to_writer = parquet_type_to_schemas
+            .iter()
+            .map(|(key, schema)| {
+                let writer = create_new_writer(schema.clone()).expect("Failed to create writer");
+                (*key, writer)
+            })
+            .collect();
 
         let buffer_uploader = GCSUploader::new(
             gcs_client.clone(),
@@ -198,16 +193,16 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let default_size_buffer_step = SizeBufferStep::new(
             Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-            buffer_uploader
+            buffer_uploader,
         );
 
         // Connect processor steps together
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-            .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
-            .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
-            .end_and_return_output_receiver(channel_size);
+        .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
+        .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
+        .end_and_return_output_receiver(channel_size);
 
         // (Optional) Parse the results
         loop {
@@ -224,39 +219,5 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                 },
             }
         }
-    }
-}
-
-pub trait ExtractResources<ParquetType> {
-    fn extract(self) -> Vec<ParquetType>;
-}
-
-impl ExtractResources<ParquetTransaction> for Input {
-    fn extract(self) -> Vec<ParquetTransaction> {
-        self.0
-    }
-}
-
-impl ExtractResources<MoveResource> for Input {
-    fn extract(self) -> Vec<MoveResource> {
-        self.1
-    }
-}
-
-impl ExtractResources<WriteSetChangeModel> for Input {
-    fn extract(self) -> Vec<WriteSetChangeModel> {
-        self.2
-    }
-}
-
-impl ExtractResources<TableItem> for Input {
-    fn extract(self) -> Vec<TableItem> {
-        self.3
-    }
-}
-
-impl ExtractResources<MoveModule> for Input {
-    fn extract(self) -> Vec<MoveModule> {
-        self.4
     }
 }
