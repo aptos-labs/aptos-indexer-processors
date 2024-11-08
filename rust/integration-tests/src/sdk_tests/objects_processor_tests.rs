@@ -80,6 +80,13 @@ mod sdk_objects_processor_tests {
         .await;
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_delete_object_without_write() {
+        // Testing that a delete resource with no matching write resource will not write that row to DB.
+        let txns = &[IMPORTED_MAINNET_TXNS_578366445_TOKEN_V2_BURN_EVENT_V2];
+        process_multiple_transactions(txns, Some("test_delete_object_without_write".to_string()))
+            .await;
+    }
     // Helper function to abstract out the transaction processing
     async fn process_multiple_transactions(txns: &[&[u8]], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
