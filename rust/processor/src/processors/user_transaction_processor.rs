@@ -238,5 +238,5 @@ pub fn user_transaction_parse(
         signatures.clear();
     }
 
-    return (user_transactions, signatures);
+    (user_transactions, signatures)
 }

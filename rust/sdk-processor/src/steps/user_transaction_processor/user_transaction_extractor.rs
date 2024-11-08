@@ -1,5 +1,5 @@
 use aptos_indexer_processor_sdk::{
-    aptos_protos::transaction::v1::{transaction::TxnData, Transaction},
+    aptos_protos::transaction::v1::Transaction,
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
     types::transaction_context::TransactionContext,
     utils::errors::ProcessorError,
@@ -10,7 +10,6 @@ use processor::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     processors::user_transaction_processor::user_transaction_parse,
-    utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
     worker::TableFlags,
 };
 pub struct UserTransactionExtractor
