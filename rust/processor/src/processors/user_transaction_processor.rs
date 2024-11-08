@@ -96,7 +96,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_user_transactions_query(
+pub fn insert_user_transactions_query(
     items_to_insert: Vec<UserTransactionModel>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -116,7 +116,7 @@ fn insert_user_transactions_query(
     )
 }
 
-fn insert_signatures_query(
+pub fn insert_signatures_query(
     items_to_insert: Vec<Signature>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -153,40 +153,8 @@ impl ProcessorTrait for UserTransactionProcessor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let mut signatures = vec![];
-        let mut user_transactions = vec![];
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let block_height = txn.block_height as i64;
-            let txn_data = match txn.txn_data.as_ref() {
-                Some(txn_data) => txn_data,
-                None => {
-                    PROCESSOR_UNKNOWN_TYPE_COUNT
-                        .with_label_values(&["UserTransactionProcessor"])
-                        .inc();
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        "Transaction data doesn't exist"
-                    );
-                    continue;
-                },
-            };
-            if let TxnData::User(inner) = txn_data {
-                let (user_transaction, sigs) = UserTransactionModel::from_transaction(
-                    inner,
-                    txn.timestamp.as_ref().unwrap(),
-                    block_height,
-                    txn.epoch as i64,
-                    txn_version,
-                );
-                signatures.extend(sigs);
-                user_transactions.push(user_transaction);
-            }
-        }
-
-        if self.deprecated_tables.contains(TableFlags::SIGNATURES) {
-            signatures.clear();
-        }
+        let (user_transactions, signatures) =
+            user_transaction_parse(transactions, self.deprecated_tables);
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -228,4 +196,47 @@ impl ProcessorTrait for UserTransactionProcessor {
     fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
+}
+
+/// Helper function to parse user transactions and signatures from the transaction data.
+pub fn user_transaction_parse(
+    transactions: Vec<Transaction>,
+    deprecated_tables: TableFlags,
+) -> (Vec<UserTransactionModel>, Vec<Signature>) {
+    let mut signatures = vec![];
+    let mut user_transactions = vec![];
+    for txn in transactions {
+        let txn_version = txn.version as i64;
+        let block_height = txn.block_height as i64;
+        let txn_data = match txn.txn_data.as_ref() {
+            Some(txn_data) => txn_data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["UserTransactionProcessor"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
+                continue;
+            },
+        };
+        if let TxnData::User(inner) = txn_data {
+            let (user_transaction, sigs) = UserTransactionModel::from_transaction(
+                inner,
+                txn.timestamp.as_ref().unwrap(),
+                block_height,
+                txn.epoch as i64,
+                txn_version,
+            );
+            signatures.extend(sigs);
+            user_transactions.push(user_transaction);
+        }
+    }
+
+    if deprecated_tables.contains(TableFlags::SIGNATURES) {
+        signatures.clear();
+    }
+
+    (user_transactions, signatures)
 }

@@ -43,9 +43,11 @@ pub enum ProcessorConfig {
     DefaultProcessor(DefaultProcessorConfig),
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
+    UserTransactionProcessor(DefaultProcessorConfig),
     StakeProcessor(StakeProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
     ObjectsProcessor(ObjectsProcessorConfig),
+    MonitoringProcessor(DefaultProcessorConfig),
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
 }
