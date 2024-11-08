@@ -9,6 +9,7 @@ use processor::{
     db::common::models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
+    processors::user_transaction_processor::user_transaction_parse,
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
     worker::TableFlags,
 };
@@ -38,41 +39,8 @@ impl Processable for UserTransactionExtractor {
         Option<TransactionContext<(Vec<UserTransactionModel>, Vec<Signature>)>>,
         ProcessorError,
     > {
-        let mut signatures = vec![];
-        let mut user_transactions = vec![];
-        for txn in item.data {
-            let txn_version = txn.version as i64;
-            let block_height = txn.block_height as i64;
-            let txn_data = match txn.txn_data.as_ref() {
-                Some(txn_data) => txn_data,
-                None => {
-                    PROCESSOR_UNKNOWN_TYPE_COUNT
-                        .with_label_values(&["UserTransactionProcessor"])
-                        .inc();
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        "Transaction data doesn't exist"
-                    );
-                    continue;
-                },
-            };
-            if let TxnData::User(inner) = txn_data {
-                let (user_transaction, sigs) = UserTransactionModel::from_transaction(
-                    inner,
-                    txn.timestamp.as_ref().unwrap(),
-                    block_height,
-                    txn.epoch as i64,
-                    txn_version,
-                );
-                signatures.extend(sigs);
-                user_transactions.push(user_transaction);
-            }
-        }
-
-        if self.deprecated_tables.contains(TableFlags::SIGNATURES) {
-            signatures.clear();
-        }
-
+        let (user_transactions, signatures) =
+            user_transaction_parse(item.data, self.deprecated_tables);
         Ok(Some(TransactionContext {
             data: (user_transactions, signatures),
             metadata: item.metadata,
