@@ -377,6 +377,7 @@ impl Transaction {
             let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
                 Self::from_transaction(txn);
             txns.push(txn.clone());
+            // TODO: Remove once fully migrated
             transaction_version_to_struct_count
                 .entry(txn.txn_version)
                 .and_modify(|e| *e += 1)
@@ -386,6 +387,7 @@ impl Transaction {
                 block_metadata_txns.push(a.clone());
             }
 
+            // TODO: Remove once fully migrated
             if !wsc_list.is_empty() {
                 transaction_version_to_struct_count
                     .entry(txn.txn_version)

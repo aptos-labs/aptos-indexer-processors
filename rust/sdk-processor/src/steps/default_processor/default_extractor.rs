@@ -13,7 +13,6 @@ use processor::{
     processors::default_processor::process_transactions,
     worker::TableFlags,
 };
-pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
 
 pub struct DefaultExtractor
 where
