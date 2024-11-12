@@ -19,7 +19,20 @@ struct ParquetBuffer {
     pub buffer_size_bytes: usize,
     pub max_size: usize,
     current_batch_metadata: TransactionMetadata,
-    upload_interval: Duration, // not sure if needed here
+}
+
+impl ParquetBuffer {
+    pub fn update_current_batch_metadata(&mut self, cur_batch_metadata: &TransactionMetadata, uploaded: bool) {
+        let buffer_metadata = &mut self.current_batch_metadata;
+        buffer_metadata.end_version = cur_batch_metadata.end_version;
+        buffer_metadata.total_size_in_bytes = cur_batch_metadata.total_size_in_bytes;
+        buffer_metadata.end_transaction_timestamp = cur_batch_metadata.end_transaction_timestamp.clone();
+        // if it wasn't uploaded -> we update only end_verion, size, and last timttesampe
+        if uploaded {
+            buffer_metadata.start_version = cur_batch_metadata.start_version;
+            buffer_metadata.start_transaction_timestamp = cur_batch_metadata.start_transaction_timestamp.clone();
+        }
+    }
 }
 
 pub struct SizeBufferStep<U>
@@ -67,23 +80,6 @@ where
         };
         Ok(())
     }
-
-    async fn upload_and_reset_buffer(
-        &mut self,
-        parquet_type: ParquetTypeEnum,
-        buffer: &mut ParquetBuffer,
-    ) -> Result<(), ProcessorError> {
-        if buffer.buffer_size_bytes > 0 {
-            debug!("Uploading buffer for {:?}", parquet_type);
-            let struct_buffer = std::mem::replace(
-                &mut buffer.buffer,
-                ParquetTypeStructs::default_for_type(&parquet_type),
-            );
-            self.buffer_uploader.handle_buffer(struct_buffer).await?;
-            buffer.buffer_size_bytes = 0;
-        }
-        Ok(())
-    }
 }
 
 
@@ -93,7 +89,7 @@ impl<U> Processable for SizeBufferStep<U>
         U: Uploadable + Send + 'static + Sync,
 {
     type Input = HashMap<ParquetTypeEnum, ParquetTypeStructs>;
-    type Output = ();
+    type Output = HashMap<ParquetTypeEnum, TransactionMetadata>;
     type RunType = PollableAsyncRunType;
 
     async fn process(
@@ -102,9 +98,10 @@ impl<U> Processable for SizeBufferStep<U>
     ) -> Result<Option<TransactionContext<Self::Output>>, ProcessorError> {
         println!("Starting process for {} data items", item.data.len());
 
-        let mut parquet_types = item.data; // Extracts the data from the input
-        let mut metadata = item.metadata;
+        let mut parquet_types = item.data;
+        let cur_batch_metadata = item.metadata;
         let mut file_uploaded = false;
+        let mut upload_metadata_map = HashMap::new();
 
         for (parquet_type, parquet_data) in parquet_types.drain() {
             println!("Processing ParquetTypeEnum: {:?}", parquet_type);
@@ -120,11 +117,10 @@ impl<U> Processable for SizeBufferStep<U>
                     );
                     // TODO: revisit.
                     ParquetBuffer {
-                        buffer: ParquetTypeStructs::default_for_type(&parquet_type),
+                        buffer: ParquetTypeStructs::default_for_type(&parquet_type), // Maybe this could be replaced with actual value
                         buffer_size_bytes: 0,
-                        max_size: self.internal_buffer_size_bytes, // maybe not needed ?
-                        current_batch_metadata: metadata.clone(),  // update this before
-                        upload_interval: self.poll_interval,       // not sure if needed here
+                        max_size: self.internal_buffer_size_bytes, // maybe we can extend this to more configurable size per table.
+                        current_batch_metadata: TransactionMetadata::default(),
                     }
                 });
 
@@ -151,51 +147,59 @@ impl<U> Processable for SizeBufferStep<U>
                     ParquetTypeStructs::default_for_type(&parquet_type),
                 );
                 self.buffer_uploader.handle_buffer(struct_buffer).await?;
-                metadata.total_size_in_bytes = buffer.buffer_size_bytes as u64;
-                buffer.buffer_size_bytes = 0; // Reset buffer size
                 file_uploaded = true;
+
+                // update this metadata before insert
+                let metadata = buffer.current_batch_metadata.clone();
+                upload_metadata_map.insert(parquet_type, metadata);
+                buffer.buffer_size_bytes = 0; // Reset buffer size
             }
 
             // Append new data to the buffer
             Self::append_to_buffer(buffer, parquet_data)?;
+            // update the buffer metadadata
+            buffer.update_current_batch_metadata(&cur_batch_metadata, file_uploaded);
             println!(
                 "Updated buffer size for {:?}: {} bytes",
                 parquet_type, buffer.buffer_size_bytes
             );
-
-            // If file was uploaded, return metadata update
-            // TODO:  if multiple files were uploaded, we should return mulitple TransactionContext.
-            if file_uploaded {
-                println!(
-                    "File uploaded for {:?}. Returning updated metadata.",
-                    parquet_type
-                );
-                return Ok(Some(TransactionContext { data: (), metadata }));
-            }
         }
 
+        if !upload_metadata_map.is_empty() {
+            // println!(
+            //     "File uploaded for {:?}. Returning updated metadata.",
+            //     parquet_type
+            // );
+            return Ok(Some(TransactionContext { data: upload_metadata_map, metadata: cur_batch_metadata }));
+        }
         Ok(None)
     }
 
     async fn cleanup(
         &mut self,
     ) -> Result<Option<Vec<TransactionContext<Self::Output>>>, ProcessorError> {
-        let mut metadata = TransactionMetadata::default();
-
+        let mut metadata_map = HashMap::new();
         debug!("Starting cleanup: uploading all remaining buffers.");
-        let buffers_to_upload = self.internal_buffers.drain().collect::<Vec<_>>();
+        for (parquet_type, mut buffer) in self.internal_buffers.drain() {
+            if buffer.buffer_size_bytes > 0 {
+                let struct_buffer = std::mem::replace(
+                    &mut buffer.buffer,
+                    ParquetTypeStructs::default_for_type(&parquet_type),
+                );
 
-        for (parquet_type, mut buffer) in buffers_to_upload {
-            self.upload_and_reset_buffer(parquet_type, &mut buffer)
-                .await?;
+                self.buffer_uploader.handle_buffer(struct_buffer).await?;
+
+                let mut metadata = buffer.current_batch_metadata.clone();
+                metadata.total_size_in_bytes = buffer.buffer_size_bytes as u64;
+                metadata_map.insert(parquet_type, metadata);
+            }
         }
 
         debug!("Cleanup complete: all buffers uploaded.");
-        // TODO: support mulitple TransactionContext
-        metadata.total_size_in_bytes = self.internal_buffer_size_bytes as u64;
-        self.internal_buffer_size_bytes = 0;
-
-        Ok(Some(vec![TransactionContext { data: (), metadata }]))
+        if !metadata_map.is_empty() {
+            return Ok(Some(vec![TransactionContext { data: metadata_map, metadata: TransactionMetadata::default() }]));
+        }
+        Ok(None)
     }
 }
 
@@ -211,22 +215,32 @@ where
     async fn poll(
         &mut self,
     ) -> Result<Option<Vec<TransactionContext<Self::Output>>>, ProcessorError> {
+        let mut metadata_map = HashMap::new();
         debug!("Polling to check if any buffers need uploading.");
-        let mut metadata = TransactionMetadata::default();
 
-        // Drain the buffers temporarily to avoid multiple mutable borrows of `self`
-        let buffers_to_upload = self.internal_buffers.drain().collect::<Vec<_>>();
+        for (parquet_type, mut buffer) in self.internal_buffers.drain() {
+            if buffer.buffer_size_bytes > 0 {
+                let struct_buffer = std::mem::replace(
+                    &mut buffer.buffer,
+                    ParquetTypeStructs::default_for_type(&parquet_type),
+                );
 
-        for (parquet_type, mut buffer) in buffers_to_upload {
-            self.upload_and_reset_buffer(parquet_type, &mut buffer)
-                .await?;
+                self.buffer_uploader.handle_buffer(struct_buffer).await?;
+
+                let metadata = buffer.current_batch_metadata.clone();
+                metadata_map.insert(parquet_type, metadata);
+
+                // Reset ParquetBuffer or maybe remove?
+                buffer.buffer_size_bytes = 0; 
+                buffer.current_batch_metadata = TransactionMetadata::default();
+            }
         }
 
-        // TODO: support mulitple TransactionContext
-        metadata.total_size_in_bytes = self.internal_buffer_size_bytes as u64;
-        self.internal_buffer_size_bytes = 0;
-
-        Ok(Some(vec![TransactionContext { data: (), metadata }]))    }
+        if !metadata_map.is_empty() {
+            return Ok(Some(vec![TransactionContext { data: metadata_map, metadata: TransactionMetadata::default() }]));
+        }
+        Ok(None)
+    }
 }
 
 impl<U> NamedStep for SizeBufferStep<U>

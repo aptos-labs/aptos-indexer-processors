@@ -32,7 +32,11 @@ use processor::{
     },
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use aptos_indexer_processor_sdk::common_steps::{DEFAULT_UPDATE_PROCESSOR_STATUS_SECS, VersionTrackerStep};
 use tracing::{debug, info};
+use crate::steps::common::processor_status_saver::get_parquet_processor_status_saver;
+use crate::steps::parquet_default_processor::parquet_version_tracker_step::ParquetVersionTrackerStep;
+
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -196,12 +200,18 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             buffer_uploader,
         );
 
+        let parquet_version_tracker_step = ParquetVersionTrackerStep::new(
+            get_parquet_processor_status_saver(self.db_pool.clone(), self.config.clone()),
+            DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
+        );
+
         // Connect processor steps together
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
         .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
+        .connect_to(parquet_version_tracker_step.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 
         // (Optional) Parse the results
