@@ -1,3 +1,4 @@
+use aptos_indexer_processor_sdk::utils::errors::ProcessorError;
 use processor::db::parquet::models::default_models::{
     parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
     parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
@@ -73,9 +74,51 @@ impl ParquetTypeStructs {
         match self {
             ParquetTypeStructs::MoveResource(_) => "move_resources",
             ParquetTypeStructs::WriteSetChange(_) => "write_set_changes",
-            ParquetTypeStructs::Transaction(_) => "parquet_transactions",
+            ParquetTypeStructs::Transaction(_) => "transactions",
             ParquetTypeStructs::TableItem(_) => "table_items",
             ParquetTypeStructs::MoveModule(_) => "move_modules",
+        }
+    }
+
+    pub fn calculate_size(&self) -> usize {
+        match self {
+            ParquetTypeStructs::MoveResource(data) => allocative::size_of_unique(data),
+            ParquetTypeStructs::WriteSetChange(data) => allocative::size_of_unique(data),
+            ParquetTypeStructs::Transaction(data) => allocative::size_of_unique(data),
+            ParquetTypeStructs::TableItem(data) => allocative::size_of_unique(data),
+            ParquetTypeStructs::MoveModule(data) => allocative::size_of_unique(data),
+        }
+    }
+
+    /// Appends data to the current buffer within each ParquetTypeStructs variant.
+    pub fn append(&mut self, other: ParquetTypeStructs) -> Result<(), ProcessorError> {
+        match (self, other) {
+            (ParquetTypeStructs::MoveResource(buf), ParquetTypeStructs::MoveResource(mut data)) => {
+                buf.append(&mut data);
+                Ok(())
+            },
+            (
+                ParquetTypeStructs::WriteSetChange(buf),
+                ParquetTypeStructs::WriteSetChange(mut data),
+            ) => {
+                buf.append(&mut data);
+                Ok(())
+            },
+            (ParquetTypeStructs::Transaction(buf), ParquetTypeStructs::Transaction(mut data)) => {
+                buf.append(&mut data);
+                Ok(())
+            },
+            (ParquetTypeStructs::TableItem(buf), ParquetTypeStructs::TableItem(mut data)) => {
+                buf.append(&mut data);
+                Ok(())
+            },
+            (ParquetTypeStructs::MoveModule(buf), ParquetTypeStructs::MoveModule(mut data)) => {
+                buf.append(&mut data);
+                Ok(())
+            },
+            _ => Err(ProcessorError::ProcessError {
+                message: "Mismatched buffer types in append operation".to_string(),
+            }),
         }
     }
 }
