@@ -37,7 +37,7 @@ pub struct UserTransaction {
     pub expiration_timestamp_secs: u64,
     pub parent_signature_type: String,
     pub gas_fee_payer_address: Option<String>,
-    pub gas_used_octa: u64,
+    pub gas_used_unit: u64,
     pub gas_unit_price: u64,
     pub max_gas_octa: u64,
     pub storage_refund_octa: u64,
@@ -105,7 +105,7 @@ impl UserTransaction {
             entry_function_id_str: get_entry_function_from_user_request(user_request)
                 .unwrap_or_default(),
             epoch,
-            gas_used_octa: txn_info.gas_used,
+            gas_used_unit: txn_info.gas_used,
             gas_fee_payer_address,
             is_transaction_success: txn_info.success,
             storage_refund_octa: fee_statement
