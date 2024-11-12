@@ -1,10 +1,15 @@
-use crate::processors::{
-    ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
-    stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+use crate::{
+    parquet_processors::ParquetTypeEnum,
+    processors::{
+        ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
+        stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+    },
 };
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use strum::IntoEnumIterator;
+
 /// This enum captures the configs for all the different processors that are defined.
 ///
 /// The configs for each processor should only contain configuration specific to that
@@ -63,21 +68,38 @@ impl ProcessorConfig {
     ///
     /// This is a convenience method to map the table names to include the processor name as a prefix, which
     /// is useful for querying the status from the processor status table in the database.
-    pub fn get_table_names(&self) -> Option<Vec<String>> {
+    pub fn get_table_names(&self) -> anyhow::Result<Option<Vec<String>>> {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config) => {
                 // Get the processor name as a prefix
                 let prefix = self.name();
-                // Use the tables from the config and map them to include the prefix
-                Some(
-                    config
-                        .tables
-                        .iter()
-                        .map(|table_name| format!("{}_{}", prefix, table_name))
-                        .collect(),
-                )
+
+                // Collect valid table names from `ParquetTypeEnum` into a set for quick lookup
+                let valid_table_names: HashSet<String> =
+                    ParquetTypeEnum::iter().map(|e| e.to_string()).collect();
+
+                // Validate and map table names with prefix
+                let mut validated_table_names = Vec::new();
+                for table_name in &config.tables {
+                    // Ensure the table name is a valid `ParquetTypeEnum` variant
+                    if !valid_table_names.contains(table_name) {
+                        return Err(anyhow::anyhow!(
+                            "Invalid table name '{}'. Expected one of: {:?}",
+                            table_name,
+                            valid_table_names
+                        ));
+                    }
+
+                    // Append the prefix to the validated table name
+                    validated_table_names.push(format!("{}_{}", prefix, table_name));
+                }
+
+                Ok(Some(validated_table_names))
             },
-            _ => None, // For all other processor types, return None
+            _ => Err(anyhow::anyhow!(
+                "Invalid parquet processor config: {:?}",
+                self
+            )),
         }
     }
 }
@@ -150,5 +172,129 @@ impl ParquetDefaultProcessorConfig {
     /// Default upload interval for parquet files in seconds
     pub const fn default_parquet_upload_interval() -> u64 {
         1800 // 30 minutes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+
+    #[derive(Debug)]
+    struct ParquetDefaultProcessorConfig {
+        tables: Vec<String>,
+    }
+
+    enum ProcessorConfig {
+        ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+        // other variants
+    }
+
+    impl ProcessorConfig {
+        pub fn name(&self) -> &str {
+            match self {
+                ProcessorConfig::ParquetDefaultProcessor(_) => "test_processor",
+                // other cases
+            }
+        }
+
+        pub fn get_table_names(&self) -> Result<Option<Vec<String>>> {
+            match self {
+                ProcessorConfig::ParquetDefaultProcessor(config) => {
+                    let prefix = self.name();
+
+                    let valid_table_names: std::collections::HashSet<String> =
+                        ParquetTypeEnum::iter().map(|e| e.to_string()).collect();
+
+                    let mut validated_table_names = Vec::new();
+                    for table_name in &config.tables {
+                        if !valid_table_names.contains(table_name) {
+                            return Err(anyhow::anyhow!(
+                                "Invalid table name '{}'. Expected one of: {:?}",
+                                table_name,
+                                valid_table_names
+                            ));
+                        }
+                        validated_table_names.push(format!("{}_{}", prefix, table_name));
+                    }
+                    Ok(Some(validated_table_names))
+                },
+            }
+        }
+    }
+
+    #[test]
+    fn test_valid_table_names() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: vec!["MoveResource".to_string(), "Transaction".to_string()],
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap().unwrap();
+        assert_eq!(table_names, vec![
+            "test_processor_MoveResource".to_string(),
+            "test_processor_Transaction".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn test_invalid_table_name() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: vec!["InvalidTable".to_string(), "Transaction".to_string()],
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_err());
+
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("Invalid table name 'InvalidTable'"));
+        assert!(error_message.contains("Expected one of:"));
+    }
+
+    #[test]
+    fn test_empty_tables() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: vec![],
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap().unwrap();
+        assert_eq!(table_names, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_duplicate_table_names() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: vec!["Transaction".to_string(), "Transaction".to_string()],
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap().unwrap();
+        assert_eq!(table_names, vec![
+            "test_processor_Transaction".to_string(),
+            "test_processor_Transaction".to_string(),
+        ]);
+    }
+
+    #[test]
+    fn test_all_enum_table_names() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: ParquetTypeEnum::iter().map(|e| e.to_string()).collect(),
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap().unwrap();
+        let expected_names: Vec<String> = ParquetTypeEnum::iter()
+            .map(|e| format!("test_processor_{}", e))
+            .collect();
+        assert_eq!(table_names, expected_names);
     }
 }

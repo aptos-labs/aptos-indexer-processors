@@ -9,7 +9,6 @@ use crate::{
         starting_version::{get_min_last_success_version_parquet, get_starting_version},
     },
 };
-use anyhow::Context;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::TransactionStream, traits::processor_trait::ProcessorTrait,
 };
@@ -73,11 +72,13 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             let table_names = self
                 .config
                 .processor_config
-                .get_table_names()
-                .context(format!(
-                    "Failed to get table names for the processor {}",
-                    self.config.processor_config.name()
-                ))?;
+                .get_table_names()?
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Failed to get table names for the processor {}",
+                        self.config.processor_config.name()
+                    )
+                })?;
             get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
                 .await?;
         };
