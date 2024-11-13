@@ -80,45 +80,6 @@ impl ParquetTypeStructs {
     }
 }
 
-pub trait ParquetStruct {}
-
-impl ParquetStruct for MoveResource {}
-impl ParquetStruct for WriteSetChangeModel {}
-impl ParquetStruct for ParquetTransaction {}
-impl ParquetStruct for TableItem {}
-impl ParquetStruct for MoveModule {}
-
-impl ParquetTypeStructs {
-    pub fn get_type(&self) -> ParquetTypeEnum {
-        match self {
-            ParquetTypeStructs::MoveResource(_) => ParquetTypeEnum::MoveResource,
-            ParquetTypeStructs::WriteSetChange(_) => ParquetTypeEnum::WriteSetChange,
-            ParquetTypeStructs::Transaction(_) => ParquetTypeEnum::Transaction,
-            ParquetTypeStructs::TableItem(_) => ParquetTypeEnum::TableItem,
-            ParquetTypeStructs::MoveModule(_) => ParquetTypeEnum::MoveModule,
-        }
-    }
-
-    /// Get a vector of trait object references to the inner structs
-    pub fn get_structs(&self) -> Vec<&dyn ParquetStruct> {
-        match self {
-            ParquetTypeStructs::MoveResource(v) => {
-                v.iter().map(|s| s as &dyn ParquetStruct).collect()
-            },
-            ParquetTypeStructs::WriteSetChange(v) => {
-                v.iter().map(|s| s as &dyn ParquetStruct).collect()
-            },
-            ParquetTypeStructs::Transaction(v) => {
-                v.iter().map(|s| s as &dyn ParquetStruct).collect()
-            },
-            ParquetTypeStructs::TableItem(v) => v.iter().map(|s| s as &dyn ParquetStruct).collect(),
-            ParquetTypeStructs::MoveModule(v) => {
-                v.iter().map(|s| s as &dyn ParquetStruct).collect()
-            },
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

@@ -83,7 +83,7 @@ impl CurrentDelegatorBalance {
             let delegator_address = standardize_address(&write_table_item.key.to_string());
 
             // Convert to TableItem model. Some fields are just placeholders
-            let (table_item_model, _) =
+            let table_item_model =
                 TableItem::from_write_table_item(write_table_item, 0, txn_version, 0);
 
             let shares: BigDecimal = table_item_model
@@ -171,7 +171,7 @@ impl CurrentDelegatorBalance {
             };
             let delegator_address = standardize_address(&write_table_item.key.to_string());
             // Convert to TableItem model. Some fields are just placeholders
-            let (table_item_model, _) =
+            let table_item_model =
                 TableItem::from_write_table_item(write_table_item, 0, txn_version, 0);
 
             let shares: BigDecimal = table_item_model

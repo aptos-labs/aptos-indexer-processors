@@ -5,6 +5,7 @@
 
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    db::common::models::default_models::move_tables::{RawTableItem, TableItemConvertible},
     utils::util::{hash_str, standardize_address},
 };
 use allocative_derive::Allocative;
@@ -161,6 +162,22 @@ impl TableMetadata {
             handle: table_item.handle.to_string(),
             key_type: table_item.data.as_ref().unwrap().key_type.clone(),
             value_type: table_item.data.as_ref().unwrap().value_type.clone(),
+        }
+    }
+}
+
+impl TableItemConvertible for TableItem {
+    fn from_raw(raw_item: &RawTableItem) -> Self {
+        TableItem {
+            txn_version: raw_item.txn_version,
+            write_set_change_index: raw_item.write_set_change_index,
+            transaction_block_height: raw_item.transaction_block_height,
+            table_key: raw_item.table_key.clone(),
+            table_handle: raw_item.table_handle.clone(),
+            decoded_key: raw_item.decoded_key.clone(),
+            decoded_value: raw_item.decoded_value.clone(),
+            is_deleted: raw_item.is_deleted,
+            block_timestamp: raw_item.block_timestamp,
         }
     }
 }

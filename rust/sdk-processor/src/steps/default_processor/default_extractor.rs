@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use processor::{
     db::common::models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
-        move_tables::{CurrentTableItem, TableItem, TableMetadata},
+        move_tables::{CurrentTableItem, TableItem, TableItemConvertible, TableMetadata},
     },
     processors::default_processor::process_transactions,
     worker::TableFlags,
@@ -47,13 +47,15 @@ impl Processable for DefaultExtractor {
         ProcessorError,
     > {
         let flags = self.deprecated_table_flags;
-        let (block_metadata_transactions, table_items, current_table_items, table_metadata) =
+        let (block_metadata_transactions, raw_table_items, current_table_items, table_metadata) =
             process_transactions(transactions.data, flags);
+        let postgres_table_items: Vec<TableItem> =
+            raw_table_items.iter().map(TableItem::from_raw).collect();
 
         Ok(Some(TransactionContext {
             data: (
                 block_metadata_transactions,
-                table_items,
+                postgres_table_items,
                 current_table_items,
                 table_metadata,
             ),

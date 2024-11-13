@@ -155,7 +155,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         let (
             (move_resources, write_set_changes, transactions, table_items, move_modules),
             transaction_version_to_struct_count,
-        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+        ) = tokio::task::spawn_blocking(move || process_transactions_parquet(transactions))
             .await
             .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
@@ -213,7 +213,8 @@ impl ProcessorTrait for ParquetDefaultProcessor {
     }
 }
 
-pub fn process_transactions(
+// TODO: Remove transaction_version_to_struct_count after migration
+pub fn process_transactions_parquet(
     transactions: Vec<Transaction>,
 ) -> (
     (
