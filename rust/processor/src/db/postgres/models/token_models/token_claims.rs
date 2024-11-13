@@ -6,11 +6,19 @@
 #![allow(clippy::unused_unit)]
 
 use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
-use crate::{schema::current_token_pending_claims, utils::util::standardize_address};
+use crate::{
+    db::postgres::models::token_v2_models::v2_token_activities::TokenActivityHelperV1,
+    schema::current_token_pending_claims, utils::util::standardize_address,
+};
+use ahash::AHashMap;
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+
+// Map to keep track of the metadata of token offers that were claimed. The key is the token data id of the offer.
+// Potentially it'd also be useful to keep track of offers that were canceled.
+pub type TokenV1Claimed = AHashMap<String, TokenActivityHelperV1>;
 
 #[derive(
     Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
@@ -136,6 +144,7 @@ impl CurrentTokenPendingClaim {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
+        tokens_claimed: &TokenV1Claimed,
     ) -> anyhow::Result<Option<Self>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
@@ -149,12 +158,27 @@ impl CurrentTokenPendingClaim {
         };
         if let Some(offer) = &maybe_offer {
             let table_handle = standardize_address(&table_item.handle.to_string());
+            let token_data_id = offer.token_id.token_data_id.to_id();
 
-            let table_metadata = table_handle_to_owner.get(&table_handle).unwrap_or_else(|| {
+            // Try to find owner from write resources
+            let mut maybe_owner_address = table_handle_to_owner
+                .get(&table_handle)
+                .map(|table_metadata| table_metadata.get_owner_address());
+
+            // If table handle isn't in TableHandleToOwner, try to find owner from token v1 claim events
+            if maybe_owner_address.is_none() {
+                if let Some(token_claimed) = tokens_claimed.get(&token_data_id) {
+                    maybe_owner_address = token_claimed.from_address.clone();
+                }
+            }
+
+            let owner_address = maybe_owner_address.unwrap_or_else(|| {
                 panic!(
                     "Missing table handle metadata for claim. \
-                    Version: {}, table handle for PendingClaims: {}, all metadata: {:?}",
-                    txn_version, table_handle, table_handle_to_owner
+                        Version: {}, table handle for PendingClaims: {}, all metadata: {:?} \
+                        Missing token data id in token claim event. \
+                        token_data_id: {}, all token claim events: {:?}",
+                    txn_version, table_handle, table_handle_to_owner, token_data_id, tokens_claimed
                 )
             });
 
@@ -171,7 +195,7 @@ impl CurrentTokenPendingClaim {
             return Ok(Some(Self {
                 token_data_id_hash,
                 property_version: token_id.property_version,
-                from_address: table_metadata.get_owner_address(),
+                from_address: owner_address,
                 to_address: offer.get_to_address(),
                 collection_data_id_hash,
                 creator_address: token_data_id_struct.get_creator_address(),
