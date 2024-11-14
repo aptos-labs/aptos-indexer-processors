@@ -1,0 +1,74 @@
+[
+  {
+    "transaction_version": 2175935,
+    "multi_agent_index": 0,
+    "multi_sig_index": 0,
+    "transaction_block_height": 1071136,
+    "signer": "0xaa90e0d9d16b63ba4a289fb0dc8d1b454058b21c9b5c76864f825d5c1f32582e",
+    "is_sender_primary": true,
+    "type_": "multi_ed25519_signature",
+    "public_key": "0x79c65acf6c2d39be49362a12438d09ddd8a09ac4ef2bf16c6ac12190808d4668",
+    "signature": "0x94fb6cc53f5a51a6d30902d74a2e175b7ae7a4deb991303c33e1cba3b543adcc06643f8d14d47bc00f1aeadbae1e0d58623ee4c033d300ba2314da3fcfd4cc0f",
+    "threshold": 3,
+    "public_key_indices": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "transaction_version": 2175935,
+    "multi_agent_index": 0,
+    "multi_sig_index": 1,
+    "transaction_block_height": 1071136,
+    "signer": "0xaa90e0d9d16b63ba4a289fb0dc8d1b454058b21c9b5c76864f825d5c1f32582e",
+    "is_sender_primary": true,
+    "type_": "multi_ed25519_signature",
+    "public_key": "0xf8609e30dcea4a3930da12c8ff7341ae4379930484c3bbc280085ee6a1455c50",
+    "signature": "0xe03eb15ea0dab549e34ae1d979f6de2c63ce4f64f54bd8c2283598595b0e755815d516aeb37d00128ce41b15dd219131aaaeaa1946ba44679f76ebbd9be7730b",
+    "threshold": 3,
+    "public_key_indices": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "transaction_version": 2175935,
+    "multi_agent_index": 0,
+    "multi_sig_index": 2,
+    "transaction_block_height": 1071136,
+    "signer": "0xaa90e0d9d16b63ba4a289fb0dc8d1b454058b21c9b5c76864f825d5c1f32582e",
+    "is_sender_primary": true,
+    "type_": "multi_ed25519_signature",
+    "public_key": "0x745a05201579729817f02983fd420d6072721fb87a73fbd31d7c6202c8459ae5",
+    "signature": "0x8ae38f8d9408ea62b33d34e8b8f9a120c36b2fb1f00c40e090810109d17041c7fb1e76be874f023a50473e7e22d0a39c65f97d9e23e8387560c9e4765470be0e",
+    "threshold": 3,
+    "public_key_indices": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  {
+    "transaction_version": 2175935,
+    "multi_agent_index": 0,
+    "multi_sig_index": 3,
+    "transaction_block_height": 1071136,
+    "signer": "0xaa90e0d9d16b63ba4a289fb0dc8d1b454058b21c9b5c76864f825d5c1f32582e",
+    "is_sender_primary": true,
+    "type_": "multi_ed25519_signature",
+    "public_key": "0xa11beec494a2ae664e1b47e331d0c7c289a786ca73afcf0cfef52814c7210a2c",
+    "signature": "0x9882cf9628b492d713c154baa13c72aa1c94c93ed8fcf102090a6afbd078ccd6d399d4939fd39717532cc53caee0bed75614b636eddd8589c194da3b40371005",
+    "threshold": 3,
+    "public_key_indices": [
+      0,
+      1,
+      2,
+      3
+    ]
+  }
+]
