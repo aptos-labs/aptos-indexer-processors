@@ -1,4 +1,4 @@
-use processor::db::common::models::default_models::{
+use processor::db::parquet::models::default_models::{
     parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
     parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
     parquet_write_set_changes::WriteSetChangeModel,

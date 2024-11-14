@@ -9,7 +9,7 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     self,
-    db::common::models::object_models::v2_objects::{CurrentObject, Object},
+    db::postgres::models::object_models::v2_objects::{CurrentObject, Object},
     processors::objects_processor::{insert_current_objects_query, insert_objects_query},
 };
 

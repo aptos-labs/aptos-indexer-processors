@@ -6,7 +6,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::user_transactions_models::{
+    db::postgres::models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     processors::user_transaction_processor::user_transaction_parse,

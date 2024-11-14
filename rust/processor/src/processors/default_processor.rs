@@ -3,10 +3,11 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::default_models::{
-        block_metadata_transactions::BlockMetadataTransactionModel,
-        move_tables::{
-            CurrentTableItem, RawTableItem, TableItem, TableItemConvertible, TableMetadata,
+    db::{
+        common::models::default_models::raw_table_items::{RawTableItem, TableItemConvertible},
+        postgres::models::default_models::{
+            block_metadata_transactions::BlockMetadataTransactionModel,
+            move_tables::{CurrentTableItem, TableItem, TableMetadata},
         },
     },
     gap_detectors::ProcessingResult,
@@ -217,14 +218,24 @@ impl ProcessorTrait for DefaultProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-        let flags = self.deprecated_tables;
-        let (block_metadata_transactions, raw_table_items, current_table_items, table_metadata) =
-            tokio::task::spawn_blocking(move || process_transactions(transactions, flags))
+
+        let (block_metadata_transactions, raw_table_items, current_table_items, mut table_metadata) =
+            tokio::task::spawn_blocking(move || process_transactions(transactions))
                 .await
                 .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
-        let postgres_table_items: Vec<TableItem> =
+        let mut postgres_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();
+
+        let flags = self.deprecated_tables;
+        // TODO: remove this, since we are not going to deprecate this anytime soon?
+        if flags.contains(TableFlags::TABLE_ITEMS) {
+            postgres_table_items.clear();
+        }
+        // TODO: migrate to Parquet
+        if flags.contains(TableFlags::TABLE_METADATAS) {
+            table_metadata.clear();
+        }
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -290,7 +301,6 @@ impl ProcessorTrait for DefaultProcessor {
 /// # Arguments
 ///
 /// * `transactions` - A vector of `Transaction` objects to be processed.
-/// * `flags` - A `TableFlags` object that determines which tables to clear after processing.
 ///
 /// # Returns
 ///
@@ -301,7 +311,6 @@ impl ProcessorTrait for DefaultProcessor {
 /// * `Vec<TableMetadata>` - A vector of table metadata, sorted by primary key.
 pub fn process_transactions(
     transactions: Vec<Transaction>,
-    flags: TableFlags,
 ) -> (
     Vec<BlockMetadataTransactionModel>,
     Vec<RawTableItem>,
@@ -403,15 +412,6 @@ pub fn process_transactions(
     current_table_items
         .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
-
-    // TODO: remove this, since we are not going to deprecate this anytime soon?
-    if flags.contains(TableFlags::TABLE_ITEMS) {
-        table_items.clear();
-    }
-    // TODO: migrate to Parquet
-    if flags.contains(TableFlags::TABLE_METADATAS) {
-        table_metadata.clear();
-    }
 
     (
         block_metadata_transactions,

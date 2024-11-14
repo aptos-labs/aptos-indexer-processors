@@ -10,7 +10,7 @@ use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Chan
 use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
 use processor::{
-    db::common::models::{
+    db::postgres::models::{
         object_models::v2_object_utils::ObjectWithMetadata, resources::FromWriteResource,
         user_transactions_models::user_transactions::UserTransaction,
     },

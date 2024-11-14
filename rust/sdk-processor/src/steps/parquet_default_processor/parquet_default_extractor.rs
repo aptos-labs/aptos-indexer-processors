@@ -10,8 +10,9 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::default_models::{
-        move_tables::TableItemConvertible, parquet_move_tables::TableItem,
+    db::{
+        common::models::default_models::raw_table_items::TableItemConvertible,
+        parquet::models::default_models::parquet_move_tables::TableItem,
     },
     processors::{
         default_processor::process_transactions,
@@ -42,8 +43,7 @@ impl Processable for ParquetDefaultExtractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
-        let (_, raw_table_items, _, _) =
-            process_transactions(transactions.data.clone(), TableFlags::empty());
+        let (_, raw_table_items, _, _) = process_transactions(transactions.data.clone());
 
         let parquet_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();

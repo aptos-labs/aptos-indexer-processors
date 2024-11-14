@@ -7,7 +7,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::{
+    db::postgres::models::{
         fungible_asset_models::{
             parquet_v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             parquet_v2_fungible_asset_balances::FungibleAssetBalance,

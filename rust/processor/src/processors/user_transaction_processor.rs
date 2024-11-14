@@ -3,7 +3,7 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::user_transactions_models::{
+    db::postgres::models::user_transactions_models::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     gap_detectors::ProcessingResult,

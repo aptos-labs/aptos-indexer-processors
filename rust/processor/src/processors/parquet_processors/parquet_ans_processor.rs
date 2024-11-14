@@ -7,7 +7,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::ans_models::{
+    db::postgres::models::ans_models::{
         ans_lookup::CurrentAnsPrimaryName,
         parquet_ans_lookup_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
     },
