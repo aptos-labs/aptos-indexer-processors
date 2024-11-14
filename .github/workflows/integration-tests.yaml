@@ -75,8 +75,7 @@ jobs:
           
       # Run Integration Tests
       - name: Run Integration Tests
-        # we want to generate output so that all_tests doesn't fail when new transaction is added
         run: |
           # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
-          cargo test sdk_tests -- --nocapture generate-output
+          cargo test sdk_tests -- --nocapture
         working-directory: rust/integration-tests

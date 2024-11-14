@@ -28,6 +28,7 @@ pub fn load_data(
     let sig_result = sig_dsl::signatures
         .filter(sig_dsl::transaction_version.eq_any(&txn_versions))
         .then_order_by(sig_dsl::transaction_version.asc())
+        .then_order_by(sig_dsl::multi_sig_index)
         .load::<Signature>(conn)?;
     result_map.insert("signatures".to_string(), serde_json::to_value(&sig_result)?);
 

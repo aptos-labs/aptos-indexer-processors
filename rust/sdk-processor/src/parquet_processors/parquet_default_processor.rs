@@ -74,10 +74,8 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                 .config
                 .processor_config
                 .get_table_names()
-                .context(format!(
-                    "Failed to get table names for the processor {}",
-                    self.config.processor_config.name()
-                ))?;
+                .context("Failed to get table names for the processor")?;
+
             get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
                 .await?;
         };
