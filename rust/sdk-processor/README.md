@@ -1,6 +1,5 @@
-# Indexer GRPC Parsers (SDK)
-
-Indexer GRPC parser is to indexer data processor that leverages the indexer grpc data. These processors have been (re)-written using the new SDK.
+# Transaction Stream Processors (SDK)
+Processors that index data from the Aptos Transaction Stream (GRPC). These processors have been (re)-written using the new Indexer SDK.
 
 - **Note: Official releases coming soon!**
 

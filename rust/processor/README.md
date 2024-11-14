@@ -1,6 +1,6 @@
-# Indexer GRPC Parser
+# Transaction Stream Processor
 
-Indexer GRPC parser is to indexer data processor that leverages the indexer grpc data.
+Processors that index data from the Aptos Transaction Stream (GRPC).
 
 - **Note: We'll launch an official endpoint soon; stay tuned!**
 
