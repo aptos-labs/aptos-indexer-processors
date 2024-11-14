@@ -149,7 +149,7 @@ impl TokenActivityV2 {
                     before_value: token_activity_helper.before_value,
                     after_value: token_activity_helper.after_value,
                     entry_function_id_str: entry_function_id_str.clone(),
-                    token_standard: TokenStandard::V2.to_string(),
+                    token_standard: TokenStandard::V1.to_string(),
                     is_fungible_v2: None,
                     transaction_timestamp: txn_timestamp,
                 }));
