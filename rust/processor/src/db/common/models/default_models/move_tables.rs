@@ -168,14 +168,12 @@ impl TableItem {
             transaction_block_height,
             key: write_table_item.key.to_string(),
             table_handle: standardize_address(&write_table_item.handle.to_string()),
-            decoded_key: serde_json::from_str(
-                write_table_item.data.as_ref().unwrap().key.as_str(),
-            )
+            decoded_key: serde_json::from_str(write_table_item.data.as_ref().unwrap().key.as_str())
                 .unwrap(),
             decoded_value: serde_json::from_str(
                 write_table_item.data.as_ref().unwrap().value.as_str(),
             )
-                .unwrap(),
+            .unwrap(),
             is_deleted: false,
         }
     }

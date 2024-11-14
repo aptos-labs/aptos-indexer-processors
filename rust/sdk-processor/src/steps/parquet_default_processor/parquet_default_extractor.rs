@@ -42,7 +42,8 @@ impl Processable for ParquetDefaultExtractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
-        let (_, raw_table_items, _, _) = process_transactions(transactions.data.clone(), TableFlags::empty());
+        let (_, raw_table_items, _, _) =
+            process_transactions(transactions.data.clone(), TableFlags::empty());
 
         let parquet_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();
