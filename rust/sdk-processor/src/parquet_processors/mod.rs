@@ -1,16 +1,30 @@
+use crate::{
+    config::{db_config::DbConfig, processor_config::ParquetDefaultProcessorConfig},
+    steps::{
+        common::gcs_uploader::{create_new_writer, GCSUploader},
+        parquet_default_processor::size_buffer::ParquetBufferStep,
+    },
+    utils::database::{new_db_pool, ArcDbPool},
+};
 use aptos_indexer_processor_sdk::utils::errors::ProcessorError;
+use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
+use parquet::schema::types::Type;
 use processor::db::parquet::models::default_models::{
     parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
     parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
     parquet_write_set_changes::WriteSetChangeModel,
 };
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use strum::{Display, EnumIter};
 
 pub mod parquet_default_processor;
 
+const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
+
 /// Enum representing the different types of Parquet files that can be processed.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Display, EnumIter)]
+#[strum(serialize_all = "snake_case")]
 #[cfg_attr(
     test,
     derive(strum::EnumDiscriminants),
@@ -121,6 +135,70 @@ impl ParquetTypeStructs {
             }),
         }
     }
+}
+
+async fn initialize_gcs_client(credentials: Option<String>) -> Arc<GCSClient> {
+    if let Some(credentials) = credentials {
+        std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
+    }
+
+    let gcs_config = GcsClientConfig::default()
+        .with_auth()
+        .await
+        .expect("Failed to create GCS client config");
+
+    Arc::new(GCSClient::new(gcs_config))
+}
+
+async fn initialize_database_pool(config: &DbConfig) -> anyhow::Result<ArcDbPool> {
+    match config {
+        DbConfig::PostgresConfig(ref postgres_config) => {
+            let conn_pool = new_db_pool(
+                &postgres_config.connection_string,
+                Some(postgres_config.db_pool_size),
+            )
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to create connection pool for PostgresConfig: {:?}",
+                    e
+                )
+            })?;
+            Ok(conn_pool)
+        },
+    }
+}
+
+async fn initialize_parquet_buffer_step(
+    gcs_client: Arc<GCSClient>,
+    parquet_processor_config: ParquetDefaultProcessorConfig,
+    parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>>,
+    processor_name: String,
+) -> anyhow::Result<ParquetBufferStep<GCSUploader>> {
+    let parquet_type_to_writer = parquet_type_to_schemas
+        .iter()
+        .map(|(key, schema)| {
+            let writer = create_new_writer(schema.clone()).expect("Failed to create writer");
+            (*key, writer)
+        })
+        .collect();
+
+    let buffer_uploader = GCSUploader::new(
+        gcs_client,
+        parquet_type_to_schemas,
+        parquet_type_to_writer,
+        parquet_processor_config.bucket_name.clone(),
+        parquet_processor_config.bucket_root.clone(),
+        processor_name,
+    )?;
+
+    let default_size_buffer_step = ParquetBufferStep::new(
+        Duration::from_secs(parquet_processor_config.parquet_upload_interval),
+        buffer_uploader,
+        parquet_processor_config.max_buffer_size,
+    );
+
+    Ok(default_size_buffer_step)
 }
 
 #[cfg(test)]

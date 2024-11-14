@@ -73,7 +73,6 @@ impl ProcessorConfig {
             ProcessorConfig::ParquetDefaultProcessor(config) => {
                 // Get the processor name as a prefix
                 let prefix = self.name();
-
                 // Collect valid table names from `ParquetTypeEnum` into a set for quick lookup
                 let valid_table_names: HashSet<String> =
                     ParquetTypeEnum::iter().map(|e| e.to_string()).collect();

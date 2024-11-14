@@ -4,6 +4,7 @@ use crate::{
         backfill_processor_status::{BackfillProcessorStatus, BackfillStatus},
         processor_status::ProcessorStatus,
     },
+    steps::parquet_default_processor::parquet_version_tracker_step::ParquetProcessorStatusSaver,
     utils::database::{execute_with_better_error, ArcDbPool},
 };
 use anyhow::Result;
@@ -40,6 +41,17 @@ pub fn get_processor_status_saver(
     }
 }
 
+pub fn get_parquet_processor_status_saver(
+    conn_pool: ArcDbPool,
+    config: IndexerProcessorConfig,
+) -> ParquetProcessorStatusSaverEnum {
+    let processor_name = config.processor_config.name().to_string();
+    ParquetProcessorStatusSaverEnum::Default {
+        conn_pool,
+        processor_name,
+    }
+}
+
 pub enum ProcessorStatusSaverEnum {
     Default {
         conn_pool: ArcDbPool,
@@ -51,6 +63,61 @@ pub enum ProcessorStatusSaverEnum {
         backfill_start_version: Option<u64>,
         backfill_end_version: Option<u64>,
     },
+}
+
+pub enum ParquetProcessorStatusSaverEnum {
+    Default {
+        conn_pool: ArcDbPool,
+        processor_name: String,
+    },
+}
+
+#[async_trait]
+impl ParquetProcessorStatusSaver for ParquetProcessorStatusSaverEnum {
+    async fn save_parquet_processor_status(
+        &self,
+        last_success_batch: &TransactionContext<()>,
+        table_name: &str,
+    ) -> Result<(), ProcessorError> {
+        let end_timestamp = last_success_batch
+            .metadata
+            .end_transaction_timestamp
+            .as_ref()
+            .map(|t| parse_timestamp(t, last_success_batch.metadata.end_version as i64))
+            .map(|t| t.naive_utc());
+        match self {
+            ParquetProcessorStatusSaverEnum::Default {
+                conn_pool,
+                processor_name,
+            } => {
+                let status = ProcessorStatus {
+                    processor: processor_name.clone() + "_" + table_name,
+                    last_success_version: last_success_batch.metadata.end_version as i64,
+                    last_transaction_timestamp: end_timestamp,
+                };
+
+                // Save regular processor status to the database
+                execute_with_better_error(
+                    conn_pool.clone(),
+                    diesel::insert_into(processor_status::table)
+                        .values(&status)
+                        .on_conflict(processor_status::processor)
+                        .do_update()
+                        .set((
+                            processor_status::last_success_version
+                                .eq(excluded(processor_status::last_success_version)),
+                            processor_status::last_updated.eq(excluded(processor_status::last_updated)),
+                            processor_status::last_transaction_timestamp
+                                .eq(excluded(processor_status::last_transaction_timestamp)),
+                        )),
+                    Some(" WHERE processor_status.last_success_version <= EXCLUDED.last_success_version "),
+                )
+                    .await?;
+
+                Ok(())
+            },
+        }
+    }
 }
 
 #[async_trait]
