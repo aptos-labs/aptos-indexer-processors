@@ -1,6 +1,6 @@
-# Indexer GRPC Parser
+# Transaction Stream Processor
 
-Indexer GRPC parser is to indexer data processor that leverages the indexer grpc data.
+Processors that index data from the Aptos Transaction Stream (GRPC).
 
 - **Note: We'll launch an official endpoint soon; stay tuned!**
 
@@ -74,3 +74,8 @@ transactions are splitted into tasks and inserted with random order.
 
 ### Manually running diesel-cli
 - `cd` into the database folder you use under `src/db/` (e.g. `src/db/postgres`), then run it.
+
+## Processor Specific Notes
+
+### Supported Coin Type Mappings
+See mapping in [v2_fungible_asset_balances.rs](https://github.com/aptos-labs/aptos-indexer-processors/blob/main/rust/processor/src/db/common/models/fungible_asset_models/v2_fungible_asset_balances.rs#L40) for a list supported coin type mappings.
