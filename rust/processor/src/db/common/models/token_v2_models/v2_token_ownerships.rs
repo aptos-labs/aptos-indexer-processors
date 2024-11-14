@@ -12,6 +12,7 @@ use super::{
 use crate::{
     db::common::models::{
         object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
+        resources::FromWriteResource,
         token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
         token_v2_models::v2_token_utils::DEFAULT_OWNER_ADDRESS,
     },
@@ -264,9 +265,7 @@ impl TokenOwnershipV2 {
             .get(&standardize_address(&token_data_id))
             .is_some()
         {
-            if let Some(object) =
-                &ObjectWithMetadata::from_write_resource(write_resource, txn_version)?
-            {
+            if let Some(object) = &ObjectWithMetadata::from_write_resource(write_resource)? {
                 let object_core = &object.object_core;
                 let owner_address = object_core.get_owner_address();
                 let storage_id = token_data_id.clone();

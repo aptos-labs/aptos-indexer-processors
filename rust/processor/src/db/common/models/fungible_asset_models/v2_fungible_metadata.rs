@@ -10,6 +10,7 @@ use crate::{
     db::common::models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        resources::FromWriteResource,
         token_v2_models::v2_token_utils::TokenStandard,
     },
     schema::fungible_asset_metadata,
@@ -56,9 +57,7 @@ impl FungibleAssetMetadataModel {
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<Self>> {
-        if let Some(inner) =
-            &FungibleAssetMetadata::from_write_resource(write_resource, txn_version)?
-        {
+        if let Some(inner) = &FungibleAssetMetadata::from_write_resource(write_resource)? {
             // the new coin type
             let asset_type = standardize_address(&write_resource.address.to_string());
             if let Some(object_metadata) = object_metadatas.get(&asset_type) {

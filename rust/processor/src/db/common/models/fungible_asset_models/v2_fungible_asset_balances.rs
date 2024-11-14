@@ -12,6 +12,7 @@ use crate::{
     db::common::models::{
         coin_models::coin_utils::{CoinInfoType, CoinResource},
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        resources::FromWriteResource,
         token_v2_models::v2_token_utils::{TokenStandard, V2_STANDARD},
     },
     schema::{
@@ -248,8 +249,7 @@ impl FungibleAssetBalance {
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentFungibleAssetBalance)>> {
-        if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource, txn_version)?
-        {
+        if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource)? {
             let storage_id = standardize_address(write_resource.address.as_str());
             // Need to get the object of the store
             if let Some(object_data) = object_metadatas.get(&storage_id) {
