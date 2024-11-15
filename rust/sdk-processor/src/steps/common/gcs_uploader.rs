@@ -26,7 +26,7 @@ pub struct GCSUploader {
 
 #[async_trait]
 pub trait Uploadable {
-    async fn handle_buffer(
+    async fn upload_buffer(
         &mut self,
         buffer: ParquetTypeStructs,
     ) -> anyhow::Result<(), ProcessorError>;
@@ -34,11 +34,10 @@ pub trait Uploadable {
 
 #[async_trait]
 impl Uploadable for GCSUploader {
-    async fn handle_buffer(
+    async fn upload_buffer(
         &mut self,
         buffer: ParquetTypeStructs,
     ) -> anyhow::Result<(), ProcessorError> {
-        // Directly call `upload_generic` for each buffer type
         let table_name = buffer.get_table_name();
 
         let result = match buffer {
@@ -115,6 +114,11 @@ impl GCSUploader {
         create_new_writer(schema)
     }
 
+    /// # Context: Why we replace our writer
+    ///
+    /// Once we’re ready to upload (either because the buffer is full or enough time has passed),
+    /// we don’t want to keep adding new data to that same writer. we want a clean slate for the next batch.
+    /// So, we replace the old writer with a new one to empty the writer buffer without losing any data.
     fn get_and_replace_writer(
         &mut self,
         parquet_type: ParquetTypeEnum,
