@@ -25,7 +25,6 @@ pub struct GCSUploader {
 }
 
 #[async_trait]
-#[warn(dead_code)]
 pub trait Uploadable {
     async fn upload_buffer(
         &mut self,
@@ -203,7 +202,7 @@ impl GCSUploader {
         )
         .await?;
 
-        println!(
+        debug!(
             "Uploaded parquet to GCS for table: {}, start_version: {}, end_version: {}",
             table_name,
             data[0].version(),

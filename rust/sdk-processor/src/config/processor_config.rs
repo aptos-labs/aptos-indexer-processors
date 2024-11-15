@@ -1,14 +1,13 @@
 use crate::{
-    parquet_processors::ParquetTypeEnum,
     processors::{
         ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
         stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
     },
+    utils::parquet_processor_table_mapping::VALID_TABLE_NAMES,
 };
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use strum::IntoEnumIterator;
 
 /// This enum captures the configs for all the different processors that are defined.
 ///
@@ -72,28 +71,18 @@ impl ProcessorConfig {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config) => {
                 // Get the processor name as a prefix
-                let prefix = self.name();
-                // Collect valid table names from `ParquetTypeEnum` into a set for quick lookup
-                let valid_table_names: HashSet<String> =
-                    ParquetTypeEnum::iter().map(|e| e.to_string()).collect();
+                let processor_name = self.name();
 
-                // Validate and map table names with prefix
-                let mut validated_table_names = Vec::new();
-                for table_name in &config.tables {
-                    // Ensure the table name is a valid `ParquetTypeEnum` variant
-                    if !valid_table_names.contains(table_name) {
-                        return Err(anyhow::anyhow!(
-                            "Invalid table name '{}'. Expected one of: {:?}",
-                            table_name,
-                            valid_table_names
-                        ));
-                    }
+                let valid_table_names = VALID_TABLE_NAMES
+                    .get(processor_name)
+                    .ok_or_else(|| anyhow::anyhow!("Processor type not recognized"))?;
 
-                    // Append the prefix to the validated table name
-                    validated_table_names.push(Self::format_table_name(prefix, table_name));
-                }
-
-                Ok(validated_table_names)
+                // Use the helper function for validation and mapping
+                Self::validate_and_prefix_table_names(
+                    &config.backfill_table,
+                    valid_table_names,
+                    processor_name,
+                )
             },
             _ => Err(anyhow::anyhow!(
                 "Invalid parquet processor config: {:?}",
@@ -105,6 +94,26 @@ impl ProcessorConfig {
     /// helper function to format the table name with the processor name.
     fn format_table_name(prefix: &str, table_name: &str) -> String {
         format!("{}.{}", prefix, table_name)
+    }
+
+    fn validate_and_prefix_table_names(
+        table_names: &HashSet<String>,
+        valid_table_names: &HashSet<String>,
+        prefix: &str,
+    ) -> anyhow::Result<Vec<String>> {
+        table_names
+            .iter()
+            .map(|table_name| {
+                if !valid_table_names.contains(table_name) {
+                    return Err(anyhow::anyhow!(
+                        "Invalid table name '{}'. Expected one of: {:?}",
+                        table_name,
+                        valid_table_names
+                    ));
+                }
+                Ok(Self::format_table_name(prefix, table_name))
+            })
+            .collect()
     }
 }
 
@@ -154,9 +163,9 @@ pub struct ParquetDefaultProcessorConfig {
     pub max_buffer_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_parquet_upload_interval")]
     pub parquet_upload_interval: u64,
-    // list of table names to backfill. Using HashSet for fast lookups, and for future extensibility.
+    // Set of table name to backfill. Using HashSet for fast lookups, and for future extensibility.
     #[serde(default)]
-    pub tables: HashSet<String>,
+    pub backfill_table: HashSet<String>,
 }
 
 impl ParquetDefaultProcessorConfig {
@@ -184,7 +193,10 @@ mod tests {
     #[test]
     fn test_valid_table_names() {
         let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
-            tables: HashSet::from(["MoveResource".to_string(), "Transaction".to_string()]),
+            backfill_table: HashSet::from([
+                "move_resources".to_string(),
+                "transactions".to_string(),
+            ]),
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
@@ -199,7 +211,7 @@ mod tests {
         let table_names = result.unwrap();
         let table_names: HashSet<String> = table_names.into_iter().collect();
         let expected_names: HashSet<String> =
-            ["Transaction".to_string(), "MoveResource".to_string()]
+            ["transactions".to_string(), "move_resources".to_string()]
                 .iter()
                 .map(|e| format!("parquet_default_processor.{}", e))
                 .collect();
@@ -209,7 +221,7 @@ mod tests {
     #[test]
     fn test_invalid_table_name() {
         let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
-            tables: HashSet::from(["InvalidTable".to_string(), "Transaction".to_string()]),
+            backfill_table: HashSet::from(["InvalidTable".to_string(), "transactions".to_string()]),
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
@@ -229,7 +241,7 @@ mod tests {
     #[test]
     fn test_empty_tables() {
         let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
-            tables: HashSet::new(),
+            backfill_table: HashSet::new(),
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
@@ -247,7 +259,7 @@ mod tests {
     #[test]
     fn test_duplicate_table_names() {
         let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
-            tables: HashSet::from(["Transaction".to_string(), "Transaction".to_string()]),
+            backfill_table: HashSet::from(["transactions".to_string(), "transactions".to_string()]),
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
@@ -261,14 +273,20 @@ mod tests {
 
         let table_names = result.unwrap();
         assert_eq!(table_names, vec![
-            "parquet_default_processor.Transaction".to_string(),
+            "parquet_default_processor.transactions".to_string(),
         ]);
     }
 
     #[test]
-    fn test_all_enum_table_names() {
+    fn test_all_table_names() {
         let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
-            tables: ParquetTypeEnum::iter().map(|e| e.to_string()).collect(),
+            backfill_table: HashSet::from([
+                "move_resources".to_string(),
+                "transactions".to_string(),
+                "write_set_changes".to_string(),
+                "table_items".to_string(),
+                "move_modules".to_string(),
+            ]),
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
@@ -281,9 +299,16 @@ mod tests {
         assert!(result.is_ok());
 
         let table_names = result.unwrap();
-        let expected_names: HashSet<String> = ParquetTypeEnum::iter()
-            .map(|e| format!("parquet_default_processor.{}", e))
-            .collect();
+        let expected_names: HashSet<String> = [
+            "move_resources".to_string(),
+            "transactions".to_string(),
+            "write_set_changes".to_string(),
+            "table_items".to_string(),
+            "move_modules".to_string(),
+        ]
+        .iter()
+        .map(|e| format!("parquet_default_processor.{}", e))
+        .collect();
         let table_names: HashSet<String> = table_names.into_iter().collect();
         assert_eq!(table_names, expected_names);
     }

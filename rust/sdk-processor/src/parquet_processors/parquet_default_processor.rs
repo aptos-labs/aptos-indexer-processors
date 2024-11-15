@@ -5,16 +5,14 @@ use crate::{
     },
     parquet_processors::{
         initialize_database_pool, initialize_gcs_client, initialize_parquet_buffer_step,
-        ParquetTypeEnum,
+        set_backfill_table_flag, ParquetTypeEnum,
     },
     steps::{
-        common::{processor_status_saver::get_parquet_processor_status_saver,
-                 parquet_buffer_step::ParquetBufferStep,
-        },
-        parquet_default_processor::{
-            parquet_default_extractor::ParquetDefaultExtractor,
+        common::{
+            parquet_processor_status_saver::get_parquet_processor_status_saver,
             parquet_version_tracker_step::ParquetVersionTrackerStep,
         },
+        parquet_default_processor::parquet_default_extractor::ParquetDefaultExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -37,7 +35,6 @@ use processor::{
         parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
         parquet_write_set_changes::WriteSetChangeModel,
     },
-    worker::TableFlags,
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
@@ -91,11 +88,13 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             },
         };
 
-        // TODO: Revisit when parquet version tracker is available.
         // Query the starting version
-        let table_names = if let Some(backfill_config) = &self.config.backfill_config {
-            // for backfill we will only backfill one table per job
-            vec![backfill_config.backfill_alias.clone()]
+        let table_names = if self.config.backfill_config.is_some() {
+            parquet_processor_config
+                .backfill_table
+                .clone()
+                .into_iter()
+                .collect()
         } else {
             self.config
                 .processor_config
@@ -103,9 +102,12 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                 .context("Failed to get table names for the processor")?
         };
 
-        let starting_version =
-            get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
-                .await?;
+        let starting_version = get_min_last_success_version_parquet(
+            &self.config,
+            self.db_pool.clone(),
+            table_names.clone(),
+        )
+        .await?;
 
         // Define processor transaction stream config
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
@@ -114,8 +116,9 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         })
         .await?;
 
+        let backfill_table = set_backfill_table_flag(table_names);
         let parquet_default_extractor = ParquetDefaultExtractor {
-            opt_in_tables: TableFlags::empty(),
+            opt_in_tables: backfill_table,
         };
 
         let gcs_client = initialize_gcs_client(

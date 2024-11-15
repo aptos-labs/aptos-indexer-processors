@@ -54,10 +54,10 @@ where
 }
 
 pub struct ParquetHandler<ParquetType>
-    where
+where
     ParquetType: NamedTable + NamedTable + HasVersion + HasParquetSchema + 'static + Allocative,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
-    {
+{
     pub schema: Arc<Type>,
     pub writer: SerializedFileWriter<Vec<u8>>,
     pub buffer: Vec<ParquetType>,
@@ -84,8 +84,7 @@ pub fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u
 
 impl<ParquetType> ParquetHandler<ParquetType>
 where
-    ParquetType: Allocative +
-    GetTimeStamp + HasVersion + HasParquetSchema + 'static + NamedTable,
+    ParquetType: Allocative + GetTimeStamp + HasVersion + HasParquetSchema + 'static + NamedTable,
     for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
 {
     fn create_new_writer(&self) -> Result<SerializedFileWriter<Vec<u8>>> {

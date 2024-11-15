@@ -1,18 +1,21 @@
 use crate::{
     config::{db_config::DbConfig, processor_config::ParquetDefaultProcessorConfig},
-    steps::{
-        common::gcs_uploader::{create_new_writer, GCSUploader},
-        parquet_default_processor::size_buffer::ParquetBufferStep,
+    steps::common::{
+        gcs_uploader::{create_new_writer, GCSUploader},
+        parquet_buffer_step::ParquetBufferStep,
     },
     utils::database::{new_db_pool, ArcDbPool},
 };
 use aptos_indexer_processor_sdk::utils::errors::ProcessorError;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
-use processor::db::parquet::models::default_models::{
-    parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-    parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
-    parquet_write_set_changes::WriteSetChangeModel,
+use processor::{
+    db::parquet::models::default_models::{
+        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
+        parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
+        parquet_write_set_changes::WriteSetChangeModel,
+    },
+    worker::TableFlags,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -199,6 +202,17 @@ async fn initialize_parquet_buffer_step(
     );
 
     Ok(default_size_buffer_step)
+}
+
+fn set_backfill_table_flag(table_names: Vec<String>) -> TableFlags {
+    let mut backfill_table = TableFlags::empty();
+
+    for table_name in table_names {
+        if let Some(flag) = TableFlags::from_name(&table_name) {
+            backfill_table |= flag;
+        }
+    }
+    backfill_table
 }
 
 #[cfg(test)]
