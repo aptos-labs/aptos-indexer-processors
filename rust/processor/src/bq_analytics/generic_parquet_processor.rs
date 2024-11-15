@@ -72,6 +72,7 @@ where
     pub last_upload_time: Instant,
     pub processor_name: String,
 }
+
 fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
     let props = WriterProperties::builder()
         .set_compression(parquet::basic::Compression::LZ4)
