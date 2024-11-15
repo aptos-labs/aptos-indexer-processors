@@ -177,7 +177,7 @@ async fn initialize_parquet_buffer_step(
     parquet_processor_config: ParquetDefaultProcessorConfig,
     parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>>,
     processor_name: String,
-) -> anyhow::Result<ParquetBufferStep<GCSUploader>> {
+) -> anyhow::Result<ParquetBufferStep> {
     let parquet_type_to_writer = parquet_type_to_schemas
         .iter()
         .map(|(key, schema)| {

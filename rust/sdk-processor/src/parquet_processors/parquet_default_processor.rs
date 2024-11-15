@@ -9,8 +9,8 @@ use crate::{
     },
     steps::{
         common::{
-            parquet_processor_status_saver::get_parquet_processor_status_saver,
             parquet_version_tracker_step::ParquetVersionTrackerStep,
+            processor_status_saver::get_processor_status_saver,
         },
         parquet_default_processor::parquet_default_extractor::ParquetDefaultExtractor,
     },
@@ -153,7 +153,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         });
 
         let parquet_version_tracker_step = ParquetVersionTrackerStep::new(
-            get_parquet_processor_status_saver(self.db_pool.clone(), self.config.clone()),
+            get_processor_status_saver(self.db_pool.clone(), self.config.clone()),
             DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
         );
 

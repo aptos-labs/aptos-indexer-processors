@@ -63,6 +63,11 @@ impl ProcessorConfig {
         self.into()
     }
 
+    /// Check if the processor is a parquet processor.
+    pub fn is_parquet_processor(&self) -> bool {
+        matches!(self, ProcessorConfig::ParquetDefaultProcessor(_))
+    }
+
     /// Get the Vec of table names for parquet processors only.
     ///
     /// This is a convenience method to map the table names to include the processor name as a prefix, which

@@ -428,7 +428,7 @@ mod tests {
             max_buffer_size: 100,
             channel_size: 100,
             google_application_credentials: None,
-            tables: HashSet::new(),
+            backfill_table: HashSet::new(),
         }
     }
 }
