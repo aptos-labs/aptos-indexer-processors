@@ -11,7 +11,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::ans_models::{
+    db::postgres::models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
         ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2},
     },

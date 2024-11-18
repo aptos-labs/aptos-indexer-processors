@@ -3,9 +3,12 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::default_models::{
-        block_metadata_transactions::BlockMetadataTransactionModel,
-        move_tables::{CurrentTableItem, TableItem, TableMetadata},
+    db::{
+        common::models::default_models::raw_table_items::{RawTableItem, TableItemConvertible},
+        postgres::models::default_models::{
+            block_metadata_transactions::BlockMetadataTransactionModel,
+            move_tables::{CurrentTableItem, TableItem, TableMetadata},
+        },
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -215,11 +218,25 @@ impl ProcessorTrait for DefaultProcessor {
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-        let flags = self.deprecated_tables;
-        let (block_metadata_transactions, table_items, current_table_items, table_metadata) =
-            tokio::task::spawn_blocking(move || process_transactions(transactions, flags))
+
+        let (block_metadata_transactions, raw_table_items, current_table_items, mut table_metadata) =
+            tokio::task::spawn_blocking(move || process_transactions(transactions))
                 .await
                 .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
+
+        let mut postgres_table_items: Vec<TableItem> =
+            raw_table_items.iter().map(TableItem::from_raw).collect();
+
+        let flags = self.deprecated_tables;
+        // TODO: remove this, since we are not going to deprecate this anytime soon?
+        if flags.contains(TableFlags::TABLE_ITEMS) {
+            postgres_table_items.clear();
+        }
+        // TODO: migrate to Parquet
+        if flags.contains(TableFlags::TABLE_METADATAS) {
+            table_metadata.clear();
+        }
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -229,7 +246,7 @@ impl ProcessorTrait for DefaultProcessor {
             start_version,
             end_version,
             &block_metadata_transactions,
-            (&table_items, &current_table_items, &table_metadata),
+            (&postgres_table_items, &current_table_items, &table_metadata),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -238,7 +255,7 @@ impl ProcessorTrait for DefaultProcessor {
         // make it faster.
         tokio::task::spawn(async move {
             drop(block_metadata_transactions);
-            drop(table_items);
+            drop(postgres_table_items);
             drop(current_table_items);
             drop(table_metadata);
         });
@@ -272,6 +289,7 @@ impl ProcessorTrait for DefaultProcessor {
     }
 }
 
+// TODO: we can further optimize this by passing in a falg to selectively parse only the required data (e.g. table_items for parquet)
 /// Processes a list of transactions and extracts relevant data into different models.
 ///
 /// This function iterates over a list of transactions, extracting block metadata transactions,
@@ -283,7 +301,6 @@ impl ProcessorTrait for DefaultProcessor {
 /// # Arguments
 ///
 /// * `transactions` - A vector of `Transaction` objects to be processed.
-/// * `flags` - A `TableFlags` object that determines which tables to clear after processing.
 ///
 /// # Returns
 ///
@@ -294,10 +311,9 @@ impl ProcessorTrait for DefaultProcessor {
 /// * `Vec<TableMetadata>` - A vector of table metadata, sorted by primary key.
 pub fn process_transactions(
     transactions: Vec<Transaction>,
-    flags: TableFlags,
 ) -> (
     Vec<BlockMetadataTransactionModel>,
-    Vec<TableItem>,
+    Vec<RawTableItem>,
     Vec<CurrentTableItem>,
     Vec<TableMetadata>,
 ) {
@@ -318,6 +334,10 @@ pub fn process_transactions(
             .info
             .as_ref()
             .expect("Transaction info doesn't exist!");
+
+        #[allow(deprecated)]
+        let block_timestamp = chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, 0)
+            .expect("Txn Timestamp is invalid!");
         let txn_data = match transaction.txn_data.as_ref() {
             Some(txn_data) => txn_data,
             None => {
@@ -349,11 +369,12 @@ pub fn process_transactions(
                 .expect("WriteSetChange must have a change")
             {
                 WriteSetChangeEnum::WriteTableItem(inner) => {
-                    let (ti, cti) = TableItem::from_write_table_item(
+                    let (ti, cti) = RawTableItem::from_write_table_item(
                         inner,
                         index as i64,
                         version,
                         block_height,
+                        block_timestamp,
                     );
                     table_items.push(ti);
                     current_table_items.insert(
@@ -366,11 +387,12 @@ pub fn process_transactions(
                     );
                 },
                 WriteSetChangeEnum::DeleteTableItem(inner) => {
-                    let (ti, cti) = TableItem::from_delete_table_item(
+                    let (ti, cti) = RawTableItem::from_delete_table_item(
                         inner,
                         index as i64,
                         version,
                         block_height,
+                        block_timestamp,
                     );
                     table_items.push(ti);
                     current_table_items
@@ -390,13 +412,6 @@ pub fn process_transactions(
     current_table_items
         .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
     table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
-
-    if flags.contains(TableFlags::TABLE_ITEMS) {
-        table_items.clear();
-    }
-    if flags.contains(TableFlags::TABLE_METADATAS) {
-        table_metadata.clear();
-    }
 
     (
         block_metadata_transactions,

@@ -6,7 +6,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
+    db::postgres::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{database::ArcDbPool, util::parse_timestamp},

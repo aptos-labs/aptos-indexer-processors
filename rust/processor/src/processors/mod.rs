@@ -33,7 +33,7 @@ use self::{
     user_transaction_processor::UserTransactionProcessor,
 };
 use crate::{
-    db::common::models::processor_status::ProcessorStatus,
+    db::postgres::models::processor_status::ProcessorStatus,
     gap_detectors::ProcessingResult,
     processors::parquet_processors::{
         parquet_ans_processor::{ParquetAnsProcessor, ParquetAnsProcessorConfig},

@@ -5,7 +5,7 @@ use aptos_indexer_processor_sdk::{
     utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
-use processor::db::common::models::account_transaction_models::account_transactions::AccountTransaction;
+use processor::db::postgres::models::account_transaction_models::account_transactions::AccountTransaction;
 use rayon::prelude::*;
 
 pub struct AccountTransactionsExtractor

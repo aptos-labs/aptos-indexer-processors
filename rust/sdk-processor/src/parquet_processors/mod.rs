@@ -1,4 +1,4 @@
-use processor::db::common::models::default_models::{
+use processor::db::parquet::models::default_models::{
     parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
     parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
     parquet_write_set_changes::WriteSetChangeModel,
@@ -66,6 +66,16 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::Transaction => ParquetTypeStructs::Transaction(Vec::new()),
             ParquetTypeEnum::TableItem => ParquetTypeStructs::TableItem(Vec::new()),
             ParquetTypeEnum::MoveModule => ParquetTypeStructs::MoveModule(Vec::new()),
+        }
+    }
+
+    pub fn get_table_name(&self) -> &'static str {
+        match self {
+            ParquetTypeStructs::MoveResource(_) => "move_resources",
+            ParquetTypeStructs::WriteSetChange(_) => "write_set_changes",
+            ParquetTypeStructs::Transaction(_) => "parquet_transactions",
+            ParquetTypeStructs::TableItem(_) => "table_items",
+            ParquetTypeStructs::MoveModule(_) => "move_modules",
         }
     }
 }
