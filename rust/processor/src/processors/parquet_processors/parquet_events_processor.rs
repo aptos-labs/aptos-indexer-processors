@@ -6,7 +6,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::events_models::parquet_events::{Event, ParquetEventModel},
+    db::postgres::models::events_models::parquet_events::{Event, ParquetEventModel},
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool, util::parse_timestamp},

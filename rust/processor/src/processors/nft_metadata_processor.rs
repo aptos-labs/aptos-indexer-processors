@@ -3,10 +3,11 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::{
+    db::postgres::models::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
+        resources::FromWriteResource,
         token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         token_v2_models::{
             v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
@@ -237,9 +238,7 @@ async fn parse_v2_token(
         let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
         for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                if let Some(object) =
-                    ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                {
+                if let Some(object) = ObjectWithMetadata::from_write_resource(wr).unwrap() {
                     token_v2_metadata_helper.insert(
                         standardize_address(&wr.address.to_string()),
                         ObjectAggregatedData {

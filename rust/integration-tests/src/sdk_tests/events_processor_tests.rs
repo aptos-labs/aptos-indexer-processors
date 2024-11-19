@@ -9,12 +9,9 @@ use std::collections::HashSet;
 
 pub async fn setup_events_processor_config(
     test_context: &SdkTestContext,
-    staring_version: u64,
-    txn_count: usize,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
-    let transaction_stream_config =
-        test_context.create_transaction_stream_config(staring_version, txn_count as u64); // since this will be always 1, we can remove from the arg list
+    let transaction_stream_config = test_context.create_transaction_stream_config(); // since this will be always 1, we can remove from the arg list
     let postgres_config = PostgresConfig {
         connection_string: db_url.to_string(),
         db_pool_size: 100,
@@ -67,7 +64,6 @@ mod tests {
     async fn testnet_events_processor_genesis_txn() {
         process_single_testnet_event_txn(
             IMPORTED_TESTNET_TXNS_1_GENESIS,
-            1,
             Some("genesis_txn_test".to_string()),
         )
         .await;
@@ -77,7 +73,6 @@ mod tests {
     async fn testnet_events_processor_new_block_event() {
         process_single_testnet_event_txn(
             IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT,
-            2,
             Some("new_block_event_test".to_string()),
         )
         .await;
@@ -87,7 +82,6 @@ mod tests {
     async fn testnet_events_processor_empty_txn() {
         process_single_testnet_event_txn(
             IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
-            3,
             Some("empty_txn_test".to_string()),
         )
         .await;
@@ -97,7 +91,6 @@ mod tests {
     async fn testnet_events_processor_coin_register_fa_metadata() {
         process_single_testnet_event_txn(
             IMPORTED_TESTNET_TXNS_278556781_V1_COIN_REGISTER_FA_METADATA,
-            278556781,
             Some("coin_register_fa_metadata_test".to_string()),
         )
         .await;
@@ -107,7 +100,6 @@ mod tests {
     async fn testnet_events_processor_fa_metadata() {
         process_single_testnet_event_txn(
             IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_,
-            1255836496,
             Some("fa_metadata_test".to_string()),
         )
         .await;
@@ -117,7 +109,6 @@ mod tests {
     async fn testnet_events_processor_fa_activities() {
         process_single_testnet_event_txn(
             IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
-            5992795934,
             Some("fa_activities_test".to_string()),
         )
         .await;
@@ -126,12 +117,8 @@ mod tests {
     /// Example test case of not using custom name
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn testnet_events_processor_coin_register() {
-        process_single_testnet_event_txn(
-            IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
-            5979639459,
-            None,
-        )
-        .await;
+        process_single_testnet_event_txn(IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER, None)
+            .await;
     }
 
     // Example 2: Test for multiple transactions handling
@@ -156,13 +143,8 @@ mod tests {
         let starting_version = transaction_batches[0].version;
 
         let db_url = db.get_db_url();
-        let (indexer_processor_config, _processor_name) = setup_events_processor_config(
-            &test_context,
-            starting_version,
-            transaction_batches.len(),
-            &db_url,
-        )
-        .await;
+        let (indexer_processor_config, _processor_name) =
+            setup_events_processor_config(&test_context, &db_url).await;
 
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
@@ -173,7 +155,6 @@ mod tests {
             events_processor,
             load_data,
             db_url,
-            vec![5523474016, 5979639459],
             diff_flag,
             output_path.clone(),
             Some("multi_txns_handling_test".to_string()),
@@ -200,11 +181,7 @@ mod tests {
     }
 
     // Helper function to abstract out the single transaction processing
-    async fn process_single_testnet_event_txn(
-        txn: &[u8],
-        txn_version: i64,
-        test_case_name: Option<String>,
-    ) {
+    async fn process_single_testnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
             .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
@@ -213,7 +190,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_events_processor_config(&test_context, txn_version as u64, 1, &db_url).await;
+            setup_events_processor_config(&test_context, &db_url).await;
 
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
@@ -224,7 +201,6 @@ mod tests {
             events_processor,
             load_data,
             db_url,
-            vec![txn_version],
             diff_flag,
             output_path.clone(),
             test_case_name.clone(),
@@ -234,18 +210,18 @@ mod tests {
             Ok(mut db_value) => {
                 let _ = validate_json(
                     &mut db_value,
-                    txn_version as u64,
+                    test_context.get_request_start_version(),
                     processor_name,
                     output_path.clone(),
                     test_case_name,
                 );
             },
             Err(e) => {
-                eprintln!(
-                    "[ERROR] Failed to run processor for txn version {}: {}",
-                    1, e
+                panic!(
+                    "Test failed on transactions {:?} due to processor error: {}",
+                    test_context.get_test_transaction_versions(),
+                    e
                 );
-                panic!("Test failed due to processor error");
             },
         }
     }

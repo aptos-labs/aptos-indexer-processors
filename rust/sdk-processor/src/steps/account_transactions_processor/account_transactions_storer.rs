@@ -11,7 +11,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::account_transaction_models::account_transactions::AccountTransaction,
+    db::postgres::models::account_transaction_models::account_transactions::AccountTransaction,
     processors::account_transactions_processor::insert_account_transactions_query,
 };
 use tracing::debug;

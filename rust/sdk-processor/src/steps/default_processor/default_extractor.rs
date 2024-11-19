@@ -6,14 +6,16 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::default_models::{
-        block_metadata_transactions::BlockMetadataTransactionModel,
-        move_tables::{CurrentTableItem, TableItem, TableMetadata},
+    db::{
+        common::models::default_models::raw_table_items::TableItemConvertible,
+        postgres::models::default_models::{
+            block_metadata_transactions::BlockMetadataTransactionModel,
+            move_tables::{CurrentTableItem, TableItem, TableMetadata},
+        },
     },
     processors::default_processor::process_transactions,
     worker::TableFlags,
 };
-pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;
 
 pub struct DefaultExtractor
 where
@@ -47,14 +49,16 @@ impl Processable for DefaultExtractor {
         >,
         ProcessorError,
     > {
-        let flags = self.deprecated_table_flags;
-        let (block_metadata_transactions, table_items, current_table_items, table_metadata) =
-            process_transactions(transactions.data, flags);
+        let (block_metadata_transactions, raw_table_items, current_table_items, table_metadata) =
+            process_transactions(transactions.data.clone());
+
+        let postgres_table_items: Vec<TableItem> =
+            raw_table_items.iter().map(TableItem::from_raw).collect();
 
         Ok(Some(TransactionContext {
             data: (
                 block_metadata_transactions,
-                table_items,
+                postgres_table_items,
                 current_table_items,
                 table_metadata,
             ),

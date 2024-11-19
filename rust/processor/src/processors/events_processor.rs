@@ -3,7 +3,7 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::events_models::events::EventModel,
+    db::postgres::models::events_models::events::EventModel,
     gap_detectors::ProcessingResult,
     schema,
     utils::{

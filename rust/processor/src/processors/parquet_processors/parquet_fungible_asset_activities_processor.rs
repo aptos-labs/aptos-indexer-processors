@@ -7,18 +7,16 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::{
+    db::postgres::models::{
         fungible_asset_models::{
             parquet_v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             parquet_v2_fungible_asset_balances::FungibleAssetBalance,
-            v2_fungible_asset_utils::{
-                ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FeeStatement,
-                FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
-            },
+            v2_fungible_asset_utils::FeeStatement,
         },
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
         },
+        resources::{FromWriteResource, V2FungibleAssetResource},
     },
     gap_detectors::ProcessingResult,
     processors::{ProcessorName, ProcessorTrait},
@@ -197,9 +195,7 @@ async fn parse_activities(
             // Need to do a first pass to get all the objects
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    if let Some(object) =
-                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                    {
+                    if let Some(object) = ObjectWithMetadata::from_write_resource(wr).unwrap() {
                         fungible_asset_object_helper.insert(
                             standardize_address(&wr.address.to_string()),
                             ObjectAggregatedData {
@@ -228,47 +224,44 @@ async fn parse_activities(
                     // Fill the v2 object metadata
                     let address = standardize_address(&write_resource.address.to_string());
                     if let Some(aggregated_data) = fungible_asset_object_helper.get_mut(&address) {
-                        if let Some(fungible_asset_metadata) =
-                            FungibleAssetMetadata::from_write_resource(write_resource, txn_version)
-                                .unwrap()
+                        if let Some(v2_fungible_asset_resource) =
+                            V2FungibleAssetResource::from_write_resource(write_resource).unwrap()
                         {
-                            aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
-                        }
-                        if let Some(fungible_asset_store) =
-                            FungibleAssetStore::from_write_resource(write_resource, txn_version)
-                                .unwrap()
-                        {
-                            aggregated_data.fungible_asset_store = Some(fungible_asset_store);
-                        }
-                        if let Some(fungible_asset_supply) =
-                            FungibleAssetSupply::from_write_resource(write_resource, txn_version)
-                                .unwrap()
-                        {
-                            aggregated_data.fungible_asset_supply = Some(fungible_asset_supply);
-                        }
-                        if let Some(concurrent_fungible_asset_supply) =
-                            ConcurrentFungibleAssetSupply::from_write_resource(
-                                write_resource,
-                                txn_version,
-                            )
-                            .unwrap()
-                        {
-                            aggregated_data.concurrent_fungible_asset_supply =
-                                Some(concurrent_fungible_asset_supply);
-                        }
-                        if let Some(concurrent_fungible_asset_balance) =
-                            ConcurrentFungibleAssetBalance::from_write_resource(
-                                write_resource,
-                                txn_version,
-                            )
-                            .unwrap()
-                        {
-                            aggregated_data.concurrent_fungible_asset_balance =
-                                Some(concurrent_fungible_asset_balance);
+                            match v2_fungible_asset_resource {
+                                V2FungibleAssetResource::FungibleAssetMetadata(
+                                    fungible_asset_metadata,
+                                ) => {
+                                    aggregated_data.fungible_asset_metadata =
+                                        Some(fungible_asset_metadata);
+                                },
+                                V2FungibleAssetResource::FungibleAssetStore(
+                                    fungible_asset_store,
+                                ) => {
+                                    aggregated_data.fungible_asset_store =
+                                        Some(fungible_asset_store);
+                                },
+                                V2FungibleAssetResource::FungibleAssetSupply(
+                                    fungible_asset_supply,
+                                ) => {
+                                    aggregated_data.fungible_asset_supply =
+                                        Some(fungible_asset_supply);
+                                },
+                                V2FungibleAssetResource::ConcurrentFungibleAssetSupply(
+                                    concurrent_fungible_asset_supply,
+                                ) => {
+                                    aggregated_data.concurrent_fungible_asset_supply =
+                                        Some(concurrent_fungible_asset_supply);
+                                },
+                                V2FungibleAssetResource::ConcurrentFungibleAssetBalance(
+                                    concurrent_fungible_asset_balance,
+                                ) => {
+                                    aggregated_data.concurrent_fungible_asset_balance =
+                                        Some(concurrent_fungible_asset_balance);
+                                },
+                            }
                         }
                         if let Some(untransferable) =
-                            Untransferable::from_write_resource(write_resource, txn_version)
-                                .unwrap()
+                            Untransferable::from_write_resource(write_resource).unwrap()
                         {
                             aggregated_data.untransferable = Some(untransferable);
                         }

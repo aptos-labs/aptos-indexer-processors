@@ -7,7 +7,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::{
+    db::postgres::models::{
         fungible_asset_models::{
             parquet_coin_supply::CoinSupply,
             parquet_v2_fungible_asset_balances::FungibleAssetBalance,
@@ -15,6 +15,7 @@ use crate::{
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
+        resources::FromWriteResource,
     },
     gap_detectors::ProcessingResult,
     processors::{ProcessorName, ProcessorTrait},
@@ -177,9 +178,7 @@ async fn parse_v2_coin(
         // Need to do a first pass to get all the objects
         for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                if let Some(object) =
-                    ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                {
+                if let Some(object) = ObjectWithMetadata::from_write_resource(wr).unwrap() {
                     fungible_asset_object_helper.insert(
                         standardize_address(&wr.address.to_string()),
                         ObjectAggregatedData {

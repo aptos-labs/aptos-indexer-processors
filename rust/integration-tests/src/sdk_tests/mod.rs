@@ -1,4 +1,4 @@
-use crate::diff_tests::remove_transaction_timestamp;
+use crate::diff_test_helper::remove_transaction_timestamp;
 use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
 use aptos_indexer_testing_framework::{
     database::{PostgresTestDatabase, TestDatabase},
@@ -14,6 +14,9 @@ use std::{
 };
 
 #[cfg(test)]
+pub mod ans_processor_tests;
+
+#[cfg(test)]
 pub mod events_processor_tests;
 #[cfg(test)]
 pub mod fungible_asset_processor_tests;
@@ -21,7 +24,18 @@ pub mod fungible_asset_processor_tests;
 pub mod token_v2_processor_tests;
 
 #[cfg(test)]
+pub mod account_transaction_processor_tests;
+
+#[cfg(test)]
 pub mod default_processor_tests;
+
+#[cfg(test)]
+pub mod objects_processor_tests;
+#[cfg(test)]
+pub mod stake_processor_tests;
+
+#[cfg(test)]
+pub mod user_transaction_processor_tests;
 
 #[allow(dead_code)]
 pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files";
@@ -43,15 +57,6 @@ pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
     }
 }
 
-#[allow(dead_code)]
-pub fn get_transaction_version_from_test_context(test_context: &SdkTestContext) -> Vec<u64> {
-    test_context
-        .transaction_batches
-        .iter()
-        .map(|txn| txn.version)
-        .collect()
-}
-
 // Common setup for database and test context
 #[allow(dead_code)]
 pub async fn setup_test_environment(
@@ -60,7 +65,10 @@ pub async fn setup_test_environment(
     let mut db = PostgresTestDatabase::new();
     db.setup().await.unwrap();
 
-    let test_context = SdkTestContext::new(transactions).await.unwrap();
+    let mut test_context = SdkTestContext::new(transactions);
+    if test_context.init_mock_grpc().await.is_err() {
+        panic!("Failed to initialize mock grpc");
+    };
 
     (db, test_context)
 }
@@ -124,7 +132,6 @@ pub async fn run_processor_test<F>(
     processor: impl ProcessorTrait,
     load_data: F,
     db_url: String,
-    txn_versions: Vec<i64>,
     generate_file_flag: bool,
     output_path: String,
     custom_file_name: Option<String>,
@@ -135,32 +142,34 @@ where
         + Sync
         + 'static,
 {
+    let txn_versions: Vec<i64> = test_context
+        .get_test_transaction_versions()
+        .into_iter()
+        .map(|v| v as i64)
+        .collect();
+
     let db_values = test_context
         .run(
             &processor,
-            txn_versions[0] as u64,
             generate_file_flag,
             output_path.clone(),
             custom_file_name,
             move || {
-                let mut conn =
-                    PgConnection::establish(&db_url).expect("Failed to establish DB connection");
+                let mut conn = PgConnection::establish(&db_url).unwrap_or_else(|e| {
+                    eprintln!("[ERROR] Failed to establish DB connection: {:?}", e);
+                    panic!("Failed to establish DB connection: {:?}", e);
+                });
 
-                let starting_version = txn_versions[0];
-                let ending_version = txn_versions[txn_versions.len() - 1];
-
-                let db_values = match load_data(&mut conn, txn_versions) {
+                let db_values = match load_data(&mut conn, txn_versions.clone()) {
                     Ok(db_data) => db_data,
                     Err(e) => {
-                        eprintln!(
-                            "[ERROR] Failed to load data {}", e
-                        );
+                        eprintln!("[ERROR] Failed to load data {}", e);
                         return Err(e);
                     },
                 };
 
                 if db_values.is_empty() {
-                    eprintln!("[WARNING] No data found for starting txn version: {} and ending txn version {}", starting_version, ending_version);
+                    eprintln!("[WARNING] No data found for versions: {:?}", txn_versions);
                 }
 
                 Ok(db_values)

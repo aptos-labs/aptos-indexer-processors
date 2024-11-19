@@ -30,12 +30,12 @@ testing-transactions = { path = "testing-transactions" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "c8f12a75c3648fba889c3da657ff713cd5e676dc" }
-aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "c8f12a75c3648fba889c3da657ff713cd5e676dc" }
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e6867c50a2c30ef16ad6f82e02313b2ba5ce361a" }
+aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e6867c50a2c30ef16ad6f82e02313b2ba5ce361a" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb" }
 aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
-aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "7429012893b530e6880877750ade5b879858285d" }
-aptos-indexer-testing-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "c8f12a75c3648fba889c3da657ff713cd5e676dc" }
+aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "cf85a5d78c6b6da6499201f583f5fef6a434071e" }
+aptos-indexer-testing-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "e6867c50a2c30ef16ad6f82e02313b2ba5ce361a" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"
 base64 = "0.13.0"
@@ -45,6 +45,7 @@ bigdecimal = { version = "0.4.0", features = ["serde"] }
 bitflags = "2.5.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+const_format = "0.2.33"
 # Do NOT enable the postgres feature here, it is conditionally enabled in a feature
 # block in the Cargo.toml file for the processor crate.
 # https://github.com/aptos-labs/aptos-indexer-processors/pull/325
@@ -144,3 +145,4 @@ canonical_json = "0.5.0"
 serde_canonical_json = "1.0.0"
 allocative = "0.3.3"
 allocative_derive = "0.3.3"
+mockall = "0.12.1"

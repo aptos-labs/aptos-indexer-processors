@@ -8,7 +8,8 @@ use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
 use processor::schema::{
     collections_v2, current_collections_v2, current_token_datas_v2, current_token_ownerships_v2,
-    current_token_v2_metadata, token_activities_v2, token_datas_v2, token_ownerships_v2,
+    current_token_pending_claims, current_token_v2_metadata, token_activities_v2, token_datas_v2,
+    token_ownerships_v2,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -200,4 +201,36 @@ pub struct CurrentTokenOwnershipV2 {
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub inserted_at: chrono::NaiveDateTime,
     pub non_transferrable_by_owner: Option<bool>,
+}
+
+#[derive(
+    Clone,
+    Debug,
+    Deserialize,
+    Eq,
+    FieldCount,
+    Identifiable,
+    Insertable,
+    PartialEq,
+    Serialize,
+    Queryable,
+)]
+#[diesel(primary_key(token_data_id_hash, property_version, from_address, to_address))]
+#[diesel(table_name = current_token_pending_claims)]
+pub struct CurrentTokenPendingClaim {
+    pub token_data_id_hash: String,
+    pub property_version: BigDecimal,
+    pub from_address: String,
+    pub to_address: String,
+    pub collection_data_id_hash: String,
+    pub creator_address: String,
+    pub collection_name: String,
+    pub name: String,
+    pub amount: BigDecimal,
+    pub table_handle: String,
+    pub last_transaction_version: i64,
+    pub inserted_at: chrono::NaiveDateTime,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub token_data_id: String,
+    pub collection_id: String,
 }

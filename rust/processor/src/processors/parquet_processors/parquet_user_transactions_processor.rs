@@ -6,7 +6,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::{
+    db::postgres::models::{
         fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
         user_transactions_models::parquet_user_transactions::UserTransaction,
     },

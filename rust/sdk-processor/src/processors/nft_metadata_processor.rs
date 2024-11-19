@@ -71,6 +71,7 @@ impl NftMetadataProcessor {
 
         // The PubSub crate utilizes service account file in GOOGLE_APPLICATION_CREDENTIALS env var for auth.
         // If not set, the crate will attempt to retrieve credentials from the metadata server.
+
         if let Some(credentials) = &nft_metadata_processor_config.google_application_credentials {
             std::env::set_var("GOOGLE_APPLICATION_CREDENTIALS", credentials);
         }

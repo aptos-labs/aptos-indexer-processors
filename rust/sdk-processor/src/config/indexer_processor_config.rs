@@ -8,8 +8,9 @@ use crate::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         default_processor::DefaultProcessor, events_processor::EventsProcessor,
         fungible_asset_processor::FungibleAssetProcessor,
-        nft_metadata_processor::NftMetadataProcessor, objects_processor::ObjectsProcessor,
-        stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
+        monitoring_processor::MonitoringProcessor, nft_metadata_processor::NftMetadataProcessor,
+        objects_processor::ObjectsProcessor, stake_processor::StakeProcessor,
+        token_v2_processor::TokenV2Processor, user_transaction_processor::UserTransactionProcessor,
     },
 };
 use anyhow::Result;
@@ -56,6 +57,10 @@ impl RunnableConfig for IndexerProcessorConfig {
                 let fungible_asset_processor = FungibleAssetProcessor::new(self.clone()).await?;
                 fungible_asset_processor.run_processor().await
             },
+            ProcessorConfig::UserTransactionProcessor(_) => {
+                let user_txns_processor = UserTransactionProcessor::new(self.clone()).await?;
+                user_txns_processor.run_processor().await
+            },
             ProcessorConfig::NftMetadataProcessor(_) => {
                 let nft_metadata_processor = NftMetadataProcessor::new(self.clone()).await?;
                 nft_metadata_processor.run_processor().await
@@ -63,6 +68,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::StakeProcessor(_) => {
                 let stake_processor = StakeProcessor::new(self.clone()).await?;
                 stake_processor.run_processor().await
+            },
+            ProcessorConfig::MonitoringProcessor(_) => {
+                let monitoring_processor = MonitoringProcessor::new(self.clone()).await?;
+                monitoring_processor.run_processor().await
             },
             ProcessorConfig::TokenV2Processor(_) => {
                 let token_v2_processor = TokenV2Processor::new(self.clone()).await?;

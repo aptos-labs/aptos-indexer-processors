@@ -7,7 +7,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::{
+    db::postgres::models::{
         token_models::{token_claims::CurrentTokenPendingClaim, tokens::TableMetadataForToken},
         token_v2_models::{
             v1_token_royalty::CurrentTokenRoyaltyV1,

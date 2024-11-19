@@ -9,7 +9,7 @@ use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use google_cloud_pubsub::publisher::Publisher;
 use processor::{
     self,
-    db::common::models::{
+    db::postgres::models::{
         token_models::token_claims::CurrentTokenPendingClaim,
         token_v2_models::{
             v1_token_royalty::CurrentTokenRoyaltyV1,

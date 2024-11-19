@@ -11,7 +11,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::default_models::{
+    db::postgres::models::default_models::{
         block_metadata_transactions::BlockMetadataTransactionModel,
         move_tables::{CurrentTableItem, TableItem, TableMetadata},
     },

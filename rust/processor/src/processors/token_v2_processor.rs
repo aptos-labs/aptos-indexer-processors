@@ -3,11 +3,12 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::{
+    db::postgres::models::{
         fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
         object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
+        resources::{FromWriteResource, V2TokenResource},
         token_models::{
             token_claims::CurrentTokenPendingClaim,
             tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
@@ -23,9 +24,7 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
-                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
-                TransferEvent, UnlimitedSupply,
+                Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
             },
         },
     },
@@ -787,9 +786,7 @@ pub async fn parse_v2_token(
             // Loop 1: Need to do a first pass to get all the object addresses and insert them into the helper
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    if let Some(object) =
-                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                    {
+                    if let Some(object) = ObjectWithMetadata::from_write_resource(wr).unwrap() {
                         token_v2_metadata_helper.insert(
                             standardize_address(&wr.address.to_string()),
                             ObjectAggregatedData {
@@ -807,49 +804,41 @@ pub async fn parse_v2_token(
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     let address = standardize_address(&wr.address.to_string());
                     if let Some(aggregated_data) = token_v2_metadata_helper.get_mut(&address) {
-                        if let Some(fixed_supply) =
-                            FixedSupply::from_write_resource(wr, txn_version).unwrap()
+                        if let Some(v2_token_resource) =
+                            V2TokenResource::from_write_resource(wr).unwrap()
                         {
-                            aggregated_data.fixed_supply = Some(fixed_supply);
-                        }
-                        if let Some(unlimited_supply) =
-                            UnlimitedSupply::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.unlimited_supply = Some(unlimited_supply);
-                        }
-                        if let Some(aptos_collection) =
-                            AptosCollection::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.aptos_collection = Some(aptos_collection);
-                        }
-                        if let Some(property_map) =
-                            PropertyMapModel::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.property_map = Some(property_map);
-                        }
-                        if let Some(concurrent_supply) =
-                            ConcurrentSupply::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.concurrent_supply = Some(concurrent_supply);
-                        }
-                        if let Some(token) = TokenV2::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.token = Some(token);
+                            match v2_token_resource {
+                                V2TokenResource::FixedSupply(fixed_supply) => {
+                                    aggregated_data.fixed_supply = Some(fixed_supply);
+                                },
+                                V2TokenResource::UnlimitedSupply(unlimited_supply) => {
+                                    aggregated_data.unlimited_supply = Some(unlimited_supply);
+                                },
+                                V2TokenResource::AptosCollection(aptos_collection) => {
+                                    aggregated_data.aptos_collection = Some(aptos_collection);
+                                },
+                                V2TokenResource::PropertyMapModel(property_map) => {
+                                    aggregated_data.property_map = Some(property_map);
+                                },
+                                V2TokenResource::ConcurrentSupply(concurrent_supply) => {
+                                    aggregated_data.concurrent_supply = Some(concurrent_supply);
+                                },
+                                V2TokenResource::TokenV2(token) => {
+                                    aggregated_data.token = Some(token);
+                                },
+                                V2TokenResource::TokenIdentifiers(token_identifier) => {
+                                    aggregated_data.token_identifier = Some(token_identifier);
+                                },
+                                V2TokenResource::Untransferable(untransferable) => {
+                                    aggregated_data.untransferable = Some(untransferable);
+                                },
+                                _ => {},
+                            }
                         }
                         if let Some(fungible_asset_metadata) =
-                            FungibleAssetMetadata::from_write_resource(wr, txn_version).unwrap()
+                            FungibleAssetMetadata::from_write_resource(wr).unwrap()
                         {
                             aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
-                        }
-                        if let Some(token_identifier) =
-                            TokenIdentifiers::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.token_identifier = Some(token_identifier);
-                        }
-                        if let Some(untransferable) =
-                            Untransferable::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.untransferable = Some(untransferable);
                         }
                     }
                 }

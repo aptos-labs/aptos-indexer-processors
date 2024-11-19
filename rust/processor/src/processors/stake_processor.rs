@@ -3,7 +3,7 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::stake_models::{
+    db::postgres::models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{

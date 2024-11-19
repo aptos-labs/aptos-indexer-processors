@@ -1,11 +1,16 @@
-use crate::processors::{
-    ans_processor::AnsProcessorConfig, nft_metadata_processor::NftMetadataProcessorConfig,
-    objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
-    token_v2_processor::TokenV2ProcessorConfig,
+use crate::{
+    parquet_processors::ParquetTypeEnum,
+    processors::{
+        ans_processor::AnsProcessorConfig, nft_metadata_processor::NftMetadataProcessorConfig,
+        objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
+        token_v2_processor::TokenV2ProcessorConfig,
+    },
 };
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use strum::IntoEnumIterator;
+
 /// This enum captures the configs for all the different processors that are defined.
 ///
 /// The configs for each processor should only contain configuration specific to that
@@ -45,9 +50,11 @@ pub enum ProcessorConfig {
     EventsProcessor(DefaultProcessorConfig),
     FungibleAssetProcessor(DefaultProcessorConfig),
     NftMetadataProcessor(NftMetadataProcessorConfig),
+    UserTransactionProcessor(DefaultProcessorConfig),
     StakeProcessor(StakeProcessorConfig),
     TokenV2Processor(TokenV2ProcessorConfig),
     ObjectsProcessor(ObjectsProcessorConfig),
+    MonitoringProcessor(DefaultProcessorConfig),
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
 }
@@ -63,22 +70,44 @@ impl ProcessorConfig {
     ///
     /// This is a convenience method to map the table names to include the processor name as a prefix, which
     /// is useful for querying the status from the processor status table in the database.
-    pub fn get_table_names(&self) -> Option<Vec<String>> {
+    pub fn get_table_names(&self) -> anyhow::Result<Vec<String>> {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config) => {
                 // Get the processor name as a prefix
                 let prefix = self.name();
-                // Use the tables from the config and map them to include the prefix
-                Some(
-                    config
-                        .tables
-                        .iter()
-                        .map(|table_name| format!("{}_{}", prefix, table_name))
-                        .collect(),
-                )
+
+                // Collect valid table names from `ParquetTypeEnum` into a set for quick lookup
+                let valid_table_names: HashSet<String> =
+                    ParquetTypeEnum::iter().map(|e| e.to_string()).collect();
+
+                // Validate and map table names with prefix
+                let mut validated_table_names = Vec::new();
+                for table_name in &config.tables {
+                    // Ensure the table name is a valid `ParquetTypeEnum` variant
+                    if !valid_table_names.contains(table_name) {
+                        return Err(anyhow::anyhow!(
+                            "Invalid table name '{}'. Expected one of: {:?}",
+                            table_name,
+                            valid_table_names
+                        ));
+                    }
+
+                    // Append the prefix to the validated table name
+                    validated_table_names.push(Self::format_table_name(prefix, table_name));
+                }
+
+                Ok(validated_table_names)
             },
-            _ => None, // For all other processor types, return None
+            _ => Err(anyhow::anyhow!(
+                "Invalid parquet processor config: {:?}",
+                self
+            )),
         }
+    }
+
+    /// helper function to format the table name with the processor name.
+    fn format_table_name(prefix: &str, table_name: &str) -> String {
+        format!("{}.{}", prefix, table_name)
     }
 }
 
@@ -122,10 +151,8 @@ pub struct ParquetDefaultProcessorConfig {
     pub bucket_name: String,
     #[serde(default)]
     pub bucket_root: String,
-    #[serde(
-        default = "ParquetDefaultProcessorConfig::default_parquet_handler_response_channel_size"
-    )]
-    pub parquet_handler_response_channel_size: usize,
+    #[serde(default = "ParquetDefaultProcessorConfig::default_channel_size")]
+    pub channel_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_max_buffer_size")]
     pub max_buffer_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_parquet_upload_interval")]
@@ -138,7 +165,7 @@ pub struct ParquetDefaultProcessorConfig {
 impl ParquetDefaultProcessorConfig {
     /// Make the default very large on purpose so that by default it's not chunked
     /// This prevents any unexpected changes in behavior
-    pub const fn default_parquet_handler_response_channel_size() -> usize {
+    pub const fn default_channel_size() -> usize {
         100_000
     }
 
@@ -150,5 +177,118 @@ impl ParquetDefaultProcessorConfig {
     /// Default upload interval for parquet files in seconds
     pub const fn default_parquet_upload_interval() -> u64 {
         1800 // 30 minutes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_table_names() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: HashSet::from(["MoveResource".to_string(), "Transaction".to_string()]),
+            bucket_name: "bucket_name".to_string(),
+            bucket_root: "bucket_root".to_string(),
+            google_application_credentials: None,
+            channel_size: 10,
+            max_buffer_size: 100000,
+            parquet_upload_interval: 1800,
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap();
+        let table_names: HashSet<String> = table_names.into_iter().collect();
+        let expected_names: HashSet<String> =
+            ["Transaction".to_string(), "MoveResource".to_string()]
+                .iter()
+                .map(|e| format!("parquet_default_processor.{}", e))
+                .collect();
+        assert_eq!(table_names, expected_names);
+    }
+
+    #[test]
+    fn test_invalid_table_name() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: HashSet::from(["InvalidTable".to_string(), "Transaction".to_string()]),
+            bucket_name: "bucket_name".to_string(),
+            bucket_root: "bucket_root".to_string(),
+            google_application_credentials: None,
+            channel_size: 10,
+            max_buffer_size: 100000,
+            parquet_upload_interval: 1800,
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_err());
+
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("Invalid table name 'InvalidTable'"));
+        assert!(error_message.contains("Expected one of:"));
+    }
+
+    #[test]
+    fn test_empty_tables() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: HashSet::new(),
+            bucket_name: "bucket_name".to_string(),
+            bucket_root: "bucket_root".to_string(),
+            google_application_credentials: None,
+            channel_size: 10,
+            max_buffer_size: 100000,
+            parquet_upload_interval: 1800,
+        });
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap();
+        assert_eq!(table_names, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_duplicate_table_names() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: HashSet::from(["Transaction".to_string(), "Transaction".to_string()]),
+            bucket_name: "bucket_name".to_string(),
+            bucket_root: "bucket_root".to_string(),
+            google_application_credentials: None,
+            channel_size: 10,
+            max_buffer_size: 100000,
+            parquet_upload_interval: 1800,
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap();
+        assert_eq!(
+            table_names,
+            vec!["parquet_default_processor.Transaction".to_string(),]
+        );
+    }
+
+    #[test]
+    fn test_all_enum_table_names() {
+        let config = ProcessorConfig::ParquetDefaultProcessor(ParquetDefaultProcessorConfig {
+            tables: ParquetTypeEnum::iter().map(|e| e.to_string()).collect(),
+            bucket_name: "bucket_name".to_string(),
+            bucket_root: "bucket_root".to_string(),
+            google_application_credentials: None,
+            channel_size: 10,
+            max_buffer_size: 100000,
+            parquet_upload_interval: 1800,
+        });
+
+        let result = config.get_table_names();
+        assert!(result.is_ok());
+
+        let table_names = result.unwrap();
+        let expected_names: HashSet<String> = ParquetTypeEnum::iter()
+            .map(|e| format!("parquet_default_processor.{}", e))
+            .collect();
+        let table_names: HashSet<String> = table_names.into_iter().collect();
+        assert_eq!(table_names, expected_names);
     }
 }

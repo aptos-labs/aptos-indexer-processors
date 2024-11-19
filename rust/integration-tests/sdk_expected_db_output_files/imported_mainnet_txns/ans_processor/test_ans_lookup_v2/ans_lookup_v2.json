@@ -1,0 +1,14 @@
+[
+  {
+    "transaction_version": 303690531,
+    "write_set_change_index": 0,
+    "domain": "pepapati",
+    "subdomain": "",
+    "token_standard": "v2",
+    "registered_address": "0xb879a253da5c2887155600f61a5a3b7b827588f7b3c486b807975fc663ca5493",
+    "expiration_timestamp": "2024-08-10T16:57:36",
+    "token_name": "pepapati.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  }
+]
