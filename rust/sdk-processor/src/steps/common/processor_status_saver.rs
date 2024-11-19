@@ -1,5 +1,5 @@
 use crate::{
-    config::indexer_processor_config::IndexerProcessorConfig,
+    config::{db_config::DbConfig, indexer_processor_config::IndexerProcessorConfig},
     db::common::models::{
         backfill_processor_status::{BackfillProcessorStatus, BackfillStatus},
         processor_status::ProcessorStatus,
@@ -34,7 +34,7 @@ pub fn get_processor_status_saver(
         }
     } else {
         let processor_name = config.processor_config.name().to_string();
-        if config.processor_config.is_parquet_processor() {
+        if let DbConfig::ParquetConfig(_) = config.db_config {
             ProcessorStatusSaverEnum::Parquet {
                 conn_pool,
                 processor_name,
@@ -105,6 +105,10 @@ impl ProcessorStatusSaverEnum {
             .map(|t| t.naive_utc());
         match self {
             ProcessorStatusSaverEnum::Postgres {
+                conn_pool,
+                processor_name,
+            }
+            | ProcessorStatusSaverEnum::Parquet {
                 conn_pool,
                 processor_name,
             } => {
@@ -189,7 +193,6 @@ impl ProcessorStatusSaverEnum {
                     .await?;
                 Ok(())
             },
-            _ => Ok(()),
         }
     }
 }

@@ -73,7 +73,7 @@ where
     pub processor_name: String,
 }
 
-pub fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
+fn create_new_writer(schema: Arc<Type>) -> Result<SerializedFileWriter<Vec<u8>>> {
     let props = WriterProperties::builder()
         .set_compression(parquet::basic::Compression::LZ4)
         .build();

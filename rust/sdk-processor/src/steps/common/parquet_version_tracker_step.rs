@@ -11,9 +11,9 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use tracing::debug;
 
-/// The `ParquetProcessorStatusSaver` trait object should be implemented in order to save the latest successfully
-///
-/// processed transaction versino to storage. I.e., persisting the `processor_status` to storage.
+/// The ParquetProcessorStatusSaver trait object is intended to save
+/// the latest successfully processed transaction version to storage,
+/// ensuring that the processor_status is persistently stored.
 #[async_trait]
 pub trait ParquetProcessorStatusSaver {
     async fn save_parquet_processor_status(
@@ -70,7 +70,7 @@ where
     S: ParquetProcessorStatusSaver + Send + 'static,
 {
     type Input = HashMap<ParquetTypeEnum, TransactionMetadata>;
-    type Output = HashMap<ParquetTypeEnum, TransactionMetadata>;
+    type Output = ();
     type RunType = PollableAsyncRunType;
 
     async fn process(
@@ -81,7 +81,7 @@ where
 
         // Check for version gap before processing each key-value pair
         for (parquet_type, current_metadata) in &current_batch.data {
-            // we need to have a map of last_sucess_bath for parquet-Type as well.
+            // we need to have a map of last_success_bath for parquet-Type as well.
             // if there is a last_success_batch for the current parquet-Type then we need to check the version gap
             debug!(
                 "checking for parquet_type: {:?} with start version {}, end_version {}",
@@ -118,7 +118,7 @@ where
 
         // Pass through the current batch with updated metadata
         Ok(Some(TransactionContext {
-            data: processed_data,
+            data: (),
             metadata: current_batch.metadata.clone(),
         }))
     }
@@ -142,12 +142,7 @@ where
         std::time::Duration::from_secs(self.polling_interval_secs)
     }
 
-    async fn poll(
-        &mut self,
-    ) -> Result<
-        Option<Vec<TransactionContext<HashMap<ParquetTypeEnum, TransactionMetadata>>>>,
-        ProcessorError,
-    > {
+    async fn poll(&mut self) -> Result<Option<Vec<TransactionContext<()>>>, ProcessorError> {
         // TODO: Add metrics for gap count
         self.save_processor_status().await?;
         // Nothing should be returned

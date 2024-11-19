@@ -1,5 +1,5 @@
 use crate::{
-    config::{db_config::DbConfig, processor_config::ParquetDefaultProcessorConfig},
+    config::db_config::DbConfig,
     steps::common::{
         gcs_uploader::{create_new_writer, GCSUploader},
         parquet_buffer_step::ParquetBufferStep,
@@ -18,7 +18,11 @@ use processor::{
     worker::TableFlags,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use strum::{Display, EnumIter};
 
 pub mod parquet_default_processor;
@@ -87,16 +91,6 @@ impl ParquetTypeStructs {
         }
     }
 
-    pub fn get_table_name(&self) -> &'static str {
-        match self {
-            ParquetTypeStructs::MoveResource(_) => "move_resources",
-            ParquetTypeStructs::WriteSetChange(_) => "write_set_changes",
-            ParquetTypeStructs::Transaction(_) => "transactions",
-            ParquetTypeStructs::TableItem(_) => "table_items",
-            ParquetTypeStructs::MoveModule(_) => "move_modules",
-        }
-    }
-
     pub fn calculate_size(&self) -> usize {
         match self {
             ParquetTypeStructs::MoveResource(data) => allocative::size_of_unique(data),
@@ -155,27 +149,32 @@ async fn initialize_gcs_client(credentials: Option<String>) -> Arc<GCSClient> {
 
 async fn initialize_database_pool(config: &DbConfig) -> anyhow::Result<ArcDbPool> {
     match config {
-        DbConfig::PostgresConfig(ref postgres_config) => {
+        DbConfig::ParquetConfig(ref parquet_config) => {
             let conn_pool = new_db_pool(
-                &postgres_config.connection_string,
-                Some(postgres_config.db_pool_size),
+                &parquet_config.connection_string,
+                Some(parquet_config.db_pool_size),
             )
             .await
             .map_err(|e| {
                 anyhow::anyhow!(
-                    "Failed to create connection pool for PostgresConfig: {:?}",
+                    "Failed to create connection pool for ParquetConfig: {:?}",
                     e
                 )
             })?;
+
             Ok(conn_pool)
         },
+        _ => Err(anyhow::anyhow!("Invalid db config for Parquet Processor")),
     }
 }
 
 async fn initialize_parquet_buffer_step(
     gcs_client: Arc<GCSClient>,
-    parquet_processor_config: ParquetDefaultProcessorConfig,
     parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>>,
+    upload_interval: u64,
+    max_buffer_size: usize,
+    bucket_name: String,
+    bucket_root: String,
     processor_name: String,
 ) -> anyhow::Result<ParquetBufferStep> {
     let parquet_type_to_writer = parquet_type_to_schemas
@@ -190,25 +189,26 @@ async fn initialize_parquet_buffer_step(
         gcs_client,
         parquet_type_to_schemas,
         parquet_type_to_writer,
-        parquet_processor_config.bucket_name.clone(),
-        parquet_processor_config.bucket_root.clone(),
+        bucket_name,
+        bucket_root,
         processor_name,
     )?;
 
     let default_size_buffer_step = ParquetBufferStep::new(
-        Duration::from_secs(parquet_processor_config.parquet_upload_interval),
+        Duration::from_secs(upload_interval),
         buffer_uploader,
-        parquet_processor_config.max_buffer_size,
+        max_buffer_size,
     );
 
     Ok(default_size_buffer_step)
 }
 
-fn set_backfill_table_flag(table_names: Vec<String>) -> TableFlags {
+fn set_backfill_table_flag(table_names: HashSet<String>) -> TableFlags {
     let mut backfill_table = TableFlags::empty();
 
-    for table_name in table_names {
-        if let Some(flag) = TableFlags::from_name(&table_name) {
+    for table_name in table_names.iter() {
+        if let Some(flag) = TableFlags::from_name(table_name) {
+            println!("Setting backfill table flag: {:?}", flag);
             backfill_table |= flag;
         }
     }

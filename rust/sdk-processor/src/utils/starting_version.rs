@@ -51,9 +51,15 @@ pub async fn get_min_last_success_version_parquet(
     conn_pool: ArcDbPool,
     table_names: Vec<String>,
 ) -> Result<u64> {
-    let min_processed_version = get_min_processed_version_from_db(conn_pool.clone(), table_names)
-        .await
-        .context("Failed to get minimum last success version from DB")?;
+    let min_processed_version = if indexer_processor_config.backfill_config.is_some() {
+        get_starting_version_from_db(indexer_processor_config, conn_pool.clone())
+            .await
+            .context("Failed to get latest processed version from DB")?
+    } else {
+        get_min_processed_version_from_db(conn_pool.clone(), table_names)
+            .await
+            .context("Failed to get minimum last success version from DB")?
+    };
 
     // If nothing checkpointed, return the `starting_version` from the config, or 0 if not set.
     Ok(min_processed_version.unwrap_or(

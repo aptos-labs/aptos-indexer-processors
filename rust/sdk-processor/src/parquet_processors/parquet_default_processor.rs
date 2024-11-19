@@ -59,15 +59,22 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
     async fn run_processor(&self) -> anyhow::Result<()> {
         // Run Migrations
-        match self.config.db_config {
-            DbConfig::PostgresConfig(ref postgres_config) => {
+        let parquet_db_config = match self.config.db_config {
+            DbConfig::ParquetConfig(ref parquet_config) => {
                 run_migrations(
-                    postgres_config.connection_string.clone(),
+                    parquet_config.connection_string.clone(),
                     self.db_pool.clone(),
                 )
                 .await;
+                parquet_config
             },
-        }
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Invalid db config for ParquetDefaultProcessor {:?}",
+                    self.config.db_config
+                ));
+            },
+        };
 
         // Check and update the ledger chain id to ensure we're indexing the correct chain
         let grpc_chain_id = TransactionStream::new(self.config.transaction_stream_config.clone())
@@ -88,24 +95,16 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             },
         };
 
-        // Query the starting version
-        let table_names = if self.config.backfill_config.is_some() {
-            parquet_processor_config
-                .backfill_table
-                .clone()
-                .into_iter()
-                .collect()
-        } else {
-            self.config
-                .processor_config
-                .get_table_names()
-                .context("Failed to get table names for the processor")?
-        };
+        let processor_status_table_names = self
+            .config
+            .processor_config
+            .get_processor_status_table_names()
+            .context("Failed to get table names for the processor status table")?;
 
         let starting_version = get_min_last_success_version_parquet(
             &self.config,
             self.db_pool.clone(),
-            table_names.clone(),
+            processor_status_table_names,
         )
         .await?;
 
@@ -116,17 +115,13 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         })
         .await?;
 
-        let backfill_table = set_backfill_table_flag(table_names);
+        let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
         let parquet_default_extractor = ParquetDefaultExtractor {
             opt_in_tables: backfill_table,
         };
 
-        let gcs_client = initialize_gcs_client(
-            parquet_processor_config
-                .google_application_credentials
-                .clone(),
-        )
-        .await;
+        let gcs_client =
+            initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
             (ParquetTypeEnum::MoveResource, MoveResource::schema()),
@@ -143,8 +138,11 @@ impl ProcessorTrait for ParquetDefaultProcessor {
 
         let default_size_buffer_step = initialize_parquet_buffer_step(
             gcs_client.clone(),
-            parquet_processor_config.clone(),
             parquet_type_to_schemas,
+            parquet_processor_config.upload_interval,
+            parquet_processor_config.max_buffer_size,
+            parquet_db_config.bucket_name.clone(),
+            parquet_db_config.bucket_root.clone(),
             self.name().to_string(),
         )
         .await
