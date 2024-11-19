@@ -149,10 +149,8 @@ pub struct ParquetDefaultProcessorConfig {
     pub bucket_name: String,
     #[serde(default)]
     pub bucket_root: String,
-    #[serde(
-        default = "ParquetDefaultProcessorConfig::default_parquet_handler_response_channel_size"
-    )]
-    pub parquet_handler_response_channel_size: usize,
+    #[serde(default = "ParquetDefaultProcessorConfig::default_channel_size")]
+    pub channel_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_max_buffer_size")]
     pub max_buffer_size: usize,
     #[serde(default = "ParquetDefaultProcessorConfig::default_parquet_upload_interval")]
@@ -165,7 +163,7 @@ pub struct ParquetDefaultProcessorConfig {
 impl ParquetDefaultProcessorConfig {
     /// Make the default very large on purpose so that by default it's not chunked
     /// This prevents any unexpected changes in behavior
-    pub const fn default_parquet_handler_response_channel_size() -> usize {
+    pub const fn default_channel_size() -> usize {
         100_000
     }
 
@@ -191,7 +189,7 @@ mod tests {
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
-            parquet_handler_response_channel_size: 10,
+            channel_size: 10,
             max_buffer_size: 100000,
             parquet_upload_interval: 1800,
         });
@@ -200,11 +198,13 @@ mod tests {
         assert!(result.is_ok());
 
         let table_names = result.unwrap();
-
-        assert_eq!(table_names, vec![
-            "parquet_default_processor.Transaction".to_string(),
-            "parquet_default_processor.MoveResource".to_string(),
-        ]);
+        let table_names: HashSet<String> = table_names.into_iter().collect();
+        let expected_names: HashSet<String> =
+            ["Transaction".to_string(), "MoveResource".to_string()]
+                .iter()
+                .map(|e| format!("parquet_default_processor.{}", e))
+                .collect();
+        assert_eq!(table_names, expected_names);
     }
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
-            parquet_handler_response_channel_size: 10,
+            channel_size: 10,
             max_buffer_size: 100000,
             parquet_upload_interval: 1800,
         });
@@ -234,7 +234,7 @@ mod tests {
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
-            parquet_handler_response_channel_size: 10,
+            channel_size: 10,
             max_buffer_size: 100000,
             parquet_upload_interval: 1800,
         });
@@ -252,7 +252,7 @@ mod tests {
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
-            parquet_handler_response_channel_size: 10,
+            channel_size: 10,
             max_buffer_size: 100000,
             parquet_upload_interval: 1800,
         });
@@ -273,7 +273,7 @@ mod tests {
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
             google_application_credentials: None,
-            parquet_handler_response_channel_size: 10,
+            channel_size: 10,
             max_buffer_size: 100000,
             parquet_upload_interval: 1800,
         });
