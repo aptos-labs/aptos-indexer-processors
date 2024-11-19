@@ -72,6 +72,13 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # google auth to create a Google Client
+      - id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           
       # Run Integration Tests
       - name: Run Integration Tests
