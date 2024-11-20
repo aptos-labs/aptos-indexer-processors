@@ -1,3 +1,6 @@
+[![codecov](https://codecov.io/gh/aptos-labs/aptos-indexer-processors/graph/badge.svg?token=yOKOnndthm)](https://codecov.io/gh/aptos-labs/aptos-indexer-processors)
+
+
 # Aptos Indexer Client Guide
 
 This guide will get you started with creating an Aptos indexer with custom parsing. We have several endpoints that provided a streaming RPC of transaction data.

@@ -29,9 +29,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/dep_install_and_lint
-        with:
-          working-directory: rust
+
+      - name: rust setup
+        run: |
+          sudo apt update && sudo apt install libdw-dev
+          cargo update
+        working-directory: rust
+
       - run: rustup component add llvm-tools-preview
       - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
         with:
@@ -48,24 +52,28 @@ jobs:
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
         working-directory: rust
+      - run: ls -R
+        working-directory: rust
       - uses: actions/upload-artifact@v4
         with:
           name: lcov_unit
-          path: lcov_unit.info
+          path: rust/lcov_unit.info
 
   upload-to-codecov:
     runs-on: ubuntu-latest
     continue-on-error: true # Don't fail if the codecov upload fails
-    #    env:
-    #      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     needs: [ rust-unit-coverage ]
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: lcov_unit
-
+      - run: ls -R
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
         with:
-          files: lcov_unit.info,lcov_smoke.info
-          fail_ci_if_error: true
+          files: lcov_unit.info
+#          fail_ci_if_error: true
+          verbose: true
