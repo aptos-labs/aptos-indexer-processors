@@ -38,28 +38,46 @@ impl Uploadable for GCSUploader {
         &mut self,
         buffer: ParquetTypeStructs,
     ) -> anyhow::Result<(), ProcessorError> {
-        let table_name = buffer.get_table_name();
-
         let result = match buffer {
             ParquetTypeStructs::Transaction(transactions) => {
-                self.upload_generic(&transactions[..], ParquetTypeEnum::Transaction, table_name)
-                    .await
+                self.upload_generic(
+                    &transactions[..],
+                    ParquetTypeEnum::Transaction,
+                    &ParquetTypeEnum::Transaction.to_string(),
+                )
+                .await
             },
             ParquetTypeStructs::MoveResource(resources) => {
-                self.upload_generic(&resources[..], ParquetTypeEnum::MoveResource, table_name)
-                    .await
+                self.upload_generic(
+                    &resources[..],
+                    ParquetTypeEnum::MoveResource,
+                    &ParquetTypeEnum::MoveResource.to_string(),
+                )
+                .await
             },
             ParquetTypeStructs::WriteSetChange(changes) => {
-                self.upload_generic(&changes[..], ParquetTypeEnum::WriteSetChange, table_name)
-                    .await
+                self.upload_generic(
+                    &changes[..],
+                    ParquetTypeEnum::WriteSetChange,
+                    &ParquetTypeEnum::WriteSetChange.to_string(),
+                )
+                .await
             },
             ParquetTypeStructs::TableItem(items) => {
-                self.upload_generic(&items[..], ParquetTypeEnum::TableItem, table_name)
-                    .await
+                self.upload_generic(
+                    &items[..],
+                    ParquetTypeEnum::TableItem,
+                    &ParquetTypeEnum::TableItem.to_string(),
+                )
+                .await
             },
             ParquetTypeStructs::MoveModule(modules) => {
-                self.upload_generic(&modules[..], ParquetTypeEnum::MoveModule, table_name)
-                    .await
+                self.upload_generic(
+                    &modules[..],
+                    ParquetTypeEnum::MoveModule,
+                    &ParquetTypeEnum::MoveModule.to_string(),
+                )
+                .await
             },
         };
 
@@ -141,7 +159,7 @@ impl GCSUploader {
         &mut self,
         data: &[ParquetType],
         parquet_type: ParquetTypeEnum,
-        table_name: &'static str,
+        table_name: &str,
     ) -> anyhow::Result<()>
     where
         ParquetType: HasVersion + GetTimeStamp + HasParquetSchema,
@@ -183,6 +201,13 @@ impl GCSUploader {
             self.processor_name.clone(),
         )
         .await?;
+
+        debug!(
+            "Uploaded parquet to GCS for table: {}, start_version: {}, end_version: {}",
+            table_name,
+            data[0].version(),
+            data[data.len() - 1].version()
+        );
 
         Ok(())
     }

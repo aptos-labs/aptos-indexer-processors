@@ -76,6 +76,10 @@ impl TokenV2Processor {
                     db_pool: conn_pool,
                 })
             },
+            _ => Err(anyhow::anyhow!(
+                "Invalid db config for TokenV2Processor {:?}",
+                config.db_config
+            )),
         }
     }
 }
@@ -88,14 +92,12 @@ impl ProcessorTrait for TokenV2Processor {
 
     async fn run_processor(&self) -> Result<()> {
         //  Run migrations
-        match self.config.db_config {
-            DbConfig::PostgresConfig(ref postgres_config) => {
-                run_migrations(
-                    postgres_config.connection_string.clone(),
-                    self.db_pool.clone(),
-                )
-                .await;
-            },
+        if let DbConfig::PostgresConfig(ref postgres_config) = self.config.db_config {
+            run_migrations(
+                postgres_config.connection_string.clone(),
+                self.db_pool.clone(),
+            )
+            .await;
         }
 
         // Merge the starting version from config and the latest processed version from the DB

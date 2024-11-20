@@ -49,12 +49,17 @@ pub async fn get_starting_version(
 pub async fn get_min_last_success_version_parquet(
     indexer_processor_config: &IndexerProcessorConfig,
     conn_pool: ArcDbPool,
-    processor_names: Vec<String>,
+    table_names: Vec<String>,
 ) -> Result<u64> {
-    let min_processed_version =
-        get_min_processed_version_from_db(conn_pool.clone(), processor_names)
+    let min_processed_version = if indexer_processor_config.backfill_config.is_some() {
+        get_starting_version_from_db(indexer_processor_config, conn_pool.clone())
             .await
-            .context("Failed to get minimum last success version from DB")?;
+            .context("Failed to get latest processed version from DB")?
+    } else {
+        get_min_processed_version_from_db(conn_pool.clone(), table_names)
+            .await
+            .context("Failed to get minimum last success version from DB")?
+    };
 
     // If nothing checkpointed, return the `starting_version` from the config, or 0 if not set.
     Ok(min_processed_version.unwrap_or(
@@ -65,14 +70,19 @@ pub async fn get_min_last_success_version_parquet(
     ))
 }
 
+/// Get the minimum last success version from the database for the given processors.
+///
+/// This should return the minimum of the last success version of the processors in the list.
+/// If any of the tables handled by the parquet processor has no entry, it should use 0 as a default value.
+/// To avoid skipping any versions, the minimum of the last success version should be used as the starting version.
 async fn get_min_processed_version_from_db(
     conn_pool: ArcDbPool,
-    processor_names: Vec<String>,
+    table_names: Vec<String>,
 ) -> Result<Option<u64>> {
     let mut queries = Vec::new();
 
     // Spawn all queries concurrently with separate connections
-    for processor_name in processor_names {
+    for processor_name in table_names {
         let conn_pool = conn_pool.clone();
         let processor_name = processor_name.clone();
 
