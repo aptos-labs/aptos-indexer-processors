@@ -99,15 +99,7 @@ impl Processable for ParquetDefaultExtractor {
         ];
 
         // Populate the map based on opt-in tables
-        for (table_flag, enum_type, data) in data_types {
-            add_to_map_if_opted_in_for_backfill(
-                self.opt_in_tables,
-                &mut map,
-                table_flag,
-                enum_type,
-                data,
-            );
-        }
+        add_to_map_if_opted_in_for_backfill(self.opt_in_tables, &mut map, data_types.to_vec());
 
         Ok(Some(TransactionContext {
             data: map,
