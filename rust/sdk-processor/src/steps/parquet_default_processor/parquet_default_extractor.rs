@@ -74,27 +74,27 @@ impl Processable for ParquetDefaultExtractor {
             (
                 TableFlags::MOVE_RESOURCES,
                 ParquetTypeEnum::MoveResource,
-                ParquetTypeStructs::MoveResource(move_resources),
+                ParquetTypeStructs::new(move_resources),
             ),
             (
                 TableFlags::WRITE_SET_CHANGES,
                 ParquetTypeEnum::WriteSetChange,
-                ParquetTypeStructs::WriteSetChange(write_set_changes),
+                ParquetTypeStructs::new(write_set_changes),
             ),
             (
                 TableFlags::TRANSACTIONS,
                 ParquetTypeEnum::Transaction,
-                ParquetTypeStructs::Transaction(parquet_transactions),
+                ParquetTypeStructs::new(parquet_transactions),
             ),
             (
                 TableFlags::TABLE_ITEMS,
                 ParquetTypeEnum::TableItem,
-                ParquetTypeStructs::TableItem(parquet_table_items),
+                ParquetTypeStructs::new(parquet_table_items),
             ),
             (
                 TableFlags::MOVE_MODULES,
                 ParquetTypeEnum::MoveModule,
-                ParquetTypeStructs::MoveModule(move_modules),
+                ParquetTypeStructs::new(move_modules),
             ),
         ];
 

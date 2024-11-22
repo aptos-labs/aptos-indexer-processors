@@ -38,49 +38,10 @@ impl Uploadable for GCSUploader {
         &mut self,
         buffer: ParquetTypeStructs,
     ) -> anyhow::Result<(), ProcessorError> {
-        let result = match buffer {
-            ParquetTypeStructs::Transaction(transactions) => {
-                self.upload_generic(
-                    &transactions[..],
-                    ParquetTypeEnum::Transaction,
-                    &ParquetTypeEnum::Transaction.to_string(),
-                )
-                .await
-            },
-            ParquetTypeStructs::MoveResource(resources) => {
-                self.upload_generic(
-                    &resources[..],
-                    ParquetTypeEnum::MoveResource,
-                    &ParquetTypeEnum::MoveResource.to_string(),
-                )
-                .await
-            },
-            ParquetTypeStructs::WriteSetChange(changes) => {
-                self.upload_generic(
-                    &changes[..],
-                    ParquetTypeEnum::WriteSetChange,
-                    &ParquetTypeEnum::WriteSetChange.to_string(),
-                )
-                .await
-            },
-            ParquetTypeStructs::TableItem(items) => {
-                self.upload_generic(
-                    &items[..],
-                    ParquetTypeEnum::TableItem,
-                    &ParquetTypeEnum::TableItem.to_string(),
-                )
-                .await
-            },
-            ParquetTypeStructs::MoveModule(modules) => {
-                self.upload_generic(
-                    &modules[..],
-                    ParquetTypeEnum::MoveModule,
-                    &ParquetTypeEnum::MoveModule.to_string(),
-                )
-                .await
-            },
-        };
+        let parquet_type = determine_parquet_type(&buffer); // Implement to deduce type
+        let table_name = parquet_type.to_string();
 
+        let result = buffer.upload_to_gcs(self, parquet_type, &table_name).await;
         if let Err(e) = result {
             error!("Failed to upload buffer: {}", e);
             return Err(ProcessorError::ProcessError {
@@ -98,6 +59,10 @@ pub fn create_new_writer(schema: Arc<Type>) -> anyhow::Result<SerializedFileWrit
     let props_arc = Arc::new(props);
 
     SerializedFileWriter::new(Vec::new(), schema, props_arc).context("Failed to create new writer")
+}
+
+fn determine_parquet_type(buffer: &ParquetTypeStructs) -> ParquetTypeEnum {
+    buffer.data.as_ref().parquet_type()
 }
 
 impl GCSUploader {
@@ -155,7 +120,7 @@ impl GCSUploader {
     }
 
     // Generic upload function to handle any data type
-    async fn upload_generic<ParquetType>(
+    pub async fn upload_generic<ParquetType>(
         &mut self,
         data: &[ParquetType],
         parquet_type: ParquetTypeEnum,
