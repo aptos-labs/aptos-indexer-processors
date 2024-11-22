@@ -1,3 +1,4 @@
+use crate::parquet_processors::ParquetTypeTrait;
 #[allow(unused_imports)]
 use crate::{
     parquet_processors::{ParquetTypeEnum, ParquetTypeStructs},
@@ -97,7 +98,8 @@ impl ParquetBufferStep {
         parquet_data: ParquetTypeStructs,
     ) -> Result<(), ProcessorError> {
         buffer.buffer_size_bytes += parquet_data.calculate_size();
-        buffer.buffer.append(parquet_data)
+        buffer.buffer.append(parquet_data)?;
+        Ok(())
     }
 
     /// Handles the addition of `parquet_data` to the buffer for a specified `ParquetTypeEnum`.
