@@ -1213,12 +1213,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "difflib"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1266,12 +1260,6 @@ name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
-
-[[package]]
-name = "downcast-rs"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
 name = "dtoa"
@@ -2302,24 +2290,15 @@ dependencies = [
  "assert-json-diff",
  "bigdecimal",
  "chrono",
- "clap",
  "diesel",
- "dirs",
  "field_count",
  "futures",
- "itertools 0.12.1",
- "json-structural-diff",
- "once_cell",
  "processor",
- "prost 0.12.6",
- "regex",
  "sdk-processor",
  "serde",
- "serde_canonical_json",
  "serde_json",
  "tempfile",
  "testcontainers",
- "testing-transactions",
  "tokio",
  "tonic 0.11.0",
  "url",
@@ -2420,17 +2399,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a88f1bda2bd75b0452a14784937d796722fdebfe50df998aeb3f0b7603019a9"
 dependencies = [
  "wasm-bindgen",
-]
-
-[[package]]
-name = "json-structural-diff"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25c7940d3c84d2079306c176c7b2b37622b6bc5e43fbd1541b1e4a4e1fd02045"
-dependencies = [
- "difflib",
- "regex",
- "serde_json",
 ]
 
 [[package]]
@@ -2816,7 +2784,6 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
 dependencies = [
- "num-bigint",
  "num-complex",
  "num-integer",
  "num-iter",
@@ -2902,7 +2869,6 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
 dependencies = [
- "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -3410,7 +3376,6 @@ dependencies = [
  "allocative",
  "allocative_derive",
  "anyhow",
- "aptos-indexer-processor-sdk",
  "aptos-moving-average 0.1.0",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
@@ -3438,7 +3403,6 @@ dependencies = [
  "kanal",
  "lazy_static",
  "native-tls",
- "num",
  "num_cpus",
  "once_cell",
  "parquet",
@@ -4214,36 +4178,27 @@ dependencies = [
  "aptos-indexer-processor-sdk-server-framework",
  "aptos-indexer-testing-framework",
  "async-trait",
- "bcs",
- "bigdecimal",
  "chrono",
  "clap",
  "diesel",
  "diesel-async",
  "diesel_migrations",
- "downcast-rs",
  "enum_dispatch",
  "field_count",
  "futures",
  "futures-util",
  "google-cloud-storage",
- "hex",
  "jemallocator",
- "kanal",
  "lazy_static",
- "mockall",
  "native-tls",
  "num_cpus",
  "parquet",
- "parquet_derive",
  "postgres-native-tls",
  "processor",
  "rayon",
  "serde",
  "serde_json",
- "sha2",
  "strum",
- "tiny-keccak",
  "tokio",
  "tokio-postgres",
  "tracing",
@@ -4286,18 +4241,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8e3592472072e6e22e0a54d5904d9febf8508f65fb8552499a1abc7d1078c3a"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde_canonical_json"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ef94ee2661f3ce924fa936258393d02155fa22c5a81125016a24069e23a0465"
-dependencies = [
- "itoa",
- "lazy_static",
- "regex",
- "serde_json",
 ]
 
 [[package]]
