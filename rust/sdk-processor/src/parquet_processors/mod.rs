@@ -32,33 +32,6 @@ pub mod parquet_default_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
-/// Trait for providing default instances of supported types.
-pub trait ParquetDefault {
-    fn default_for_type() -> Self;
-}
-
-/// Macro to implement ParquetDefault for multiple types.
-macro_rules! impl_parquet_default {
-    ($($type:ty),*) => {
-        $(
-            impl ParquetDefault for Vec<$type> {
-                fn default_for_type() -> Self {
-                    Vec::new()
-                }
-            }
-        )*
-    };
-}
-
-// Apply the macro to all supported types
-impl_parquet_default!(
-    MoveResource,
-    WriteSetChangeModel,
-    ParquetTransaction,
-    TableItem,
-    MoveModule
-);
-
 /// Enum representing the different types of Parquet files that can be processed.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Display, EnumIter)]
 #[strum(serialize_all = "snake_case")]
@@ -155,9 +128,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::MoveModule => ParquetTypeStructs::MoveModule(Vec::new()),
         }
     }
-}
 
-impl ParquetTypeStructs {
     pub fn append(&mut self, other: ParquetTypeStructs) -> Result<(), ProcessorError> {
         macro_rules! handle_append {
             ($self_data:expr, $other_data:expr) => {{
