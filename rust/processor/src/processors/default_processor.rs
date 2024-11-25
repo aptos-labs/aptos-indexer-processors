@@ -4,7 +4,10 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::default_models::raw_table_items::{RawTableItem, TableItemConvertible},
+        common::models::default_models::{
+            raw_current_table_items::{CurrentTableItemConvertible, RawCurrentTableItem},
+            raw_table_items::{RawTableItem, TableItemConvertible},
+        },
         postgres::models::default_models::{
             block_metadata_transactions::BlockMetadataTransactionModel,
             move_tables::{CurrentTableItem, TableItem, TableMetadata},
@@ -219,13 +222,22 @@ impl ProcessorTrait for DefaultProcessor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let (block_metadata_transactions, raw_table_items, current_table_items, mut table_metadata) =
-            tokio::task::spawn_blocking(move || process_transactions(transactions))
-                .await
-                .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
+        let (
+            block_metadata_transactions,
+            raw_table_items,
+            raw_current_table_items,
+            mut table_metadata,
+        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+            .await
+            .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
         let mut postgres_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();
+
+        let postgres_current_table_items: Vec<CurrentTableItem> = raw_current_table_items
+            .iter()
+            .map(CurrentTableItem::from_raw)
+            .collect();
 
         let flags = self.deprecated_tables;
         // TODO: remove this, since we are not going to deprecate this anytime soon?
@@ -246,7 +258,11 @@ impl ProcessorTrait for DefaultProcessor {
             start_version,
             end_version,
             &block_metadata_transactions,
-            (&postgres_table_items, &current_table_items, &table_metadata),
+            (
+                &postgres_table_items,
+                &postgres_current_table_items,
+                &table_metadata,
+            ),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -256,7 +272,7 @@ impl ProcessorTrait for DefaultProcessor {
         tokio::task::spawn(async move {
             drop(block_metadata_transactions);
             drop(postgres_table_items);
-            drop(current_table_items);
+            drop(postgres_current_table_items);
             drop(table_metadata);
         });
 
@@ -306,7 +322,7 @@ impl ProcessorTrait for DefaultProcessor {
 ///
 /// A tuple containing:
 /// * `Vec<BlockMetadataTransactionModel>` - A vector of block metadata transaction models.
-/// * `Vec<TableItem>` - A vector of table items.
+/// * `Vec<RawTableItem>` - A vector of table items.
 /// * `Vec<CurrentTableItem>` - A vector of current table items, sorted by primary key.
 /// * `Vec<TableMetadata>` - A vector of table metadata, sorted by primary key.
 pub fn process_transactions(
@@ -314,7 +330,7 @@ pub fn process_transactions(
 ) -> (
     Vec<BlockMetadataTransactionModel>,
     Vec<RawTableItem>,
-    Vec<CurrentTableItem>,
+    Vec<RawCurrentTableItem>,
     Vec<TableMetadata>,
 ) {
     let mut block_metadata_transactions = vec![];
@@ -406,7 +422,7 @@ pub fn process_transactions(
     // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
     let mut current_table_items = current_table_items
         .into_values()
-        .collect::<Vec<CurrentTableItem>>();
+        .collect::<Vec<RawCurrentTableItem>>();
     let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
     // Sort by PK
     current_table_items

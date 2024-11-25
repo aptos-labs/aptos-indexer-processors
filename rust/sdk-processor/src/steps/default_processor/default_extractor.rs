@@ -7,7 +7,10 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::default_models::raw_table_items::TableItemConvertible,
+        common::models::default_models::{
+            raw_current_table_items::CurrentTableItemConvertible,
+            raw_table_items::TableItemConvertible,
+        },
         postgres::models::default_models::{
             block_metadata_transactions::BlockMetadataTransactionModel,
             move_tables::{CurrentTableItem, TableItem, TableMetadata},
@@ -49,17 +52,21 @@ impl Processable for DefaultExtractor {
         >,
         ProcessorError,
     > {
-        let (block_metadata_transactions, raw_table_items, current_table_items, table_metadata) =
+        let (block_metadata_transactions, raw_table_items, raw_current_table_items, table_metadata) =
             process_transactions(transactions.data.clone());
 
         let postgres_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();
+        let postgres_current_table_items: Vec<CurrentTableItem> = raw_current_table_items
+            .iter()
+            .map(CurrentTableItem::from_raw)
+            .collect();
 
         Ok(Some(TransactionContext {
             data: (
                 block_metadata_transactions,
                 postgres_table_items,
-                current_table_items,
+                postgres_current_table_items,
                 table_metadata,
             ),
             metadata: transactions.metadata,

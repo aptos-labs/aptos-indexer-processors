@@ -111,6 +111,8 @@ bitflags! {
 
         // User transaction
         const SIGNATURES = 1 << 23;
+
+        const CURRENT_TABLE_ITEMS = 1 << 24;
     }
 }
 

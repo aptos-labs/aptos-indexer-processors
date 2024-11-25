@@ -13,8 +13,10 @@ use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClien
 use parquet::schema::types::Type;
 use processor::{
     db::parquet::models::default_models::{
-        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-        parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
+        parquet_move_modules::MoveModule,
+        parquet_move_resources::MoveResource,
+        parquet_move_tables::{CurrentTableItem, TableItem},
+        parquet_transactions::Transaction as ParquetTransaction,
         parquet_write_set_changes::WriteSetChangeModel,
     },
     worker::TableFlags,
@@ -57,6 +59,7 @@ pub enum ParquetTypeEnum {
     Transaction,
     TableItem,
     MoveModule,
+    CurrentTableItem,
 }
 
 /// Trait for handling various Parquet types.
@@ -107,6 +110,7 @@ impl_parquet_trait!(WriteSetChangeModel, ParquetTypeEnum::WriteSetChange);
 impl_parquet_trait!(ParquetTransaction, ParquetTypeEnum::Transaction);
 impl_parquet_trait!(TableItem, ParquetTypeEnum::TableItem);
 impl_parquet_trait!(MoveModule, ParquetTypeEnum::MoveModule);
+impl_parquet_trait!(CurrentTableItem, ParquetTypeEnum::CurrentTableItem);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -116,6 +120,7 @@ pub enum ParquetTypeStructs {
     Transaction(Vec<ParquetTransaction>),
     TableItem(Vec<TableItem>),
     MoveModule(Vec<MoveModule>),
+    CurrentTableItem(Vec<CurrentTableItem>),
 }
 
 impl ParquetTypeStructs {
@@ -126,6 +131,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::Transaction => ParquetTypeStructs::Transaction(Vec::new()),
             ParquetTypeEnum::TableItem => ParquetTypeStructs::TableItem(Vec::new()),
             ParquetTypeEnum::MoveModule => ParquetTypeStructs::MoveModule(Vec::new()),
+            ParquetTypeEnum::CurrentTableItem => ParquetTypeStructs::CurrentTableItem(Vec::new()),
         }
     }
 
@@ -165,6 +171,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::MoveModule(self_data),
                 ParquetTypeStructs::MoveModule(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentTableItem(self_data),
+                ParquetTypeStructs::CurrentTableItem(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
@@ -271,6 +283,7 @@ mod tests {
             ParquetTypeEnum::Transaction,
             ParquetTypeEnum::TableItem,
             ParquetTypeEnum::MoveModule,
+            ParquetTypeEnum::CurrentTableItem,
         ];
 
         for t in types {
