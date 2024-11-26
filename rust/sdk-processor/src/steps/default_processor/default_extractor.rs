@@ -10,7 +10,7 @@ use processor::{
         common::models::default_models::{
             raw_block_metadata_transactions::BlockMetadataTransactionConvertible,
             raw_current_table_items::CurrentTableItemConvertible,
-            raw_table_items::TableItemConvertible,
+            raw_table_items::TableItemConvertible, raw_table_metadata::TableMetadataConvertible,
         },
         postgres::models::default_models::{
             block_metadata_transactions::BlockMetadataTransactionModel,
@@ -57,7 +57,7 @@ impl Processable for DefaultExtractor {
             raw_block_metadata_transactions,
             raw_table_items,
             raw_current_table_items,
-            table_metadata,
+            raw_table_metadata,
         ) = process_transactions(transactions.data.clone());
 
         let postgres_table_items: Vec<TableItem> =
@@ -71,13 +71,17 @@ impl Processable for DefaultExtractor {
                 .iter()
                 .map(BlockMetadataTransactionModel::from_raw)
                 .collect();
+        let postgres_table_metadata = raw_table_metadata
+            .iter()
+            .map(TableMetadata::from_raw)
+            .collect();
 
         Ok(Some(TransactionContext {
             data: (
                 postgres_block_metadata_transactions,
                 postgres_table_items,
                 postgres_current_table_items,
-                table_metadata,
+                postgres_table_metadata,
             ),
             metadata: transactions.metadata,
         }))

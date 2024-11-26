@@ -35,6 +35,7 @@ use processor::{
         parquet_move_modules::MoveModule,
         parquet_move_resources::MoveResource,
         parquet_move_tables::{CurrentTableItem, TableItem},
+        parquet_table_metadata::TableMetadata,
         parquet_transactions::Transaction as ParquetTransaction,
         parquet_write_set_changes::WriteSetChangeModel,
     },
@@ -143,6 +144,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
                 ParquetTypeEnum::BlockMetadataTransaction,
                 BlockMetadataTransaction::schema(),
             ),
+            (ParquetTypeEnum::TableMetadata, TableMetadata::schema()),
         ]
         .into_iter()
         .collect();

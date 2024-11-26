@@ -7,10 +7,10 @@ use crate::{
     db::common::models::default_models::{
         raw_current_table_items::{CurrentTableItemConvertible, RawCurrentTableItem},
         raw_table_items::{RawTableItem, TableItemConvertible},
+        raw_table_metadata::{RawTableMetadata, TableMetadataConvertible},
     },
     schema::{current_table_items, table_items, table_metadatas},
 };
-use aptos_protos::transaction::v1::WriteTableItem;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -68,12 +68,12 @@ impl TableItemConvertible for TableItem {
     }
 }
 
-impl TableMetadata {
-    pub fn from_write_table_item(table_item: &WriteTableItem) -> Self {
-        Self {
-            handle: table_item.handle.to_string(),
-            key_type: table_item.data.as_ref().unwrap().key_type.clone(),
-            value_type: table_item.data.as_ref().unwrap().value_type.clone(),
+impl TableMetadataConvertible for TableMetadata {
+    fn from_raw(raw_item: &RawTableMetadata) -> Self {
+        TableMetadata {
+            handle: raw_item.handle.clone(),
+            key_type: raw_item.key_type.clone(),
+            value_type: raw_item.value_type.clone(),
         }
     }
 }

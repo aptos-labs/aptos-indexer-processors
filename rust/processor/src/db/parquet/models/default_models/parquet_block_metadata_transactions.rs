@@ -25,9 +25,9 @@ pub struct BlockMetadataTransaction {
     pub id: String,
     pub round: i64,
     pub epoch: i64,
-    pub previous_block_votes_bitvec: String, // serde_json::Value,
+    pub previous_block_votes_bitvec: String,
     pub proposer: String,
-    pub failed_proposer_indices: String, //serde_json::Value,
+    pub failed_proposer_indices: String,
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }

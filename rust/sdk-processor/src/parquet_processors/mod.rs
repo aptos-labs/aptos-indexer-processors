@@ -17,6 +17,7 @@ use processor::{
         parquet_move_modules::MoveModule,
         parquet_move_resources::MoveResource,
         parquet_move_tables::{CurrentTableItem, TableItem},
+        parquet_table_metadata::TableMetadata,
         parquet_transactions::Transaction as ParquetTransaction,
         parquet_write_set_changes::WriteSetChangeModel,
     },
@@ -62,7 +63,7 @@ pub enum ParquetTypeEnum {
     MoveModule,
     CurrentTableItem,
     BlockMetadataTransaction,
-    // TableMetadata,
+    TableMetadata,
 }
 
 /// Trait for handling various Parquet types.
@@ -118,6 +119,7 @@ impl_parquet_trait!(
     BlockMetadataTransaction,
     ParquetTypeEnum::BlockMetadataTransaction
 );
+impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -129,6 +131,7 @@ pub enum ParquetTypeStructs {
     MoveModule(Vec<MoveModule>),
     CurrentTableItem(Vec<CurrentTableItem>),
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
+    TableMetadata(Vec<TableMetadata>),
 }
 
 impl ParquetTypeStructs {
@@ -143,6 +146,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::BlockMetadataTransaction => {
                 ParquetTypeStructs::BlockMetadataTransaction(Vec::new())
             },
+            ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
         }
     }
 
@@ -194,6 +198,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::BlockMetadataTransaction(self_data),
                 ParquetTypeStructs::BlockMetadataTransaction(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::TableMetadata(self_data),
+                ParquetTypeStructs::TableMetadata(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

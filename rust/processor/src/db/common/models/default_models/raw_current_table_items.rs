@@ -7,8 +7,6 @@ pub struct RawCurrentTableItem {
     pub key: String,
     pub decoded_key: String,
     pub decoded_value: Option<String>,
-    // pub decoded_key: serde_json::Value,
-    // pub decoded_value: Option<serde_json::Value>,
     pub last_transaction_version: i64,
     pub is_deleted: bool,
     pub block_timestamp: chrono::NaiveDateTime,
