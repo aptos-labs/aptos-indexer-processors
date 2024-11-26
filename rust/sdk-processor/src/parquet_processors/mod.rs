@@ -7,6 +7,8 @@ use crate::{
     utils::database::{new_db_pool, ArcDbPool},
 };
 use aptos_indexer_processor_sdk::utils::errors::ProcessorError;
+use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
 use processor::{
@@ -17,6 +19,7 @@ use processor::{
     },
     worker::TableFlags,
 };
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -56,22 +59,57 @@ pub enum ParquetTypeEnum {
     MoveModule,
 }
 
-#[derive(Clone, Debug, strum::EnumDiscriminants)]
-#[strum(serialize_all = "snake_case")]
-#[strum_discriminants(
-    derive(
-        Deserialize,
-        Serialize,
-        strum::EnumVariantNames,
-        strum::IntoStaticStr,
-        strum::Display,
-        clap::ValueEnum
-    ),
-    name(ParquetTypeStructName),
-    clap(rename_all = "snake_case"),
-    serde(rename_all = "snake_case"),
-    strum(serialize_all = "snake_case")
-)]
+/// Trait for handling various Parquet types.
+#[async_trait]
+#[enum_dispatch]
+pub trait ParquetTypeTrait: std::fmt::Debug + Send + Sync {
+    fn parquet_type(&self) -> ParquetTypeEnum;
+    fn calculate_size(&self) -> usize;
+
+    async fn upload_to_gcs(
+        &self,
+        uploader: &mut GCSUploader,
+        parquet_type: ParquetTypeEnum,
+        table_name: &str,
+    ) -> anyhow::Result<()>;
+}
+
+/// Macro for implementing ParquetTypeTrait for multiple types.
+macro_rules! impl_parquet_trait {
+    ($type:ty, $enum_variant:expr) => {
+        #[async_trait]
+        impl ParquetTypeTrait for Vec<$type> {
+            fn parquet_type(&self) -> ParquetTypeEnum {
+                $enum_variant
+            }
+
+            fn calculate_size(&self) -> usize {
+                allocative::size_of_unique(self)
+            }
+
+            async fn upload_to_gcs(
+                &self,
+                uploader: &mut GCSUploader,
+                parquet_type: ParquetTypeEnum,
+                table_name: &str,
+            ) -> anyhow::Result<()> {
+                uploader
+                    .upload_generic(self, parquet_type, table_name)
+                    .await
+            }
+        }
+    };
+}
+
+// Apply macro to supported types
+impl_parquet_trait!(MoveResource, ParquetTypeEnum::MoveResource);
+impl_parquet_trait!(WriteSetChangeModel, ParquetTypeEnum::WriteSetChange);
+impl_parquet_trait!(ParquetTransaction, ParquetTypeEnum::Transaction);
+impl_parquet_trait!(TableItem, ParquetTypeEnum::TableItem);
+impl_parquet_trait!(MoveModule, ParquetTypeEnum::MoveModule);
+
+#[derive(Debug, Clone)]
+#[enum_dispatch(ParquetTypeTrait)]
 pub enum ParquetTypeStructs {
     MoveResource(Vec<MoveResource>),
     WriteSetChange(Vec<WriteSetChangeModel>),
@@ -91,41 +129,44 @@ impl ParquetTypeStructs {
         }
     }
 
-    pub fn calculate_size(&self) -> usize {
-        match self {
-            ParquetTypeStructs::MoveResource(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::WriteSetChange(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::Transaction(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::TableItem(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::MoveModule(data) => allocative::size_of_unique(data),
-        }
-    }
-
-    /// Appends data to the current buffer within each ParquetTypeStructs variant.
     pub fn append(&mut self, other: ParquetTypeStructs) -> Result<(), ProcessorError> {
-        match (self, other) {
-            (ParquetTypeStructs::MoveResource(buf), ParquetTypeStructs::MoveResource(mut data)) => {
-                buf.append(&mut data);
+        macro_rules! handle_append {
+            ($self_data:expr, $other_data:expr) => {{
+                $self_data.extend($other_data);
                 Ok(())
+            }};
+        }
+
+        match (self, other) {
+            (
+                ParquetTypeStructs::MoveResource(self_data),
+                ParquetTypeStructs::MoveResource(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
             },
             (
-                ParquetTypeStructs::WriteSetChange(buf),
-                ParquetTypeStructs::WriteSetChange(mut data),
+                ParquetTypeStructs::WriteSetChange(self_data),
+                ParquetTypeStructs::WriteSetChange(other_data),
             ) => {
-                buf.append(&mut data);
-                Ok(())
+                handle_append!(self_data, other_data)
             },
-            (ParquetTypeStructs::Transaction(buf), ParquetTypeStructs::Transaction(mut data)) => {
-                buf.append(&mut data);
-                Ok(())
+            (
+                ParquetTypeStructs::Transaction(self_data),
+                ParquetTypeStructs::Transaction(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
             },
-            (ParquetTypeStructs::TableItem(buf), ParquetTypeStructs::TableItem(mut data)) => {
-                buf.append(&mut data);
-                Ok(())
+            (
+                ParquetTypeStructs::TableItem(self_data),
+                ParquetTypeStructs::TableItem(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
             },
-            (ParquetTypeStructs::MoveModule(buf), ParquetTypeStructs::MoveModule(mut data)) => {
-                buf.append(&mut data);
-                Ok(())
+            (
+                ParquetTypeStructs::MoveModule(self_data),
+                ParquetTypeStructs::MoveModule(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
             },
             _ => Err(ProcessorError::ProcessError {
                 message: "Mismatched buffer types in append operation".to_string(),
@@ -147,6 +188,7 @@ async fn initialize_gcs_client(credentials: Option<String>) -> Arc<GCSClient> {
     Arc::new(GCSClient::new(gcs_config))
 }
 
+/// Initializes the database connection pool.
 async fn initialize_database_pool(config: &DbConfig) -> anyhow::Result<ArcDbPool> {
     match config {
         DbConfig::ParquetConfig(ref parquet_config) => {
@@ -168,6 +210,7 @@ async fn initialize_database_pool(config: &DbConfig) -> anyhow::Result<ArcDbPool
     }
 }
 
+/// Initializes the Parquet buffer step.
 async fn initialize_parquet_buffer_step(
     gcs_client: Arc<GCSClient>,
     parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>>,
@@ -203,6 +246,7 @@ async fn initialize_parquet_buffer_step(
     Ok(default_size_buffer_step)
 }
 
+/// Sets the backfill table flag.
 fn set_backfill_table_flag(table_names: HashSet<String>) -> TableFlags {
     let mut backfill_table = TableFlags::empty();
 
@@ -216,17 +260,24 @@ fn set_backfill_table_flag(table_names: HashSet<String>) -> TableFlags {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
-    use strum::VariantNames;
 
-    /// This test exists to make sure that when a new processor is added, it is added
-    /// to both Processor and ProcessorConfig.
-    ///
-    /// To make sure this passes, make sure the variants are in the same order
-    /// (lexicographical) and the names match.
     #[test]
-    fn test_parquet_type_names_complete() {
-        assert_eq!(ParquetTypeStructName::VARIANTS, ParquetTypeName::VARIANTS);
+    fn test_parquet_type_enum_matches_trait() {
+        let types = vec![
+            ParquetTypeEnum::MoveResource,
+            ParquetTypeEnum::WriteSetChange,
+            ParquetTypeEnum::Transaction,
+            ParquetTypeEnum::TableItem,
+            ParquetTypeEnum::MoveModule,
+        ];
+
+        for t in types {
+            // Use a type corresponding to the ParquetTypeEnum
+            let default = ParquetTypeStructs::default_for_type(&t);
+
+            assert_eq!(default.parquet_type(), t);
+        }
     }
 }
