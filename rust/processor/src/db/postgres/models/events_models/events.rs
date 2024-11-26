@@ -11,6 +11,8 @@ use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
+use super::raw_events::{EventConvertible, RawEvent};
+
 // p99 currently is 303 so using 300 as a safe max length
 const EVENT_TYPE_MAX_LENGTH: usize = 300;
 
@@ -74,3 +76,19 @@ impl Event {
 
 // Prevent conflicts with other things named `Event`
 pub type EventModel = Event;
+
+impl EventConvertible for Event {
+    fn from_raw(raw_item: &RawEvent) -> Self {
+        Event {
+            sequence_number: raw_item.sequence_number,
+            creation_number: raw_item.creation_number,
+            account_address: raw_item.account_address.clone(),
+            transaction_version: raw_item.txn_version,
+            transaction_block_height: raw_item.block_height,
+            type_: raw_item.event_type.clone(),
+            data: serde_json::from_str(raw_item.data.as_str()).unwrap(),
+            event_index: raw_item.event_index,
+            indexed_type: truncate_str(&raw_item.event_type, EVENT_TYPE_MAX_LENGTH),
+        }
+    }
+}

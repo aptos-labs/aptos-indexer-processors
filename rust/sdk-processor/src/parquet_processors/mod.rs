@@ -1,13 +1,17 @@
 use aptos_indexer_processor_sdk::utils::errors::ProcessorError;
-use processor::db::parquet::models::default_models::{
-    parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-    parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
-    parquet_write_set_changes::WriteSetChangeModel,
+use processor::db::{
+    parquet::models::default_models::{
+        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
+        parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
+        parquet_write_set_changes::WriteSetChangeModel,
+    },
+    postgres::models::events_models::parquet_events::Event,
 };
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 
 pub mod parquet_default_processor;
+pub mod parquet_events_processor;
 
 /// Enum representing the different types of Parquet files that can be processed.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Display, EnumIter)]
@@ -33,6 +37,7 @@ pub enum ParquetTypeEnum {
     Transaction,
     TableItem,
     MoveModule,
+    Event,
 }
 
 #[derive(Clone, Debug, strum::EnumDiscriminants)]
@@ -57,6 +62,7 @@ pub enum ParquetTypeStructs {
     Transaction(Vec<ParquetTransaction>),
     TableItem(Vec<TableItem>),
     MoveModule(Vec<MoveModule>),
+    Event(Vec<Event>),
 }
 
 impl ParquetTypeStructs {
@@ -67,6 +73,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::Transaction => ParquetTypeStructs::Transaction(Vec::new()),
             ParquetTypeEnum::TableItem => ParquetTypeStructs::TableItem(Vec::new()),
             ParquetTypeEnum::MoveModule => ParquetTypeStructs::MoveModule(Vec::new()),
+            ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
         }
     }
 
@@ -77,6 +84,7 @@ impl ParquetTypeStructs {
             ParquetTypeStructs::Transaction(_) => "transactions",
             ParquetTypeStructs::TableItem(_) => "table_items",
             ParquetTypeStructs::MoveModule(_) => "move_modules",
+            ParquetTypeStructs::Event(_) => "events",
         }
     }
 
@@ -87,6 +95,7 @@ impl ParquetTypeStructs {
             ParquetTypeStructs::Transaction(data) => allocative::size_of_unique(data),
             ParquetTypeStructs::TableItem(data) => allocative::size_of_unique(data),
             ParquetTypeStructs::MoveModule(data) => allocative::size_of_unique(data),
+            ParquetTypeStructs::Event(data) => allocative::size_of_unique(data),
         }
     }
 

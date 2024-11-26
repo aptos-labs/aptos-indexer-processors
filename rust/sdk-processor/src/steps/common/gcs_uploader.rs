@@ -61,6 +61,10 @@ impl Uploadable for GCSUploader {
                 self.upload_generic(&modules[..], ParquetTypeEnum::MoveModule, table_name)
                     .await
             },
+            ParquetTypeStructs::Event(events) => {
+                self.upload_generic(&events[..], ParquetTypeEnum::Event, table_name)
+                    .await
+            },
         };
 
         if let Err(e) = result {

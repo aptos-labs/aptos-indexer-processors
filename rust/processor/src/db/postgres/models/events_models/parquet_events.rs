@@ -13,6 +13,8 @@ use lazy_static::lazy_static;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
+use super::raw_events::{EventConvertible, RawEvent};
+
 // p99 currently is 303 so using 300 as a safe max length
 const EVENT_TYPE_MAX_LENGTH: usize = 300;
 const DEFAULT_CREATION_NUMBER: i64 = 0;
@@ -201,4 +203,23 @@ fn handle_user_txn_type(
         .collect()
 }
 
+impl EventConvertible for Event {
+    fn from_raw(raw_item: &RawEvent) -> Self {
+        Event {
+            sequence_number: raw_item.sequence_number,
+            creation_number: raw_item.creation_number,
+            account_address: raw_item.account_address.clone(),
+            txn_version: raw_item.txn_version,
+            block_height: raw_item.block_height,
+            event_type: raw_item.event_type.clone(),
+            data: raw_item.data.clone(),
+            event_index: raw_item.event_index,
+            indexed_type: truncate_str(&raw_item.event_type, EVENT_TYPE_MAX_LENGTH),
+            type_tag_bytes: raw_item.type_tag_bytes,
+            total_bytes: raw_item.total_bytes,
+            event_version: raw_item.event_version,
+            block_timestamp: raw_item.block_timestamp,
+        }
+    }
+}
 pub type ParquetEventModel = Event;
