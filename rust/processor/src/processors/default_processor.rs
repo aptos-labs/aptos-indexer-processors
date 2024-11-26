@@ -5,6 +5,9 @@ use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
         common::models::default_models::{
+            raw_block_metadata_transactions::{
+                BlockMetadataTransactionConvertible, RawBlockMetadataTransactionModel,
+            },
             raw_current_table_items::{CurrentTableItemConvertible, RawCurrentTableItem},
             raw_table_items::{RawTableItem, TableItemConvertible},
         },
@@ -223,7 +226,7 @@ impl ProcessorTrait for DefaultProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let (
-            block_metadata_transactions,
+            raw_block_metadata_transactions,
             raw_table_items,
             raw_current_table_items,
             mut table_metadata,
@@ -238,6 +241,12 @@ impl ProcessorTrait for DefaultProcessor {
             .iter()
             .map(CurrentTableItem::from_raw)
             .collect();
+
+        let postgres_block_metadata_transactions: Vec<BlockMetadataTransactionModel> =
+            raw_block_metadata_transactions
+                .iter()
+                .map(BlockMetadataTransactionModel::from_raw)
+                .collect();
 
         let flags = self.deprecated_tables;
         // TODO: remove this, since we are not going to deprecate this anytime soon?
@@ -257,7 +266,7 @@ impl ProcessorTrait for DefaultProcessor {
             self.name(),
             start_version,
             end_version,
-            &block_metadata_transactions,
+            &postgres_block_metadata_transactions,
             (
                 &postgres_table_items,
                 &postgres_current_table_items,
@@ -270,7 +279,7 @@ impl ProcessorTrait for DefaultProcessor {
         // These vectors could be super large and take a lot of time to drop, move to background to
         // make it faster.
         tokio::task::spawn(async move {
-            drop(block_metadata_transactions);
+            drop(postgres_block_metadata_transactions);
             drop(postgres_table_items);
             drop(postgres_current_table_items);
             drop(table_metadata);
@@ -321,14 +330,14 @@ impl ProcessorTrait for DefaultProcessor {
 /// # Returns
 ///
 /// A tuple containing:
-/// * `Vec<BlockMetadataTransactionModel>` - A vector of block metadata transaction models.
+/// * `Vec<RawBlockMetadataTransactionModel>` - A vector of block metadata transaction models.
 /// * `Vec<RawTableItem>` - A vector of table items.
-/// * `Vec<CurrentTableItem>` - A vector of current table items, sorted by primary key.
+/// * `Vec<RawCurrentTableItem>` - A vector of current table items, sorted by primary key.
 /// * `Vec<TableMetadata>` - A vector of table metadata, sorted by primary key.
 pub fn process_transactions(
     transactions: Vec<Transaction>,
 ) -> (
-    Vec<BlockMetadataTransactionModel>,
+    Vec<RawBlockMetadataTransactionModel>,
     Vec<RawTableItem>,
     Vec<RawCurrentTableItem>,
     Vec<TableMetadata>,
@@ -368,7 +377,7 @@ pub fn process_transactions(
             },
         };
         if let TxnData::BlockMetadata(block_metadata_txn) = txn_data {
-            let bmt = BlockMetadataTransactionModel::from_bmt_transaction(
+            let bmt = RawBlockMetadataTransactionModel::from_bmt_transaction(
                 block_metadata_txn,
                 version,
                 block_height,

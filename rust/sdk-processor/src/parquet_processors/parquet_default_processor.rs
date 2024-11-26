@@ -31,6 +31,7 @@ use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
     db::parquet::models::default_models::{
+        parquet_block_metadata_transactions::BlockMetadataTransaction,
         parquet_move_modules::MoveModule,
         parquet_move_resources::MoveResource,
         parquet_move_tables::{CurrentTableItem, TableItem},
@@ -137,6 +138,10 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             (
                 ParquetTypeEnum::CurrentTableItem,
                 CurrentTableItem::schema(),
+            ),
+            (
+                ParquetTypeEnum::BlockMetadataTransaction,
+                BlockMetadataTransaction::schema(),
             ),
         ]
         .into_iter()

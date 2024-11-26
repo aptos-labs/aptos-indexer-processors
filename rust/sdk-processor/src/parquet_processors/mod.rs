@@ -13,6 +13,7 @@ use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClien
 use parquet::schema::types::Type;
 use processor::{
     db::parquet::models::default_models::{
+        parquet_block_metadata_transactions::BlockMetadataTransaction,
         parquet_move_modules::MoveModule,
         parquet_move_resources::MoveResource,
         parquet_move_tables::{CurrentTableItem, TableItem},
@@ -60,6 +61,8 @@ pub enum ParquetTypeEnum {
     TableItem,
     MoveModule,
     CurrentTableItem,
+    BlockMetadataTransaction,
+    // TableMetadata,
 }
 
 /// Trait for handling various Parquet types.
@@ -111,6 +114,10 @@ impl_parquet_trait!(ParquetTransaction, ParquetTypeEnum::Transaction);
 impl_parquet_trait!(TableItem, ParquetTypeEnum::TableItem);
 impl_parquet_trait!(MoveModule, ParquetTypeEnum::MoveModule);
 impl_parquet_trait!(CurrentTableItem, ParquetTypeEnum::CurrentTableItem);
+impl_parquet_trait!(
+    BlockMetadataTransaction,
+    ParquetTypeEnum::BlockMetadataTransaction
+);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -121,6 +128,7 @@ pub enum ParquetTypeStructs {
     TableItem(Vec<TableItem>),
     MoveModule(Vec<MoveModule>),
     CurrentTableItem(Vec<CurrentTableItem>),
+    BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
 }
 
 impl ParquetTypeStructs {
@@ -132,6 +140,9 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::TableItem => ParquetTypeStructs::TableItem(Vec::new()),
             ParquetTypeEnum::MoveModule => ParquetTypeStructs::MoveModule(Vec::new()),
             ParquetTypeEnum::CurrentTableItem => ParquetTypeStructs::CurrentTableItem(Vec::new()),
+            ParquetTypeEnum::BlockMetadataTransaction => {
+                ParquetTypeStructs::BlockMetadataTransaction(Vec::new())
+            },
         }
     }
 
@@ -177,6 +188,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentTableItem(self_data),
                 ParquetTypeStructs::CurrentTableItem(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::BlockMetadataTransaction(self_data),
+                ParquetTypeStructs::BlockMetadataTransaction(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

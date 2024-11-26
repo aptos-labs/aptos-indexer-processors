@@ -64,6 +64,10 @@ pub struct CurrentTableItem {
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
+impl NamedTable for CurrentTableItem {
+    const TABLE_NAME: &'static str = "current_table_items";
+}
+
 impl HasVersion for CurrentTableItem {
     fn version(&self) -> i64 {
         self.last_transaction_version

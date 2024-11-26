@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use processor::{
     db::{
         common::models::default_models::{
+            raw_block_metadata_transactions::BlockMetadataTransactionConvertible,
             raw_current_table_items::CurrentTableItemConvertible,
             raw_table_items::TableItemConvertible,
         },
@@ -52,8 +53,12 @@ impl Processable for DefaultExtractor {
         >,
         ProcessorError,
     > {
-        let (block_metadata_transactions, raw_table_items, raw_current_table_items, table_metadata) =
-            process_transactions(transactions.data.clone());
+        let (
+            raw_block_metadata_transactions,
+            raw_table_items,
+            raw_current_table_items,
+            table_metadata,
+        ) = process_transactions(transactions.data.clone());
 
         let postgres_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();
@@ -61,10 +66,15 @@ impl Processable for DefaultExtractor {
             .iter()
             .map(CurrentTableItem::from_raw)
             .collect();
+        let postgres_block_metadata_transactions: Vec<BlockMetadataTransactionModel> =
+            raw_block_metadata_transactions
+                .iter()
+                .map(BlockMetadataTransactionModel::from_raw)
+                .collect();
 
         Ok(Some(TransactionContext {
             data: (
-                block_metadata_transactions,
+                postgres_block_metadata_transactions,
                 postgres_table_items,
                 postgres_current_table_items,
                 table_metadata,

@@ -227,11 +227,10 @@ pub fn process_transactions_parquet(
     AHashMap<i64, i64>,
 ) {
     let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
-    let (txns, _block_metadata_txns, write_set_changes, wsc_details) =
-        TransactionModel::from_transactions(
-            &transactions,
-            &mut transaction_version_to_struct_count,
-        );
+    let (txns, write_set_changes, wsc_details) = TransactionModel::from_transactions(
+        &transactions,
+        &mut transaction_version_to_struct_count,
+    );
 
     let mut move_modules = vec![];
     let mut move_resources = vec![];

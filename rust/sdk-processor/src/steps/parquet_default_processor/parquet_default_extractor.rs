@@ -12,10 +12,14 @@ use async_trait::async_trait;
 use processor::{
     db::{
         common::models::default_models::{
+            raw_block_metadata_transactions::BlockMetadataTransactionConvertible,
             raw_current_table_items::CurrentTableItemConvertible,
             raw_table_items::TableItemConvertible,
         },
-        parquet::models::default_models::parquet_move_tables::{CurrentTableItem, TableItem},
+        parquet::models::default_models::{
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_tables::{CurrentTableItem, TableItem},
+        },
     },
     processors::{
         default_processor::process_transactions,
@@ -47,7 +51,7 @@ impl Processable for ParquetDefaultExtractor {
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
         let (
-            _block_metadata_transactions,
+            raw_block_metadata_transactions,
             raw_table_items,
             raw_current_table_items,
             _table_metadata,
@@ -59,6 +63,11 @@ impl Processable for ParquetDefaultExtractor {
             .iter()
             .map(CurrentTableItem::from_raw)
             .collect();
+        let parquet_block_metadata_transactions: Vec<BlockMetadataTransaction> =
+            raw_block_metadata_transactions
+                .iter()
+                .map(BlockMetadataTransaction::from_raw)
+                .collect();
 
         let (
             (
@@ -78,9 +87,13 @@ impl Processable for ParquetDefaultExtractor {
         debug!(" - ParquetTransactions: {}", parquet_transactions.len());
         debug!(" - TableItems: {}", parquet_table_items.len());
         debug!(" - MoveModules: {}", move_modules.len());
-        println!(
+        debug!(
             " - CurrentTableItems: {}",
             parquet_current_table_items.len()
+        );
+        debug!(
+            " - BlockMetadataTransactions: {}",
+            parquet_block_metadata_transactions.len()
         );
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
@@ -116,6 +129,11 @@ impl Processable for ParquetDefaultExtractor {
                 TableFlags::CURRENT_TABLE_ITEMS,
                 ParquetTypeEnum::CurrentTableItem,
                 ParquetTypeStructs::CurrentTableItem(parquet_current_table_items),
+            ),
+            (
+                TableFlags::BLOCK_METADATA_TRANSACTIONS,
+                ParquetTypeEnum::BlockMetadataTransaction,
+                ParquetTypeStructs::BlockMetadataTransaction(parquet_block_metadata_transactions),
             ),
         ];
 
