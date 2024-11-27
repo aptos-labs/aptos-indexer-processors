@@ -32,6 +32,9 @@ use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
     db::parquet::models::fungible_asset_models::{
         parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+        parquet_v2_fungible_asset_balances::{
+            CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+        },
         parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
     },
 };
@@ -130,6 +133,18 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
             (
                 ParquetTypeEnum::FungibleAssetMetadata,
                 FungibleAssetMetadataModel::schema(),
+            ),
+            (
+                ParquetTypeEnum::FungibleAssetBalance,
+                FungibleAssetBalance::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentFungibleAssetBalance,
+                CurrentFungibleAssetBalance::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentUnifiedFungibleAssetBalance,
+                CurrentUnifiedFungibleAssetBalance::schema(),
             ),
         ]
         .into_iter()

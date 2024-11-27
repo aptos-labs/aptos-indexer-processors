@@ -14,7 +14,7 @@ use processor::{
         ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2},
     },
     processors::ans_processor::parse_ans,
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 
 pub struct AnsExtractor

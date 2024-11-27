@@ -25,7 +25,7 @@ use aptos_indexer_processor_sdk::{
     },
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
-use processor::worker::TableFlags;
+use processor::utils::table_flags::TableFlags;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 

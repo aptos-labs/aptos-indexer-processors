@@ -7,15 +7,17 @@
 
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::postgres::models::{
-        fungible_asset_models::parquet_v2_fungible_asset_balances::DEFAULT_AMOUNT_VALUE,
-        object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
-        resources::FromWriteResource,
-        token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
-        token_v2_models::{
-            parquet_v2_token_datas::TokenDataV2,
-            v2_token_ownerships::{CurrentTokenOwnershipV2, NFTOwnershipV2},
-            v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
+    db::{
+        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_balances::DEFAULT_AMOUNT_VALUE,
+        postgres::models::{
+            object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
+            resources::FromWriteResource,
+            token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
+            token_v2_models::{
+                parquet_v2_token_datas::TokenDataV2,
+                v2_token_ownerships::{CurrentTokenOwnershipV2, NFTOwnershipV2},
+                v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
+            },
         },
     },
     utils::util::{ensure_not_negative, standardize_address},

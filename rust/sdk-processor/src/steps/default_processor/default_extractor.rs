@@ -18,7 +18,7 @@ use processor::{
         },
     },
     processors::default_processor::process_transactions,
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 
 pub struct DefaultExtractor

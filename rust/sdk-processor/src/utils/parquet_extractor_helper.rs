@@ -1,5 +1,5 @@
 use crate::parquet_processors::{ParquetTypeEnum, ParquetTypeStructs};
-use processor::worker::TableFlags;
+use processor::utils::table_flags::TableFlags;
 use std::collections::HashMap;
 
 /// Fill the map with data if the table is opted in for backfill-purpose

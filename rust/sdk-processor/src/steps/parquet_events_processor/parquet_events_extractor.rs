@@ -11,7 +11,7 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     processors::parquet_processors::parquet_events_processor::process_transactions_parquet,
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 use std::collections::HashMap;
 
@@ -42,7 +42,7 @@ impl Processable for ParquetEventsExtractor {
         // Array of tuples for each data type and its corresponding enum variant and flag
         let data_types = [(
             TableFlags::EVENTS,
-            ParquetTypeEnum::Event,
+            ParquetTypeEnum::Events,
             ParquetTypeStructs::Event(events),
         )];
 

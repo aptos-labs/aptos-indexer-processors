@@ -83,7 +83,7 @@ impl FungibleAssetActivityConvertible for FungibleAssetActivity {
             asset_type: raw_item.asset_type,
             is_frozen: raw_item.is_frozen,
             amount: Some(raw_item.amount.clone().unwrap().to_string()),
-            event_type: raw_item.type_.clone(),
+            event_type: raw_item.event_type.clone(),
             is_gas_fee: raw_item.is_gas_fee,
             gas_fee_payer_address: raw_item.gas_fee_payer_address,
             is_transaction_success: raw_item.is_transaction_success,

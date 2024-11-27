@@ -18,8 +18,15 @@ use processor::{
             parquet_write_set_changes::WriteSetChangeModel,
         },
         event_models::parquet_events::Event as EventPQ,
+        fungible_asset_models::{
+            parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+            parquet_v2_fungible_asset_balances::{
+                CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                FungibleAssetBalance,
+            },
+            parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+        },
     },
-    fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -128,12 +135,16 @@ impl ProcessorConfig {
                 CurrentTableItem::TABLE_NAME.to_string(),
                 TableMetadata::TABLE_NAME.to_string(),
             ]),
-            ProcessorName::ParquetEventProcessor => {
+            ProcessorName::ParquetEventsProcessor => {
                 HashSet::from([EventPQ::TABLE_NAME.to_string()])
-            }
-            ProcessorName::ParquetFungibleAssetProcessor => {
-                HashSet::from([FungibleAssetActivity::TABLE_NAME.to_string()])
             },
+            ProcessorName::ParquetFungibleAssetProcessor => HashSet::from([
+                FungibleAssetActivity::TABLE_NAME.to_string(),
+                FungibleAssetBalance::TABLE_NAME.to_string(),
+                CurrentFungibleAssetBalance::TABLE_NAME.to_string(),
+                CurrentUnifiedFungibleAssetBalance::TABLE_NAME.to_string(),
+                FungibleAssetMetadataModel::TABLE_NAME.to_string(),
+            ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }
     }

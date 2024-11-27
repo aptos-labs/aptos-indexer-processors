@@ -8,15 +8,15 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::fungible_asset_models::raw_v2_fungible_asset_activities::{
-            EventToCoinType, FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+        common::models::fungible_asset_models::{
+            raw_v2_fungible_asset_activities::{
+                EventToCoinType, FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+            },
+            raw_v2_fungible_asset_balances::RawFungibleAssetBalance,
         },
         parquet::models::fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
         postgres::models::{
-            fungible_asset_models::{
-                parquet_v2_fungible_asset_balances::FungibleAssetBalance,
-                v2_fungible_asset_utils::FeeStatement,
-            },
+            fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
                 Untransferable,
@@ -223,7 +223,7 @@ async fn parse_activities(
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                     if let Some((_, _, event_to_coin)) =
-                        FungibleAssetBalance::get_v1_from_write_resource(
+                        RawFungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
                             index as i64,
                             txn_version,
@@ -281,7 +281,7 @@ async fn parse_activities(
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
                     if let Some((_, _, event_to_coin)) =
-                        FungibleAssetBalance::get_v1_from_delete_resource(
+                        RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
                             txn_version,

@@ -26,7 +26,7 @@ use processor::{
         default_processor::process_transactions,
         parquet_processors::parquet_default_processor::process_transactions_parquet,
     },
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 use std::collections::HashMap;
 use tracing::debug;
