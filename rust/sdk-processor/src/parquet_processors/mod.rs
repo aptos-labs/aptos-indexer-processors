@@ -26,6 +26,7 @@ use processor::{
             event_models::parquet_events::Event,
             user_transaction_models::parquet_user_transactions::UserTransaction,
             fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+            parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
         postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
     },
@@ -71,7 +72,7 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 // TODO: Rename this to ParquetTableEnum as this reflects the table name rather than the type name
 // which is written in plural form.
 pub enum ParquetTypeEnum {
-    Events,
+    // default
     MoveResources,
     WriteSetChanges,
     Transactions,
@@ -80,11 +81,15 @@ pub enum ParquetTypeEnum {
     CurrentTableItems,
     BlockMetadataTransactions,
     TableMetadata,
+    // events
+    Events,
+    // user transactions
     UserTransactions,
-
     // ANS types
     AnsPrimaryNameV2,
+    // fa
     FungibleAssetActivity,
+    FungibleAssetMetadata,
 }
 
 /// Trait for handling various Parquet types.
@@ -148,6 +153,10 @@ impl_parquet_trait!(
     FungibleAssetActivity,
     ParquetTypeEnum::FungibleAssetActivity
 );
+impl_parquet_trait!(
+    FungibleAssetMetadataModel,
+    ParquetTypeEnum::FungibleAssetMetadata
+);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -164,6 +173,7 @@ pub enum ParquetTypeStructs {
     TableMetadata(Vec<TableMetadata>),
     AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
     FungibleAssetActivity(Vec<FungibleAssetActivity>),
+    FungibleAssetMetadata(Vec<FungibleAssetMetadataModel>),
 }
 
 impl ParquetTypeStructs {
@@ -184,6 +194,9 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::AnsPrimaryNameV2 => ParquetTypeStructs::AnsPrimaryNameV2(Vec::new()),
             ParquetTypeEnum::FungibleAssetActivity => {
                 ParquetTypeStructs::FungibleAssetActivity(Vec::new())
+            },
+            ParquetTypeEnum::FungibleAssetMetadata => {
+                ParquetTypeStructs::FungibleAssetMetadata(Vec::new())
             },
         }
     }
@@ -264,6 +277,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::FungibleAssetActivity(self_data),
                 ParquetTypeStructs::FungibleAssetActivity(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::FungibleAssetMetadata(self_data),
+                ParquetTypeStructs::FungibleAssetMetadata(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

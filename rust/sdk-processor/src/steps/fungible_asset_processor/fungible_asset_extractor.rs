@@ -7,7 +7,10 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::fungible_asset_models::raw_v2_fungible_asset_activities::FungibleAssetActivityConvertible,
+        common::models::fungible_asset_models::{
+            raw_v2_fungible_asset_activities::FungibleAssetActivityConvertible,
+            raw_v2_fungible_metadata::FungibleAssetMetadataConvertible,
+        },
         postgres::models::{
             coin_models::coin_supply::CoinSupply,
             fungible_asset_models::{
@@ -59,7 +62,7 @@ impl Processable for FungibleAssetExtractor {
     > {
         let (
             raw_fungible_asset_activities,
-            fungible_asset_metadata,
+            raw_fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
             current_unified_fungible_asset_balances,
@@ -72,10 +75,16 @@ impl Processable for FungibleAssetExtractor {
                 .map(FungibleAssetActivity::from_raw)
                 .collect();
 
+        let postgres_fungible_asset_metadata: Vec<FungibleAssetMetadataModel> =
+            raw_fungible_asset_metadata
+                .into_iter()
+                .map(FungibleAssetMetadataModel::from_raw)
+                .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 postgres_fungible_asset_activities,
-                fungible_asset_metadata,
+                postgres_fungible_asset_metadata,
                 fungible_asset_balances,
                 current_fungible_asset_balances,
                 current_unified_fungible_asset_balances,
