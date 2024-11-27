@@ -6,15 +6,18 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::postgres::models::{
-        coin_models::coin_supply::CoinSupply,
-        fungible_asset_models::{
-            v2_fungible_asset_activities::FungibleAssetActivity,
-            v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
-                FungibleAssetBalance,
+    db::{
+        common::models::fungible_asset_models::raw_v2_fungible_asset_activities::FungibleAssetActivityConvertible,
+        postgres::models::{
+            coin_models::coin_supply::CoinSupply,
+            fungible_asset_models::{
+                v2_fungible_asset_activities::FungibleAssetActivity,
+                v2_fungible_asset_balances::{
+                    CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                    FungibleAssetBalance,
+                },
+                v2_fungible_metadata::FungibleAssetMetadataModel,
             },
-            v2_fungible_metadata::FungibleAssetMetadataModel,
         },
     },
     processors::fungible_asset_processor::parse_v2_coin,
@@ -55,7 +58,7 @@ impl Processable for FungibleAssetExtractor {
         ProcessorError,
     > {
         let (
-            fungible_asset_activities,
+            raw_fungible_asset_activities,
             fungible_asset_metadata,
             fungible_asset_balances,
             current_fungible_asset_balances,
@@ -63,9 +66,15 @@ impl Processable for FungibleAssetExtractor {
             coin_supply,
         ) = parse_v2_coin(&transactions.data).await;
 
+        let postgres_fungible_asset_activities: Vec<FungibleAssetActivity> =
+            raw_fungible_asset_activities
+                .into_iter()
+                .map(FungibleAssetActivity::from_raw)
+                .collect();
+
         Ok(Some(TransactionContext {
             data: (
-                fungible_asset_activities,
+                postgres_fungible_asset_activities,
                 fungible_asset_metadata,
                 fungible_asset_balances,
                 current_fungible_asset_balances,
