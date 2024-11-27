@@ -30,7 +30,10 @@ use aptos_indexer_processor_sdk::{
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::parquet::models::fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+    db::parquet::models::fungible_asset_models::{
+        parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+        parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+    },
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
@@ -119,10 +122,16 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
         let gcs_client =
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
-        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [(
-            ParquetTypeEnum::FungibleAssetActivity,
-            FungibleAssetActivity::schema(),
-        )]
+        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
+            (
+                ParquetTypeEnum::FungibleAssetActivity,
+                FungibleAssetActivity::schema(),
+            ),
+            (
+                ParquetTypeEnum::FungibleAssetMetadata,
+                FungibleAssetMetadataModel::schema(),
+            ),
+        ]
         .into_iter()
         .collect();
 

@@ -4,8 +4,14 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::fungible_asset_models::raw_v2_fungible_asset_activities::{
-            FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+        common::models::fungible_asset_models::{
+            raw_v2_fungible_asset_activities::{
+                FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+            },
+            raw_v2_fungible_metadata::{
+                FungibleAssetMetadataConvertible, FungibleAssetMetadataMapping,
+                RawFungibleAssetMetadataModel,
+            },
         },
         postgres::models::{
             coin_models::coin_supply::CoinSupply,
@@ -16,7 +22,7 @@ use crate::{
                     CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
                 },
                 v2_fungible_asset_utils::FeeStatement,
-                v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
+                v2_fungible_metadata::FungibleAssetMetadataModel,
             },
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
@@ -367,7 +373,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 
         let (
             raw_fungible_asset_activities,
-            fungible_asset_metadata,
+            raw_fungible_asset_metadata,
             mut fungible_asset_balances,
             mut current_fungible_asset_balances,
             current_unified_fungible_asset_balances,
@@ -378,6 +384,12 @@ impl ProcessorTrait for FungibleAssetProcessor {
             raw_fungible_asset_activities
                 .into_iter()
                 .map(FungibleAssetActivity::from_raw)
+                .collect();
+
+        let postgres_fungible_asset_metadata: Vec<FungibleAssetMetadataModel> =
+            raw_fungible_asset_metadata
+                .into_iter()
+                .map(FungibleAssetMetadataModel::from_raw)
                 .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
@@ -423,7 +435,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             start_version,
             end_version,
             &postgres_fungible_asset_activities,
-            &fungible_asset_metadata,
+            &postgres_fungible_asset_metadata,
             &fungible_asset_balances,
             &current_fungible_asset_balances,
             (&coin_balance, &fa_balance),
@@ -465,7 +477,7 @@ pub async fn parse_v2_coin(
     transactions: &[Transaction],
 ) -> (
     Vec<RawFungibleAssetActivity>,
-    Vec<FungibleAssetMetadataModel>,
+    Vec<RawFungibleAssetMetadataModel>,
     Vec<FungibleAssetBalance>,
     Vec<CurrentFungibleAssetBalance>,
     Vec<CurrentUnifiedFungibleAssetBalance>,
@@ -691,7 +703,7 @@ pub async fn parse_v2_coin(
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteResource(write_resource) => {
                         if let Some(fa_metadata) =
-                            FungibleAssetMetadataModel::get_v1_from_write_resource(
+                            RawFungibleAssetMetadataModel::get_v1_from_write_resource(
                                 write_resource,
                                 index as i64,
                                 txn_version,
@@ -710,7 +722,7 @@ pub async fn parse_v2_coin(
                                 .insert(fa_metadata.asset_type.clone(), fa_metadata);
                         }
                         if let Some(fa_metadata) =
-                            FungibleAssetMetadataModel::get_v2_from_write_resource(
+                            RawFungibleAssetMetadataModel::get_v2_from_write_resource(
                                 write_resource,
                                 txn_version,
                                 txn_timestamp,
@@ -787,7 +799,7 @@ pub async fn parse_v2_coin(
     // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
     let mut fungible_asset_metadata = fungible_asset_metadata
         .into_values()
-        .collect::<Vec<FungibleAssetMetadataModel>>();
+        .collect::<Vec<RawFungibleAssetMetadataModel>>();
     let mut current_fungible_asset_balances = current_fungible_asset_balances
         .into_values()
         .collect::<Vec<CurrentFungibleAssetBalance>>();
