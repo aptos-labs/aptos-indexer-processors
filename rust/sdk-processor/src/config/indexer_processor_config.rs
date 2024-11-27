@@ -8,6 +8,7 @@ use crate::{
         parquet_events_processor::ParquetEventsProcessor,
         parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
         parquet_user_transaction_processor::ParquetUserTransactionsProcessor,
+        parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
     },
     processors::{
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
