@@ -116,6 +116,8 @@ bitflags! {
         const CURRENT_TABLE_ITEMS = 1 << 24;
         const BLOCK_METADATA_TRANSACTIONS = 1 << 25;
 
+        const FUNGIBLE_ASSET_ACTIVITIES = 1 << 26;
+
         // Events
         const EVENTS = 1 << 30; // start at 30 to avoid conflicts with other flags.
 

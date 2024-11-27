@@ -25,6 +25,7 @@ use processor::{
             },
             event_models::parquet_events::Event,
             user_transaction_models::parquet_user_transactions::UserTransaction,
+            fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
         },
         postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
     },
@@ -43,6 +44,7 @@ pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_user_transaction_processor;
+pub mod parquet_fungible_asset_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -82,6 +84,7 @@ pub enum ParquetTypeEnum {
 
     // ANS types
     AnsPrimaryNameV2,
+    FungibleAssetActivity,
 }
 
 /// Trait for handling various Parquet types.
@@ -141,6 +144,10 @@ impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
 impl_parquet_trait!(Event, ParquetTypeEnum::Events);
 impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransactions);
 impl_parquet_trait!(AnsPrimaryNameV2, ParquetTypeEnum::AnsPrimaryNameV2);
+impl_parquet_trait!(
+    FungibleAssetActivity,
+    ParquetTypeEnum::FungibleAssetActivity
+);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -156,6 +163,7 @@ pub enum ParquetTypeStructs {
     UserTransaction(Vec<UserTransaction>),
     TableMetadata(Vec<TableMetadata>),
     AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
+    FungibleAssetActivity(Vec<FungibleAssetActivity>),
 }
 
 impl ParquetTypeStructs {
@@ -174,6 +182,9 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::Events => ParquetTypeStructs::Event(Vec::new()),
             ParquetTypeEnum::UserTransactions => ParquetTypeStructs::UserTransaction(Vec::new()),
             ParquetTypeEnum::AnsPrimaryNameV2 => ParquetTypeStructs::AnsPrimaryNameV2(Vec::new()),
+            ParquetTypeEnum::FungibleAssetActivity => {
+                ParquetTypeStructs::FungibleAssetActivity(Vec::new())
+            },
         }
     }
 
@@ -247,6 +258,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::AnsPrimaryNameV2(self_data),
                 ParquetTypeStructs::AnsPrimaryNameV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::FungibleAssetActivity(self_data),
+                ParquetTypeStructs::FungibleAssetActivity(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

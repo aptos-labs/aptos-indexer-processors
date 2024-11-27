@@ -3,21 +3,27 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::postgres::models::{
-        coin_models::coin_supply::CoinSupply,
-        fungible_asset_models::{
-            v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
-            v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalance, CurrentFungibleAssetMapping,
-                CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+    db::{
+        common::models::fungible_asset_models::raw_v2_fungible_asset_activities::{
+            FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+        },
+        postgres::models::{
+            coin_models::coin_supply::CoinSupply,
+            fungible_asset_models::{
+                v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
+                v2_fungible_asset_balances::{
+                    CurrentFungibleAssetBalance, CurrentFungibleAssetMapping,
+                    CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+                },
+                v2_fungible_asset_utils::FeeStatement,
+                v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
             },
-            v2_fungible_asset_utils::FeeStatement,
-            v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+                Untransferable,
+            },
+            resources::{FromWriteResource, V2FungibleAssetResource},
         },
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-        },
-        resources::{FromWriteResource, V2FungibleAssetResource},
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -360,13 +366,19 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
         let (
-            fungible_asset_activities,
+            raw_fungible_asset_activities,
             fungible_asset_metadata,
             mut fungible_asset_balances,
             mut current_fungible_asset_balances,
             current_unified_fungible_asset_balances,
             mut coin_supply,
         ) = parse_v2_coin(&transactions).await;
+
+        let postgres_fungible_asset_activities: Vec<FungibleAssetActivity> =
+            raw_fungible_asset_activities
+                .into_iter()
+                .map(FungibleAssetActivity::from_raw)
+                .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -410,7 +422,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             self.name(),
             start_version,
             end_version,
-            &fungible_asset_activities,
+            &postgres_fungible_asset_activities,
             &fungible_asset_metadata,
             &fungible_asset_balances,
             &current_fungible_asset_balances,
@@ -452,7 +464,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
 pub async fn parse_v2_coin(
     transactions: &[Transaction],
 ) -> (
-    Vec<FungibleAssetActivity>,
+    Vec<RawFungibleAssetActivity>,
     Vec<FungibleAssetMetadataModel>,
     Vec<FungibleAssetBalance>,
     Vec<CurrentFungibleAssetBalance>,
@@ -620,7 +632,7 @@ pub async fn parse_v2_coin(
                     let event_type = event.type_str.as_str();
                     FeeStatement::from_event(event_type, &event.data, txn_version)
                 });
-                let gas_event = FungibleAssetActivity::get_gas_event(
+                let gas_event = RawFungibleAssetActivity::get_gas_event(
                     transaction_info,
                     req,
                     &entry_function_id_str,
@@ -634,7 +646,7 @@ pub async fn parse_v2_coin(
 
             // Loop 3 to handle events and collect additional metadata from events for v2
             for (index, event) in events.iter().enumerate() {
-                if let Some(v1_activity) = FungibleAssetActivity::get_v1_from_event(
+                if let Some(v1_activity) = RawFungibleAssetActivity::get_v1_from_event(
                     event,
                     txn_version,
                     block_height,
@@ -653,7 +665,7 @@ pub async fn parse_v2_coin(
                 }) {
                     fungible_asset_activities.push(v1_activity);
                 }
-                if let Some(v2_activity) = FungibleAssetActivity::get_v2_from_event(
+                if let Some(v2_activity) = RawFungibleAssetActivity::get_v2_from_event(
                     event,
                     txn_version,
                     block_height,

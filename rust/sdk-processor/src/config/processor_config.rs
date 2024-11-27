@@ -20,6 +20,7 @@ use processor::{
         event_models::parquet_events::Event as EventPQ,
         user_transaction_models::parquet_user_transactions::UserTransaction,
     },
+    fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -72,6 +73,7 @@ pub enum ProcessorConfig {
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
     ParquetUserTransactionsProcessor(ParquetDefaultProcessorConfig),
+    ParquetFungibleAssetProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -89,7 +91,8 @@ impl ProcessorConfig {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config)
             | ProcessorConfig::ParquetEventsProcessor(config)
-            | ProcessorConfig::ParquetUserTransactionsProcessor(config) => {
+            | ProcessorConfig::ParquetUserTransactionsProcessor(config)
+            | ProcessorConfig::ParquetFungibleAssetProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 
@@ -133,6 +136,9 @@ impl ProcessorConfig {
             },
             ProcessorName::ParquetUserTransactionsProcessor => {
                 HashSet::from([UserTransaction::TABLE_NAME.to_string()])
+            },
+            ProcessorName::ParquetFungibleAssetProcessor => {
+                HashSet::from([FungibleAssetActivity::TABLE_NAME.to_string()])
             },
             _ => HashSet::new(), // Default case for unsupported processors
         }
