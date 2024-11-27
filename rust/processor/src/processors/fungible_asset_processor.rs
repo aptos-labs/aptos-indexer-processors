@@ -8,6 +8,12 @@ use crate::{
             raw_v2_fungible_asset_activities::{
                 FungibleAssetActivityConvertible, RawFungibleAssetActivity,
             },
+            raw_v2_fungible_asset_balances::{
+                CurrentFungibleAssetBalanceConvertible, CurrentFungibleAssetMapping,
+                CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
+                RawCurrentFungibleAssetBalance, RawCurrentUnifiedFungibleAssetBalance,
+                RawFungibleAssetBalance,
+            },
             raw_v2_fungible_metadata::{
                 FungibleAssetMetadataConvertible, FungibleAssetMetadataMapping,
                 RawFungibleAssetMetadataModel,
@@ -18,15 +24,14 @@ use crate::{
             fungible_asset_models::{
                 v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
                 v2_fungible_asset_balances::{
-                    CurrentFungibleAssetBalance, CurrentFungibleAssetMapping,
-                    CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+                    CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                    FungibleAssetBalance,
                 },
                 v2_fungible_asset_utils::FeeStatement,
                 v2_fungible_metadata::FungibleAssetMetadataModel,
             },
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-                Untransferable,
             },
             resources::{FromWriteResource, V2FungibleAssetResource},
         },
@@ -36,9 +41,9 @@ use crate::{
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+        table_flags::TableFlags,
         util::{get_entry_function_from_user_request, standardize_address},
     },
-    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -374,9 +379,9 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let (
             raw_fungible_asset_activities,
             raw_fungible_asset_metadata,
-            mut fungible_asset_balances,
-            mut current_fungible_asset_balances,
-            current_unified_fungible_asset_balances,
+            raw_fungible_asset_balances,
+            raw_current_fungible_asset_balances,
+            raw_current_unified_fungible_asset_balances,
             mut coin_supply,
         ) = parse_v2_coin(&transactions).await;
 
@@ -392,6 +397,25 @@ impl ProcessorTrait for FungibleAssetProcessor {
                 .map(FungibleAssetMetadataModel::from_raw)
                 .collect();
 
+        let mut postgres_fungible_asset_balances: Vec<FungibleAssetBalance> =
+            raw_fungible_asset_balances
+                .into_iter()
+                .map(FungibleAssetBalance::from_raw)
+                .collect();
+
+        let mut postgres_current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance> =
+            raw_current_fungible_asset_balances
+                .into_iter()
+                .map(CurrentFungibleAssetBalance::from_raw)
+                .collect();
+
+        let postgres_current_unified_fungible_asset_balances: Vec<
+            CurrentUnifiedFungibleAssetBalance,
+        > = raw_current_unified_fungible_asset_balances
+            .into_iter()
+            .map(CurrentUnifiedFungibleAssetBalance::from_raw)
+            .collect();
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -406,7 +430,7 @@ impl ProcessorTrait for FungibleAssetProcessor {
             // by looking at whether asset_type_v2 is null (must be v1 if it's null)
             // Note, we can't check asset_type_v1 is none because we're now filling asset_type_v1
             // for certain assets
-            current_unified_fungible_asset_balances
+            postgres_current_unified_fungible_asset_balances
                 .into_iter()
                 .partition(|x| x.asset_type_v2.is_none())
         };
@@ -415,14 +439,14 @@ impl ProcessorTrait for FungibleAssetProcessor {
             .deprecated_tables
             .contains(TableFlags::FUNGIBLE_ASSET_BALANCES)
         {
-            fungible_asset_balances.clear();
+            postgres_fungible_asset_balances.clear();
         }
 
         if self
             .deprecated_tables
             .contains(TableFlags::CURRENT_FUNGIBLE_ASSET_BALANCES)
         {
-            current_fungible_asset_balances.clear();
+            postgres_current_fungible_asset_balances.clear();
         }
 
         if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
@@ -436,8 +460,8 @@ impl ProcessorTrait for FungibleAssetProcessor {
             end_version,
             &postgres_fungible_asset_activities,
             &postgres_fungible_asset_metadata,
-            &fungible_asset_balances,
-            &current_fungible_asset_balances,
+            &postgres_fungible_asset_balances,
+            &postgres_current_fungible_asset_balances,
             (&coin_balance, &fa_balance),
             &coin_supply,
             &self.per_table_chunk_sizes,
@@ -472,15 +496,16 @@ impl ProcessorTrait for FungibleAssetProcessor {
     }
 }
 
+/// TODO: After the migration is complete, we can move this to common models folder
 /// V2 coin is called fungible assets and this flow includes all data from V1 in coin_processor
 pub async fn parse_v2_coin(
     transactions: &[Transaction],
 ) -> (
     Vec<RawFungibleAssetActivity>,
     Vec<RawFungibleAssetMetadataModel>,
-    Vec<FungibleAssetBalance>,
-    Vec<CurrentFungibleAssetBalance>,
-    Vec<CurrentUnifiedFungibleAssetBalance>,
+    Vec<RawFungibleAssetBalance>,
+    Vec<RawCurrentFungibleAssetBalance>,
+    Vec<RawCurrentUnifiedFungibleAssetBalance>,
     Vec<CoinSupply>,
 ) {
     let mut fungible_asset_activities = vec![];
@@ -565,7 +590,7 @@ pub async fn parse_v2_coin(
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                     if let Some((balance, current_balance, event_to_coin)) =
-                        FungibleAssetBalance::get_v1_from_write_resource(
+                        RawFungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
                             index as i64,
                             txn_version,
@@ -622,7 +647,7 @@ pub async fn parse_v2_coin(
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
                     if let Some((balance, current_balance, event_to_coin)) =
-                        FungibleAssetBalance::get_v1_from_delete_resource(
+                        RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
                             txn_version,
@@ -741,7 +766,7 @@ pub async fn parse_v2_coin(
                                 .insert(fa_metadata.asset_type.clone(), fa_metadata);
                         }
                         if let Some((balance, curr_balance)) =
-                            FungibleAssetBalance::get_v2_from_write_resource(
+                            RawFungibleAssetBalance::get_v2_from_write_resource(
                                 write_resource,
                                 index as i64,
                                 txn_version,
@@ -802,7 +827,7 @@ pub async fn parse_v2_coin(
         .collect::<Vec<RawFungibleAssetMetadataModel>>();
     let mut current_fungible_asset_balances = current_fungible_asset_balances
         .into_values()
-        .collect::<Vec<CurrentFungibleAssetBalance>>();
+        .collect::<Vec<RawCurrentFungibleAssetBalance>>();
 
     // Sort by PK
     fungible_asset_metadata.sort_by(|a, b| a.asset_type.cmp(&b.asset_type));
@@ -811,7 +836,7 @@ pub async fn parse_v2_coin(
     // Process the unified balance
     let current_unified_fungible_asset_balances = current_fungible_asset_balances
         .iter()
-        .map(CurrentUnifiedFungibleAssetBalance::from)
+        .map(RawCurrentUnifiedFungibleAssetBalance::from)
         .collect::<Vec<_>>();
     (
         fungible_asset_activities,

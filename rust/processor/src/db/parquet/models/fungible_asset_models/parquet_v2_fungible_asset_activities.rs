@@ -32,8 +32,6 @@ pub type CoinType = String;
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
 pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
 
-/// TODO: This is just a copy of v2_fungible_asset_activities.rs. We should unify the 2 implementations
-/// and have parquet as an output.
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
 )]
@@ -83,7 +81,7 @@ impl FungibleAssetActivityConvertible for FungibleAssetActivity {
             asset_type: raw_item.asset_type,
             is_frozen: raw_item.is_frozen,
             amount: Some(raw_item.amount.clone().unwrap().to_string()),
-            event_type: raw_item.type_.clone(),
+            event_type: raw_item.event_type.clone(),
             is_gas_fee: raw_item.is_gas_fee,
             gas_fee_payer_address: raw_item.gas_fee_payer_address,
             is_transaction_success: raw_item.is_transaction_success,

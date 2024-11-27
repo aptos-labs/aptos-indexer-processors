@@ -12,7 +12,7 @@ pub mod user_transaction_processor;
 // parquet
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
-pub mod parquet_user_transaction_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_user_transaction_processor;
 
 pub const MIN_TRANSACTIONS_PER_RAYON_JOB: usize = 64;

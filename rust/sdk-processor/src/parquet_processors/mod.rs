@@ -24,13 +24,19 @@ use processor::{
                 parquet_write_set_changes::WriteSetChangeModel,
             },
             event_models::parquet_events::Event,
+            fungible_asset_models::{
+                parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+                parquet_v2_fungible_asset_balances::{
+                    CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                    FungibleAssetBalance,
+                },
+                parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+            },
             user_transaction_models::parquet_user_transactions::UserTransaction,
-            fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
-            parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
         postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
     },
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 #[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
@@ -44,8 +50,8 @@ use strum::{Display, EnumIter};
 pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
-pub mod parquet_user_transaction_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_user_transaction_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -88,8 +94,11 @@ pub enum ParquetTypeEnum {
     // ANS types
     AnsPrimaryNameV2,
     // fa
-    FungibleAssetActivity,
+    FungibleAssetActivities,
     FungibleAssetMetadata,
+    FungibleAssetBalances,
+    CurrentFungibleAssetBalances,
+    CurrentFungibleAssetBalancesLegacy,
 }
 
 /// Trait for handling various Parquet types.
@@ -151,11 +160,20 @@ impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransactions);
 impl_parquet_trait!(AnsPrimaryNameV2, ParquetTypeEnum::AnsPrimaryNameV2);
 impl_parquet_trait!(
     FungibleAssetActivity,
-    ParquetTypeEnum::FungibleAssetActivity
+    ParquetTypeEnum::FungibleAssetActivities
 );
 impl_parquet_trait!(
     FungibleAssetMetadataModel,
     ParquetTypeEnum::FungibleAssetMetadata
+);
+impl_parquet_trait!(FungibleAssetBalance, ParquetTypeEnum::FungibleAssetBalances);
+impl_parquet_trait!(
+    CurrentUnifiedFungibleAssetBalance,
+    ParquetTypeEnum::CurrentFungibleAssetBalances
+);
+impl_parquet_trait!(
+    CurrentFungibleAssetBalance,
+    ParquetTypeEnum::CurrentFungibleAssetBalancesLegacy
 );
 
 #[derive(Debug, Clone)]
@@ -174,6 +192,9 @@ pub enum ParquetTypeStructs {
     AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
     FungibleAssetActivity(Vec<FungibleAssetActivity>),
     FungibleAssetMetadata(Vec<FungibleAssetMetadataModel>),
+    FungibleAssetBalance(Vec<FungibleAssetBalance>),
+    CurrentFungibleAssetBalance(Vec<CurrentFungibleAssetBalance>),
+    CurrentUnifiedFungibleAssetBalance(Vec<CurrentUnifiedFungibleAssetBalance>),
 }
 
 impl ParquetTypeStructs {
@@ -192,11 +213,20 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::Events => ParquetTypeStructs::Event(Vec::new()),
             ParquetTypeEnum::UserTransactions => ParquetTypeStructs::UserTransaction(Vec::new()),
             ParquetTypeEnum::AnsPrimaryNameV2 => ParquetTypeStructs::AnsPrimaryNameV2(Vec::new()),
-            ParquetTypeEnum::FungibleAssetActivity => {
+            ParquetTypeEnum::FungibleAssetActivities => {
                 ParquetTypeStructs::FungibleAssetActivity(Vec::new())
             },
             ParquetTypeEnum::FungibleAssetMetadata => {
                 ParquetTypeStructs::FungibleAssetMetadata(Vec::new())
+            },
+            ParquetTypeEnum::FungibleAssetBalances => {
+                ParquetTypeStructs::FungibleAssetBalance(Vec::new())
+            },
+            ParquetTypeEnum::CurrentFungibleAssetBalancesLegacy => {
+                ParquetTypeStructs::CurrentFungibleAssetBalance(Vec::new())
+            },
+            ParquetTypeEnum::CurrentFungibleAssetBalances => {
+                ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(Vec::new())
             },
         }
     }
@@ -283,6 +313,24 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::FungibleAssetMetadata(self_data),
                 ParquetTypeStructs::FungibleAssetMetadata(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::FungibleAssetBalance(self_data),
+                ParquetTypeStructs::FungibleAssetBalance(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentFungibleAssetBalance(self_data),
+                ParquetTypeStructs::CurrentFungibleAssetBalance(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(self_data),
+                ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

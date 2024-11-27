@@ -9,6 +9,10 @@ use processor::{
     db::{
         common::models::fungible_asset_models::{
             raw_v2_fungible_asset_activities::FungibleAssetActivityConvertible,
+            raw_v2_fungible_asset_balances::{
+                CurrentFungibleAssetBalanceConvertible,
+                CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
+            },
             raw_v2_fungible_metadata::FungibleAssetMetadataConvertible,
         },
         postgres::models::{
@@ -63,9 +67,9 @@ impl Processable for FungibleAssetExtractor {
         let (
             raw_fungible_asset_activities,
             raw_fungible_asset_metadata,
-            fungible_asset_balances,
-            current_fungible_asset_balances,
-            current_unified_fungible_asset_balances,
+            raw_fungible_asset_balances,
+            raw_current_fungible_asset_balances,
+            raw_current_unified_fungible_asset_balances,
             coin_supply,
         ) = parse_v2_coin(&transactions.data).await;
 
@@ -81,13 +85,32 @@ impl Processable for FungibleAssetExtractor {
                 .map(FungibleAssetMetadataModel::from_raw)
                 .collect();
 
+        let postgres_fungible_asset_balances: Vec<FungibleAssetBalance> =
+            raw_fungible_asset_balances
+                .into_iter()
+                .map(FungibleAssetBalance::from_raw)
+                .collect();
+
+        let postgres_current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance> =
+            raw_current_fungible_asset_balances
+                .into_iter()
+                .map(CurrentFungibleAssetBalance::from_raw)
+                .collect();
+
+        let postgres_current_unified_fungible_asset_balances: Vec<
+            CurrentUnifiedFungibleAssetBalance,
+        > = raw_current_unified_fungible_asset_balances
+            .into_iter()
+            .map(CurrentUnifiedFungibleAssetBalance::from_raw)
+            .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 postgres_fungible_asset_activities,
                 postgres_fungible_asset_metadata,
-                fungible_asset_balances,
-                current_fungible_asset_balances,
-                current_unified_fungible_asset_balances,
+                postgres_fungible_asset_balances,
+                postgres_current_fungible_asset_balances,
+                postgres_current_unified_fungible_asset_balances,
                 coin_supply,
             ),
             metadata: transactions.metadata,

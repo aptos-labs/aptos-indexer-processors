@@ -17,9 +17,9 @@ use crate::{
     schema,
     utils::{
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+        table_flags::TableFlags,
         util::standardize_address,
     },
-    worker::TableFlags,
     IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;

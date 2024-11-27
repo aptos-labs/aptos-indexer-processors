@@ -33,9 +33,9 @@ use crate::{
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool, DbPoolConnection},
+        table_flags::TableFlags,
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
-    worker::TableFlags,
     IndexerGrpcProcessorConfig,
 };
 use ahash::{AHashMap, AHashSet};

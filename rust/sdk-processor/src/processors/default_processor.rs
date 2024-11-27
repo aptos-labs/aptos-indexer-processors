@@ -23,7 +23,7 @@ use aptos_indexer_processor_sdk::{
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
 use async_trait::async_trait;
-use processor::worker::TableFlags;
+use processor::utils::table_flags::TableFlags;
 use tracing::{debug, info};
 
 pub struct DefaultProcessor {
