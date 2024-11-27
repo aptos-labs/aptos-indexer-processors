@@ -55,6 +55,7 @@ pub enum ProcessorConfig {
     MonitoringProcessor(DefaultProcessorConfig),
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+    ParquetEventsProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -261,9 +262,10 @@ mod tests {
         assert!(result.is_ok());
 
         let table_names = result.unwrap();
-        assert_eq!(table_names, vec![
-            "parquet_default_processor.Transaction".to_string(),
-        ]);
+        assert_eq!(
+            table_names,
+            vec!["parquet_default_processor.Transaction".to_string(),]
+        );
     }
 
     #[test]

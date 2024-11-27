@@ -9,7 +9,7 @@ use crate::{
             gcs_uploader::{create_new_writer, GCSUploader},
             parquet_buffer_step::ParquetBufferStep,
         },
-        parquet_default_processor::parquet_default_extractor::ParquetDefaultExtractor,
+        parquet_events_processor::parquet_events_extractor::ParquetEventsExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -28,28 +28,19 @@ use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClien
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::{
-        parquet::models::default_models::{
-            parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-            parquet_move_tables::TableItem,
-            parquet_transactions::Transaction as ParquetTransaction,
-            parquet_write_set_changes::WriteSetChangeModel,
-        },
-        postgres::models::events_models::events::Event,
-    },
-    worker::TableFlags,
+    db::postgres::models::events_models::parquet_events::Event as EventPQ, worker::TableFlags,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::{debug, info};
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
-pub struct ParquetDefaultProcessor {
+pub struct ParquetEventsProcessor {
     pub config: IndexerProcessorConfig,
     pub db_pool: ArcDbPool, // for processor status
 }
 
-impl ParquetDefaultProcessor {
+impl ParquetEventsProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> anyhow::Result<Self> {
         match config.db_config {
             DbConfig::PostgresConfig(ref postgres_config) => {
@@ -75,7 +66,7 @@ impl ParquetDefaultProcessor {
 }
 
 #[async_trait::async_trait]
-impl ProcessorTrait for ParquetDefaultProcessor {
+impl ProcessorTrait for ParquetEventsProcessor {
     fn name(&self) -> &'static str {
         self.config.processor_config.name()
     }
@@ -119,12 +110,12 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
         let parquet_processor_config = match self.config.processor_config.clone() {
-            ProcessorConfig::ParquetDefaultProcessor(parquet_processor_config) => {
+            ProcessorConfig::ParquetEventsProcessor(parquet_processor_config) => {
                 parquet_processor_config
             },
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid processor configuration for ParquetDefaultProcessor {:?}",
+                    "Invalid processor configuration for ParquetEventsProcessor {:?}",
                     self.config.processor_config
                 ));
             },
@@ -137,7 +128,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         })
         .await?;
 
-        let parquet_default_extractor = ParquetDefaultExtractor {
+        let parquet_events_extractor = ParquetEventsExtractor {
             opt_in_tables: TableFlags::empty(),
         };
 
@@ -157,7 +148,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         let gcs_client = Arc::new(GCSClient::new(gcs_config));
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
-            [(ParquetTypeEnum::Event, Event::schema())]
+            [(ParquetTypeEnum::Event, EventPQ::schema())]
                 .into_iter()
                 .collect();
 
@@ -190,7 +181,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
+        .connect_to(parquet_events_extractor.into_runnable_step(), channel_size)
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
         .end_and_return_output_receiver(channel_size);
 

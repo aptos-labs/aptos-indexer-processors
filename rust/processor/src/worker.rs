@@ -111,6 +111,9 @@ bitflags! {
 
         // User transaction
         const SIGNATURES = 1 << 23;
+
+        // Events
+        const EVENTS = 1 << 26;
     }
 }
 
