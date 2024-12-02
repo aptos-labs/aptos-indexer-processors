@@ -79,7 +79,8 @@ impl ProcessorConfig {
     /// is useful for querying the status from the processor status table in the database.
     pub fn get_processor_status_table_names(&self) -> anyhow::Result<Vec<String>> {
         match self {
-            ProcessorConfig::ParquetDefaultProcessor(config) => {
+            ProcessorConfig::ParquetDefaultProcessor(config)
+            | ProcessorConfig::ParquetEventsProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 

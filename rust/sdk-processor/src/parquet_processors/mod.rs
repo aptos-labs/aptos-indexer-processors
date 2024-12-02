@@ -198,6 +198,9 @@ impl ParquetTypeStructs {
             ) => {
                 handle_append!(self_data, other_data)
             },
+            (ParquetTypeStructs::Event(self_data), ParquetTypeStructs::Event(other_data)) => {
+                handle_append!(self_data, other_data)
+            },
             _ => Err(ProcessorError::ProcessError {
                 message: "Mismatched buffer types in append operation".to_string(),
             }),
