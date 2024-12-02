@@ -39,7 +39,7 @@ impl ParquetBuffer {
         cur_batch_metadata: &TransactionMetadata,
     ) -> Result<(), ProcessorError> {
         if let Some(buffer_metadata) = &mut self.current_batch_metadata {
-            if buffer_metadata.end_version != cur_batch_metadata.start_version {
+            if buffer_metadata.end_version + 1 != cur_batch_metadata.start_version {
                 // this shouldn't happen but if it does, we want to know
                 return Err(ProcessorError::ProcessError {
                     message: format!(
@@ -97,7 +97,8 @@ impl ParquetBufferStep {
         parquet_data: ParquetTypeStructs,
     ) -> Result<(), ProcessorError> {
         buffer.buffer_size_bytes += parquet_data.calculate_size();
-        buffer.buffer.append(parquet_data)
+        buffer.buffer.append(parquet_data)?;
+        Ok(())
     }
 
     /// Handles the addition of `parquet_data` to the buffer for a specified `ParquetTypeEnum`.
@@ -289,7 +290,7 @@ impl NamedStep for ParquetBufferStep {
 #[cfg(test)]
 mod tests {
     use crate::{
-        config::processor_config::ParquetDefaultProcessorConfig,
+        config::db_config::ParquetConfig,
         steps::common::{
             gcs_uploader::{create_new_writer, GCSUploader},
             parquet_buffer_step::{ParquetBufferStep, ParquetTypeEnum, ParquetTypeStructs},
@@ -305,22 +306,15 @@ mod tests {
         bq_analytics::generic_parquet_processor::HasParquetSchema,
         db::parquet::models::default_models::parquet_move_resources::MoveResource,
     };
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-        time::Duration,
-    };
+    use std::{collections::HashMap, sync::Arc, time::Duration};
 
     #[tokio::test]
     #[allow(clippy::needless_return)]
     async fn test_parquet_buffer_step_no_upload() -> anyhow::Result<()> {
-        let poll_interval = Duration::from_secs(10);
-        let buffer_max_size = 100;
-        let parquet_processor_config = create_parquet_processor_config();
-
-        let buffer_uploader = create_parquet_uploader(&parquet_processor_config).await?;
+        let db_config = create_parquet_db_config();
+        let buffer_uploader = create_parquet_uploader(&db_config).await?;
         let mut parquet_step =
-            ParquetBufferStep::new(poll_interval, buffer_uploader, buffer_max_size);
+            ParquetBufferStep::new(Duration::from_secs(10), buffer_uploader, 100);
 
         let data = HashMap::from([(
             ParquetTypeEnum::MoveResource,
@@ -344,13 +338,12 @@ mod tests {
     #[tokio::test]
     #[allow(clippy::needless_return)]
     async fn test_parquet_buffer_step_trigger_upload() -> anyhow::Result<()> {
-        let poll_interval = Duration::from_secs(10);
         let buffer_max_size = 25; // Default ParquetTypeStructs for MoveResource is 24 bytes
-        let parquet_processor_config = create_parquet_processor_config();
+        let db_config = create_parquet_db_config();
 
-        let buffer_uploader = create_parquet_uploader(&parquet_processor_config).await?;
+        let buffer_uploader = create_parquet_uploader(&db_config).await?;
         let mut parquet_step =
-            ParquetBufferStep::new(poll_interval, buffer_uploader, buffer_max_size);
+            ParquetBufferStep::new(Duration::from_secs(10), buffer_uploader, buffer_max_size);
 
         // Test data below `buffer_max_size`
         let data = HashMap::from([(
@@ -388,9 +381,7 @@ mod tests {
         Ok(())
     }
 
-    async fn create_parquet_uploader(
-        parquet_processor_config: &ParquetDefaultProcessorConfig,
-    ) -> anyhow::Result<GCSUploader> {
+    async fn create_parquet_uploader(db_config: &ParquetConfig) -> anyhow::Result<GCSUploader> {
         let gcs_config = GcsClientConfig::default()
             .with_auth()
             .await
@@ -414,21 +405,19 @@ mod tests {
             gcs_client,
             parquet_type_to_schemas,
             parquet_type_to_writer,
-            parquet_processor_config.bucket_name.clone(),
-            parquet_processor_config.bucket_root.clone(),
+            db_config.bucket_name.clone(),
+            db_config.bucket_root.clone(),
             "processor_name".to_string(),
         )
     }
 
-    fn create_parquet_processor_config() -> ParquetDefaultProcessorConfig {
-        ParquetDefaultProcessorConfig {
+    fn create_parquet_db_config() -> ParquetConfig {
+        ParquetConfig {
+            connection_string: "connection_string".to_string(),
+            db_pool_size: 10,
             bucket_name: "bucket_name".to_string(),
             bucket_root: "bucket_root".to_string(),
-            parquet_upload_interval: 180,
-            max_buffer_size: 100,
-            channel_size: 100,
             google_application_credentials: None,
-            tables: HashSet::new(),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::parquet_processors::{ParquetTypeEnum, ParquetTypeStructs};
+use crate::parquet_processors::{ParquetTypeEnum, ParquetTypeStructs, ParquetTypeTrait};
 use anyhow::Context;
 use aptos_indexer_processor_sdk::utils::errors::ProcessorError;
 use async_trait::async_trait;
@@ -38,35 +38,10 @@ impl Uploadable for GCSUploader {
         &mut self,
         buffer: ParquetTypeStructs,
     ) -> anyhow::Result<(), ProcessorError> {
-        let table_name = buffer.get_table_name();
+        let parquet_type = buffer.parquet_type();
+        let table_name = parquet_type.to_string();
 
-        let result = match buffer {
-            ParquetTypeStructs::Transaction(transactions) => {
-                self.upload_generic(&transactions[..], ParquetTypeEnum::Transaction, table_name)
-                    .await
-            },
-            ParquetTypeStructs::MoveResource(resources) => {
-                self.upload_generic(&resources[..], ParquetTypeEnum::MoveResource, table_name)
-                    .await
-            },
-            ParquetTypeStructs::WriteSetChange(changes) => {
-                self.upload_generic(&changes[..], ParquetTypeEnum::WriteSetChange, table_name)
-                    .await
-            },
-            ParquetTypeStructs::TableItem(items) => {
-                self.upload_generic(&items[..], ParquetTypeEnum::TableItem, table_name)
-                    .await
-            },
-            ParquetTypeStructs::MoveModule(modules) => {
-                self.upload_generic(&modules[..], ParquetTypeEnum::MoveModule, table_name)
-                    .await
-            },
-            ParquetTypeStructs::Event(events) => {
-                self.upload_generic(&events[..], ParquetTypeEnum::Event, table_name)
-                    .await
-            },
-        };
-
+        let result = buffer.upload_to_gcs(self, parquet_type, &table_name).await;
         if let Err(e) = result {
             error!("Failed to upload buffer: {}", e);
             return Err(ProcessorError::ProcessError {
@@ -141,11 +116,11 @@ impl GCSUploader {
     }
 
     // Generic upload function to handle any data type
-    async fn upload_generic<ParquetType>(
+    pub async fn upload_generic<ParquetType>(
         &mut self,
         data: &[ParquetType],
         parquet_type: ParquetTypeEnum,
-        table_name: &'static str,
+        table_name: &str,
     ) -> anyhow::Result<()>
     where
         ParquetType: HasVersion + GetTimeStamp + HasParquetSchema,
@@ -187,6 +162,13 @@ impl GCSUploader {
             self.processor_name.clone(),
         )
         .await?;
+
+        debug!(
+            "Uploaded parquet to GCS for table: {}, start_version: {}, end_version: {}",
+            table_name,
+            data[0].version(),
+            data[data.len() - 1].version()
+        );
 
         Ok(())
     }

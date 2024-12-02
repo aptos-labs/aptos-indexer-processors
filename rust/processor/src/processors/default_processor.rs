@@ -289,7 +289,7 @@ impl ProcessorTrait for DefaultProcessor {
     }
 }
 
-// TODO: we can further optimize this by passing in a falg to selectively parse only the required data (e.g. table_items for parquet)
+// TODO: we can further optimize this by passing in a flag to selectively parse only the required data (e.g. table_items for parquet)
 /// Processes a list of transactions and extracts relevant data into different models.
 ///
 /// This function iterates over a list of transactions, extracting block metadata transactions,

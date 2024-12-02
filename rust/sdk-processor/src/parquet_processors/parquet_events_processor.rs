@@ -3,37 +3,37 @@ use crate::{
         db_config::DbConfig, indexer_processor_config::IndexerProcessorConfig,
         processor_config::ProcessorConfig,
     },
-    parquet_processors::ParquetTypeEnum,
+    parquet_processors::{
+        initialize_database_pool, initialize_gcs_client, initialize_parquet_buffer_step,
+        set_backfill_table_flag, ParquetTypeEnum,
+    },
     steps::{
         common::{
-            gcs_uploader::{create_new_writer, GCSUploader},
-            parquet_buffer_step::ParquetBufferStep,
+            parquet_version_tracker_step::ParquetVersionTrackerStep,
+            processor_status_saver::get_processor_status_saver,
         },
         parquet_events_processor::parquet_events_extractor::ParquetEventsExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
-        database::{new_db_pool, run_migrations, ArcDbPool},
-        starting_version::{get_min_last_success_version_parquet, get_starting_version},
+        database::{run_migrations, ArcDbPool},
+        starting_version::get_min_last_success_version_parquet,
     },
 };
 use anyhow::Context;
 use aptos_indexer_processor_sdk::{
     aptos_indexer_transaction_stream::{TransactionStream, TransactionStreamConfig},
     builder::ProcessorBuilder,
-    common_steps::TransactionStreamStep,
+    common_steps::{TransactionStreamStep, DEFAULT_UPDATE_PROCESSOR_STATUS_SECS},
     traits::{processor_trait::ProcessorTrait, IntoRunnableStep},
 };
-use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::postgres::models::events_models::parquet_events::Event as EventPQ, worker::TableFlags,
+    db::postgres::models::events_models::parquet_events::Event as EventPQ,
 };
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
-
-const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
 pub struct ParquetEventsProcessor {
     pub config: IndexerProcessorConfig,
@@ -42,29 +42,10 @@ pub struct ParquetEventsProcessor {
 
 impl ParquetEventsProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> anyhow::Result<Self> {
-        match config.db_config {
-            DbConfig::PostgresConfig(ref postgres_config) => {
-                let conn_pool = new_db_pool(
-                    &postgres_config.connection_string,
-                    Some(postgres_config.db_pool_size),
-                )
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to create connection pool for PostgresConfig: {:?}",
-                        e
-                    )
-                })?;
-
-                Ok(Self {
-                    config,
-                    db_pool: conn_pool,
-                })
-            },
-        }
+        let db_pool = initialize_database_pool(&config.db_config).await?;
+        Ok(Self { config, db_pool })
     }
 }
-
 #[async_trait::async_trait]
 impl ProcessorTrait for ParquetEventsProcessor {
     fn name(&self) -> &'static str {
@@ -73,33 +54,21 @@ impl ProcessorTrait for ParquetEventsProcessor {
 
     async fn run_processor(&self) -> anyhow::Result<()> {
         // Run Migrations
-        match self.config.db_config {
-            DbConfig::PostgresConfig(ref postgres_config) => {
+        let parquet_db_config = match self.config.db_config {
+            DbConfig::ParquetConfig(ref parquet_config) => {
                 run_migrations(
-                    postgres_config.connection_string.clone(),
+                    parquet_config.connection_string.clone(),
                     self.db_pool.clone(),
                 )
                 .await;
+                parquet_config
             },
-        }
-
-        // Determine the processing mode (backfill or regular)
-        let is_backfill = self.config.backfill_config.is_some();
-
-        // TODO: Revisit when parquet version tracker is available.
-        // Query the starting version
-        let starting_version = if is_backfill {
-            get_starting_version(&self.config, self.db_pool.clone()).await?
-        } else {
-            // Regular mode logic: Fetch the minimum last successful version across all relevant tables
-            let table_names = self
-                .config
-                .processor_config
-                .get_table_names()
-                .context("Failed to get table names for the processor")?;
-
-            get_min_last_success_version_parquet(&self.config, self.db_pool.clone(), table_names)
-                .await?
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Invalid db config for ParquetEventsProcessor {:?}",
+                    self.config.db_config
+                ));
+            },
         };
 
         // Check and update the ledger chain id to ensure we're indexing the correct chain
@@ -121,6 +90,19 @@ impl ProcessorTrait for ParquetEventsProcessor {
             },
         };
 
+        let processor_status_table_names = self
+            .config
+            .processor_config
+            .get_processor_status_table_names()
+            .context("Failed to get table names for the processor status table")?;
+
+        let starting_version = get_min_last_success_version_parquet(
+            &self.config,
+            self.db_pool.clone(),
+            processor_status_table_names,
+        )
+        .await?;
+
         // Define processor transaction stream config
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
@@ -128,54 +110,39 @@ impl ProcessorTrait for ParquetEventsProcessor {
         })
         .await?;
 
+        let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
         let parquet_events_extractor = ParquetEventsExtractor {
-            opt_in_tables: TableFlags::empty(),
+            opt_in_tables: backfill_table,
         };
 
-        let credentials = parquet_processor_config
-            .google_application_credentials
-            .clone();
-
-        if let Some(credentials) = credentials {
-            std::env::set_var(GOOGLE_APPLICATION_CREDENTIALS, credentials);
-        }
-
-        let gcs_config = GcsClientConfig::default()
-            .with_auth()
-            .await
-            .expect("Failed to create GCS client config");
-
-        let gcs_client = Arc::new(GCSClient::new(gcs_config));
+        let gcs_client =
+            initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
             [(ParquetTypeEnum::Event, EventPQ::schema())]
                 .into_iter()
                 .collect();
 
-        let parquet_type_to_writer = parquet_type_to_schemas
-            .iter()
-            .map(|(key, schema)| {
-                let writer = create_new_writer(schema.clone()).expect("Failed to create writer");
-                (*key, writer)
-            })
-            .collect();
-
-        let buffer_uploader = GCSUploader::new(
+        let default_size_buffer_step = initialize_parquet_buffer_step(
             gcs_client.clone(),
             parquet_type_to_schemas,
-            parquet_type_to_writer,
-            parquet_processor_config.bucket_name.clone(),
-            parquet_processor_config.bucket_root.clone(),
+            parquet_processor_config.upload_interval,
+            parquet_processor_config.max_buffer_size,
+            parquet_db_config.bucket_name.clone(),
+            parquet_db_config.bucket_root.clone(),
             self.name().to_string(),
-        )?;
+        )
+        .await
+        .unwrap_or_else(|e| {
+            panic!("Failed to initialize parquet buffer step: {:?}", e);
+        });
+
+        let parquet_version_tracker_step = ParquetVersionTrackerStep::new(
+            get_processor_status_saver(self.db_pool.clone(), self.config.clone()),
+            DEFAULT_UPDATE_PROCESSOR_STATUS_SECS,
+        );
 
         let channel_size = parquet_processor_config.channel_size;
-
-        let default_size_buffer_step = ParquetBufferStep::new(
-            Duration::from_secs(parquet_processor_config.parquet_upload_interval),
-            buffer_uploader,
-            parquet_processor_config.max_buffer_size,
-        );
 
         // Connect processor steps together
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
@@ -183,6 +150,10 @@ impl ProcessorTrait for ParquetEventsProcessor {
         )
         .connect_to(parquet_events_extractor.into_runnable_step(), channel_size)
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
+        .connect_to(
+            parquet_version_tracker_step.into_runnable_step(),
+            channel_size,
+        )
         .end_and_return_output_receiver(channel_size);
 
         loop {

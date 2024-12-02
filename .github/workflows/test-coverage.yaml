@@ -1,0 +1,79 @@
+name: "Test_Coverage"
+on:
+  # Trigger if any of the conditions
+  #   1. Daily at 12am UTC from the main branch, or
+  #   2. PR with a specific label (see below)
+  schedule:
+    - cron: "0 0 * * *"
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  rust-unit-coverage:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+
+      - name: rust setup
+        run: |
+          sudo apt update && sudo apt install libdw-dev
+          cargo update
+        working-directory: rust
+
+      - run: rustup component add llvm-tools-preview
+      - uses: taiki-e/install-action@4fedbddde88aab767a45a011661f832d68202716 # pin@v2.33.28
+        with:
+          tool: nextest,cargo-llvm-cov
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: cargo llvm-cov nextest --lcov --output-path lcov_unit.info -vv --ignore-run-fail --workspace
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: 33554432 # 32 MB of stack
+          MVP_TEST_ON_CI: true
+          SOLC_EXE: /home/runner/bin/solc
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+        working-directory: rust
+      - run: ls -R
+        working-directory: rust
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov_unit
+          path: rust/lcov_unit.info
+
+  upload-to-codecov:
+    runs-on: ubuntu-latest
+    continue-on-error: true # Don't fail if the codecov upload fails
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    needs: [ rust-unit-coverage ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lcov_unit
+      - run: ls -R
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        with:
+          files: lcov_unit.info
+#          fail_ci_if_error: true
+          verbose: true

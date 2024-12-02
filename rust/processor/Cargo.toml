@@ -17,7 +17,6 @@ ahash = { workspace = true }
 allocative = { workspace = true }
 allocative_derive = { workspace = true }
 anyhow = { workspace = true }
-aptos-indexer-processor-sdk = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
@@ -63,7 +62,6 @@ url = { workspace = true }
 
 # Postgres SSL support
 native-tls = { workspace = true }
-num = { workspace = true }
 postgres-native-tls = { workspace = true }
 tiny-keccak = { workspace = true }
 tokio-postgres = { workspace = true }
