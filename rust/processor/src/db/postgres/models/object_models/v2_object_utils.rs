@@ -137,7 +137,9 @@ impl ObjectWithMetadata {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Untransferable;
+pub struct Untransferable {
+    dummy_field: bool,
+}
 
 impl TryFrom<&WriteResource> for Untransferable {
     type Error = anyhow::Error;
