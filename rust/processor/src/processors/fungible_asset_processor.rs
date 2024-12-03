@@ -15,7 +15,7 @@ use crate::{
             v2_fungible_metadata::{FungibleAssetMetadataMapping, FungibleAssetMetadataModel},
         },
         object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
         },
         resources::{FromWriteResource, V2FungibleAssetResource},
     },
@@ -593,11 +593,6 @@ pub async fn parse_v2_coin(
                                         Some(concurrent_fungible_asset_balance);
                                 },
                             }
-                        }
-                        if let Some(untransferable) =
-                            Untransferable::from_write_resource(write_resource).unwrap()
-                        {
-                            aggregated_data.untransferable = Some(untransferable);
                         }
                     }
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
