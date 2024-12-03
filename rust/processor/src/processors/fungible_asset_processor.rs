@@ -594,9 +594,17 @@ pub async fn parse_v2_coin(
                                 },
                             }
                         }
-                        if let Some(untransferable) =
-                            Untransferable::from_write_resource(write_resource).unwrap()
-                        {
+                        if let Some(untransferable) = Untransferable::from_write_resource(
+                            write_resource,
+                        )
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                                    transaction_version = txn_version,
+                                    index = index,
+                                    error = ?e,
+                                    "[Parser] Error parsing untransferable");
+                            panic!("[Parser] Error parsing untransferable");
+                        }) {
                             aggregated_data.untransferable = Some(untransferable);
                         }
                     }
