@@ -16,6 +16,7 @@ use crate::{
         parquet_user_transaction_processor::ParquetUserTransactionsProcessor,
     },
     processors::{
+        account_restoration_processor::AccountRestorationProcessor,
         account_transactions_processor::AccountTransactionsProcessor, ans_processor::AnsProcessor,
         default_processor::DefaultProcessor, events_processor::EventsProcessor,
         fungible_asset_processor::FungibleAssetProcessor,
@@ -48,6 +49,10 @@ pub struct IndexerProcessorConfig {
 impl RunnableConfig for IndexerProcessorConfig {
     async fn run(&self) -> Result<()> {
         match self.processor_config {
+            ProcessorConfig::AccountRestorationProcessor(_) => {
+                let acc_rest_processor = AccountRestorationProcessor::new(self.clone()).await?;
+                acc_rest_processor.run_processor().await
+            },
             ProcessorConfig::AccountTransactionsProcessor(_) => {
                 let acc_txns_processor = AccountTransactionsProcessor::new(self.clone()).await?;
                 acc_txns_processor.run_processor().await

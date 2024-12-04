@@ -1,13 +1,13 @@
 -- Public key to associated multikey auth keys
 CREATE TABLE public_key_auth_keys
 (
-  public_key_bcs VARCHAR(134) NOT NULL, -- with key type prefixes
+  public_key VARCHAR(132) NOT NULL,
   public_key_type VARCHAR(50) NOT NULL,
   auth_key VARCHAR(66) NOT NULL,
   verified BOOLEAN NOT NULL,
   -- Constraints
   PRIMARY KEY (
-    public_key_bcs,
+    public_key,
     public_key_type,
     auth_key
   )
@@ -25,7 +25,7 @@ CREATE TABLE auth_key_multikey_layout
 -- Auth key to account addresses
 CREATE TABLE auth_key_account_addresses (
   auth_key VARCHAR(66) NOT NULL,
-  address VARCHAR(66) UNIQUE NOT NULL,
+  address VARCHAR(66) NOT NULL,
   verified BOOLEAN NOT NULL,
   -- Constraints
   PRIMARY KEY (

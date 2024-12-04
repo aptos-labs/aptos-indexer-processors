@@ -3,12 +3,11 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{
-    schema::auth_key_account_addresses::{self},
-};
+use crate::schema::auth_key_account_addresses::{self};
+use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Identifiable, Insertable, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(auth_key, address))]
 #[diesel(table_name = auth_key_account_addresses)]
 pub struct AuthKeyAccountAddress {
