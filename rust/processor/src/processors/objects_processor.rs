@@ -7,6 +7,7 @@ use crate::{
         object_models::{
             v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+                Untransferable,
             },
             v2_objects::{CurrentObject, Object},
         },
@@ -221,6 +222,20 @@ impl ProcessorTrait for ObjectsProcessor {
                             concurrent_fungible_asset_balance: None,
                             token_identifier: None,
                         });
+                    }
+                }
+            }
+
+            // Second pass to get object metadata
+            for wsc in changes.iter() {
+                if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                    let address = standardize_address(&write_resource.address.to_string());
+                    if let Some(aggregated_data) = object_metadata_helper.get_mut(&address) {
+                        if let Some(untransferable) =
+                            Untransferable::from_write_resource(write_resource).unwrap()
+                        {
+                            aggregated_data.untransferable = Some(untransferable);
+                        }
                     }
                 }
             }
