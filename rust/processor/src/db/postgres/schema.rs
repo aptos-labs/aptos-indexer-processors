@@ -943,7 +943,7 @@ diesel::table! {
 
 diesel::table! {
     processor_status (processor) {
-        #[max_length = 50]
+        #[max_length = 100]
         processor -> Varchar,
         last_success_version -> Int8,
         last_updated -> Timestamp,

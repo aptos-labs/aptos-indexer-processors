@@ -318,8 +318,8 @@ mod tests {
             ParquetBufferStep::new(Duration::from_secs(10), buffer_uploader, 100);
 
         let data = HashMap::from([(
-            ParquetTypeEnum::MoveResource,
-            ParquetTypeStructs::default_for_type(&ParquetTypeEnum::MoveResource),
+            ParquetTypeEnum::MoveResources,
+            ParquetTypeStructs::default_for_type(&ParquetTypeEnum::MoveResources),
         )]);
         let metadata = TransactionMetadata::default();
 
@@ -348,8 +348,8 @@ mod tests {
 
         // Test data below `buffer_max_size`
         let data = HashMap::from([(
-            ParquetTypeEnum::MoveResource,
-            ParquetTypeStructs::default_for_type(&ParquetTypeEnum::MoveResource),
+            ParquetTypeEnum::MoveResources,
+            ParquetTypeStructs::default_for_type(&ParquetTypeEnum::MoveResources),
         )]);
         let metadata = TransactionMetadata::default();
 
@@ -364,8 +364,8 @@ mod tests {
 
         // Test buffer + data > `buffer_max_size`
         let data = HashMap::from([(
-            ParquetTypeEnum::MoveResource,
-            ParquetTypeStructs::default_for_type(&ParquetTypeEnum::MoveResource),
+            ParquetTypeEnum::MoveResources,
+            ParquetTypeStructs::default_for_type(&ParquetTypeEnum::MoveResources),
         )]);
         let metadata = TransactionMetadata::default();
 
@@ -390,7 +390,7 @@ mod tests {
         let gcs_client = Arc::new(GCSClient::new(gcs_config));
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
-            [(ParquetTypeEnum::MoveResource, MoveResource::schema())]
+            [(ParquetTypeEnum::MoveResources, MoveResource::schema())]
                 .into_iter()
                 .collect();
 

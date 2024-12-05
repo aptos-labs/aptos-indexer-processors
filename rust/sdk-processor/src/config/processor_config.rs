@@ -3,15 +3,21 @@ use crate::{
         ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
         stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
     },
-    utils::parquet_processor_table_mapping::VALID_TABLE_NAMES,
+    utils::parquet_processor_table_mapping::{format_table_name, VALID_TABLE_NAMES},
 };
 use ahash::AHashMap;
 use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
-    db::parquet::models::default_models::{
-        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-        parquet_move_tables::TableItem, parquet_transactions::Transaction,
-        parquet_write_set_changes::WriteSetChangeModel,
+    db::parquet::models::{
+        default_models::{
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_modules::MoveModule,
+            parquet_move_resources::MoveResource,
+            parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
+            parquet_transactions::Transaction,
+            parquet_write_set_changes::WriteSetChangeModel,
+        },
+        event_models::parquet_events::Event as EventPQ,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -63,6 +69,7 @@ pub enum ProcessorConfig {
     MonitoringProcessor(DefaultProcessorConfig),
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+    ParquetEventsProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -78,7 +85,8 @@ impl ProcessorConfig {
     /// is useful for querying the status from the processor status table in the database.
     pub fn get_processor_status_table_names(&self) -> anyhow::Result<Vec<String>> {
         match self {
-            ProcessorConfig::ParquetDefaultProcessor(config) => {
+            ProcessorConfig::ParquetDefaultProcessor(config)
+            | ProcessorConfig::ParquetEventsProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 
@@ -91,7 +99,7 @@ impl ProcessorConfig {
                     Ok(valid_table_names
                         .iter()
                         .cloned()
-                        .map(|table_name| Self::format_table_name(processor_name, &table_name))
+                        .map(|table_name| format_table_name(processor_name, &table_name))
                         .collect())
                 } else {
                     Self::validate_backfill_table_names(&config.backfill_table, valid_table_names)
@@ -113,14 +121,13 @@ impl ProcessorConfig {
                 WriteSetChangeModel::TABLE_NAME.to_string(),
                 TableItem::TABLE_NAME.to_string(),
                 MoveModule::TABLE_NAME.to_string(),
+                EventPQ::TABLE_NAME.to_string(),
+                BlockMetadataTransaction::TABLE_NAME.to_string(),
+                CurrentTableItem::TABLE_NAME.to_string(),
+                TableMetadata::TABLE_NAME.to_string(),
             ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }
-    }
-
-    /// helper function to format the table name with the processor name.
-    fn format_table_name(prefix: &str, table_name: &str) -> String {
-        format!("{}.{}", prefix, table_name)
     }
 
     /// This is to validate table_name for the backfill table
@@ -264,6 +271,9 @@ mod tests {
             "write_set_changes".to_string(),
             "table_items".to_string(),
             "move_modules".to_string(),
+            "block_metadata_transactions".to_string(),
+            "current_table_items".to_string(),
+            "table_metadata".to_string(),
         ]
         .iter()
         .map(|e| format!("parquet_default_processor.{}", e))

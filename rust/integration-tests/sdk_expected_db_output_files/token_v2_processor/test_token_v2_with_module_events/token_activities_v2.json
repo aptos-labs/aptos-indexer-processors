@@ -1,0 +1,36 @@
+[
+  {
+    "transaction_version": 78753832,
+    "event_index": 0,
+    "event_account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "token_data_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "property_version_v1": "0",
+    "type_": "0x4::collection::MintEvent",
+    "from_address": "0x28adfb8a46395e7ccd83038860764193eea3f834ae6894e75cd80a3e1ff23b0b",
+    "to_address": null,
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0xc8185b4484917ffda406f31fb71ab9a2b9ac7387041235b21dd7e4e5bdccb838::ambassador::mint_numbered_ambassador_token_by_user",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-12-02T19:50:23.770129"
+  },
+  {
+    "transaction_version": 78753832,
+    "event_index": 1,
+    "event_account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "token_data_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "property_version_v1": "0",
+    "type_": "0x1::object::Transfer",
+    "from_address": "0xc8185b4484917ffda406f31fb71ab9a2b9ac7387041235b21dd7e4e5bdccb838",
+    "to_address": "0x28adfb8a46395e7ccd83038860764193eea3f834ae6894e75cd80a3e1ff23b0b",
+    "token_amount": "1",
+    "before_value": null,
+    "after_value": null,
+    "entry_function_id_str": "0xc8185b4484917ffda406f31fb71ab9a2b9ac7387041235b21dd7e4e5bdccb838::ambassador::mint_numbered_ambassador_token_by_user",
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-12-02T19:50:23.770129"
+  }
+]

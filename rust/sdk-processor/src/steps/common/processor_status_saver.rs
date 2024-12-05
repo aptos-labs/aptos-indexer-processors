@@ -5,7 +5,10 @@ use crate::{
         processor_status::ProcessorStatus,
     },
     steps::common::parquet_version_tracker_step::ParquetProcessorStatusSaver,
-    utils::database::{execute_with_better_error, ArcDbPool},
+    utils::{
+        database::{execute_with_better_error, ArcDbPool},
+        parquet_processor_table_mapping::format_table_name,
+    },
 };
 use anyhow::Result;
 use aptos_indexer_processor_sdk::{
@@ -112,8 +115,8 @@ impl ProcessorStatusSaverEnum {
                 conn_pool,
                 processor_name,
             } => {
-                let processor_name = if table_name.is_some() {
-                    format!("{}_{}", processor_name, table_name.unwrap())
+                let processor_name = if let Some(table_name) = table_name {
+                    format_table_name(processor_name, &table_name)
                 } else {
                     processor_name.clone()
                 };

@@ -49,6 +49,9 @@ mod tests {
     };
     use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
     use aptos_indexer_test_transactions::{
+        IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_, IMPORTED_TESTNET_TXNS_1_GENESIS,
         IMPORTED_TESTNET_TXNS_278556781_V1_COIN_REGISTER_FA_METADATA,
         IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT, IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
@@ -121,6 +124,33 @@ mod tests {
             .await;
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn devnet_events_processor_coin_module_events() {
+        process_single_devnet_event_txn(
+            IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
+            Some("coin_event_v2".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn devnet_events_processor_token_v1_module_events() {
+        process_single_devnet_event_txn(
+            IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
+            Some("token_v1_event_v2".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn devnet_events_processor_token_v2_module_events() {
+        process_single_devnet_event_txn(
+            IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
+            Some("token_v2_event_v2".to_string()),
+        )
+        .await;
+    }
+
     // Example 2: Test for multiple transactions handling
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn testnet_events_processor_db_output_scenario_testing() {
@@ -180,11 +210,23 @@ mod tests {
         }
     }
 
-    // Helper function to abstract out the single transaction processing
+    async fn process_single_devnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
+        process_single_event_txn(txn, test_case_name, "imported_devnet_txns").await
+    }
+
     async fn process_single_testnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
+        process_single_event_txn(txn, test_case_name, "imported_testnet_txns").await
+    }
+
+    // Helper function to abstract out the single transaction processing
+    async fn process_single_event_txn(
+        txn: &[u8],
+        test_case_name: Option<String>,
+        folder_name: &str,
+    ) {
         let (diff_flag, custom_output_path) = get_test_config();
         let output_path = custom_output_path
-            .unwrap_or_else(|| format!("{}/imported_testnet_txns", DEFAULT_OUTPUT_FOLDER));
+            .unwrap_or_else(|| format!("{}/{}", DEFAULT_OUTPUT_FOLDER, folder_name));
 
         let (db, mut test_context) = setup_test_environment(&[txn]).await;
 

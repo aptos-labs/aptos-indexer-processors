@@ -251,10 +251,37 @@ pub struct WithdrawTokenEventType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawTokenEventTypeV2 {
+    account: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    pub id: TokenIdType,
+}
+impl WithdrawTokenEventTypeV2 {
+    pub fn get_account(&self) -> String {
+        standardize_address(&self.account)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DepositTokenEventType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
     pub id: TokenIdType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositTokenEventTypeV2 {
+    account: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    pub id: TokenIdType,
+}
+
+impl DepositTokenEventTypeV2 {
+    pub fn get_account(&self) -> String {
+        standardize_address(&self.account)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -265,6 +292,20 @@ pub struct MintTokenEventType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MintTokenEventTypeV2 {
+    creator: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    pub id: TokenDataIdType,
+}
+
+impl MintTokenEventTypeV2 {
+    pub fn get_account(&self) -> String {
+        standardize_address(&self.creator)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BurnTokenEventType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
@@ -272,9 +313,36 @@ pub struct BurnTokenEventType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BurnTokenEventTypeV2 {
+    account: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    pub id: TokenIdType,
+}
+
+impl BurnTokenEventTypeV2 {
+    pub fn get_account(&self) -> String {
+        standardize_address(&self.account)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MutateTokenPropertyMapEventType {
     pub old_id: TokenIdType,
     pub new_id: TokenIdType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MutateTokenPropertyMapEventTypeV2 {
+    account: String,
+    pub old_id: TokenIdType,
+    pub new_id: TokenIdType,
+}
+
+impl MutateTokenPropertyMapEventTypeV2 {
+    pub fn get_account(&self) -> String {
+        standardize_address(&self.account)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -288,6 +356,25 @@ pub struct OfferTokenEventType {
 impl OfferTokenEventType {
     pub fn get_to_address(&self) -> String {
         standardize_address(&self.to_address)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OfferTokenEventTypeV2 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    account: String,
+    to_address: String,
+    pub token_id: TokenIdType,
+}
+
+impl OfferTokenEventTypeV2 {
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_address)
+    }
+
+    pub fn get_from_address(&self) -> String {
+        standardize_address(&self.account)
     }
 }
 
@@ -306,6 +393,25 @@ impl CancelTokenOfferEventType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CancelTokenOfferEventTypeV2 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    account: String,
+    to_address: String,
+    pub token_id: TokenIdType,
+}
+
+impl CancelTokenOfferEventTypeV2 {
+    pub fn get_from_address(&self) -> String {
+        standardize_address(&self.account)
+    }
+
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_address)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClaimTokenEventType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
@@ -314,6 +420,25 @@ pub struct ClaimTokenEventType {
 }
 
 impl ClaimTokenEventType {
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_address)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimTokenEventTypeV2 {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+    account: String,
+    to_address: String,
+    pub token_id: TokenIdType,
+}
+
+impl ClaimTokenEventTypeV2 {
+    pub fn get_from_address(&self) -> String {
+        standardize_address(&self.account)
+    }
+
     pub fn get_to_address(&self) -> String {
         standardize_address(&self.to_address)
     }
@@ -385,13 +510,21 @@ impl TokenWriteSet {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TokenEvent {
     MintTokenEvent(MintTokenEventType),
+    Mint(MintTokenEventTypeV2),
     BurnTokenEvent(BurnTokenEventType),
+    Burn(BurnTokenEventTypeV2),
     MutateTokenPropertyMapEvent(MutateTokenPropertyMapEventType),
+    MutatePropertyMap(MutateTokenPropertyMapEventTypeV2),
     WithdrawTokenEvent(WithdrawTokenEventType),
+    TokenWithdraw(WithdrawTokenEventTypeV2),
     DepositTokenEvent(DepositTokenEventType),
+    TokenDeposit(DepositTokenEventTypeV2),
     OfferTokenEvent(OfferTokenEventType),
+    Offer(OfferTokenEventTypeV2),
     CancelTokenOfferEvent(CancelTokenOfferEventType),
+    CancelOffer(CancelTokenOfferEventTypeV2),
     ClaimTokenEvent(ClaimTokenEventType),
+    Claim(ClaimTokenEventTypeV2),
 }
 
 impl TokenEvent {
@@ -400,24 +533,48 @@ impl TokenEvent {
             "0x3::token::MintTokenEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::MintTokenEvent(inner)))
             },
+            "0x3::token::Mint" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::Mint(inner)))
+            },
             "0x3::token::BurnTokenEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::BurnTokenEvent(inner)))
             },
+            "0x3::token::Burn" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::Burn(inner)))
+            },
             "0x3::token::MutateTokenPropertyMapEvent" => serde_json::from_str(data)
                 .map(|inner| Some(TokenEvent::MutateTokenPropertyMapEvent(inner))),
+            "0x3::token::MutatePropertyMap" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::MutatePropertyMap(inner)))
+            },
             "0x3::token::WithdrawEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::WithdrawTokenEvent(inner)))
+            },
+            "0x3::token::TokenWithdraw" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::TokenWithdraw(inner)))
             },
             "0x3::token::DepositEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::DepositTokenEvent(inner)))
             },
+            "0x3::token::TokenDeposit" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::TokenDeposit(inner)))
+            },
             "0x3::token_transfers::TokenOfferEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::OfferTokenEvent(inner)))
             },
+            "0x3::token_transfers::Offer" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::Offer(inner)))
+            },
             "0x3::token_transfers::TokenCancelOfferEvent" => serde_json::from_str(data)
                 .map(|inner| Some(TokenEvent::CancelTokenOfferEvent(inner))),
+            "0x3::token_transfers::CancelOffer" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::CancelOffer(inner)))
+            },
             "0x3::token_transfers::TokenClaimEvent" => {
                 serde_json::from_str(data).map(|inner| Some(TokenEvent::ClaimTokenEvent(inner)))
+            },
+            "0x3::token_transfers::Claim" => {
+                serde_json::from_str(data).map(|inner| Some(TokenEvent::Claim(inner)))
             },
             _ => Ok(None),
         }

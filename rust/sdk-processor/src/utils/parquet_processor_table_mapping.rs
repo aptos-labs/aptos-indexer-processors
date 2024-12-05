@@ -15,3 +15,8 @@ lazy_static! {
         map
     };
 }
+
+/// helper function to format the table name with the processor name.
+pub fn format_table_name(prefix: &str, table_name: &str) -> String {
+    format!("{}.{}", prefix, table_name)
+}

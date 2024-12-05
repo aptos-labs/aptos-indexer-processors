@@ -29,6 +29,7 @@ pub trait NamedTable {
     const TABLE_NAME: &'static str;
 }
 
+/// TODO: Deprecate once fully migrated to SDK
 pub trait HasVersion {
     fn version(&self) -> i64;
 }
@@ -37,6 +38,7 @@ pub trait HasParquetSchema {
     fn schema() -> Arc<parquet::schema::types::Type>;
 }
 
+/// TODO: Deprecate once fully migrated to SDK
 pub trait GetTimeStamp {
     fn get_timestamp(&self) -> chrono::NaiveDateTime;
 }

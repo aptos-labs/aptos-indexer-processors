@@ -49,7 +49,7 @@ impl ProposalVote {
         let txn_version = transaction.version as i64;
 
         if let TxnData::User(user_txn) = txn_data {
-            for event in &user_txn.events {
+            for event in user_txn.events.iter() {
                 if let Some(StakeEvent::GovernanceVoteEvent(ev)) =
                     StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
                 {

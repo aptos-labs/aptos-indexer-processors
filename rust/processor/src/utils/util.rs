@@ -301,6 +301,17 @@ pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
+pub fn compute_nanos_since_epoch(datetime: NaiveDateTime) -> u64 {
+    // The Unix epoch is 1970-01-01T00:00:00Z
+    #[allow(deprecated)]
+    let unix_epoch = NaiveDateTime::from_timestamp(0, 0);
+    let duration_since_epoch = datetime.signed_duration_since(unix_epoch);
+
+    // Convert the duration to nanoseconds and return
+    duration_since_epoch.num_seconds() as u64 * 1_000_000_000
+        + duration_since_epoch.subsec_nanos() as u64
+}
+
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {
     #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(

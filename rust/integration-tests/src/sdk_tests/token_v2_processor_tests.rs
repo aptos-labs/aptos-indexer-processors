@@ -58,6 +58,8 @@ mod sdk_token_v2_processor_tests {
         },
     };
     use aptos_indexer_test_transactions::{
+        IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_MAINNET_TXNS_1058723093_TOKEN_V1_MINT_WITHDRAW_DEPOSIT_EVENTS,
         IMPORTED_MAINNET_TXNS_1080786089_TOKEN_V2_BURN_EVENT_V1,
         IMPORTED_MAINNET_TXNS_11648867_TOKEN_V1_BURN_EVENT,
@@ -327,6 +329,23 @@ mod sdk_token_v2_processor_tests {
         process_single_transaction(
             IMPORTED_MAINNET_TXNS_97963136_TOKEN_V2_CANCEL_OFFER,
             Some("test_token_v1_cancel_offer".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_with_module_events() {
+        process_single_transaction(
+            IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
+            Some("test_token_v1_with_module_events".to_string()),
+        )
+        .await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v2_with_module_events() {
+        process_single_transaction(
+            IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
+            Some("test_token_v2_with_module_events".to_string()),
         )
         .await;
     }

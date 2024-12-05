@@ -4,10 +4,13 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    db::common::models::default_models::raw_table_items::{RawTableItem, TableItemConvertible},
+    db::common::models::default_models::{
+        raw_current_table_items::{CurrentTableItemConvertible, RawCurrentTableItem},
+        raw_table_items::{RawTableItem, TableItemConvertible},
+        raw_table_metadata::{RawTableMetadata, TableMetadataConvertible},
+    },
     schema::{current_table_items, table_items, table_metadatas},
 };
-use aptos_protos::transaction::v1::WriteTableItem;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -65,12 +68,29 @@ impl TableItemConvertible for TableItem {
     }
 }
 
-impl TableMetadata {
-    pub fn from_write_table_item(table_item: &WriteTableItem) -> Self {
-        Self {
-            handle: table_item.handle.to_string(),
-            key_type: table_item.data.as_ref().unwrap().key_type.clone(),
-            value_type: table_item.data.as_ref().unwrap().value_type.clone(),
+impl TableMetadataConvertible for TableMetadata {
+    fn from_raw(raw_item: &RawTableMetadata) -> Self {
+        TableMetadata {
+            handle: raw_item.handle.clone(),
+            key_type: raw_item.key_type.clone(),
+            value_type: raw_item.value_type.clone(),
+        }
+    }
+}
+
+impl CurrentTableItemConvertible for CurrentTableItem {
+    fn from_raw(raw_item: &RawCurrentTableItem) -> Self {
+        CurrentTableItem {
+            table_handle: raw_item.table_handle.clone(),
+            key_hash: raw_item.key_hash.clone(),
+            key: raw_item.key.clone(),
+            decoded_key: serde_json::from_str(raw_item.decoded_key.as_str()).unwrap(),
+            decoded_value: raw_item
+                .decoded_value
+                .clone()
+                .map(|v| serde_json::from_str(v.as_str()).unwrap()),
+            last_transaction_version: raw_item.last_transaction_version,
+            is_deleted: raw_item.is_deleted,
         }
     }
 }

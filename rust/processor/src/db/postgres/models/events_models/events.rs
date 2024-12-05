@@ -4,15 +4,12 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
+    db::common::models::event_models::raw_events::{EventConvertible, RawEvent},
     schema::events,
-    utils::util::{standardize_address, truncate_str},
 };
 use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-// p99 currently is 303 so using 300 as a safe max length
-const EVENT_TYPE_MAX_LENGTH: usize = 300;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
@@ -36,20 +33,15 @@ impl Event {
         transaction_block_height: i64,
         event_index: i64,
     ) -> Self {
-        let t: &str = event.type_str.as_ref();
-        Event {
-            account_address: standardize_address(
-                event.key.as_ref().unwrap().account_address.as_str(),
-            ),
-            creation_number: event.key.as_ref().unwrap().creation_number as i64,
-            sequence_number: event.sequence_number as i64,
+        let raw = RawEvent::from_raw_event(
+            event,
             transaction_version,
             transaction_block_height,
-            type_: t.to_string(),
-            data: serde_json::from_str(event.data.as_str()).unwrap(),
             event_index,
-            indexed_type: truncate_str(t, EVENT_TYPE_MAX_LENGTH),
-        }
+            None,
+            None,
+        );
+        Self::from_raw(&raw)
     }
 
     pub fn from_events(
@@ -69,6 +61,22 @@ impl Event {
                 )
             })
             .collect::<Vec<EventModel>>()
+    }
+}
+
+impl EventConvertible for Event {
+    fn from_raw(raw: &RawEvent) -> Self {
+        Event {
+            sequence_number: raw.sequence_number,
+            creation_number: raw.creation_number,
+            account_address: raw.account_address.clone(),
+            transaction_version: raw.transaction_version,
+            transaction_block_height: raw.transaction_block_height,
+            type_: raw.type_.clone(),
+            data: serde_json::from_str(&raw.data).unwrap(),
+            event_index: raw.event_index,
+            indexed_type: raw.indexed_type.clone(),
+        }
     }
 }
 

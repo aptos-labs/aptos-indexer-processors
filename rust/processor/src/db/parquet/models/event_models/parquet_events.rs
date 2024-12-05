@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    utils::util::{standardize_address, truncate_str},
+    db::common::models::event_models::raw_events::{
+        EventConvertible, RawEvent, EVENT_TYPE_MAX_LENGTH,
+    },
+    utils::util::truncate_str,
 };
 use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{Event as EventPB, EventSizeInfo};
@@ -13,10 +15,11 @@ use lazy_static::lazy_static;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-// p99 currently is 303 so using 300 as a safe max length
-const EVENT_TYPE_MAX_LENGTH: usize = 300;
 const DEFAULT_CREATION_NUMBER: i64 = 0;
 const DEFAULT_SEQUENCE_NUMBER: i64 = 0;
+// This is for future proofing. TODO: change when events v2 comes
+const EVENT_VERSION: i8 = 1i8;
+
 lazy_static! {
     pub static ref DEFAULT_ACCOUNT_ADDRESS: String = "NULL_ACCOUNT_ADDRESS".to_string();
     pub static ref DEFAULT_EVENT_TYPE: String = "NULL_EVENT_TYPE".to_string();
@@ -66,24 +69,15 @@ impl Event {
         size_info: &EventSizeInfo,
         block_timestamp: chrono::NaiveDateTime,
     ) -> Self {
-        let event_type: &str = event.type_str.as_ref();
-        Event {
-            account_address: standardize_address(
-                event.key.as_ref().unwrap().account_address.as_str(),
-            ),
-            creation_number: event.key.as_ref().unwrap().creation_number as i64,
-            sequence_number: event.sequence_number as i64,
+        let raw = RawEvent::from_raw_event(
+            event,
             txn_version,
             block_height,
-            event_type: event_type.to_string(),
-            data: event.data.clone(),
             event_index,
-            indexed_type: truncate_str(event_type, EVENT_TYPE_MAX_LENGTH),
-            type_tag_bytes: size_info.type_tag_bytes as i64,
-            total_bytes: size_info.total_bytes as i64,
-            event_version: 1i8, // this is for future proofing. TODO: change when events v2 comes
-            block_timestamp,
-        }
+            Some(size_info),
+            Some(block_timestamp),
+        );
+        Self::from_raw(&raw)
     }
 
     // This function is added to handle the txn with events filtered, but event_size_info is not filtered.
@@ -106,7 +100,7 @@ impl Event {
             indexed_type: truncate_str(&DEFAULT_EVENT_TYPE, EVENT_TYPE_MAX_LENGTH),
             type_tag_bytes: size_info.type_tag_bytes as i64,
             total_bytes: size_info.total_bytes as i64,
-            event_version: 1i8, // this is for future proofing. TODO: change when events v2 comes
+            event_version: EVENT_VERSION,
             block_timestamp,
         }
     }
@@ -199,6 +193,26 @@ fn handle_user_txn_type(
             )
         })
         .collect()
+}
+
+impl EventConvertible for Event {
+    fn from_raw(raw: &RawEvent) -> Self {
+        Event {
+            txn_version: raw.transaction_version,
+            account_address: raw.account_address.clone(),
+            sequence_number: raw.sequence_number,
+            creation_number: raw.creation_number,
+            block_height: raw.transaction_block_height,
+            event_type: raw.type_.clone(),
+            data: raw.data.clone(),
+            event_index: raw.event_index,
+            indexed_type: raw.indexed_type.clone(),
+            type_tag_bytes: raw.type_tag_bytes.unwrap_or(0),
+            total_bytes: raw.total_bytes.unwrap_or(0),
+            event_version: EVENT_VERSION,
+            block_timestamp: raw.block_timestamp.unwrap(),
+        }
+    }
 }
 
 pub type ParquetEventModel = Event;
