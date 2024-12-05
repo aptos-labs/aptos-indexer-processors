@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::db::common::models::event_models::raw_events::{
-    EventConvertible, RawEvent, EVENT_TYPE_MAX_LENGTH,
-};
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    db::common::models::event_models::raw_events::{
+        EventConvertible, RawEvent, EVENT_TYPE_MAX_LENGTH,
+    },
     utils::util::truncate_str,
 };
 use allocative_derive::Allocative;

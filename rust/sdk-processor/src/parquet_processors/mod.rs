@@ -11,16 +11,18 @@ use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
-use processor::db::parquet::models::event_models::parquet_events::Event;
 use processor::{
-    db::parquet::models::default_models::{
-        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-        parquet_move_tables::TableItem, parquet_transactions::Transaction as ParquetTransaction,
-        parquet_write_set_changes::WriteSetChangeModel,
+    db::parquet::models::{
+        default_models::{
+            parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
+            parquet_move_tables::TableItem,
+            parquet_transactions::Transaction as ParquetTransaction,
+            parquet_write_set_changes::WriteSetChangeModel,
+        },
+        event_models::parquet_events::Event,
     },
     worker::TableFlags,
 };
-
 #[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 use std::{

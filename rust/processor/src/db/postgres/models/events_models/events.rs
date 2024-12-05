@@ -3,12 +3,13 @@
 
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::schema::events;
+use crate::{
+    db::common::models::event_models::raw_events::{EventConvertible, RawEvent},
+    schema::events,
+};
 use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-use crate::db::common::models::event_models::raw_events::{EventConvertible, RawEvent};
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
