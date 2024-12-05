@@ -12,7 +12,7 @@ use crate::{
             parquet_version_tracker_step::ParquetVersionTrackerStep,
             processor_status_saver::get_processor_status_saver,
         },
-        parquet_default_processor::parquet_default_extractor::ParquetDefaultExtractor,
+        parquet_transaction_metadata_processor::parquet_transaction_metadata_extractor::ParquetTransactionMetadataExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -30,25 +30,17 @@ use aptos_indexer_processor_sdk::{
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::parquet::models::default_models::{
-        parquet_block_metadata_transactions::BlockMetadataTransaction,
-        parquet_move_modules::MoveModule,
-        parquet_move_resources::MoveResource,
-        parquet_move_tables::{CurrentTableItem, TableItem},
-        parquet_table_metadata::TableMetadata,
-        parquet_transactions::Transaction as ParquetTransaction,
-        parquet_write_set_changes::WriteSetChangeModel,
-    },
+    db::parquet::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
 
-pub struct ParquetDefaultProcessor {
+pub struct ParquetTransactionMetadataProcessor {
     pub config: IndexerProcessorConfig,
     pub db_pool: ArcDbPool,
 }
 
-impl ParquetDefaultProcessor {
+impl ParquetTransactionMetadataProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> anyhow::Result<Self> {
         let db_pool = initialize_database_pool(&config.db_config).await?;
         Ok(Self { config, db_pool })
@@ -56,7 +48,7 @@ impl ParquetDefaultProcessor {
 }
 
 #[async_trait::async_trait]
-impl ProcessorTrait for ParquetDefaultProcessor {
+impl ProcessorTrait for ParquetTransactionMetadataProcessor {
     fn name(&self) -> &'static str {
         self.config.processor_config.name()
     }
@@ -74,7 +66,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             },
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid db config for ParquetDefaultProcessor {:?}",
+                    "Invalid db config for ParquetTransactionMetadataProcessor {:?}",
                     self.config.db_config
                 ));
             },
@@ -88,12 +80,12 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
         let parquet_processor_config = match self.config.processor_config.clone() {
-            ProcessorConfig::ParquetDefaultProcessor(parquet_processor_config) => {
+            ProcessorConfig::ParquetTransactionMetadataProcessor(parquet_processor_config) => {
                 parquet_processor_config
             },
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid processor configuration for ParquetDefaultProcessor {:?}",
+                    "Invalid processor configuration for ParquetTransactionMetadataProcessor {:?}",
                     self.config.processor_config
                 ));
             },
@@ -120,34 +112,17 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         .await?;
 
         let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
-        let parquet_default_extractor = ParquetDefaultExtractor {
+        let parquet_txn_metadata_extractor = ParquetTransactionMetadataExtractor {
             opt_in_tables: backfill_table,
         };
 
         let gcs_client =
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
-        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
-            (ParquetTypeEnum::MoveResources, MoveResource::schema()),
-            (
-                ParquetTypeEnum::WriteSetChanges,
-                WriteSetChangeModel::schema(),
-            ),
-            (ParquetTypeEnum::Transactions, ParquetTransaction::schema()),
-            (ParquetTypeEnum::TableItems, TableItem::schema()),
-            (ParquetTypeEnum::MoveModules, MoveModule::schema()),
-            (
-                ParquetTypeEnum::CurrentTableItems,
-                CurrentTableItem::schema(),
-            ),
-            (
-                ParquetTypeEnum::BlockMetadataTransactions,
-                BlockMetadataTransaction::schema(),
-            ),
-            (ParquetTypeEnum::TableMetadata, TableMetadata::schema()),
-        ]
-        .into_iter()
-        .collect();
+        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
+            [(ParquetTypeEnum::WriteSetSize, WriteSetSize::schema())]
+                .into_iter()
+                .collect();
 
         let default_size_buffer_step = initialize_parquet_buffer_step(
             gcs_client.clone(),
@@ -174,7 +149,10 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
+        .connect_to(
+            parquet_txn_metadata_extractor.into_runnable_step(),
+            channel_size,
+        )
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
         .connect_to(
             parquet_version_tracker_step.into_runnable_step(),

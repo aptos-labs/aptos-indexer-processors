@@ -2,6 +2,7 @@ use crate::{
     parquet_processors::{ParquetTypeEnum, ParquetTypeStructs},
     utils::parquet_extractor_helper::add_to_map_if_opted_in_for_backfill,
 };
+use ahash::AHashMap;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
@@ -10,13 +11,14 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    processors::parquet_processors::parquet_events_processor::process_transactions_parquet,
+    processors::parquet_processors::parquet_transaction_metadata_processor::process_transaction,
     utils::table_flags::TableFlags,
 };
 use std::collections::HashMap;
+use tracing::debug;
 
 /// Extracts parquet data from transactions, allowing optional selection of specific tables.
-pub struct ParquetEventsExtractor
+pub struct ParquetTransactionMetadataExtractor
 where
     Self: Processable + Send + Sized + 'static,
 {
@@ -26,7 +28,7 @@ where
 type ParquetTypeMap = HashMap<ParquetTypeEnum, ParquetTypeStructs>;
 
 #[async_trait]
-impl Processable for ParquetEventsExtractor {
+impl Processable for ParquetTransactionMetadataExtractor {
     type Input = Vec<Transaction>;
     type Output = ParquetTypeMap;
     type RunType = AsyncRunType;
@@ -35,14 +37,19 @@ impl Processable for ParquetEventsExtractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
-        let (_txn_ver_map, events) = process_transactions_parquet(transactions.data);
+        let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
+        let write_set_size =
+            process_transaction(transactions.data, &mut transaction_version_to_struct_count);
+
+        debug!("Processed data sizes:");
+        debug!(" - WriteSetSize: {}", write_set_size.len());
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
         let data_types = [(
-            TableFlags::EVENTS,
-            ParquetTypeEnum::Events,
-            ParquetTypeStructs::Event(events),
+            TableFlags::WRITE_SET_SIZE,
+            ParquetTypeEnum::WriteSetSize,
+            ParquetTypeStructs::WriteSetSize(write_set_size),
         )];
 
         // Populate the map based on opt-in tables
@@ -55,10 +62,10 @@ impl Processable for ParquetEventsExtractor {
     }
 }
 
-impl AsyncStep for ParquetEventsExtractor {}
+impl AsyncStep for ParquetTransactionMetadataExtractor {}
 
-impl NamedStep for ParquetEventsExtractor {
+impl NamedStep for ParquetTransactionMetadataExtractor {
     fn name(&self) -> String {
-        "ParquetEventsExtractor".to_string()
+        "ParquetTransactionMetadataExtractor".to_string()
     }
 }

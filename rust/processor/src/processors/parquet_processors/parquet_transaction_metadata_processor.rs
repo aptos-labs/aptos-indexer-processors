@@ -6,7 +6,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::postgres::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
+    db::parquet::models::transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{database::ArcDbPool, util::parse_timestamp},
@@ -92,31 +92,8 @@ impl ProcessorTrait for ParquetTransactionMetadataProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
-        let mut write_set_sizes = vec![];
-
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
-            let size_info = match txn.size_info.as_ref() {
-                Some(size_info) => size_info,
-                None => {
-                    warn!(version = txn.version, "Transaction size info not found");
-                    continue;
-                },
-            };
-            for (index, write_set_size_info) in size_info.write_op_size_info.iter().enumerate() {
-                write_set_sizes.push(WriteSetSize::from_transaction_info(
-                    write_set_size_info,
-                    txn_version,
-                    index as i64,
-                    block_timestamp,
-                ));
-                transaction_version_to_struct_count
-                    .entry(txn_version)
-                    .and_modify(|e| *e += 1)
-                    .or_insert(1);
-            }
-        }
+        let write_set_sizes =
+            process_transaction(transactions, &mut transaction_version_to_struct_count);
 
         let write_set_size_info_parquet_data = ParquetDataGeneric {
             data: write_set_sizes,
@@ -142,4 +119,36 @@ impl ProcessorTrait for ParquetTransactionMetadataProcessor {
     fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
+}
+
+pub fn process_transaction(
+    transactions: Vec<Transaction>,
+    transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
+) -> Vec<WriteSetSize> {
+    let mut write_set_sizes = vec![];
+
+    for txn in transactions {
+        let txn_version = txn.version as i64;
+        let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
+        let size_info = match txn.size_info.as_ref() {
+            Some(size_info) => size_info,
+            None => {
+                warn!(version = txn.version, "Transaction size info not found");
+                continue;
+            },
+        };
+        for (index, write_set_size_info) in size_info.write_op_size_info.iter().enumerate() {
+            write_set_sizes.push(WriteSetSize::from_transaction_info(
+                write_set_size_info,
+                txn_version,
+                index as i64,
+                block_timestamp,
+            ));
+            transaction_version_to_struct_count
+                .entry(txn_version)
+                .and_modify(|e| *e += 1)
+                .or_insert(1);
+        }
+    }
+    write_set_sizes
 }

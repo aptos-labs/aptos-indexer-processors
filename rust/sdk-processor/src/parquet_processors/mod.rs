@@ -32,6 +32,7 @@ use processor::{
                 },
                 parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
             },
+            transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
             user_transaction_models::parquet_user_transactions::UserTransaction,
         },
         postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
@@ -51,6 +52,7 @@ pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_transaction_metadata_processor;
 pub mod parquet_user_transaction_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
@@ -99,6 +101,8 @@ pub enum ParquetTypeEnum {
     FungibleAssetBalances,
     CurrentFungibleAssetBalances,
     CurrentFungibleAssetBalancesLegacy,
+    // txn metadata,
+    WriteSetSize,
 }
 
 /// Trait for handling various Parquet types.
@@ -175,6 +179,7 @@ impl_parquet_trait!(
     CurrentFungibleAssetBalance,
     ParquetTypeEnum::CurrentFungibleAssetBalancesLegacy
 );
+impl_parquet_trait!(WriteSetSize, ParquetTypeEnum::WriteSetSize);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -195,6 +200,7 @@ pub enum ParquetTypeStructs {
     FungibleAssetBalance(Vec<FungibleAssetBalance>),
     CurrentFungibleAssetBalance(Vec<CurrentFungibleAssetBalance>),
     CurrentUnifiedFungibleAssetBalance(Vec<CurrentUnifiedFungibleAssetBalance>),
+    WriteSetSize(Vec<WriteSetSize>),
 }
 
 impl ParquetTypeStructs {
@@ -228,6 +234,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::CurrentFungibleAssetBalances => {
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(Vec::new())
             },
+            ParquetTypeEnum::WriteSetSize => ParquetTypeStructs::WriteSetSize(Vec::new()),
         }
     }
 
@@ -331,6 +338,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(self_data),
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::WriteSetSize(self_data),
+                ParquetTypeStructs::WriteSetSize(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
