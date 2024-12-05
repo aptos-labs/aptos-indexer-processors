@@ -56,13 +56,13 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
     )
 )]
 pub enum ParquetTypeEnum {
-    MoveResource,
-    WriteSetChange,
-    Transaction,
-    TableItem,
-    MoveModule,
-    CurrentTableItem,
-    BlockMetadataTransaction,
+    MoveResources,
+    WriteSetChanges,
+    Transactions,
+    TableItems,
+    MoveModules,
+    CurrentTableItems,
+    BlockMetadataTransactions,
     TableMetadata,
 }
 
@@ -109,15 +109,15 @@ macro_rules! impl_parquet_trait {
 }
 
 // Apply macro to supported types
-impl_parquet_trait!(MoveResource, ParquetTypeEnum::MoveResource);
-impl_parquet_trait!(WriteSetChangeModel, ParquetTypeEnum::WriteSetChange);
-impl_parquet_trait!(ParquetTransaction, ParquetTypeEnum::Transaction);
-impl_parquet_trait!(TableItem, ParquetTypeEnum::TableItem);
-impl_parquet_trait!(MoveModule, ParquetTypeEnum::MoveModule);
-impl_parquet_trait!(CurrentTableItem, ParquetTypeEnum::CurrentTableItem);
+impl_parquet_trait!(MoveResource, ParquetTypeEnum::MoveResources);
+impl_parquet_trait!(WriteSetChangeModel, ParquetTypeEnum::WriteSetChanges);
+impl_parquet_trait!(ParquetTransaction, ParquetTypeEnum::Transactions);
+impl_parquet_trait!(TableItem, ParquetTypeEnum::TableItems);
+impl_parquet_trait!(MoveModule, ParquetTypeEnum::MoveModules);
+impl_parquet_trait!(CurrentTableItem, ParquetTypeEnum::CurrentTableItems);
 impl_parquet_trait!(
     BlockMetadataTransaction,
-    ParquetTypeEnum::BlockMetadataTransaction
+    ParquetTypeEnum::BlockMetadataTransactions
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
 
@@ -137,13 +137,13 @@ pub enum ParquetTypeStructs {
 impl ParquetTypeStructs {
     pub fn default_for_type(parquet_type: &ParquetTypeEnum) -> Self {
         match parquet_type {
-            ParquetTypeEnum::MoveResource => ParquetTypeStructs::MoveResource(Vec::new()),
-            ParquetTypeEnum::WriteSetChange => ParquetTypeStructs::WriteSetChange(Vec::new()),
-            ParquetTypeEnum::Transaction => ParquetTypeStructs::Transaction(Vec::new()),
-            ParquetTypeEnum::TableItem => ParquetTypeStructs::TableItem(Vec::new()),
-            ParquetTypeEnum::MoveModule => ParquetTypeStructs::MoveModule(Vec::new()),
-            ParquetTypeEnum::CurrentTableItem => ParquetTypeStructs::CurrentTableItem(Vec::new()),
-            ParquetTypeEnum::BlockMetadataTransaction => {
+            ParquetTypeEnum::MoveResources => ParquetTypeStructs::MoveResource(Vec::new()),
+            ParquetTypeEnum::WriteSetChanges => ParquetTypeStructs::WriteSetChange(Vec::new()),
+            ParquetTypeEnum::Transactions => ParquetTypeStructs::Transaction(Vec::new()),
+            ParquetTypeEnum::TableItems => ParquetTypeStructs::TableItem(Vec::new()),
+            ParquetTypeEnum::MoveModules => ParquetTypeStructs::MoveModule(Vec::new()),
+            ParquetTypeEnum::CurrentTableItems => ParquetTypeStructs::CurrentTableItem(Vec::new()),
+            ParquetTypeEnum::BlockMetadataTransactions => {
                 ParquetTypeStructs::BlockMetadataTransaction(Vec::new())
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
@@ -305,12 +305,12 @@ mod tests {
     #[test]
     fn test_parquet_type_enum_matches_trait() {
         let types = vec![
-            ParquetTypeEnum::MoveResource,
-            ParquetTypeEnum::WriteSetChange,
-            ParquetTypeEnum::Transaction,
-            ParquetTypeEnum::TableItem,
-            ParquetTypeEnum::MoveModule,
-            ParquetTypeEnum::CurrentTableItem,
+            ParquetTypeEnum::MoveResources,
+            ParquetTypeEnum::WriteSetChanges,
+            ParquetTypeEnum::Transactions,
+            ParquetTypeEnum::TableItems,
+            ParquetTypeEnum::MoveModules,
+            ParquetTypeEnum::CurrentTableItems,
         ];
 
         for t in types {

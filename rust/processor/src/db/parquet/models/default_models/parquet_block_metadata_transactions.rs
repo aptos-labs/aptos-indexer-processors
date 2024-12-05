@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub struct BlockMetadataTransaction {
     pub txn_version: i64,
     pub block_height: i64,
-    pub id: String,
+    pub block_id: String,
     pub round: i64,
     pub epoch: i64,
     pub previous_block_votes_bitvec: String,
@@ -30,6 +30,7 @@ pub struct BlockMetadataTransaction {
     pub failed_proposer_indices: String,
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
+    pub since_unix_epoch: u64,
 }
 
 impl NamedTable for BlockMetadataTransaction {
@@ -53,13 +54,14 @@ impl BlockMetadataTransactionConvertible for BlockMetadataTransaction {
         BlockMetadataTransaction {
             txn_version: raw_item.version,
             block_height: raw_item.block_height,
-            id: raw_item.id.clone(),
+            block_id: raw_item.id.clone(),
             round: raw_item.round,
             epoch: raw_item.epoch,
             previous_block_votes_bitvec: raw_item.previous_block_votes_bitvec.clone(),
             proposer: raw_item.proposer.clone(),
             failed_proposer_indices: raw_item.failed_proposer_indices.clone(),
             block_timestamp: raw_item.timestamp,
+            since_unix_epoch: raw_item.ns_since_unix_epoch,
         }
     }
 }
@@ -68,22 +70,25 @@ impl BlockMetadataTransactionConvertible for BlockMetadataTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parquet::record::RecordWriter;
+    use crate::{parquet::record::RecordWriter, utils::util::compute_nanos_since_epoch};
     use chrono::NaiveDateTime;
     use parquet::file::writer::SerializedFileWriter;
     use serde_json::json;
+
     #[test]
     fn test_raw_block_metadata_transaction() {
+        let time_stamp = NaiveDateTime::from_timestamp(1, 0);
         let samples = vec![BlockMetadataTransaction {
             txn_version: 1,
             block_height: 1,
-            id: "id".to_string(),
+            block_id: "id".to_string(),
             round: 1,
             epoch: 1,
             previous_block_votes_bitvec: json!([1, 2, 3]).to_string(),
             proposer: "proposer".to_string(),
             failed_proposer_indices: json!([1, 2, 3]).to_string(),
-            block_timestamp: NaiveDateTime::from_timestamp(1, 0),
+            block_timestamp: time_stamp,
+            since_unix_epoch: compute_nanos_since_epoch(time_stamp),
         }];
 
         let schema = samples.as_slice().schema().unwrap();
@@ -101,6 +106,7 @@ mod tests {
 
     #[test]
     fn test_from_raw() {
+        let time_stamp = NaiveDateTime::from_timestamp(1, 0);
         let raw = RawBlockMetadataTransaction {
             version: 1,
             block_height: 1,
@@ -110,14 +116,15 @@ mod tests {
             previous_block_votes_bitvec: json!([1, 2, 3]).to_string(),
             proposer: "proposer".to_string(),
             failed_proposer_indices: json!([1, 2, 3]).to_string(),
-            timestamp: NaiveDateTime::from_timestamp(1, 0),
+            timestamp: time_stamp,
+            ns_since_unix_epoch: compute_nanos_since_epoch(time_stamp),
         };
 
         let block_metadata_transaction = BlockMetadataTransaction::from_raw(&raw);
 
         assert_eq!(block_metadata_transaction.txn_version, 1);
         assert_eq!(block_metadata_transaction.block_height, 1);
-        assert_eq!(block_metadata_transaction.id, "id");
+        assert_eq!(block_metadata_transaction.block_id, "id");
         assert_eq!(block_metadata_transaction.round, 1);
         assert_eq!(block_metadata_transaction.epoch, 1);
         assert_eq!(

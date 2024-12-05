@@ -367,8 +367,9 @@ pub fn process_transactions(
             .expect("Transaction info doesn't exist!");
 
         #[allow(deprecated)]
-        let block_timestamp = chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, 0)
-            .expect("Txn Timestamp is invalid!");
+        let block_timestamp =
+            chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32)
+                .expect("Txn Timestamp is invalid!");
         let txn_data = match transaction.txn_data.as_ref() {
             Some(txn_data) => txn_data,
             None => {

@@ -108,37 +108,37 @@ impl Processable for ParquetDefaultExtractor {
         let data_types = [
             (
                 TableFlags::MOVE_RESOURCES,
-                ParquetTypeEnum::MoveResource,
+                ParquetTypeEnum::MoveResources,
                 ParquetTypeStructs::MoveResource(move_resources),
             ),
             (
                 TableFlags::WRITE_SET_CHANGES,
-                ParquetTypeEnum::WriteSetChange,
+                ParquetTypeEnum::WriteSetChanges,
                 ParquetTypeStructs::WriteSetChange(write_set_changes),
             ),
             (
                 TableFlags::TRANSACTIONS,
-                ParquetTypeEnum::Transaction,
+                ParquetTypeEnum::Transactions,
                 ParquetTypeStructs::Transaction(parquet_transactions),
             ),
             (
                 TableFlags::TABLE_ITEMS,
-                ParquetTypeEnum::TableItem,
+                ParquetTypeEnum::TableItems,
                 ParquetTypeStructs::TableItem(parquet_table_items),
             ),
             (
                 TableFlags::MOVE_MODULES,
-                ParquetTypeEnum::MoveModule,
+                ParquetTypeEnum::MoveModules,
                 ParquetTypeStructs::MoveModule(move_modules),
             ),
             (
                 TableFlags::CURRENT_TABLE_ITEMS,
-                ParquetTypeEnum::CurrentTableItem,
+                ParquetTypeEnum::CurrentTableItems,
                 ParquetTypeStructs::CurrentTableItem(parquet_current_table_items),
             ),
             (
                 TableFlags::BLOCK_METADATA_TRANSACTIONS,
-                ParquetTypeEnum::BlockMetadataTransaction,
+                ParquetTypeEnum::BlockMetadataTransactions,
                 ParquetTypeStructs::BlockMetadataTransaction(parquet_block_metadata_transactions),
             ),
             (

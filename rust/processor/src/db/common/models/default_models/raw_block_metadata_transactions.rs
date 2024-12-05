@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::utils::util::{parse_timestamp, standardize_address};
+use crate::utils::util::{compute_nanos_since_epoch, parse_timestamp, standardize_address};
 use aptos_protos::{transaction::v1::BlockMetadataTransaction, util::timestamp::Timestamp};
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +16,11 @@ pub struct RawBlockMetadataTransaction {
     pub id: String,
     pub round: i64,
     pub epoch: i64,
-    pub previous_block_votes_bitvec: String, // serde_json::Value,
+    pub previous_block_votes_bitvec: String,
     pub proposer: String,
-    pub failed_proposer_indices: String, //serde_json::Value,
+    pub failed_proposer_indices: String,
     pub timestamp: chrono::NaiveDateTime,
+    pub ns_since_unix_epoch: u64,
 }
 
 impl RawBlockMetadataTransaction {
@@ -30,6 +31,7 @@ impl RawBlockMetadataTransaction {
         epoch: i64,
         timestamp: &Timestamp,
     ) -> Self {
+        let block_timestamp = parse_timestamp(timestamp, version);
         Self {
             version,
             block_height,
@@ -44,7 +46,8 @@ impl RawBlockMetadataTransaction {
                 .unwrap()
                 .to_string(),
             // time is in microseconds
-            timestamp: parse_timestamp(timestamp, version),
+            timestamp: block_timestamp,
+            ns_since_unix_epoch: compute_nanos_since_epoch(block_timestamp),
         }
     }
 }

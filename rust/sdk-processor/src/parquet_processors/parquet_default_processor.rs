@@ -111,6 +111,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             processor_status_table_names,
         )
         .await?;
+        println!("Starting version: {:?}", starting_version);
 
         // Define processor transaction stream config
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
@@ -128,20 +129,20 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
-            (ParquetTypeEnum::MoveResource, MoveResource::schema()),
+            (ParquetTypeEnum::MoveResources, MoveResource::schema()),
             (
-                ParquetTypeEnum::WriteSetChange,
+                ParquetTypeEnum::WriteSetChanges,
                 WriteSetChangeModel::schema(),
             ),
-            (ParquetTypeEnum::Transaction, ParquetTransaction::schema()),
-            (ParquetTypeEnum::TableItem, TableItem::schema()),
-            (ParquetTypeEnum::MoveModule, MoveModule::schema()),
+            (ParquetTypeEnum::Transactions, ParquetTransaction::schema()),
+            (ParquetTypeEnum::TableItems, TableItem::schema()),
+            (ParquetTypeEnum::MoveModules, MoveModule::schema()),
             (
-                ParquetTypeEnum::CurrentTableItem,
+                ParquetTypeEnum::CurrentTableItems,
                 CurrentTableItem::schema(),
             ),
             (
-                ParquetTypeEnum::BlockMetadataTransaction,
+                ParquetTypeEnum::BlockMetadataTransactions,
                 BlockMetadataTransaction::schema(),
             ),
             (ParquetTypeEnum::TableMetadata, TableMetadata::schema()),

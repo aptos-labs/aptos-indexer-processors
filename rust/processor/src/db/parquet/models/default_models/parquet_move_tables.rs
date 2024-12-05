@@ -90,7 +90,7 @@ pub struct TableMetadata {
 }
 
 impl NamedTable for TableMetadata {
-    const TABLE_NAME: &'static str = "table_metadatas";
+    const TABLE_NAME: &'static str = "table_metadata";
 }
 
 impl HasVersion for TableMetadata {
