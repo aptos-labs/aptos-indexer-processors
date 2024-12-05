@@ -1,3 +1,4 @@
+use crate::parquet_processors::ParquetTypeTrait;
 #[allow(unused_imports)]
 use crate::{
     parquet_processors::{ParquetTypeEnum, ParquetTypeStructs},

@@ -15,14 +15,15 @@ use processor::{
     db::parquet::models::{
         default_models::{
             parquet_block_metadata_transactions::BlockMetadataTransaction,
-        parquet_move_modules::MoveModule,
-        parquet_move_resources::MoveResource,
-        parquet_move_tables::{CurrentTableItem, TableItem},
-        parquet_table_metadata::TableMetadata,
-        parquet_transactions::Transaction as ParquetTransaction,
-        parquet_write_set_changes::WriteSetChangeModel,
+            parquet_move_modules::MoveModule,
+            parquet_move_resources::MoveResource,
+            parquet_move_tables::{CurrentTableItem, TableItem},
+            parquet_table_metadata::TableMetadata,
+            parquet_transactions::Transaction as ParquetTransaction,
+            parquet_write_set_changes::WriteSetChangeModel,
         },
         event_models::parquet_events::Event,
+    },
     worker::TableFlags,
 };
 #[allow(unused_imports)]
@@ -59,11 +60,6 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
     )
 )]
 pub enum ParquetTypeEnum {
-    MoveResource,
-    WriteSetChange,
-    Transaction,
-    TableItem,
-    MoveModule,
     Event,
     MoveResources,
     WriteSetChanges,
@@ -73,7 +69,6 @@ pub enum ParquetTypeEnum {
     CurrentTableItems,
     BlockMetadataTransactions,
     TableMetadata,
-    Event,
 }
 
 /// Trait for handling various Parquet types.
@@ -131,7 +126,7 @@ impl_parquet_trait!(
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
 impl_parquet_trait!(Event, ParquetTypeEnum::Event);
-  
+
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
 pub enum ParquetTypeStructs {
@@ -160,28 +155,6 @@ impl ParquetTypeStructs {
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
             ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
-        }
-    }
-
-    pub fn get_table_name(&self) -> &'static str {
-        match self {
-            ParquetTypeStructs::MoveResource(_) => "move_resources",
-            ParquetTypeStructs::WriteSetChange(_) => "write_set_changes",
-            ParquetTypeStructs::Transaction(_) => "transactions",
-            ParquetTypeStructs::TableItem(_) => "table_items",
-            ParquetTypeStructs::MoveModule(_) => "move_modules",
-            ParquetTypeStructs::Event(_) => "events",
-        }
-    }
-
-    pub fn calculate_size(&self) -> usize {
-        match self {
-            ParquetTypeStructs::MoveResource(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::WriteSetChange(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::Transaction(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::TableItem(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::MoveModule(data) => allocative::size_of_unique(data),
-            ParquetTypeStructs::Event(data) => allocative::size_of_unique(data),
         }
     }
 
@@ -226,7 +199,7 @@ impl ParquetTypeStructs {
                 handle_append!(self_data, other_data)
             },
             (ParquetTypeStructs::Event(self_data), ParquetTypeStructs::Event(other_data)) => {
-              handle_append!(self_data, other_data)
+                handle_append!(self_data, other_data)
             },
             (
                 ParquetTypeStructs::CurrentTableItem(self_data),

@@ -10,18 +10,13 @@ use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
     db::parquet::models::{
         default_models::{
-            parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-            parquet_move_tables::TableItem, parquet_transactions::Transaction,
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_modules::MoveModule,
+            parquet_move_resources::MoveResource,
+            parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
+            parquet_transactions::Transaction,
             parquet_write_set_changes::WriteSetChangeModel,
         },
-        event_models::parquet_events::Event as EventPQ,
-    db::parquet::models::default_models::{
-        parquet_block_metadata_transactions::BlockMetadataTransaction,
-        parquet_move_modules::MoveModule,
-        parquet_move_resources::MoveResource,
-        parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
-        parquet_transactions::Transaction,
-        parquet_write_set_changes::WriteSetChangeModel,
         event_models::parquet_events::Event as EventPQ,
     },
 };
