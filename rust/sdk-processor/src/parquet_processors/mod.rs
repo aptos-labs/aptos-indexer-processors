@@ -12,14 +12,17 @@ use enum_dispatch::enum_dispatch;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
 use processor::{
-    db::parquet::models::default_models::{
-        parquet_block_metadata_transactions::BlockMetadataTransaction,
-        parquet_move_modules::MoveModule,
-        parquet_move_resources::MoveResource,
-        parquet_move_tables::{CurrentTableItem, TableItem},
-        parquet_table_metadata::TableMetadata,
-        parquet_transactions::Transaction as ParquetTransaction,
-        parquet_write_set_changes::WriteSetChangeModel,
+    db::parquet::models::{
+        default_models::{
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_modules::MoveModule,
+            parquet_move_resources::MoveResource,
+            parquet_move_tables::{CurrentTableItem, TableItem},
+            parquet_table_metadata::TableMetadata,
+            parquet_transactions::Transaction as ParquetTransaction,
+            parquet_write_set_changes::WriteSetChangeModel,
+        },
+        event_models::parquet_events::Event,
     },
     worker::TableFlags,
 };
@@ -33,6 +36,7 @@ use std::{
 use strum::{Display, EnumIter};
 
 pub mod parquet_default_processor;
+pub mod parquet_events_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -56,6 +60,7 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
     )
 )]
 pub enum ParquetTypeEnum {
+    Event,
     MoveResources,
     WriteSetChanges,
     Transactions,
@@ -120,6 +125,7 @@ impl_parquet_trait!(
     ParquetTypeEnum::BlockMetadataTransactions
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
+impl_parquet_trait!(Event, ParquetTypeEnum::Event);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -129,6 +135,7 @@ pub enum ParquetTypeStructs {
     Transaction(Vec<ParquetTransaction>),
     TableItem(Vec<TableItem>),
     MoveModule(Vec<MoveModule>),
+    Event(Vec<Event>),
     CurrentTableItem(Vec<CurrentTableItem>),
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
     TableMetadata(Vec<TableMetadata>),
@@ -147,9 +154,11 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::BlockMetadataTransaction(Vec::new())
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
+            ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
         }
     }
 
+    /// Appends data to the current buffer within each ParquetTypeStructs variant.
     pub fn append(&mut self, other: ParquetTypeStructs) -> Result<(), ProcessorError> {
         macro_rules! handle_append {
             ($self_data:expr, $other_data:expr) => {{
@@ -187,6 +196,9 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::MoveModule(self_data),
                 ParquetTypeStructs::MoveModule(other_data),
             ) => {
+                handle_append!(self_data, other_data)
+            },
+            (ParquetTypeStructs::Event(self_data), ParquetTypeStructs::Event(other_data)) => {
                 handle_append!(self_data, other_data)
             },
             (

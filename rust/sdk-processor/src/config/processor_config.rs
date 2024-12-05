@@ -8,13 +8,16 @@ use crate::{
 use ahash::AHashMap;
 use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
-    db::parquet::models::default_models::{
-        parquet_block_metadata_transactions::BlockMetadataTransaction,
-        parquet_move_modules::MoveModule,
-        parquet_move_resources::MoveResource,
-        parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
-        parquet_transactions::Transaction,
-        parquet_write_set_changes::WriteSetChangeModel,
+    db::parquet::models::{
+        default_models::{
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_modules::MoveModule,
+            parquet_move_resources::MoveResource,
+            parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
+            parquet_transactions::Transaction,
+            parquet_write_set_changes::WriteSetChangeModel,
+        },
+        event_models::parquet_events::Event as EventPQ,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -66,6 +69,7 @@ pub enum ProcessorConfig {
     MonitoringProcessor(DefaultProcessorConfig),
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
+    ParquetEventsProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -81,7 +85,8 @@ impl ProcessorConfig {
     /// is useful for querying the status from the processor status table in the database.
     pub fn get_processor_status_table_names(&self) -> anyhow::Result<Vec<String>> {
         match self {
-            ProcessorConfig::ParquetDefaultProcessor(config) => {
+            ProcessorConfig::ParquetDefaultProcessor(config)
+            | ProcessorConfig::ParquetEventsProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 
@@ -116,6 +121,7 @@ impl ProcessorConfig {
                 WriteSetChangeModel::TABLE_NAME.to_string(),
                 TableItem::TABLE_NAME.to_string(),
                 MoveModule::TABLE_NAME.to_string(),
+                EventPQ::TABLE_NAME.to_string(),
                 BlockMetadataTransaction::TABLE_NAME.to_string(),
                 CurrentTableItem::TABLE_NAME.to_string(),
                 TableMetadata::TABLE_NAME.to_string(),
