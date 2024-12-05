@@ -8,10 +8,13 @@ use crate::{
 use ahash::AHashMap;
 use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
-    db::parquet::models::default_models::{
-        parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
-        parquet_move_tables::TableItem, parquet_transactions::Transaction,
-        parquet_write_set_changes::WriteSetChangeModel,
+    db::parquet::models::{
+        default_models::{
+            parquet_move_modules::MoveModule, parquet_move_resources::MoveResource,
+            parquet_move_tables::TableItem, parquet_transactions::Transaction,
+            parquet_write_set_changes::WriteSetChangeModel,
+        },
+        event_models::parquet_events::Event as EventPQ,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -115,6 +118,7 @@ impl ProcessorConfig {
                 WriteSetChangeModel::TABLE_NAME.to_string(),
                 TableItem::TABLE_NAME.to_string(),
                 MoveModule::TABLE_NAME.to_string(),
+                EventPQ::TABLE_NAME.to_string(),
             ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }
