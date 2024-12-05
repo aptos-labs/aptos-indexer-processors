@@ -1,0 +1,49 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753811,
+    "transaction_block_height": 10811317,
+    "type_": "0x1::coin::CoinWithdraw",
+    "data": {
+      "amount": "1",
+      "account": "0xe93dcd3dd5febf8d72bf8d33e1d85a6115300fedfe055c062834d264f103ce4c",
+      "coin_type": "0x1::aptos_coin::AptosCoin"
+    },
+    "indexed_type": "0x1::coin::CoinWithdraw",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753811,
+    "transaction_block_height": 10811317,
+    "type_": "0x1::coin::CoinDeposit",
+    "data": {
+      "amount": "1",
+      "account": "0x74512d8383e6857a9a587012c44ad98420cbc713301714402611d7f87a7f4fe0",
+      "coin_type": "0x1::aptos_coin::AptosCoin"
+    },
+    "indexed_type": "0x1::coin::CoinDeposit",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753811,
+    "transaction_block_height": 10811317,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "4",
+      "storage_fee_octas": "0",
+      "execution_gas_units": "4",
+      "total_charge_gas_units": "7",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 2
+  }
+]

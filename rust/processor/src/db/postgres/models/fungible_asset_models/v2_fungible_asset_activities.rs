@@ -162,6 +162,16 @@ impl FungibleAssetActivity {
                     inner.amount.clone(),
                     None,
                 ),
+                CoinEvent::WithdrawCoinEventV2(inner) => (
+                    standardize_address(&inner.account),
+                    inner.amount.clone(),
+                    Some(inner.coin_type.clone()),
+                ),
+                CoinEvent::DepositCoinEventV2(inner) => (
+                    standardize_address(&inner.account),
+                    inner.amount.clone(),
+                    Some(inner.coin_type.clone()),
+                ),
             };
             let coin_type = if let Some(coin_type) = coin_type_option {
                 coin_type

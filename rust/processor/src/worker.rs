@@ -111,7 +111,10 @@ bitflags! {
 
         // User transaction
         const SIGNATURES = 1 << 23;
-
+        // More tables
+        const CURRENT_TABLE_ITEMS = 1 << 24;
+        const BLOCK_METADATA_TRANSACTIONS = 1 << 25;
+        
         // Events
         const EVENTS = 1 << 24;
     }

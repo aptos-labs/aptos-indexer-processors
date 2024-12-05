@@ -1,0 +1,51 @@
+[
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753832,
+    "transaction_block_height": 10811321,
+    "type_": "0x4::collection::Mint",
+    "data": {
+      "index": {
+        "value": "133740"
+      },
+      "token": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+      "collection": "0x58677eec16fc1a3d37dcfe5fa3ab62081d0838a694612a34e757caa7f7f2adb0"
+    },
+    "indexed_type": "0x4::collection::Mint",
+    "event_index": 0
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753832,
+    "transaction_block_height": 10811321,
+    "type_": "0x1::object::Transfer",
+    "data": {
+      "to": "0x28adfb8a46395e7ccd83038860764193eea3f834ae6894e75cd80a3e1ff23b0b",
+      "from": "0xc8185b4484917ffda406f31fb71ab9a2b9ac7387041235b21dd7e4e5bdccb838",
+      "object": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b"
+    },
+    "indexed_type": "0x1::object::Transfer",
+    "event_index": 1
+  },
+  {
+    "sequence_number": 0,
+    "creation_number": 0,
+    "account_address": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "transaction_version": 78753832,
+    "transaction_block_height": 10811321,
+    "type_": "0x1::transaction_fee::FeeStatement",
+    "data": {
+      "io_gas_units": "6",
+      "storage_fee_octas": "78920",
+      "execution_gas_units": "6",
+      "total_charge_gas_units": "801",
+      "storage_fee_refund_octas": "0"
+    },
+    "indexed_type": "0x1::transaction_fee::FeeStatement",
+    "event_index": 2
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "transaction_version": 78753832,
+    "write_set_change_index": -1,
+    "token_data_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "property_version_v1": "0",
+    "owner_address": "0xc8185b4484917ffda406f31fb71ab9a2b9ac7387041235b21dd7e4e5bdccb838",
+    "storage_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "amount": "0",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": true,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-12-02T19:50:23.770129",
+    "non_transferrable_by_owner": true
+  },
+  {
+    "transaction_version": 78753832,
+    "write_set_change_index": 7,
+    "token_data_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "property_version_v1": "0",
+    "owner_address": "0x28adfb8a46395e7ccd83038860764193eea3f834ae6894e75cd80a3e1ff23b0b",
+    "storage_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "amount": "1",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": true,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "transaction_timestamp": "2024-12-02T19:50:23.770129",
+    "non_transferrable_by_owner": true
+  }
+]

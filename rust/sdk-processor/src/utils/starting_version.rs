@@ -27,7 +27,7 @@ pub async fn get_starting_version(
     indexer_processor_config: &IndexerProcessorConfig,
     conn_pool: ArcDbPool,
 ) -> Result<u64> {
-    // Check if there's a checkpoint in the approrpiate processor status table.
+    // Check if there's a checkpoint in the appropriate processor status table.
     let latest_processed_version =
         get_starting_version_from_db(indexer_processor_config, conn_pool)
             .await

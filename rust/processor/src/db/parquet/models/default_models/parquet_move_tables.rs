@@ -5,7 +5,10 @@
 
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::common::models::default_models::raw_table_items::{RawTableItem, TableItemConvertible},
+    db::common::models::default_models::{
+        raw_current_table_items::{CurrentTableItemConvertible, RawCurrentTableItem},
+        raw_table_items::{RawTableItem, TableItemConvertible},
+    },
     utils::util::{hash_str, standardize_address},
 };
 use allocative_derive::Allocative;
@@ -46,15 +49,35 @@ impl GetTimeStamp for TableItem {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, Serialize, ParquetRecordWriter,
+)]
 pub struct CurrentTableItem {
     pub table_handle: String,
     pub key_hash: String,
     pub key: String,
-    pub decoded_key: serde_json::Value,
-    pub decoded_value: Option<serde_json::Value>,
+    pub decoded_key: String,
+    pub decoded_value: Option<String>,
     pub last_transaction_version: i64,
     pub is_deleted: bool,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
+}
+
+impl NamedTable for CurrentTableItem {
+    const TABLE_NAME: &'static str = "current_table_items";
+}
+
+impl HasVersion for CurrentTableItem {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl GetTimeStamp for CurrentTableItem {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
 }
 
 #[derive(
@@ -67,7 +90,7 @@ pub struct TableMetadata {
 }
 
 impl NamedTable for TableMetadata {
-    const TABLE_NAME: &'static str = "table_metadatas";
+    const TABLE_NAME: &'static str = "table_metadata";
 }
 
 impl HasVersion for TableMetadata {
@@ -107,16 +130,11 @@ impl TableItem {
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
                 key_hash: hash_str(&write_table_item.key.to_string()),
                 key: write_table_item.key.to_string(),
-                decoded_key: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
-                decoded_value: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().value.as_str(),
-                )
-                .unwrap(),
+                decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
+                decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
                 last_transaction_version: txn_version,
                 is_deleted: false,
+                block_timestamp,
             },
         )
     }
@@ -144,13 +162,11 @@ impl TableItem {
                 table_handle: standardize_address(&delete_table_item.handle.to_string()),
                 key_hash: hash_str(&delete_table_item.key.to_string()),
                 key: delete_table_item.key.to_string(),
-                decoded_key: serde_json::from_str(
-                    delete_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
+                decoded_key: delete_table_item.data.as_ref().unwrap().key.clone(),
                 decoded_value: None,
                 last_transaction_version: txn_version,
                 is_deleted: true,
+                block_timestamp,
             },
         )
     }
@@ -176,6 +192,21 @@ impl TableItemConvertible for TableItem {
             table_handle: raw_item.table_handle.clone(),
             decoded_key: raw_item.decoded_key.clone(),
             decoded_value: raw_item.decoded_value.clone(),
+            is_deleted: raw_item.is_deleted,
+            block_timestamp: raw_item.block_timestamp,
+        }
+    }
+}
+
+impl CurrentTableItemConvertible for CurrentTableItem {
+    fn from_raw(raw_item: &RawCurrentTableItem) -> Self {
+        CurrentTableItem {
+            table_handle: raw_item.table_handle.clone(),
+            key_hash: raw_item.key_hash.clone(),
+            key: raw_item.key.clone(),
+            decoded_key: raw_item.decoded_key.clone(),
+            decoded_value: raw_item.decoded_value.clone(),
+            last_transaction_version: raw_item.last_transaction_version,
             is_deleted: raw_item.is_deleted,
             block_timestamp: raw_item.block_timestamp,
         }

@@ -1,0 +1,22 @@
+[
+  {
+    "transaction_version": 78753832,
+    "write_set_change_index": 7,
+    "token_data_id": "0xb63f1fe89e713c0bbd093ea2f5d7af58fa69e90af27035f0b2e202e66d432d6b",
+    "collection_id": "0x58677eec16fc1a3d37dcfe5fa3ab62081d0838a694612a34e757caa7f7f2adb0",
+    "token_name": "superstar #133740",
+    "maximum": null,
+    "supply": null,
+    "largest_property_version_v1": null,
+    "token_uri": "fEL4YUz13hHhi573dzmC0yulbUh7RGcHxWjDteeRIuPE0dfBVBBronze",
+    "token_properties": {
+      "Rank": "Bronze"
+    },
+    "description": "pd9eIPNuxydkn3JJsYvGKVGMomZXCvuc1EQ92PzpIW512zEeCJEKGXR21707nHmzRLokNVfJ5ufd5jzk3GINOLAZ2CjGlsM2SJWb",
+    "token_standard": "v2",
+    "is_fungible_v2": false,
+    "transaction_timestamp": "2024-12-02T19:50:23.770129",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

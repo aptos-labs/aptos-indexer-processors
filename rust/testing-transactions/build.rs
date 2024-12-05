@@ -12,6 +12,7 @@ fn main() {
     // Create necessary directories if missing
     create_directory_if_missing("json_transactions/imported_mainnet_txns");
     create_directory_if_missing("json_transactions/imported_testnet_txns");
+    create_directory_if_missing("json_transactions/imported_devnet_txns");
     create_directory_if_missing("json_transactions/scripted_transactions");
 
     // Process different directories and collect name mappings
@@ -24,6 +25,12 @@ fn main() {
     all_transactions_code.push_str(&process_directory(
         "imported_testnet_txns",
         "IMPORTED_TESTNET_TXNS",
+        false,
+        &mut name_function_code,
+    ));
+    all_transactions_code.push_str(&process_directory(
+        "imported_devnet_txns",
+        "IMPORTED_DEVNET_TXNS",
         false,
         &mut name_function_code,
     ));

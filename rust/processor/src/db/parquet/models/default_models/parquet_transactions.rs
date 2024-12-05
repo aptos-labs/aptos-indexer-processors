@@ -8,7 +8,6 @@
 use super::parquet_write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel};
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::postgres::models::default_models::block_metadata_transactions::BlockMetadataTransactionModel,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         util::{get_clean_payload, get_clean_writeset, get_payload_type, standardize_address},
@@ -144,12 +143,7 @@ impl Transaction {
 
     pub fn from_transaction(
         transaction: &TransactionPB,
-    ) -> (
-        Self,
-        Option<BlockMetadataTransactionModel>,
-        Vec<WriteSetChangeModel>,
-        Vec<WriteSetChangeDetail>,
-    ) {
+    ) -> (Self, Vec<WriteSetChangeModel>, Vec<WriteSetChangeDetail>) {
         let block_height = transaction.block_height as i64;
         let epoch = transaction.epoch as i64;
         let transaction_info = transaction
@@ -172,7 +166,7 @@ impl Transaction {
                     epoch,
                     block_height,
                 );
-                return (transaction_out, None, Vec::new(), Vec::new());
+                return (transaction_out, Vec::new(), Vec::new());
             },
         };
         let txn_version = transaction.version as i64;
@@ -226,7 +220,6 @@ impl Transaction {
                         block_timestamp,
                         txn_size_info,
                     ),
-                    None,
                     wsc,
                     wsc_detail,
                 )
@@ -259,7 +252,6 @@ impl Transaction {
                         block_timestamp,
                         txn_size_info,
                     ),
-                    None,
                     wsc,
                     wsc_detail,
                 )
@@ -284,13 +276,6 @@ impl Transaction {
                         block_timestamp,
                         txn_size_info,
                     ),
-                    Some(BlockMetadataTransactionModel::from_bmt_transaction(
-                        block_metadata_txn,
-                        txn_version,
-                        block_height,
-                        epoch,
-                        timestamp,
-                    )),
                     wsc,
                     wsc_detail,
                 )
@@ -308,7 +293,6 @@ impl Transaction {
                     block_timestamp,
                     txn_size_info,
                 ),
-                None,
                 vec![],
                 vec![],
             ),
@@ -332,7 +316,6 @@ impl Transaction {
                         block_timestamp,
                         txn_size_info,
                     ),
-                    None,
                     wsc,
                     wsc_detail,
                 )
@@ -350,7 +333,6 @@ impl Transaction {
                     block_timestamp,
                     txn_size_info,
                 ),
-                None,
                 vec![],
                 vec![],
             ),
@@ -362,28 +344,21 @@ impl Transaction {
         transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
     ) -> (
         Vec<Self>,
-        Vec<BlockMetadataTransactionModel>,
         Vec<WriteSetChangeModel>,
         Vec<WriteSetChangeDetail>,
     ) {
         let mut txns = vec![];
-        let mut block_metadata_txns = vec![];
         let mut wscs = vec![];
         let mut wsc_details = vec![];
 
         for txn in transactions {
-            let (txn, block_metadata, mut wsc_list, mut wsc_detail_list) =
-                Self::from_transaction(txn);
+            let (txn, mut wsc_list, mut wsc_detail_list) = Self::from_transaction(txn);
             txns.push(txn.clone());
             // TODO: Remove once fully migrated
             transaction_version_to_struct_count
                 .entry(txn.txn_version)
                 .and_modify(|e| *e += 1)
                 .or_insert(1);
-
-            if let Some(a) = block_metadata {
-                block_metadata_txns.push(a.clone());
-            }
 
             // TODO: Remove once fully migrated
             if !wsc_list.is_empty() {
@@ -396,7 +371,7 @@ impl Transaction {
 
             wsc_details.append(&mut wsc_detail_list);
         }
-        (txns, block_metadata_txns, wscs, wsc_details)
+        (txns, wscs, wsc_details)
     }
 }
 
