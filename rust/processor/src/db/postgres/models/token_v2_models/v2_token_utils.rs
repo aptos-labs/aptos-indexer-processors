@@ -219,6 +219,16 @@ pub struct Mint {
 }
 
 impl Mint {
+    pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
+        if let Some(V2TokenEvent::Mint(inner)) =
+            V2TokenEvent::from_event(event.type_str.as_str(), &event.data, txn_version).unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_token_address(&self) -> String {
         standardize_address(&self.token)
     }
@@ -226,6 +236,14 @@ impl Mint {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenMutationEvent {
+    pub mutated_field_name: String,
+    pub old_value: String,
+    pub new_value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenMutationEventV2 {
+    pub token_address: String,
     pub mutated_field_name: String,
     pub old_value: String,
     pub new_value: String,
@@ -257,14 +275,22 @@ impl BurnEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Burn {
     collection: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub index: BigDecimal,
     token: String,
     previous_owner: String,
 }
 
 impl Burn {
-    pub fn new(collection: String, token: String, previous_owner: String) -> Self {
+    pub fn new(
+        collection: String,
+        index: BigDecimal,
+        token: String,
+        previous_owner: String,
+    ) -> Self {
         Burn {
             collection,
+            index,
             token,
             previous_owner,
         }
@@ -367,6 +393,7 @@ pub enum V2TokenEvent {
     Mint(Mint),
     MintEvent(MintEvent),
     TokenMutationEvent(TokenMutationEvent),
+    TokenMutation(TokenMutationEventV2),
     Burn(Burn),
     BurnEvent(BurnEvent),
     TransferEvent(TransferEvent),
@@ -384,13 +411,16 @@ impl V2TokenEvent {
             "0x4::token::MutationEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TokenMutationEvent(inner)))
             },
+            "0x4::token::Mutation" => {
+                serde_json::from_str(data).map(|inner| Some(Self::TokenMutation(inner)))
+            },
             "0x4::collection::Burn" => {
                 serde_json::from_str(data).map(|inner| Some(Self::Burn(inner)))
             },
             "0x4::collection::BurnEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::BurnEvent(inner)))
             },
-            "0x1::object::TransferEvent" => {
+            "0x1::object::TransferEvent" | "0x1::object::Transfer" => {
                 serde_json::from_str(data).map(|inner| Some(Self::TransferEvent(inner)))
             },
             _ => Ok(None),

@@ -1,0 +1,19 @@
+[
+  {
+    "token_data_id": "0xa91e026e2572b12e1d115ee7459326a87f709be38a85e1ebddb4de50c1b3696d",
+    "collection_id": "0x5f7245e54ce188cae66bd5fe4f06bd70a90391024adc65786cad9f3cc2321ca1",
+    "token_name": "NFT Collectible #13360",
+    "maximum": "1",
+    "supply": "1",
+    "largest_property_version_v1": "0",
+    "token_uri": "https://aptos.dev",
+    "description": "",
+    "token_properties": {},
+    "token_standard": "v1",
+    "is_fungible_v2": null,
+    "last_transaction_version": 78753831,
+    "last_transaction_timestamp": "2024-12-02T19:50:23.770129",
+    "is_deleted_v2": null,
+    "decimals": 0
+  }
+]

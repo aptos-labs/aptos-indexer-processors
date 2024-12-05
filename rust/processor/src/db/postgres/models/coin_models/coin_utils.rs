@@ -150,6 +150,22 @@ pub struct DepositCoinEvent {
     pub amount: BigDecimal,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawCoinEventV2 {
+    pub coin_type: String,
+    pub account: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositCoinEventV2 {
+    pub coin_type: String,
+    pub account: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
 pub struct CoinInfoType {
     coin_type: String,
     creator_address: String,
@@ -318,6 +334,8 @@ impl CoinResource {
 pub enum CoinEvent {
     WithdrawCoinEvent(WithdrawCoinEvent),
     DepositCoinEvent(DepositCoinEvent),
+    WithdrawCoinEventV2(WithdrawCoinEventV2),
+    DepositCoinEventV2(DepositCoinEventV2),
 }
 
 impl CoinEvent {
@@ -328,6 +346,12 @@ impl CoinEvent {
             },
             "0x1::coin::DepositEvent" => {
                 serde_json::from_str(data).map(|inner| Some(CoinEvent::DepositCoinEvent(inner)))
+            },
+            "0x1::coin::CoinWithdraw" => {
+                serde_json::from_str(data).map(|inner| Some(CoinEvent::WithdrawCoinEventV2(inner)))
+            },
+            "0x1::coin::CoinDeposit" => {
+                serde_json::from_str(data).map(|inner| Some(CoinEvent::DepositCoinEventV2(inner)))
             },
             _ => Ok(None),
         }

@@ -24,7 +24,7 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
             },
         },
     },
@@ -849,20 +849,23 @@ pub async fn parse_v2_token(
             // and burn / transfer events need to come before the next loop
             for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address(), burn_event);
-                }
-                if let Some(old_burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
+                    tokens_burned.insert(burn_event.get_token_address(), burn_event.clone());
+                } else if let Some(mint_event) = Mint::from_event(event, txn_version).unwrap() {
+                    tokens_minted.insert(mint_event.get_token_address());
+                } else if let Some(old_burn_event) =
+                    BurnEvent::from_event(event, txn_version).unwrap()
+                {
                     let burn_event = Burn::new(
                         standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
+                        old_burn_event.index.clone(),
                         old_burn_event.get_token_address(),
                         "".to_string(),
                     );
                     tokens_burned.insert(burn_event.get_token_address(), burn_event);
-                }
-                if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap() {
+                } else if let Some(mint_event) = MintEvent::from_event(event, txn_version).unwrap()
+                {
                     tokens_minted.insert(mint_event.get_token_address());
-                }
-                if let Some(transfer_events) =
+                } else if let Some(transfer_events) =
                     TransferEvent::from_event(event, txn_version).unwrap()
                 {
                     if let Some(aggregated_data) =
