@@ -11,8 +11,16 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::default_models::raw_table_items::TableItemConvertible,
-        parquet::models::default_models::parquet_move_tables::TableItem,
+        common::models::default_models::{
+            raw_block_metadata_transactions::BlockMetadataTransactionConvertible,
+            raw_current_table_items::CurrentTableItemConvertible,
+            raw_table_items::TableItemConvertible, raw_table_metadata::TableMetadataConvertible,
+        },
+        parquet::models::default_models::{
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_tables::{CurrentTableItem, TableItem},
+            parquet_table_metadata::TableMetadata,
+        },
     },
     processors::{
         default_processor::process_transactions,
@@ -43,10 +51,28 @@ impl Processable for ParquetDefaultExtractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
-        let (_, raw_table_items, _, _) = process_transactions(transactions.data.clone());
+        let (
+            raw_block_metadata_transactions,
+            raw_table_items,
+            raw_current_table_items,
+            raw_table_metadata,
+        ) = process_transactions(transactions.data.clone());
 
         let parquet_table_items: Vec<TableItem> =
             raw_table_items.iter().map(TableItem::from_raw).collect();
+        let parquet_current_table_items: Vec<CurrentTableItem> = raw_current_table_items
+            .iter()
+            .map(CurrentTableItem::from_raw)
+            .collect();
+        let parquet_block_metadata_transactions: Vec<BlockMetadataTransaction> =
+            raw_block_metadata_transactions
+                .iter()
+                .map(BlockMetadataTransaction::from_raw)
+                .collect();
+        let parquet_table_metadata: Vec<TableMetadata> = raw_table_metadata
+            .iter()
+            .map(TableMetadata::from_raw)
+            .collect();
 
         let (
             (
@@ -66,6 +92,15 @@ impl Processable for ParquetDefaultExtractor {
         debug!(" - ParquetTransactions: {}", parquet_transactions.len());
         debug!(" - TableItems: {}", parquet_table_items.len());
         debug!(" - MoveModules: {}", move_modules.len());
+        debug!(
+            " - CurrentTableItems: {}",
+            parquet_current_table_items.len()
+        );
+        debug!(
+            " - BlockMetadataTransactions: {}",
+            parquet_block_metadata_transactions.len()
+        );
+        debug!(" - TableMetadata: {}", parquet_table_metadata.len());
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
@@ -73,28 +108,43 @@ impl Processable for ParquetDefaultExtractor {
         let data_types = [
             (
                 TableFlags::MOVE_RESOURCES,
-                ParquetTypeEnum::MoveResource,
+                ParquetTypeEnum::MoveResources,
                 ParquetTypeStructs::MoveResource(move_resources),
             ),
             (
                 TableFlags::WRITE_SET_CHANGES,
-                ParquetTypeEnum::WriteSetChange,
+                ParquetTypeEnum::WriteSetChanges,
                 ParquetTypeStructs::WriteSetChange(write_set_changes),
             ),
             (
                 TableFlags::TRANSACTIONS,
-                ParquetTypeEnum::Transaction,
+                ParquetTypeEnum::Transactions,
                 ParquetTypeStructs::Transaction(parquet_transactions),
             ),
             (
                 TableFlags::TABLE_ITEMS,
-                ParquetTypeEnum::TableItem,
+                ParquetTypeEnum::TableItems,
                 ParquetTypeStructs::TableItem(parquet_table_items),
             ),
             (
                 TableFlags::MOVE_MODULES,
-                ParquetTypeEnum::MoveModule,
+                ParquetTypeEnum::MoveModules,
                 ParquetTypeStructs::MoveModule(move_modules),
+            ),
+            (
+                TableFlags::CURRENT_TABLE_ITEMS,
+                ParquetTypeEnum::CurrentTableItems,
+                ParquetTypeStructs::CurrentTableItem(parquet_current_table_items),
+            ),
+            (
+                TableFlags::BLOCK_METADATA_TRANSACTIONS,
+                ParquetTypeEnum::BlockMetadataTransactions,
+                ParquetTypeStructs::BlockMetadataTransaction(parquet_block_metadata_transactions),
+            ),
+            (
+                TableFlags::TABLE_METADATAS,
+                ParquetTypeEnum::TableMetadata,
+                ParquetTypeStructs::TableMetadata(parquet_table_metadata),
             ),
         ];
 

@@ -4190,6 +4190,7 @@ dependencies = [
  "google-cloud-storage",
  "jemallocator",
  "lazy_static",
+ "log",
  "native-tls",
  "num_cpus",
  "parquet",

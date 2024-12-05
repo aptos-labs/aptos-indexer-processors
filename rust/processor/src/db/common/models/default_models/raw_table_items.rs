@@ -1,5 +1,8 @@
 use crate::{
-    db::postgres::models::default_models::move_tables::{CurrentTableItem, TableItem},
+    db::{
+        common::models::default_models::raw_current_table_items::RawCurrentTableItem,
+        postgres::models::default_models::move_tables::TableItem,
+    },
     utils::util::{hash_str, standardize_address},
 };
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
@@ -24,7 +27,7 @@ impl RawTableItem {
         txn_version: i64,
         transaction_block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
-    ) -> (Self, CurrentTableItem) {
+    ) -> (Self, RawCurrentTableItem) {
         (
             Self {
                 txn_version,
@@ -37,20 +40,15 @@ impl RawTableItem {
                 is_deleted: false,
                 block_timestamp,
             },
-            CurrentTableItem {
+            RawCurrentTableItem {
                 table_handle: standardize_address(&write_table_item.handle.to_string()),
                 key_hash: hash_str(&write_table_item.key.to_string()),
                 key: write_table_item.key.to_string(),
-                decoded_key: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
-                decoded_value: serde_json::from_str(
-                    write_table_item.data.as_ref().unwrap().value.as_str(),
-                )
-                .unwrap(),
+                decoded_key: write_table_item.data.as_ref().unwrap().key.clone(),
+                decoded_value: Some(write_table_item.data.as_ref().unwrap().value.clone()),
                 last_transaction_version: txn_version,
                 is_deleted: false,
+                block_timestamp,
             },
         )
     }
@@ -61,7 +59,7 @@ impl RawTableItem {
         txn_version: i64,
         transaction_block_height: i64,
         block_timestamp: chrono::NaiveDateTime,
-    ) -> (Self, CurrentTableItem) {
+    ) -> (Self, RawCurrentTableItem) {
         (
             Self {
                 txn_version,
@@ -74,17 +72,15 @@ impl RawTableItem {
                 is_deleted: true,
                 block_timestamp,
             },
-            CurrentTableItem {
+            RawCurrentTableItem {
                 table_handle: standardize_address(&delete_table_item.handle.to_string()),
                 key_hash: hash_str(&delete_table_item.key.to_string()),
                 key: delete_table_item.key.to_string(),
-                decoded_key: serde_json::from_str(
-                    delete_table_item.data.as_ref().unwrap().key.as_str(),
-                )
-                .unwrap(),
+                decoded_key: delete_table_item.data.as_ref().unwrap().key.clone(),
                 decoded_value: None,
                 last_transaction_version: txn_version,
                 is_deleted: true,
+                block_timestamp,
             },
         )
     }

@@ -6,10 +6,11 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
+    db::common::models::default_models::raw_block_metadata_transactions::{
+        BlockMetadataTransactionConvertible, RawBlockMetadataTransaction,
+    },
     schema::block_metadata_transactions,
-    utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_protos::{transaction::v1::BlockMetadataTransaction, util::timestamp::Timestamp};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -28,29 +29,26 @@ pub struct BlockMetadataTransactionPG {
     pub timestamp: chrono::NaiveDateTime,
 }
 
-impl BlockMetadataTransactionPG {
-    pub fn from_bmt_transaction(
-        txn: &BlockMetadataTransaction,
-        version: i64,
-        block_height: i64,
-        epoch: i64,
-        timestamp: &Timestamp,
-    ) -> Self {
-        Self {
-            version,
-            block_height,
-            id: txn.id.to_string(),
-            epoch,
-            round: txn.round as i64,
-            proposer: standardize_address(txn.proposer.as_str()),
-            failed_proposer_indices: serde_json::to_value(&txn.failed_proposer_indices).unwrap(),
-            previous_block_votes_bitvec: serde_json::to_value(&txn.previous_block_votes_bitvec)
-                .unwrap(),
-            // time is in microseconds
-            timestamp: parse_timestamp(timestamp, version),
+impl BlockMetadataTransactionConvertible for BlockMetadataTransactionPG {
+    fn from_raw(raw_item: &RawBlockMetadataTransaction) -> Self {
+        BlockMetadataTransactionPG {
+            version: raw_item.version,
+            block_height: raw_item.block_height,
+            id: raw_item.id.clone(),
+            round: raw_item.round,
+            epoch: raw_item.epoch,
+            previous_block_votes_bitvec: serde_json::from_str(
+                raw_item.previous_block_votes_bitvec.as_str(),
+            )
+            .unwrap(),
+            failed_proposer_indices: serde_json::from_str(
+                raw_item.failed_proposer_indices.as_str(),
+            )
+            .unwrap(),
+            proposer: raw_item.proposer.clone(),
+            timestamp: raw_item.timestamp,
         }
     }
 }
-
 // Prevent conflicts with other things named `Transaction`
 pub type BlockMetadataTransactionModel = BlockMetadataTransactionPG;
