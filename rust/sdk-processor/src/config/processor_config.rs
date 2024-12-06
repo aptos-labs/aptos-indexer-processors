@@ -9,6 +9,7 @@ use ahash::AHashMap;
 use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
     db::parquet::models::{
+        account_transaction_models::parquet_account_transactions::AccountTransaction,
         default_models::{
             parquet_block_metadata_transactions::BlockMetadataTransaction,
             parquet_move_modules::MoveModule,
@@ -81,6 +82,7 @@ pub enum ProcessorConfig {
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
     ParquetFungibleAssetProcessor(ParquetDefaultProcessorConfig),
     ParquetTransactionMetadataProcessor(ParquetDefaultProcessorConfig),
+    ParquetAccountTransactionsProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -99,6 +101,7 @@ impl ProcessorConfig {
             ProcessorConfig::ParquetDefaultProcessor(config)
             | ProcessorConfig::ParquetEventsProcessor(config)
             | ProcessorConfig::ParquetTransactionMetadataProcessor(config)
+            | ProcessorConfig::ParquetAccountTransactionsProcessor(config)
             | ProcessorConfig::ParquetFungibleAssetProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
@@ -150,6 +153,9 @@ impl ProcessorConfig {
             ]),
             ProcessorName::ParquetTransactionMetadataProcessor => {
                 HashSet::from([WriteSetSize::TABLE_NAME.to_string()])
+            },
+            ProcessorName::ParquetAccountTransactionsProcessor => {
+                HashSet::from([AccountTransaction::TABLE_NAME.to_string()])
             },
             _ => HashSet::new(), // Default case for unsupported processors
         }
