@@ -5,7 +5,10 @@ use aptos_indexer_processor_sdk::{
     utils::errors::ProcessorError,
 };
 use async_trait::async_trait;
-use processor::db::postgres::models::account_transaction_models::account_transactions::AccountTransaction;
+use processor::db::{
+    common::models::account_transaction_models::raw_account_transactions::RawAccountTransaction,
+    postgres::models::account_transaction_models::account_transactions::AccountTransaction,
+};
 use rayon::prelude::*;
 
 pub struct AccountTransactionsExtractor
@@ -27,7 +30,7 @@ impl Processable for AccountTransactionsExtractor {
             .into_par_iter()
             .map(|txn| {
                 let transaction_version = txn.version as i64;
-                let accounts = AccountTransaction::get_accounts(&txn);
+                let accounts = RawAccountTransaction::get_accounts(&txn);
                 accounts
                     .into_iter()
                     .map(|account_address| AccountTransaction {

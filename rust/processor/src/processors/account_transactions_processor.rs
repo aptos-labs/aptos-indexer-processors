@@ -3,7 +3,10 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::postgres::models::account_transaction_models::account_transactions::AccountTransaction,
+    db::{
+        common::models::account_transaction_models::raw_account_transactions::RawAccountTransaction,
+        postgres::models::account_transaction_models::account_transactions::AccountTransaction,
+    },
     gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
@@ -106,7 +109,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
             .into_par_iter()
             .map(|txn| {
                 let transaction_version = txn.version as i64;
-                let accounts = AccountTransaction::get_accounts(&txn);
+                let accounts = RawAccountTransaction::get_accounts(&txn);
                 accounts
                     .into_iter()
                     .map(|account_address| AccountTransaction {
