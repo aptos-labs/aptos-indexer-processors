@@ -31,6 +31,7 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
+        transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
     },
     utils::table_flags::TableFlags,
 };
@@ -46,6 +47,7 @@ use strum::{Display, EnumIter};
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_transaction_metadata_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -86,6 +88,8 @@ pub enum ParquetTypeEnum {
     FungibleAssetBalance,
     CurrentFungibleAssetBalance,
     CurrentUnifiedFungibleAssetBalance,
+    // txn metadata,
+    WriteSetSize,
 }
 
 /// Trait for handling various Parquet types.
@@ -160,6 +164,7 @@ impl_parquet_trait!(
     CurrentUnifiedFungibleAssetBalance,
     ParquetTypeEnum::CurrentUnifiedFungibleAssetBalance
 );
+impl_parquet_trait!(WriteSetSize, ParquetTypeEnum::WriteSetSize);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -178,6 +183,7 @@ pub enum ParquetTypeStructs {
     FungibleAssetBalance(Vec<FungibleAssetBalance>),
     CurrentFungibleAssetBalance(Vec<CurrentFungibleAssetBalance>),
     CurrentUnifiedFungibleAssetBalance(Vec<CurrentUnifiedFungibleAssetBalance>),
+    WriteSetSize(Vec<WriteSetSize>),
 }
 
 impl ParquetTypeStructs {
@@ -209,6 +215,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::CurrentUnifiedFungibleAssetBalance => {
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(Vec::new())
             },
+            ParquetTypeEnum::WriteSetSize => ParquetTypeStructs::WriteSetSize(Vec::new()),
         }
     }
 
@@ -300,6 +307,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(self_data),
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::WriteSetSize(self_data),
+                ParquetTypeStructs::WriteSetSize(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
