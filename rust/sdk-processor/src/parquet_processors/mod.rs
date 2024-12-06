@@ -14,6 +14,7 @@ use parquet::schema::types::Type;
 use processor::{
     db::{
         parquet::models::{
+            account_transaction_models::parquet_account_transactions::AccountTransaction,
             default_models::{
                 parquet_block_metadata_transactions::BlockMetadataTransaction,
                 parquet_move_modules::MoveModule,
@@ -48,6 +49,7 @@ use std::{
 };
 use strum::{Display, EnumIter};
 
+pub mod parquet_account_transactions_processor;
 pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
@@ -103,6 +105,8 @@ pub enum ParquetTypeEnum {
     CurrentFungibleAssetBalancesLegacy,
     // txn metadata,
     WriteSetSize,
+    // account transactions
+    AccountTransactions,
 }
 
 /// Trait for handling various Parquet types.
@@ -180,6 +184,7 @@ impl_parquet_trait!(
     ParquetTypeEnum::CurrentFungibleAssetBalancesLegacy
 );
 impl_parquet_trait!(WriteSetSize, ParquetTypeEnum::WriteSetSize);
+impl_parquet_trait!(AccountTransaction, ParquetTypeEnum::AccountTransactions);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -201,6 +206,7 @@ pub enum ParquetTypeStructs {
     CurrentFungibleAssetBalance(Vec<CurrentFungibleAssetBalance>),
     CurrentUnifiedFungibleAssetBalance(Vec<CurrentUnifiedFungibleAssetBalance>),
     WriteSetSize(Vec<WriteSetSize>),
+    AccountTransaction(Vec<AccountTransaction>),
 }
 
 impl ParquetTypeStructs {
@@ -235,6 +241,9 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::CurrentUnifiedFungibleAssetBalance(Vec::new())
             },
             ParquetTypeEnum::WriteSetSize => ParquetTypeStructs::WriteSetSize(Vec::new()),
+            ParquetTypeEnum::AccountTransactions => {
+                ParquetTypeStructs::AccountTransaction(Vec::new())
+            },
         }
     }
 
@@ -344,6 +353,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::WriteSetSize(self_data),
                 ParquetTypeStructs::WriteSetSize(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::AccountTransaction(self_data),
+                ParquetTypeStructs::AccountTransaction(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

@@ -4,6 +4,7 @@
 use super::{db_config::DbConfig, processor_config::ProcessorConfig};
 use crate::{
     parquet_processors::{
+        parquet_account_transactions_processor::ParquetAccountTransactionsProcessor,
         parquet_default_processor::ParquetDefaultProcessor,
         parquet_events_processor::ParquetEventsProcessor,
         parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
@@ -105,6 +106,11 @@ impl RunnableConfig for IndexerProcessorConfig {
                 let parquet_transaction_metadata_processor =
                     ParquetTransactionMetadataProcessor::new(self.clone()).await?;
                 parquet_transaction_metadata_processor.run_processor().await
+            },
+            ProcessorConfig::ParquetAccountTransactionsProcessor(_) => {
+                let parquet_account_transactions_processor =
+                    ParquetAccountTransactionsProcessor::new(self.clone()).await?;
+                parquet_account_transactions_processor.run_processor().await
             },
         }
     }
