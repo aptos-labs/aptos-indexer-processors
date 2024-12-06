@@ -12,7 +12,7 @@ use crate::{
             parquet_version_tracker_step::ParquetVersionTrackerStep,
             processor_status_saver::get_processor_status_saver,
         },
-        parquet_events_processor::parquet_events_extractor::ParquetEventsExtractor,
+        parquet_fungible_asset_processor::parquet_fa_extractor::ParquetFungibleAssetExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -30,24 +30,31 @@ use aptos_indexer_processor_sdk::{
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::parquet::models::event_models::parquet_events::Event as EventPQ,
+    db::parquet::models::fungible_asset_models::{
+        parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+        parquet_v2_fungible_asset_balances::{
+            CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+        },
+        parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+    },
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
 
-pub struct ParquetEventsProcessor {
+pub struct ParquetFungibleAssetProcessor {
     pub config: IndexerProcessorConfig,
-    pub db_pool: ArcDbPool, // for processor status
+    pub db_pool: ArcDbPool,
 }
 
-impl ParquetEventsProcessor {
+impl ParquetFungibleAssetProcessor {
     pub async fn new(config: IndexerProcessorConfig) -> anyhow::Result<Self> {
         let db_pool = initialize_database_pool(&config.db_config).await?;
         Ok(Self { config, db_pool })
     }
 }
+
 #[async_trait::async_trait]
-impl ProcessorTrait for ParquetEventsProcessor {
+impl ProcessorTrait for ParquetFungibleAssetProcessor {
     fn name(&self) -> &'static str {
         self.config.processor_config.name()
     }
@@ -65,7 +72,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
             },
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid db config for ParquetEventsProcessor {:?}",
+                    "Invalid db config for ParquetFungibleAssetProcessor {:?}",
                     self.config.db_config
                 ));
             },
@@ -79,12 +86,12 @@ impl ProcessorTrait for ParquetEventsProcessor {
         check_or_update_chain_id(grpc_chain_id as i64, self.db_pool.clone()).await?;
 
         let parquet_processor_config = match self.config.processor_config.clone() {
-            ProcessorConfig::ParquetEventsProcessor(parquet_processor_config) => {
+            ProcessorConfig::ParquetFungibleAssetProcessor(parquet_processor_config) => {
                 parquet_processor_config
             },
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid processor configuration for ParquetEventsProcessor {:?}",
+                    "Invalid processor configuration for ParquetFungibleAssetProcessor {:?}",
                     self.config.processor_config
                 ));
             },
@@ -111,17 +118,37 @@ impl ProcessorTrait for ParquetEventsProcessor {
         .await?;
 
         let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
-        let parquet_events_extractor = ParquetEventsExtractor {
+        let parquet_fa_extractor = ParquetFungibleAssetExtractor {
             opt_in_tables: backfill_table,
         };
 
         let gcs_client =
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
-        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
-            [(ParquetTypeEnum::Events, EventPQ::schema())]
-                .into_iter()
-                .collect();
+        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
+            (
+                ParquetTypeEnum::FungibleAssetActivity,
+                FungibleAssetActivity::schema(),
+            ),
+            (
+                ParquetTypeEnum::FungibleAssetMetadata,
+                FungibleAssetMetadataModel::schema(),
+            ),
+            (
+                ParquetTypeEnum::FungibleAssetBalance,
+                FungibleAssetBalance::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentFungibleAssetBalance,
+                CurrentFungibleAssetBalance::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentUnifiedFungibleAssetBalance,
+                CurrentUnifiedFungibleAssetBalance::schema(),
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         let default_size_buffer_step = initialize_parquet_buffer_step(
             gcs_client.clone(),
@@ -148,7 +175,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(parquet_events_extractor.into_runnable_step(), channel_size)
+        .connect_to(parquet_fa_extractor.into_runnable_step(), channel_size)
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
         .connect_to(
             parquet_version_tracker_step.into_runnable_step(),

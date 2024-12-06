@@ -8,5 +8,3 @@ pub mod v2_fungible_metadata;
 
 // parquet models
 pub mod parquet_coin_supply;
-pub mod parquet_v2_fungible_asset_activities;
-pub mod parquet_v2_fungible_asset_balances;

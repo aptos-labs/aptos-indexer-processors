@@ -29,7 +29,7 @@ use processor::{
         insert_fungible_asset_activities_query, insert_fungible_asset_balances_query,
         insert_fungible_asset_metadata_query,
     },
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 
 pub struct FungibleAssetStorer
