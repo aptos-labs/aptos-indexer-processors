@@ -1,0 +1,18 @@
+[
+  {
+    "token_data_id_hash": "2877fd783c3c7957b50941cce1b3b729dae16b5928e0ba0606cd282df2b085c8",
+    "property_version": "0",
+    "from_address": "0xd77942ad91c35a2d165fdec8f6a28ec48b6bb9f905db2fd0ac8a7e481a9c543e",
+    "to_address": "0xe2ebcbacd81584f97b6ba9a458239ea083428d75158c0d42ef38b6379527e99a",
+    "collection_data_id_hash": "84b2198ac10fdbb64bc3474ed0cf184b7bdcd5bc5f098a8858f2e48f379c5fcc",
+    "creator_address": "0xd77942ad91c35a2d165fdec8f6a28ec48b6bb9f905db2fd0ac8a7e481a9c543e",
+    "collection_name": "Alice's",
+    "name": "Alice's first token",
+    "amount": "0",
+    "table_handle": "0xc4b3a532f522e5cc021427b4d729938073a6d34949bd397490d4bbf96a4703f1",
+    "last_transaction_version": 19922017,
+    "collection_id": "0x84b2198ac10fdbb64bc3474ed0cf184b7bdcd5bc5f098a8858f2e48f379c5fcc",
+    "last_transaction_timestamp": "2024-11-28T23:53:41.291148",
+    "token_data_id": "0x2877fd783c3c7957b50941cce1b3b729dae16b5928e0ba0606cd282df2b085c8"
+  }
+]

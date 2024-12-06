@@ -207,13 +207,7 @@ impl TokenActivityV2 {
         tokens_claimed: &mut TokenV1Claimed,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
-        tracing::info!("event_type: {}, event: {:?}", event_type, event);
         if let Some(token_event) = &TokenEvent::from_event(&event_type, &event.data, txn_version)? {
-            tracing::info!(
-                "TokenActivityV2::get_v1_from_parsed_event: event_type: {}, event: {:?}",
-                event_type,
-                token_event
-            );
             let event_account_address =
                 standardize_address(&event.key.as_ref().unwrap().account_address);
             let token_activity_helper = match token_event {
