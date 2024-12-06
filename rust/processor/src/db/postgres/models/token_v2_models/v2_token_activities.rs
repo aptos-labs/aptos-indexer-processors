@@ -9,7 +9,10 @@ use super::v2_token_utils::{TokenStandard, V2TokenEvent};
 use crate::{
     db::postgres::models::{
         object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::token_utils::{TokenDataIdType, TokenEvent},
+        token_models::{
+            token_claims::TokenV1Claimed,
+            token_utils::{TokenDataIdType, TokenEvent},
+        },
     },
     schema::token_activities_v2,
     utils::util::standardize_address,
@@ -41,7 +44,8 @@ pub struct TokenActivityV2 {
 }
 
 /// A simplified TokenActivity (excluded common fields) to reduce code duplication
-struct TokenActivityHelperV1 {
+#[derive(Clone, Debug)]
+pub struct TokenActivityHelperV1 {
     pub token_data_id_struct: TokenDataIdType,
     pub property_version: BigDecimal,
     pub from_address: Option<String>,
@@ -200,6 +204,7 @@ impl TokenActivityV2 {
         txn_timestamp: chrono::NaiveDateTime,
         event_index: i64,
         entry_function_id_str: &Option<String>,
+        tokens_claimed: &mut TokenV1Claimed,
     ) -> anyhow::Result<Option<Self>> {
         let event_type = event.type_str.clone();
         if let Some(token_event) = &TokenEvent::from_event(&event_type, &event.data, txn_version)? {
@@ -290,12 +295,17 @@ impl TokenActivityV2 {
                     to_address: Some(inner.get_to_address()),
                     token_amount: inner.amount.clone(),
                 },
-                TokenEvent::ClaimTokenEvent(inner) => TokenActivityHelperV1 {
-                    token_data_id_struct: inner.token_id.token_data_id.clone(),
-                    property_version: inner.token_id.property_version.clone(),
-                    from_address: Some(event_account_address.clone()),
-                    to_address: Some(inner.get_to_address()),
-                    token_amount: inner.amount.clone(),
+                TokenEvent::ClaimTokenEvent(inner) => {
+                    let token_data_id_struct = inner.token_id.token_data_id.clone();
+                    let helper = TokenActivityHelperV1 {
+                        token_data_id_struct: token_data_id_struct.clone(),
+                        property_version: inner.token_id.property_version.clone(),
+                        from_address: Some(event_account_address.clone()),
+                        to_address: Some(inner.get_to_address()),
+                        token_amount: inner.amount.clone(),
+                    };
+                    tokens_claimed.insert(token_data_id_struct.to_id(), helper.clone());
+                    helper
                 },
                 TokenEvent::Offer(inner) => TokenActivityHelperV1 {
                     token_data_id_struct: inner.token_id.token_data_id.clone(),
@@ -311,12 +321,17 @@ impl TokenActivityV2 {
                     to_address: Some(inner.get_to_address()),
                     token_amount: inner.amount.clone(),
                 },
-                TokenEvent::Claim(inner) => TokenActivityHelperV1 {
-                    token_data_id_struct: inner.token_id.token_data_id.clone(),
-                    property_version: inner.token_id.property_version.clone(),
-                    from_address: Some(inner.get_from_address()),
-                    to_address: Some(inner.get_to_address()),
-                    token_amount: inner.amount.clone(),
+                TokenEvent::Claim(inner) => {
+                    let token_data_id_struct = inner.token_id.token_data_id.clone();
+                    let helper = TokenActivityHelperV1 {
+                        token_data_id_struct: token_data_id_struct.clone(),
+                        property_version: inner.token_id.property_version.clone(),
+                        from_address: Some(inner.get_from_address()),
+                        to_address: Some(inner.get_to_address()),
+                        token_amount: inner.amount.clone(),
+                    };
+                    tokens_claimed.insert(token_data_id_struct.to_id(), helper.clone());
+                    helper
                 },
             };
             let token_data_id_struct = token_activity_helper.token_data_id_struct;
