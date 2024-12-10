@@ -8,7 +8,10 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::token_v2_models::raw_token_claims::CurrentTokenPendingClaimConvertible,
+        common::models::token_v2_models::{
+            raw_token_claims::CurrentTokenPendingClaimConvertible,
+            raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
+        },
         postgres::models::{
             token_models::{token_claims::CurrentTokenPendingClaim, tokens::TableMetadataForToken},
             token_v2_models::{
@@ -69,9 +72,9 @@ impl Processable for TokenV2Extractor {
     ) -> Result<
         Option<
             TransactionContext<(
-                Vec<CollectionV2>,
-                Vec<TokenDataV2>,
-                Vec<TokenOwnershipV2>,
+                Vec<CollectionV2>,     // TODO: Deprecate this
+                Vec<TokenDataV2>,      // TODO: Deprecate this
+                Vec<TokenOwnershipV2>, // TODO: Deprecate this
                 Vec<CurrentCollectionV2>,
                 Vec<CurrentTokenDataV2>,
                 Vec<CurrentTokenDataV2>,
@@ -110,7 +113,7 @@ impl Processable for TokenV2Extractor {
             current_deleted_token_ownerships_v2,
             token_activities_v2,
             current_token_v2_metadata,
-            current_token_royalties_v1,
+            raw_current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
             &transactions.data,
@@ -126,6 +129,12 @@ impl Processable for TokenV2Extractor {
             .map(CurrentTokenPendingClaim::from_raw)
             .collect();
 
+        let postgres_current_token_royalties_v1: Vec<CurrentTokenRoyaltyV1> =
+            raw_current_token_royalties_v1
+                .into_iter()
+                .map(CurrentTokenRoyaltyV1::from_raw)
+                .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 collections_v2,
@@ -138,7 +147,7 @@ impl Processable for TokenV2Extractor {
                 current_deleted_token_ownerships_v2,
                 token_activities_v2,
                 current_token_v2_metadata,
-                current_token_royalties_v1,
+                postgres_current_token_royalties_v1,
                 postgres_current_token_claims,
             ),
             metadata: transactions.metadata,
