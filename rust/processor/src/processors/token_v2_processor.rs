@@ -621,7 +621,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_deleted_token_ownerships_v2,
             token_activities_v2,
             raw_current_token_v2_metadata,
-            raw_current_token_royalties_v1,
+            current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
             &transactions,
