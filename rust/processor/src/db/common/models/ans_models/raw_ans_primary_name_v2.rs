@@ -5,16 +5,15 @@
 #![allow(clippy::unused_unit)]
 
 use super::raw_ans_lookup_v2::TokenStandardType;
-use crate::db::postgres::models::{
-    ans_models::{
+use crate::db::{
+    common::models::token_v2_models::v2_token_utils::TokenStandard,
+    postgres::models::ans_models::{
         ans_lookup::{AnsPrimaryName, CurrentAnsPrimaryName},
         ans_utils::SetReverseLookupEvent,
     },
-    token_v2_models::v2_token_utils::TokenStandard,
 };
 use aptos_protos::transaction::v1::Event;
 use serde::{Deserialize, Serialize};
-
 type RegisteredAddress = String;
 // PK of current_ans_primary_nameTokenStandard
 type CurrentAnsPrimaryNameV2PK = (RegisteredAddress, TokenStandardType);

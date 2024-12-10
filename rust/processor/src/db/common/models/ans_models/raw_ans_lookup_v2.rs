@@ -6,12 +6,12 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        ans_models::{
+    db::{
+        common::models::token_v2_models::v2_token_utils::TokenStandard,
+        postgres::models::ans_models::{
             ans_lookup::{AnsLookup, CurrentAnsLookup},
             ans_utils::{get_token_name, NameRecordV2, SubdomainExtV2},
         },
-        token_v2_models::v2_token_utils::TokenStandard,
     },
     utils::util::standardize_address,
 };
