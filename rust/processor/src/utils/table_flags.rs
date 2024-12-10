@@ -52,6 +52,7 @@ bitflags! {
         const COLLECTIONS_V2 = 1 << 57;
         const TOKEN_OWNERSHIPS_V2 = 1 << 58;
         const TOKEN_DATAS_V2 = 1 << 59;
+        const CURRENT_TOKEN_ROYALTY_V1 = 1 << 60;
 
         // User Transactions and Signatures: 61-70
         const USER_TRANSACTIONS = 1 << 61;
