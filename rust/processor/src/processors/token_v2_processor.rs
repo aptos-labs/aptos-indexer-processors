@@ -4,8 +4,11 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::token_v2_models::raw_token_claims::{
-            CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim, TokenV1Claimed,
+        common::models::token_v2_models::{
+            raw_token_claims::{
+                CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim, TokenV1Claimed,
+            },
+            raw_v1_token_royalty::{CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1},
         },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
@@ -617,7 +620,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_deleted_token_ownerships_v2,
             token_activities_v2,
             mut current_token_v2_metadata,
-            current_token_royalties_v1,
+            raw_current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
             &transactions,
@@ -632,6 +635,12 @@ impl ProcessorTrait for TokenV2Processor {
             .into_iter()
             .map(CurrentTokenPendingClaim::from_raw)
             .collect();
+
+        let postgres_current_token_royalties_v1: Vec<CurrentTokenRoyaltyV1> =
+            raw_current_token_royalties_v1
+                .into_iter()
+                .map(CurrentTokenRoyaltyV1::from_raw)
+                .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -671,7 +680,7 @@ impl ProcessorTrait for TokenV2Processor {
             ),
             &token_activities_v2,
             &current_token_v2_metadata,
-            &current_token_royalties_v1,
+            &postgres_current_token_royalties_v1,
             &postgres_current_token_claims,
             &self.per_table_chunk_sizes,
         )
@@ -723,7 +732,7 @@ pub async fn parse_v2_token(
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
-    Vec<CurrentTokenRoyaltyV1>,
+    Vec<RawCurrentTokenRoyaltyV1>,
     Vec<RawCurrentTokenPendingClaim>,
 ) {
     // Token V2 and V1 combined
@@ -752,7 +761,7 @@ pub async fn parse_v2_token(
     // Basically token properties
     let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
         AHashMap::new();
-    let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, CurrentTokenRoyaltyV1> =
+    let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenRoyaltyV1> =
         AHashMap::new();
     // migrating this from v1 token model as we don't have any replacement table for this
     let mut all_current_token_claims: AHashMap<
@@ -967,7 +976,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some(current_token_royalty) =
-                            CurrentTokenRoyaltyV1::get_v1_from_write_table_item(
+                            RawCurrentTokenRoyaltyV1::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 txn_timestamp,
@@ -1294,7 +1303,7 @@ pub async fn parse_v2_token(
         .collect::<Vec<CurrentTokenOwnershipV2>>();
     let mut current_token_royalties_v1 = current_token_royalties_v1
         .into_values()
-        .collect::<Vec<CurrentTokenRoyaltyV1>>();
+        .collect::<Vec<RawCurrentTokenRoyaltyV1>>();
     let mut all_current_token_claims = all_current_token_claims
         .into_values()
         .collect::<Vec<RawCurrentTokenPendingClaim>>();
