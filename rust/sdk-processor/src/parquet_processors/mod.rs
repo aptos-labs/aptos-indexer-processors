@@ -34,8 +34,11 @@ use processor::{
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
         token_v2_models::{
-            token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_token_activities::TokenActivityV2, v2_token_metadata::CurrentTokenV2Metadata,
+            token_claims::CurrentTokenPendingClaim,
+            v1_token_royalty::CurrentTokenRoyaltyV1,
+            v2_token_activities::TokenActivityV2,
+            v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
+            v2_token_metadata::CurrentTokenV2Metadata,
         },
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
@@ -115,6 +118,8 @@ pub enum ParquetTypeEnum {
     CurrentTokenRoyaltiesV1,
     CurrentTokenV2Metadata,
     TokenActivitiesV2,
+    TokenDatasV2,
+    CurrentTokenDatasV2,
 }
 
 /// Trait for handling various Parquet types.
@@ -206,6 +211,8 @@ impl_parquet_trait!(
     ParquetTypeEnum::CurrentTokenV2Metadata
 );
 impl_parquet_trait!(TokenActivityV2, ParquetTypeEnum::TokenActivitiesV2);
+impl_parquet_trait!(TokenDataV2, ParquetTypeEnum::TokenDatasV2);
+impl_parquet_trait!(CurrentTokenDataV2, ParquetTypeEnum::CurrentTokenDatasV2);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -232,6 +239,8 @@ pub enum ParquetTypeStructs {
     CurrentTokenRoyaltyV1(Vec<CurrentTokenRoyaltyV1>),
     CurrentTokenV2Metadata(Vec<CurrentTokenV2Metadata>),
     TokenActivityV2(Vec<TokenActivityV2>),
+    TokenDataV2(Vec<TokenDataV2>),
+    CurrentTokenDataV2(Vec<CurrentTokenDataV2>),
 }
 
 impl ParquetTypeStructs {
@@ -279,6 +288,10 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::CurrentTokenV2Metadata(Vec::new())
             },
             ParquetTypeEnum::TokenActivitiesV2 => ParquetTypeStructs::TokenActivityV2(Vec::new()),
+            ParquetTypeEnum::TokenDatasV2 => ParquetTypeStructs::TokenDataV2(Vec::new()),
+            ParquetTypeEnum::CurrentTokenDatasV2 => {
+                ParquetTypeStructs::CurrentTokenDataV2(Vec::new())
+            },
         }
     }
 
@@ -418,6 +431,18 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::TokenActivityV2(self_data),
                 ParquetTypeStructs::TokenActivityV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::TokenDataV2(self_data),
+                ParquetTypeStructs::TokenDataV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentTokenDataV2(self_data),
+                ParquetTypeStructs::CurrentTokenDataV2(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

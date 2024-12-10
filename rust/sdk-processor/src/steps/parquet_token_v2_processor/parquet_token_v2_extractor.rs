@@ -15,11 +15,15 @@ use processor::{
             raw_token_claims::CurrentTokenPendingClaimConvertible,
             raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
             raw_v2_token_activities::TokenActivityV2Convertible,
+            raw_v2_token_datas::{CurrentTokenDataV2Convertible, TokenDataV2Convertible},
             raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
         },
         parquet::models::token_v2_models::{
-            token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_token_activities::TokenActivityV2, v2_token_metadata::CurrentTokenV2Metadata,
+            token_claims::CurrentTokenPendingClaim,
+            v1_token_royalty::CurrentTokenRoyaltyV1,
+            v2_token_activities::TokenActivityV2,
+            v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
+            v2_token_metadata::CurrentTokenV2Metadata,
         },
         postgres::models::token_models::tokens::TableMetadataForToken,
     },
@@ -84,11 +88,11 @@ impl Processable for ParquetTokenV2Extractor {
 
         let (
             _collections_v2,
-            _token_datas_v2,
+            raw_token_datas_v2,
             _token_ownerships_v2,
             _current_collections_v2,
-            _current_token_datas_v2,
-            _current_deleted_token_datas_v2,
+            raw_current_token_datas_v2,
+            raw_current_deleted_token_datas_v2,
             _current_token_ownerships_v2,
             _current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
@@ -126,6 +130,22 @@ impl Processable for ParquetTokenV2Extractor {
             .map(TokenActivityV2::from_raw)
             .collect();
 
+        let parquet_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+            .into_iter()
+            .map(TokenDataV2::from_raw)
+            .collect();
+
+        let parquet_current_token_datas_v2: Vec<CurrentTokenDataV2> = raw_current_token_datas_v2
+            .into_iter()
+            .map(CurrentTokenDataV2::from_raw)
+            .collect();
+
+        let parquet_deleted_current_token_datss_v2: Vec<CurrentTokenDataV2> =
+            raw_current_deleted_token_datas_v2
+                .into_iter()
+                .map(CurrentTokenDataV2::from_raw)
+                .collect();
+
         // Print the size of each extracted data type
         debug!("Processed data sizes:");
         debug!(
@@ -141,6 +161,24 @@ impl Processable for ParquetTokenV2Extractor {
             parquet_current_token_v2_metadata.len()
         );
         debug!(" - TokenActivityV2: {}", parquet_token_activities_v2.len());
+        debug!(" - TokenDataV2: {}", parquet_token_datas_v2.len());
+        debug!(
+            " - CurrentTokenDataV2: {}",
+            parquet_current_token_datas_v2.len()
+        );
+        debug!(
+            " - CurrentDeletedTokenDataV2: {}",
+            parquet_deleted_current_token_datss_v2.len()
+        );
+
+        // We are merging these two tables, b/c they are essentially the same table
+        let mut combined_current_token_datas_v2: Vec<CurrentTokenDataV2> = Vec::new();
+        parquet_current_token_datas_v2
+            .iter()
+            .for_each(|x| combined_current_token_datas_v2.push(x.clone()));
+        parquet_deleted_current_token_datss_v2
+            .iter()
+            .for_each(|x| combined_current_token_datas_v2.push(x.clone()));
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
@@ -165,6 +203,16 @@ impl Processable for ParquetTokenV2Extractor {
                 TableFlags::TOKEN_ACTIVITIES_V2,
                 ParquetTypeEnum::TokenActivitiesV2,
                 ParquetTypeStructs::TokenActivityV2(parquet_token_activities_v2),
+            ),
+            (
+                TableFlags::TOKEN_DATAS_V2,
+                ParquetTypeEnum::TokenDatasV2,
+                ParquetTypeStructs::TokenDataV2(parquet_token_datas_v2),
+            ),
+            (
+                TableFlags::CURRENT_TOKEN_DATAS_V2,
+                ParquetTypeEnum::CurrentTokenDatasV2,
+                ParquetTypeStructs::CurrentTokenDataV2(combined_current_token_datas_v2),
             ),
         ];
 
