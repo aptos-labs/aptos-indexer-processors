@@ -1,4 +1,5 @@
 use crate::{
+    parquet_processors::parquet_ans_processor::ParquetAnsProcessorConfig,
     processors::{
         ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
         stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
@@ -10,6 +11,10 @@ use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
     db::parquet::models::{
         account_transaction_models::parquet_account_transactions::AccountTransaction,
+        ans_models::{
+            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
+        },
         default_models::{
             parquet_block_metadata_transactions::BlockMetadataTransaction,
             parquet_move_modules::MoveModule,
@@ -88,6 +93,7 @@ pub enum ProcessorConfig {
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
+    ParquetAnsProcessor(ParquetAnsProcessorConfig),
     ParquetUserTransactionsProcessor(ParquetDefaultProcessorConfig),
     ParquetFungibleAssetProcessor(ParquetDefaultProcessorConfig),
     ParquetTransactionMetadataProcessor(ParquetDefaultProcessorConfig),
@@ -107,36 +113,39 @@ impl ProcessorConfig {
     /// This is a convenience method to map the table names to include the processor name as a prefix, which
     /// is useful for querying the status from the processor status table in the database.
     pub fn get_processor_status_table_names(&self) -> anyhow::Result<Vec<String>> {
-        match self {
+        let default_config = match self {
             ProcessorConfig::ParquetDefaultProcessor(config)
             | ProcessorConfig::ParquetEventsProcessor(config)
             | ProcessorConfig::ParquetUserTransactionsProcessor(config)
             | ProcessorConfig::ParquetTransactionMetadataProcessor(config)
             | ProcessorConfig::ParquetAccountTransactionsProcessor(config)
             | ProcessorConfig::ParquetTokenV2Processor(config)
-            | ProcessorConfig::ParquetFungibleAssetProcessor(config) => {
-                // Get the processor name as a prefix
-                let processor_name = self.name();
-
-                let valid_table_names = VALID_TABLE_NAMES
-                    .get(processor_name)
-                    .ok_or_else(|| anyhow::anyhow!("Processor type not recognized"))?;
-
-                // Use the helper function for validation and mapping
-                if config.backfill_table.is_empty() {
-                    Ok(valid_table_names
-                        .iter()
-                        .cloned()
-                        .map(|table_name| format_table_name(processor_name, &table_name))
-                        .collect())
-                } else {
-                    Self::validate_backfill_table_names(&config.backfill_table, valid_table_names)
-                }
+            | ProcessorConfig::ParquetFungibleAssetProcessor(config) => config,
+            ProcessorConfig::ParquetAnsProcessor(config) => &config.default,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Invalid parquet processor config: {:?}",
+                    self
+                ))
             },
-            _ => Err(anyhow::anyhow!(
-                "Invalid parquet processor config: {:?}",
-                self
-            )),
+        };
+
+        // Get the processor name as a prefix
+        let processor_name = self.name();
+
+        let valid_table_names = VALID_TABLE_NAMES
+            .get(processor_name)
+            .ok_or_else(|| anyhow::anyhow!("Processor type not recognized"))?;
+
+        // Use the helper function for validation and mapping
+        if default_config.backfill_table.is_empty() {
+            Ok(valid_table_names
+                .iter()
+                .cloned()
+                .map(|table_name| format_table_name(processor_name, &table_name))
+                .collect())
+        } else {
+            Self::validate_backfill_table_names(&default_config.backfill_table, valid_table_names)
         }
     }
 
@@ -156,6 +165,12 @@ impl ProcessorConfig {
             ProcessorName::ParquetEventsProcessor => {
                 HashSet::from([EventPQ::TABLE_NAME.to_string()])
             },
+            ProcessorName::ParquetAnsProcessor => HashSet::from([
+                AnsLookupV2::TABLE_NAME.to_string(),
+                AnsPrimaryNameV2::TABLE_NAME.to_string(),
+                CurrentAnsLookupV2::TABLE_NAME.to_string(),
+                CurrentAnsPrimaryNameV2::TABLE_NAME.to_string(),
+            ]),
             ProcessorName::ParquetUserTransactionsProcessor => {
                 HashSet::from([UserTransaction::TABLE_NAME.to_string()])
             },

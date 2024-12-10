@@ -14,7 +14,10 @@ use parquet::schema::types::Type;
 use processor::{
     db::parquet::models::{
         account_transaction_models::parquet_account_transactions::AccountTransaction,
-        ans_models::parquet_ans_primary_name_v2::AnsPrimaryNameV2,
+        ans_models::{
+            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
+        },
         default_models::{
             parquet_block_metadata_transactions::BlockMetadataTransaction,
             parquet_move_modules::MoveModule,
@@ -103,6 +106,9 @@ pub enum ParquetTypeEnum {
     UserTransactions,
     // ANS types
     AnsPrimaryNameV2,
+    CurrentAnsPrimaryNameV2,
+    AnsLookupV2,
+    CurrentAnsLookupV2,
     // fa
     FungibleAssetActivities,
     FungibleAssetMetadata,
@@ -211,30 +217,47 @@ impl_parquet_trait!(
     ParquetTypeEnum::CurrentTokenV2Metadata
 );
 impl_parquet_trait!(TokenActivityV2, ParquetTypeEnum::TokenActivitiesV2);
+impl_parquet_trait!(
+    CurrentAnsPrimaryNameV2,
+    ParquetTypeEnum::CurrentAnsPrimaryNameV2
+);
+impl_parquet_trait!(AnsLookupV2, ParquetTypeEnum::AnsLookupV2);
+impl_parquet_trait!(CurrentAnsLookupV2, ParquetTypeEnum::CurrentAnsLookupV2);
 impl_parquet_trait!(TokenDataV2, ParquetTypeEnum::TokenDatasV2);
 impl_parquet_trait!(CurrentTokenDataV2, ParquetTypeEnum::CurrentTokenDatasV2);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
 pub enum ParquetTypeStructs {
+    // Default
     MoveResource(Vec<MoveResource>),
     WriteSetChange(Vec<WriteSetChangeModel>),
     Transaction(Vec<ParquetTransaction>),
     TableItem(Vec<TableItem>),
     MoveModule(Vec<MoveModule>),
-    Event(Vec<Event>),
     CurrentTableItem(Vec<CurrentTableItem>),
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
-    UserTransaction(Vec<UserTransaction>),
     TableMetadata(Vec<TableMetadata>),
+    // Events
+    Event(Vec<Event>),
+    // User txn
+    UserTransaction(Vec<UserTransaction>),
+    // ANS types
     AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
+    CurrentAnsPrimaryNameV2(Vec<CurrentAnsPrimaryNameV2>),
+    AnsLookupV2(Vec<AnsLookupV2>),
+    CurrentAnsLookupV2(Vec<CurrentAnsLookupV2>),
+    // FA
     FungibleAssetActivity(Vec<FungibleAssetActivity>),
     FungibleAssetMetadata(Vec<FungibleAssetMetadataModel>),
     FungibleAssetBalance(Vec<FungibleAssetBalance>),
     CurrentFungibleAssetBalance(Vec<CurrentFungibleAssetBalance>),
     CurrentUnifiedFungibleAssetBalance(Vec<CurrentUnifiedFungibleAssetBalance>),
+    // Txn metadata
     WriteSetSize(Vec<WriteSetSize>),
+    // account txn
     AccountTransaction(Vec<AccountTransaction>),
+    // Token V2
     CurrentTokenPendingClaim(Vec<CurrentTokenPendingClaim>),
     CurrentTokenRoyaltyV1(Vec<CurrentTokenRoyaltyV1>),
     CurrentTokenV2Metadata(Vec<CurrentTokenV2Metadata>),
@@ -288,6 +311,13 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::CurrentTokenV2Metadata(Vec::new())
             },
             ParquetTypeEnum::TokenActivitiesV2 => ParquetTypeStructs::TokenActivityV2(Vec::new()),
+            ParquetTypeEnum::CurrentAnsPrimaryNameV2 => {
+                ParquetTypeStructs::CurrentAnsPrimaryNameV2(Vec::new())
+            },
+            ParquetTypeEnum::AnsLookupV2 => ParquetTypeStructs::AnsLookupV2(Vec::new()),
+            ParquetTypeEnum::CurrentAnsLookupV2 => {
+                ParquetTypeStructs::CurrentAnsLookupV2(Vec::new())
+            },
             ParquetTypeEnum::TokenDatasV2 => ParquetTypeStructs::TokenDataV2(Vec::new()),
             ParquetTypeEnum::CurrentTokenDatasV2 => {
                 ParquetTypeStructs::CurrentTokenDataV2(Vec::new())
@@ -363,12 +393,6 @@ impl ParquetTypeStructs {
                 handle_append!(self_data, other_data)
             },
             (
-                ParquetTypeStructs::AnsPrimaryNameV2(self_data),
-                ParquetTypeStructs::AnsPrimaryNameV2(other_data),
-            ) => {
-                handle_append!(self_data, other_data)
-            },
-            (
                 ParquetTypeStructs::FungibleAssetActivity(self_data),
                 ParquetTypeStructs::FungibleAssetActivity(other_data),
             ) => {
@@ -431,6 +455,31 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::TokenActivityV2(self_data),
                 ParquetTypeStructs::TokenActivityV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            // ANS types
+            (
+                ParquetTypeStructs::AnsPrimaryNameV2(self_data),
+                ParquetTypeStructs::AnsPrimaryNameV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentAnsPrimaryNameV2(self_data),
+                ParquetTypeStructs::CurrentAnsPrimaryNameV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::AnsLookupV2(self_data),
+                ParquetTypeStructs::AnsLookupV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentAnsLookupV2(self_data),
+                ParquetTypeStructs::CurrentAnsLookupV2(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
