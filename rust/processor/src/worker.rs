@@ -118,6 +118,9 @@ bitflags! {
 
         // Events
         const EVENTS = 1 << 30; // start at 30 to avoid conflicts with other flags.
+
+        // User Transactions
+        const USER_TRANSACTIONS = 1 << 31;
     }
 }
 
