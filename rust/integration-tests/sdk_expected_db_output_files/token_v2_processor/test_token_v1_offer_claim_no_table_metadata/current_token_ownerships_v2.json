@@ -1,0 +1,17 @@
+[
+  {
+    "token_data_id": "0x2877fd783c3c7957b50941cce1b3b729dae16b5928e0ba0606cd282df2b085c8",
+    "property_version_v1": "0",
+    "owner_address": "0xe2ebcbacd81584f97b6ba9a458239ea083428d75158c0d42ef38b6379527e99a",
+    "storage_id": "0xa5e6f84af35d356027c1513b37248bae3968c20720af6fc2d5c58b7c90ffda55",
+    "amount": "1",
+    "table_type_v1": "0x3::token::TokenStore",
+    "token_properties_mutated_v1": {},
+    "is_soulbound_v2": null,
+    "token_standard": "v1",
+    "is_fungible_v2": null,
+    "last_transaction_version": 19922017,
+    "last_transaction_timestamp": "2024-11-28T23:53:41.291148",
+    "non_transferrable_by_owner": null
+  }
+]

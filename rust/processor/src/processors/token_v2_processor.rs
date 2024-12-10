@@ -10,7 +10,7 @@ use crate::{
         },
         resources::{FromWriteResource, V2TokenResource},
         token_models::{
-            token_claims::CurrentTokenPendingClaim,
+            token_claims::{CurrentTokenPendingClaim, TokenV1Claimed},
             tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
         },
         token_v2_models::{
@@ -783,6 +783,9 @@ pub async fn parse_v2_token(
             // Get mint events for token v2 by object
             let mut tokens_minted: TokenV2Minted = AHashSet::new();
 
+            // Get claim events for token v1 by table handle
+            let mut tokens_claimed: TokenV1Claimed = AHashMap::new();
+
             // Loop 1: Need to do a first pass to get all the object addresses and insert them into the helper
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
@@ -847,6 +850,7 @@ pub async fn parse_v2_token(
             // Loop 3: Pass through events to get the burn events and token activities v2
             // This needs to be here because we need the metadata parsed in loop 2 for token activities
             // and burn / transfer events need to come before the next loop
+            // Also parses token v1 claim events, which will be used in Loop 4 to build the claims table
             for (index, event) in user_txn.events.iter().enumerate() {
                 if let Some(burn_event) = Burn::from_event(event, txn_version).unwrap() {
                     tokens_burned.insert(burn_event.get_token_address(), burn_event.clone());
@@ -890,6 +894,7 @@ pub async fn parse_v2_token(
                     txn_timestamp,
                     index as i64,
                     &entry_function_id_str,
+                    &mut tokens_claimed,
                 )
                 .unwrap()
                 {
@@ -1053,6 +1058,7 @@ pub async fn parse_v2_token(
                                 txn_version,
                                 txn_timestamp,
                                 table_handle_to_owner,
+                                &tokens_claimed,
                             )
                             .unwrap()
                         {
