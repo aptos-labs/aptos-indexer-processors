@@ -27,6 +27,7 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
+        token_v2_models::token_claims::CurrentTokenPendingClaim,
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
     },
@@ -85,6 +86,7 @@ pub enum ProcessorConfig {
     ParquetFungibleAssetProcessor(ParquetDefaultProcessorConfig),
     ParquetTransactionMetadataProcessor(ParquetDefaultProcessorConfig),
     ParquetAccountTransactionsProcessor(ParquetDefaultProcessorConfig),
+    ParquetTokenV2Processor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -105,6 +107,7 @@ impl ProcessorConfig {
             | ProcessorConfig::ParquetUserTransactionsProcessor(config)
             | ProcessorConfig::ParquetTransactionMetadataProcessor(config)
             | ProcessorConfig::ParquetAccountTransactionsProcessor(config)
+            | ProcessorConfig::ParquetTokenV2Processor(config)
             | ProcessorConfig::ParquetFungibleAssetProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
@@ -162,6 +165,9 @@ impl ProcessorConfig {
             },
             ProcessorName::ParquetAccountTransactionsProcessor => {
                 HashSet::from([AccountTransaction::TABLE_NAME.to_string()])
+            },
+            ProcessorName::ParquetTokenV2Processor => {
+                HashSet::from([CurrentTokenPendingClaim::TABLE_NAME.to_string()])
             },
             _ => HashSet::new(), // Default case for unsupported processors
         }

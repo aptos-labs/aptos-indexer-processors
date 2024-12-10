@@ -7,15 +7,18 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::postgres::models::{
-        token_models::{token_claims::CurrentTokenPendingClaim, tokens::TableMetadataForToken},
-        token_v2_models::{
-            v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_collections::{CollectionV2, CurrentCollectionV2},
-            v2_token_activities::TokenActivityV2,
-            v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
-            v2_token_metadata::CurrentTokenV2Metadata,
-            v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
+    db::{
+        common::models::token_v2_models::raw_token_claims::CurrentTokenPendingClaimConvertible,
+        postgres::models::{
+            token_models::{token_claims::CurrentTokenPendingClaim, tokens::TableMetadataForToken},
+            token_v2_models::{
+                v1_token_royalty::CurrentTokenRoyaltyV1,
+                v2_collections::{CollectionV2, CurrentCollectionV2},
+                v2_token_activities::TokenActivityV2,
+                v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
+                v2_token_metadata::CurrentTokenV2Metadata,
+                v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
+            },
         },
     },
     processors::token_v2_processor::parse_v2_token,
@@ -108,7 +111,7 @@ impl Processable for TokenV2Extractor {
             token_activities_v2,
             current_token_v2_metadata,
             current_token_royalties_v1,
-            current_token_claims,
+            raw_current_token_claims,
         ) = parse_v2_token(
             &transactions.data,
             &table_handle_to_owner,
@@ -117,6 +120,11 @@ impl Processable for TokenV2Extractor {
             self.query_retry_delay_ms,
         )
         .await;
+
+        let postgres_current_token_claims: Vec<CurrentTokenPendingClaim> = raw_current_token_claims
+            .into_iter()
+            .map(CurrentTokenPendingClaim::from_raw)
+            .collect();
 
         Ok(Some(TransactionContext {
             data: (
@@ -131,7 +139,7 @@ impl Processable for TokenV2Extractor {
                 token_activities_v2,
                 current_token_v2_metadata,
                 current_token_royalties_v1,
-                current_token_claims,
+                postgres_current_token_claims,
             ),
             metadata: transactions.metadata,
         }))

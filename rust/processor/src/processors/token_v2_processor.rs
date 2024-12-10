@@ -3,28 +3,33 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::postgres::models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+    db::{
+        common::models::token_v2_models::raw_token_claims::{
+            CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim, TokenV1Claimed,
         },
-        resources::{FromWriteResource, V2TokenResource},
-        token_models::{
-            token_claims::{CurrentTokenPendingClaim, TokenV1Claimed},
-            tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
-        },
-        token_v2_models::{
-            v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
-            v2_token_activities::TokenActivityV2,
-            v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
-            v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
-            v2_token_ownerships::{
-                CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
-                TokenOwnershipV2,
+        postgres::models::{
+            fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
-            v2_token_utils::{
-                Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+            resources::{FromWriteResource, V2TokenResource},
+            token_models::{
+                token_claims::CurrentTokenPendingClaim,
+                tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
+            },
+            token_v2_models::{
+                v1_token_royalty::CurrentTokenRoyaltyV1,
+                v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
+                v2_token_activities::TokenActivityV2,
+                v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
+                v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
+                v2_token_ownerships::{
+                    CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
+                    TokenOwnershipV2,
+                },
+                v2_token_utils::{
+                    Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                },
             },
         },
     },
@@ -613,7 +618,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_activities_v2,
             mut current_token_v2_metadata,
             current_token_royalties_v1,
-            current_token_claims,
+            raw_current_token_claims,
         ) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
@@ -622,6 +627,11 @@ impl ProcessorTrait for TokenV2Processor {
             query_retry_delay_ms,
         )
         .await;
+
+        let postgres_current_token_claims: Vec<CurrentTokenPendingClaim> = raw_current_token_claims
+            .into_iter()
+            .map(CurrentTokenPendingClaim::from_raw)
+            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -662,7 +672,7 @@ impl ProcessorTrait for TokenV2Processor {
             &token_activities_v2,
             &current_token_v2_metadata,
             &current_token_royalties_v1,
-            &current_token_claims,
+            &postgres_current_token_claims,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -714,7 +724,7 @@ pub async fn parse_v2_token(
     Vec<TokenActivityV2>,
     Vec<CurrentTokenV2Metadata>,
     Vec<CurrentTokenRoyaltyV1>,
-    Vec<CurrentTokenPendingClaim>,
+    Vec<RawCurrentTokenPendingClaim>,
 ) {
     // Token V2 and V1 combined
     let mut collections_v2 = vec![];
@@ -747,7 +757,7 @@ pub async fn parse_v2_token(
     // migrating this from v1 token model as we don't have any replacement table for this
     let mut all_current_token_claims: AHashMap<
         CurrentTokenPendingClaimPK,
-        CurrentTokenPendingClaim,
+        RawCurrentTokenPendingClaim,
     > = AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
@@ -1001,7 +1011,7 @@ pub async fn parse_v2_token(
                             }
                         }
                         if let Some(current_token_token_claim) =
-                            CurrentTokenPendingClaim::from_write_table_item(
+                            RawCurrentTokenPendingClaim::from_write_table_item(
                                 table_item,
                                 txn_version,
                                 txn_timestamp,
@@ -1053,7 +1063,7 @@ pub async fn parse_v2_token(
                             }
                         }
                         if let Some(current_token_token_claim) =
-                            CurrentTokenPendingClaim::from_delete_table_item(
+                            RawCurrentTokenPendingClaim::from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 txn_timestamp,
@@ -1287,7 +1297,7 @@ pub async fn parse_v2_token(
         .collect::<Vec<CurrentTokenRoyaltyV1>>();
     let mut all_current_token_claims = all_current_token_claims
         .into_values()
-        .collect::<Vec<CurrentTokenPendingClaim>>();
+        .collect::<Vec<RawCurrentTokenPendingClaim>>();
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
     current_deleted_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));
