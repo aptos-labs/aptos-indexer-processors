@@ -152,6 +152,7 @@ pub struct Worker {
     pub transaction_filter: TransactionFilter,
     pub grpc_response_item_timeout_in_secs: u64,
     pub deprecated_tables: TableFlags,
+    pub db_row_name: String,
 }
 
 impl Worker {
@@ -175,6 +176,7 @@ impl Worker {
         transaction_filter: TransactionFilter,
         grpc_response_item_timeout_in_secs: u64,
         deprecated_tables: HashSet<String>,
+        db_row_name: String,
     ) -> Result<Self> {
         let processor_name = processor_config.name();
         info!(processor_name = processor_name, "[Parser] Kicking off");
@@ -220,6 +222,7 @@ impl Worker {
             transaction_filter,
             grpc_response_item_timeout_in_secs,
             deprecated_tables: deprecated_tables_flags,
+            db_row_name,
         })
     }
 
@@ -230,7 +233,7 @@ impl Worker {
     ///   * Note that the batches will be sequential so we won't have problems with gaps
     /// 4. We will keep track of the last processed version and monitoring things like TPS
     pub async fn run(&mut self) {
-        let processor_name = self.processor_config.name();
+        let processor_name = self.db_row_name.clone();
         info!(
             processor_name = processor_name,
             service_type = PROCESSOR_SERVICE_TYPE,
@@ -352,6 +355,7 @@ impl Worker {
             self.deprecated_tables,
             self.db_pool.clone(),
             maybe_gap_detector_sender,
+            self.db_row_name.clone(),
         );
 
         let gap_detector = if is_parquet_processor {
@@ -381,7 +385,7 @@ impl Worker {
         // 5. If it's the wrong chain, panic.
 
         info!(
-            processor_name = processor_name,
+            processor_name = self.db_row_name,
             service_type = PROCESSOR_SERVICE_TYPE,
             stream_address = self.indexer_grpc_data_service_address.as_str(),
             concurrent_tasks,
@@ -396,13 +400,14 @@ impl Worker {
                     receiver.clone(),
                     gap_detector_sender.clone(),
                     gap_detector.clone(),
+                    self.db_row_name.clone(),
                 )
                 .await;
             processor_tasks.push(join_handle);
         }
 
         info!(
-            processor_name = processor_name,
+            processor_name = self.db_row_name,
             service_type = PROCESSOR_SERVICE_TYPE,
             stream_address = self.indexer_grpc_data_service_address.as_str(),
             concurrent_tasks,
@@ -421,8 +426,9 @@ impl Worker {
         receiver: kanal::AsyncReceiver<TransactionsPBResponse>,
         gap_detector_sender: AsyncSender<ProcessingResult>,
         mut gap_detector: GapDetector,
+        db_row_name: String,
     ) -> JoinHandle<()> {
-        let processor_name = self.processor_config.name();
+        let processor_name = db_row_name.clone();
         let stream_address = self.indexer_grpc_data_service_address.to_string();
         let receiver_clone = receiver.clone();
         let auth_token = self.auth_token.clone();
@@ -435,6 +441,7 @@ impl Worker {
                 self.deprecated_tables,
                 self.db_pool.clone(),
                 Some(gap_detector_sender.clone()),
+                "".to_string(),
             )
         } else {
             build_processor(
@@ -443,6 +450,7 @@ impl Worker {
                 self.deprecated_tables,
                 self.db_pool.clone(),
                 None,
+                db_row_name,
             )
         };
 
@@ -461,7 +469,7 @@ impl Worker {
             loop {
                 let txn_channel_fetch_latency = std::time::Instant::now();
                 match fetch_transactions(
-                    processor_name,
+                    &processor_name,
                     &stream_address,
                     receiver_clone.clone(),
                     task_index,
@@ -542,7 +550,7 @@ impl Worker {
                             transactions_pb,
                             &processor,
                             chain_id,
-                            processor_name,
+                            &processor_name,
                             &auth_token,
                             false, // enable_verbose_logging
                         )
@@ -551,7 +559,7 @@ impl Worker {
                         let processing_result = match res {
                             Ok(versions) => {
                                 PROCESSOR_SUCCESSES_COUNT
-                                    .with_label_values(&[processor_name])
+                                    .with_label_values(&[&processor_name])
                                     .inc();
                                 versions
                             },
@@ -564,7 +572,7 @@ impl Worker {
                                     "[Parser][T#{}] Error processing transactions", task_index
                                 );
                                 PROCESSOR_ERRORS_COUNT
-                                    .with_label_values(&[processor_name])
+                                    .with_label_values(&[&processor_name])
                                     .inc();
                                 panic!(
                                     "[Parser][T#{}] Error processing '{:}' transactions: {:?}",
@@ -610,13 +618,13 @@ impl Worker {
 
                                 // TODO: For these three, do an atomic thing, or ideally move to an async metrics collector!
                                 GRPC_LATENCY_BY_PROCESSOR_IN_SECS
-                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .with_label_values(&[&processor_name, &task_index_str])
                                     .observe(time_diff_since_pb_timestamp_in_secs(
                                         end_txn_timestamp.as_ref().unwrap(),
                                     ));
                                 LATEST_PROCESSED_VERSION
                                     .with_label_values(&[
-                                        processor_name,
+                                        &processor_name,
                                         step,
                                         label,
                                         &task_index_str,
@@ -624,7 +632,7 @@ impl Worker {
                                     .set(last_txn_version as i64);
                                 TRANSACTION_UNIX_TIMESTAMP
                                     .with_label_values(&[
-                                        processor_name,
+                                        &processor_name,
                                         step,
                                         label,
                                         &task_index_str,
@@ -634,7 +642,7 @@ impl Worker {
                                 // Single batch metrics
                                 PROCESSED_BYTES_COUNT
                                     .with_label_values(&[
-                                        processor_name,
+                                        &processor_name,
                                         step,
                                         label,
                                         &task_index_str,
@@ -642,7 +650,7 @@ impl Worker {
                                     .inc_by(size_in_bytes as u64);
                                 NUM_TRANSACTIONS_PROCESSED_COUNT
                                     .with_label_values(&[
-                                        processor_name,
+                                        &processor_name,
                                         step,
                                         label,
                                         &task_index_str,
@@ -650,13 +658,13 @@ impl Worker {
                                     .inc_by(num_processed);
 
                                 SINGLE_BATCH_PROCESSING_TIME_IN_SECS
-                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .with_label_values(&[&processor_name, &task_index_str])
                                     .observe(processing_time);
                                 SINGLE_BATCH_PARSING_TIME_IN_SECS
-                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .with_label_values(&[&processor_name, &task_index_str])
                                     .observe(processing_result.processing_duration_in_secs);
                                 SINGLE_BATCH_DB_INSERTION_TIME_IN_SECS
-                                    .with_label_values(&[processor_name, &task_index_str])
+                                    .with_label_values(&[&processor_name, &task_index_str])
                                     .observe(processing_result.db_insertion_duration_in_secs);
 
                                 gap_detector_sender
@@ -679,7 +687,7 @@ impl Worker {
 
                                 NUM_TRANSACTIONS_PROCESSED_COUNT
                                     .with_label_values(&[
-                                        processor_name,
+                                        &processor_name,
                                         step,
                                         label,
                                         &task_index_str,
@@ -760,9 +768,7 @@ impl Worker {
     pub async fn get_start_version(&self) -> Result<Option<u64>> {
         let mut conn = self.db_pool.get().await?;
 
-        match ProcessorStatusQuery::get_by_processor(self.processor_config.name(), &mut conn)
-            .await?
-        {
+        match ProcessorStatusQuery::get_by_processor(&self.db_row_name, &mut conn).await? {
             Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
             None => Ok(None),
         }
@@ -920,6 +926,7 @@ pub fn build_processor_for_testing(
         deprecated_tables,
         db_pool,
         None,
+        "".to_string(),
     )
 }
 
@@ -934,6 +941,7 @@ pub fn build_processor(
     deprecated_tables: TableFlags,
     db_pool: ArcDbPool,
     gap_detector_sender: Option<AsyncSender<ProcessingResult>>, // Parquet only
+    db_row_name: String,
 ) -> Processor {
     match config {
         ProcessorConfig::AccountTransactionsProcessor => Processor::from(
@@ -958,7 +966,9 @@ pub fn build_processor(
             per_table_chunk_sizes,
             deprecated_tables,
         )),
-        ProcessorConfig::MonitoringProcessor => Processor::from(MonitoringProcessor::new(db_pool)),
+        ProcessorConfig::MonitoringProcessor => {
+            Processor::from(MonitoringProcessor::new(db_pool, db_row_name))
+        },
         ProcessorConfig::NftMetadataProcessor(config) => {
             Processor::from(NftMetadataProcessor::new(db_pool, config.clone()))
         },
