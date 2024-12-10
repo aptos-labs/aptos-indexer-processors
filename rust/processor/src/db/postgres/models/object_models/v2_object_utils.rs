@@ -6,15 +6,17 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        fungible_asset_models::v2_fungible_asset_utils::{
-            ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FungibleAssetMetadata,
-            FungibleAssetStore, FungibleAssetSupply,
-        },
-        resources::FromWriteResource,
-        token_v2_models::v2_token_utils::{
+    db::{
+        common::models::token_v2_models::v2_token_utils::{
             AptosCollection, ConcurrentSupply, FixedSupply, PropertyMapModel, TokenIdentifiers,
             TokenV2, TransferEvent, UnlimitedSupply,
+        },
+        postgres::models::{
+            fungible_asset_models::v2_fungible_asset_utils::{
+                ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply,
+                FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+            },
+            resources::FromWriteResource,
         },
     },
     utils::util::{deserialize_from_string, standardize_address},
@@ -23,7 +25,6 @@ use ahash::AHashMap;
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
-
 // PK of current_objects, i.e. object_address
 pub type CurrentObjectPK = String;
 

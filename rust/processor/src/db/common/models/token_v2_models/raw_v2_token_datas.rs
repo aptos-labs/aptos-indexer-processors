@@ -6,11 +6,12 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        resources::FromWriteResource,
-        token_models::token_utils::TokenWriteSet,
-        token_v2_models::v2_token_utils::{TokenStandard, TokenV2, TokenV2Burned},
+    db::{
+        common::models::token_v2_models::v2_token_utils::{TokenStandard, TokenV2, TokenV2Burned},
+        postgres::models::{
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            resources::FromWriteResource, token_models::token_utils::TokenWriteSet,
+        },
     },
     utils::util::standardize_address,
 };
