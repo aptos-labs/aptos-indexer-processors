@@ -8,7 +8,12 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        parquet::models::token_v2_models::v2_token_ownerships::TokenOwnershipV2,
+        common::models::token_v2_models::raw_v2_token_datas::{
+            RawTokenDataV2, TokenDataV2Convertible,
+        },
+        parquet::models::token_v2_models::{
+            v2_token_datas::TokenDataV2, v2_token_ownerships::TokenOwnershipV2,
+        },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
             object_models::v2_object_utils::{
@@ -17,7 +22,6 @@ use crate::{
             resources::{FromWriteResource, V2TokenResource},
             token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
             token_v2_models::{
-                parquet_v2_token_datas::TokenDataV2,
                 v2_token_ownerships::NFTOwnershipV2,
                 v2_token_utils::{
                     Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
@@ -129,15 +133,20 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
-        let (token_datas_v2, token_ownerships_v2) = parse_v2_token(
+        let (raw_token_datas_v2, token_ownerships_v2) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
             &mut transaction_version_to_struct_count,
         )
         .await;
 
+        let parquet_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+            .into_iter()
+            .map(TokenDataV2::from_raw)
+            .collect();
+
         let token_data_v2_parquet_data = ParquetDataGeneric {
-            data: token_datas_v2,
+            data: parquet_token_datas_v2,
         };
 
         self.v2_token_datas_sender
@@ -175,7 +184,7 @@ async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
-) -> (Vec<TokenDataV2>, Vec<TokenOwnershipV2>) {
+) -> (Vec<RawTokenDataV2>, Vec<TokenOwnershipV2>) {
     // Token V2 and V1 combined
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
@@ -315,15 +324,16 @@ async fn parse_v2_token(
                 let wsc_index = index as i64;
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteTableItem(table_item) => {
-                        if let Some(token_data) = TokenDataV2::get_v1_from_write_table_item(
-                            table_item,
-                            txn_version,
-                            wsc_index,
-                            txn_timestamp,
-                        )
-                        .unwrap()
+                        if let Some((raw_token_data, _)) =
+                            RawTokenDataV2::get_v1_from_write_table_item(
+                                table_item,
+                                txn_version,
+                                wsc_index,
+                                txn_timestamp,
+                            )
+                            .unwrap()
                         {
-                            token_datas_v2.push(token_data);
+                            token_datas_v2.push(raw_token_data);
                             transaction_version_to_struct_count
                                 .entry(txn_version)
                                 .and_modify(|e| *e += 1)
@@ -385,18 +395,19 @@ async fn parse_v2_token(
                         }
                     },
                     Change::WriteResource(resource) => {
-                        if let Some(token_data) = TokenDataV2::get_v2_from_write_resource(
-                            resource,
-                            txn_version,
-                            wsc_index,
-                            txn_timestamp,
-                            &token_v2_metadata_helper,
-                        )
-                        .unwrap()
+                        if let Some((raw_token_data, _current_token_data)) =
+                            RawTokenDataV2::get_v2_from_write_resource(
+                                resource,
+                                txn_version,
+                                wsc_index,
+                                txn_timestamp,
+                                &token_v2_metadata_helper,
+                            )
+                            .unwrap()
                         {
                             // Add NFT ownership
                             let mut ownerships = TokenOwnershipV2::get_nft_v2_from_token_data(
-                                &token_data,
+                                &raw_token_data,
                                 &token_v2_metadata_helper,
                             )
                             .unwrap();
@@ -422,7 +433,7 @@ async fn parse_v2_token(
                                 .and_modify(|e| *e += ownerships.len() as i64 + 1)
                                 .or_insert(ownerships.len() as i64 + 1);
                             token_ownerships_v2.append(&mut ownerships);
-                            token_datas_v2.push(token_data);
+                            token_datas_v2.push(raw_token_data);
                         }
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
