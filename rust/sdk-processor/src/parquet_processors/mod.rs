@@ -24,6 +24,7 @@ use processor::{
                 parquet_write_set_changes::WriteSetChangeModel,
             },
             event_models::parquet_events::Event,
+            user_transaction_models::parquet_user_transactions::UserTransaction,
         },
         postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
     },
@@ -41,6 +42,7 @@ use strum::{Display, EnumIter};
 pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
+pub mod parquet_user_transaction_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -63,8 +65,11 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
         strum(serialize_all = "snake_case")
     )
 )]
+
+// TODO: Rename this to ParquetTableEnum as this reflects the table name rather than the type name
+// which is written in plural form.
 pub enum ParquetTypeEnum {
-    Event,
+    Events,
     MoveResources,
     WriteSetChanges,
     Transactions,
@@ -73,6 +78,7 @@ pub enum ParquetTypeEnum {
     CurrentTableItems,
     BlockMetadataTransactions,
     TableMetadata,
+    UserTransactions,
 
     // ANS types
     AnsPrimaryNameV2,
@@ -132,7 +138,8 @@ impl_parquet_trait!(
     ParquetTypeEnum::BlockMetadataTransactions
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
-impl_parquet_trait!(Event, ParquetTypeEnum::Event);
+impl_parquet_trait!(Event, ParquetTypeEnum::Events);
+impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransactions);
 impl_parquet_trait!(AnsPrimaryNameV2, ParquetTypeEnum::AnsPrimaryNameV2);
 
 #[derive(Debug, Clone)]
@@ -146,6 +153,7 @@ pub enum ParquetTypeStructs {
     Event(Vec<Event>),
     CurrentTableItem(Vec<CurrentTableItem>),
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
+    UserTransaction(Vec<UserTransaction>),
     TableMetadata(Vec<TableMetadata>),
     AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
 }
@@ -163,7 +171,8 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::BlockMetadataTransaction(Vec::new())
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
-            ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
+            ParquetTypeEnum::Events => ParquetTypeStructs::Event(Vec::new()),
+            ParquetTypeEnum::UserTransactions => ParquetTypeStructs::UserTransaction(Vec::new()),
             ParquetTypeEnum::AnsPrimaryNameV2 => ParquetTypeStructs::AnsPrimaryNameV2(Vec::new()),
         }
     }
@@ -226,6 +235,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::TableMetadata(self_data),
                 ParquetTypeStructs::TableMetadata(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::UserTransaction(self_data),
+                ParquetTypeStructs::UserTransaction(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

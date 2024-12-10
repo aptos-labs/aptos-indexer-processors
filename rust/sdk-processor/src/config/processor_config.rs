@@ -18,6 +18,7 @@ use processor::{
             parquet_write_set_changes::WriteSetChangeModel,
         },
         event_models::parquet_events::Event as EventPQ,
+        user_transaction_models::parquet_user_transactions::UserTransaction,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -70,6 +71,7 @@ pub enum ProcessorConfig {
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
+    ParquetUserTransactionsProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -86,7 +88,8 @@ impl ProcessorConfig {
     pub fn get_processor_status_table_names(&self) -> anyhow::Result<Vec<String>> {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config)
-            | ProcessorConfig::ParquetEventsProcessor(config) => {
+            | ProcessorConfig::ParquetEventsProcessor(config)
+            | ProcessorConfig::ParquetUserTransactionsProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 
@@ -121,11 +124,16 @@ impl ProcessorConfig {
                 WriteSetChangeModel::TABLE_NAME.to_string(),
                 TableItem::TABLE_NAME.to_string(),
                 MoveModule::TABLE_NAME.to_string(),
-                EventPQ::TABLE_NAME.to_string(),
                 BlockMetadataTransaction::TABLE_NAME.to_string(),
                 CurrentTableItem::TABLE_NAME.to_string(),
                 TableMetadata::TABLE_NAME.to_string(),
             ]),
+            ProcessorName::ParquetEventsProcessor => {
+                HashSet::from([EventPQ::TABLE_NAME.to_string()])
+            },
+            ProcessorName::ParquetUserTransactionsProcessor => {
+                HashSet::from([UserTransaction::TABLE_NAME.to_string()])
+            },
             _ => HashSet::new(), // Default case for unsupported processors
         }
     }

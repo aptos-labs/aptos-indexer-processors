@@ -10,13 +10,14 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    processors::parquet_processors::parquet_events_processor::process_transactions_parquet,
+    processors::parquet_processors::parquet_user_transactions_processor::process_transactions,
     worker::TableFlags,
 };
 use std::collections::HashMap;
+use tracing::debug;
 
 /// Extracts parquet data from transactions, allowing optional selection of specific tables.
-pub struct ParquetEventsExtractor
+pub struct ParquetUserTransactionExtractor
 where
     Self: Processable + Send + Sized + 'static,
 {
@@ -26,7 +27,7 @@ where
 type ParquetTypeMap = HashMap<ParquetTypeEnum, ParquetTypeStructs>;
 
 #[async_trait]
-impl Processable for ParquetEventsExtractor {
+impl Processable for ParquetUserTransactionExtractor {
     type Input = Vec<Transaction>;
     type Output = ParquetTypeMap;
     type RunType = AsyncRunType;
@@ -35,15 +36,19 @@ impl Processable for ParquetEventsExtractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
-        let (_txn_ver_map, events) = process_transactions_parquet(transactions.data);
+        let (user_txns, _) = process_transactions(transactions.data.clone()).await;
+
+        // Print the size of each extracted data type
+        debug!("Processed data sizes:");
+        debug!(" - UserTransactions: {}", user_txns.len());
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
         // Array of tuples for each data type and its corresponding enum variant and flag
         let data_types = [(
-            TableFlags::EVENTS,
-            ParquetTypeEnum::Events,
-            ParquetTypeStructs::Event(events),
+            TableFlags::USER_TRANSACTIONS,
+            ParquetTypeEnum::UserTransactions,
+            ParquetTypeStructs::UserTransaction(user_txns),
         )];
 
         // Populate the map based on opt-in tables
@@ -56,10 +61,10 @@ impl Processable for ParquetEventsExtractor {
     }
 }
 
-impl AsyncStep for ParquetEventsExtractor {}
+impl AsyncStep for ParquetUserTransactionExtractor {}
 
-impl NamedStep for ParquetEventsExtractor {
+impl NamedStep for ParquetUserTransactionExtractor {
     fn name(&self) -> String {
-        "ParquetEventsExtractor".to_string()
+        "ParquetUserTransactionExtractor".to_string()
     }
 }
