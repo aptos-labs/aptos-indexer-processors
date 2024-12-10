@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use processor::{
     db::postgres::models::ans_models::{
         ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
-        ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2},
+        ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+        ans_primary_name_v2::CurrentAnsPrimaryNameV2,
     },
     processors::ans_processor::{
         insert_ans_lookups_query, insert_ans_lookups_v2_query, insert_ans_primary_names_query,

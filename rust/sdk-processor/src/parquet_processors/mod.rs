@@ -12,18 +12,21 @@ use enum_dispatch::enum_dispatch;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
 use processor::{
-    db::parquet::models::{
-        default_models::{
-            parquet_block_metadata_transactions::BlockMetadataTransaction,
-            parquet_move_modules::MoveModule,
-            parquet_move_resources::MoveResource,
-            parquet_move_tables::{CurrentTableItem, TableItem},
-            parquet_table_metadata::TableMetadata,
-            parquet_transactions::Transaction as ParquetTransaction,
-            parquet_write_set_changes::WriteSetChangeModel,
+    db::{
+        parquet::models::{
+            default_models::{
+                parquet_block_metadata_transactions::BlockMetadataTransaction,
+                parquet_move_modules::MoveModule,
+                parquet_move_resources::MoveResource,
+                parquet_move_tables::{CurrentTableItem, TableItem},
+                parquet_table_metadata::TableMetadata,
+                parquet_transactions::Transaction as ParquetTransaction,
+                parquet_write_set_changes::WriteSetChangeModel,
+            },
+            event_models::parquet_events::Event,
+            user_transaction_models::parquet_user_transactions::UserTransaction,
         },
-        event_models::parquet_events::Event,
-        user_transaction_models::parquet_user_transactions::UserTransaction,
+        postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
     },
     worker::TableFlags,
 };
@@ -36,6 +39,7 @@ use std::{
 };
 use strum::{Display, EnumIter};
 
+pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_user_transaction_processor;
@@ -61,8 +65,11 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
         strum(serialize_all = "snake_case")
     )
 )]
+
+// TODO: Rename this to ParquetTableEnum as this reflects the table name rather than the type name
+// which is written in plural form.
 pub enum ParquetTypeEnum {
-    Event,
+    Events,
     MoveResources,
     WriteSetChanges,
     Transactions,
@@ -71,7 +78,10 @@ pub enum ParquetTypeEnum {
     CurrentTableItems,
     BlockMetadataTransactions,
     TableMetadata,
-    UserTransaction,
+    UserTransactions,
+
+    // ANS types
+    AnsPrimaryNameV2,
 }
 
 /// Trait for handling various Parquet types.
@@ -128,8 +138,9 @@ impl_parquet_trait!(
     ParquetTypeEnum::BlockMetadataTransactions
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
-impl_parquet_trait!(Event, ParquetTypeEnum::Event);
-impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransaction);
+impl_parquet_trait!(Event, ParquetTypeEnum::Events);
+impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransactions);
+impl_parquet_trait!(AnsPrimaryNameV2, ParquetTypeEnum::AnsPrimaryNameV2);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -144,6 +155,7 @@ pub enum ParquetTypeStructs {
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
     UserTransaction(Vec<UserTransaction>),
     TableMetadata(Vec<TableMetadata>),
+    AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
 }
 
 impl ParquetTypeStructs {
@@ -159,8 +171,9 @@ impl ParquetTypeStructs {
                 ParquetTypeStructs::BlockMetadataTransaction(Vec::new())
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
-            ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
-            ParquetTypeEnum::UserTransaction => ParquetTypeStructs::UserTransaction(Vec::new()),
+            ParquetTypeEnum::Events => ParquetTypeStructs::Event(Vec::new()),
+            ParquetTypeEnum::UserTransactions => ParquetTypeStructs::UserTransaction(Vec::new()),
+            ParquetTypeEnum::AnsPrimaryNameV2 => ParquetTypeStructs::AnsPrimaryNameV2(Vec::new()),
         }
     }
 
@@ -228,6 +241,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::UserTransaction(self_data),
                 ParquetTypeStructs::UserTransaction(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::AnsPrimaryNameV2(self_data),
+                ParquetTypeStructs::AnsPrimaryNameV2(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
@@ -335,6 +354,7 @@ mod tests {
             ParquetTypeEnum::TableItems,
             ParquetTypeEnum::MoveModules,
             ParquetTypeEnum::CurrentTableItems,
+            ParquetTypeEnum::AnsPrimaryNameV2,
         ];
 
         for t in types {

@@ -119,7 +119,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
-            [(ParquetTypeEnum::Event, EventPQ::schema())]
+            [(ParquetTypeEnum::Events, EventPQ::schema())]
                 .into_iter()
                 .collect();
 

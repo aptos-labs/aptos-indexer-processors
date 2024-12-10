@@ -120,7 +120,7 @@ impl ProcessorTrait for ParquetUserTransactionsProcessor {
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> =
-            [(ParquetTypeEnum::UserTransaction, UserTransaction::schema())]
+            [(ParquetTypeEnum::UserTransactions, UserTransaction::schema())]
                 .into_iter()
                 .collect();
 

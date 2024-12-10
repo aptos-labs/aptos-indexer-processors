@@ -42,7 +42,7 @@ impl Processable for ParquetEventsExtractor {
         // Array of tuples for each data type and its corresponding enum variant and flag
         let data_types = [(
             TableFlags::EVENTS,
-            ParquetTypeEnum::Event,
+            ParquetTypeEnum::Events,
             ParquetTypeStructs::Event(events),
         )];
 

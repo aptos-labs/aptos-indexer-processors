@@ -177,7 +177,7 @@ fn parse_ans(
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
             // 2. SetReverseLookupEvents: parse to get current_ans_primary_names
             for (event_index, event) in user_txn.events.iter().enumerate() {
-                if let Some((_, ans_lookup_v2)) =
+                if let Some((_, ans_primary_name_v2)) =
                     CurrentAnsPrimaryNameV2::parse_v2_primary_name_record_from_event(
                         event,
                         txn_version,
@@ -187,7 +187,7 @@ fn parse_ans(
                     )
                     .unwrap()
                 {
-                    all_ans_primary_names_v2.push(ans_lookup_v2);
+                    all_ans_primary_names_v2.push(ans_primary_name_v2);
                     transaction_version_to_struct_count
                         .entry(txn_version)
                         .and_modify(|e| *e += 1)

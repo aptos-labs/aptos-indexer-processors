@@ -47,7 +47,7 @@ impl Processable for ParquetUserTransactionExtractor {
         // Array of tuples for each data type and its corresponding enum variant and flag
         let data_types = [(
             TableFlags::USER_TRANSACTIONS,
-            ParquetTypeEnum::UserTransaction,
+            ParquetTypeEnum::UserTransactions,
             ParquetTypeStructs::UserTransaction(user_txns),
         )];
 
