@@ -32,6 +32,7 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
+        token_v2_models::token_claims::CurrentTokenPendingClaim,
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
     },
     utils::table_flags::TableFlags,
@@ -49,6 +50,7 @@ pub mod parquet_account_transactions_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_token_v2_processor;
 pub mod parquet_transaction_metadata_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
@@ -94,6 +96,8 @@ pub enum ParquetTypeEnum {
     WriteSetSize,
     // account transactions
     AccountTransactions,
+    // token v2
+    CurrentTokenPendingClaims,
 }
 
 /// Trait for handling various Parquet types.
@@ -170,6 +174,10 @@ impl_parquet_trait!(
 );
 impl_parquet_trait!(WriteSetSize, ParquetTypeEnum::WriteSetSize);
 impl_parquet_trait!(AccountTransaction, ParquetTypeEnum::AccountTransactions);
+impl_parquet_trait!(
+    CurrentTokenPendingClaim,
+    ParquetTypeEnum::CurrentTokenPendingClaims
+);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -190,6 +198,7 @@ pub enum ParquetTypeStructs {
     CurrentUnifiedFungibleAssetBalance(Vec<CurrentUnifiedFungibleAssetBalance>),
     WriteSetSize(Vec<WriteSetSize>),
     AccountTransaction(Vec<AccountTransaction>),
+    CurrentTokenPendingClaim(Vec<CurrentTokenPendingClaim>),
 }
 
 impl ParquetTypeStructs {
@@ -224,6 +233,9 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::WriteSetSize => ParquetTypeStructs::WriteSetSize(Vec::new()),
             ParquetTypeEnum::AccountTransactions => {
                 ParquetTypeStructs::AccountTransaction(Vec::new())
+            },
+            ParquetTypeEnum::CurrentTokenPendingClaims => {
+                ParquetTypeStructs::CurrentTokenPendingClaim(Vec::new())
             },
         }
     }
@@ -328,6 +340,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::AccountTransaction(self_data),
                 ParquetTypeStructs::AccountTransaction(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentTokenPendingClaim(self_data),
+                ParquetTypeStructs::CurrentTokenPendingClaim(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
