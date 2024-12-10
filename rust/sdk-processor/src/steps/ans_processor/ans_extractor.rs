@@ -9,9 +9,16 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::postgres::models::ans_models::{
-        ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
-        ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2},
+    db::{
+        common::models::ans_models::{
+            raw_ans_lookup_v2::{AnsLookupV2Convertible, CurrentAnsLookupV2Convertible},
+            raw_ans_primary_name_v2::CurrentAnsPrimaryNameV2Convertible,
+        },
+        postgres::models::ans_models::{
+            ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
+            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+            ans_primary_name_v2::CurrentAnsPrimaryNameV2,
+        },
     },
     processors::ans_processor::parse_ans,
     worker::TableFlags,
@@ -83,9 +90,9 @@ impl Processable for AnsExtractor {
             mut all_ans_lookups,
             mut all_current_ans_primary_names,
             mut all_ans_primary_names,
-            all_current_ans_lookups_v2,
-            all_ans_lookups_v2,
-            all_current_ans_primary_names_v2,
+            raw_current_ans_lookups_v2,
+            raw_ans_lookups_v2,
+            raw_current_ans_primary_names_v2,
             _, // AnsPrimaryNameV2 is deprecated.
         ) = parse_ans(
             &input.data,
@@ -116,15 +123,31 @@ impl Processable for AnsExtractor {
             all_current_ans_primary_names.clear();
         }
 
+        let postgres_current_ans_lookups_v2: Vec<CurrentAnsLookupV2> = raw_current_ans_lookups_v2
+            .iter()
+            .map(CurrentAnsLookupV2::from_raw)
+            .collect();
+
+        let postgres_ans_lookups_v2: Vec<AnsLookupV2> = raw_ans_lookups_v2
+            .iter()
+            .map(AnsLookupV2::from_raw)
+            .collect();
+
+        let postgres_current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2> =
+            raw_current_ans_primary_names_v2
+                .iter()
+                .map(CurrentAnsPrimaryNameV2::from_raw)
+                .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 all_current_ans_lookups,
                 all_ans_lookups,
                 all_current_ans_primary_names,
                 all_ans_primary_names,
-                all_current_ans_lookups_v2,
-                all_ans_lookups_v2,
-                all_current_ans_primary_names_v2,
+                postgres_current_ans_lookups_v2,
+                postgres_ans_lookups_v2,
+                postgres_current_ans_primary_names_v2,
             ),
             metadata: input.metadata,
         }))

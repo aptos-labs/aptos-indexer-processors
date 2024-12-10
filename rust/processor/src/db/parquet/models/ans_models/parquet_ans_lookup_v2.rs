@@ -6,20 +6,17 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::ans_models::raw_ans_lookup_v2::{
         AnsLookupV2Convertible, CurrentAnsLookupV2Convertible, RawAnsLookupV2,
         RawCurrentAnsLookupV2,
     },
-    schema::{ans_lookup_v2, current_ans_lookup_v2},
 };
-use diesel::prelude::*;
-use field_count::FieldCount;
+use allocative::Allocative;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Default, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(transaction_version, write_set_change_index))]
-#[diesel(table_name = ans_lookup_v2)]
-#[diesel(treat_none_as_null = true)]
+#[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct AnsLookupV2 {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
@@ -27,10 +24,28 @@ pub struct AnsLookupV2 {
     pub subdomain: String,
     pub token_standard: String,
     pub registered_address: Option<String>,
+    #[allocative(skip)]
     pub expiration_timestamp: chrono::NaiveDateTime,
     pub token_name: String,
     pub is_deleted: bool,
     pub subdomain_expiration_policy: Option<i64>,
+}
+
+impl NamedTable for AnsLookupV2 {
+    const TABLE_NAME: &'static str = "ans_lookup_v2";
+}
+
+impl HasVersion for AnsLookupV2 {
+    fn version(&self) -> i64 {
+        self.transaction_version
+    }
+}
+
+impl GetTimeStamp for AnsLookupV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        #[warn(deprecated)]
+        chrono::NaiveDateTime::default()
+    }
 }
 
 impl AnsLookupV2Convertible for AnsLookupV2 {
@@ -50,31 +65,35 @@ impl AnsLookupV2Convertible for AnsLookupV2 {
     }
 }
 
-#[derive(
-    Clone,
-    Default,
-    Debug,
-    Deserialize,
-    FieldCount,
-    Identifiable,
-    Insertable,
-    Serialize,
-    PartialEq,
-    Eq,
-)]
-#[diesel(primary_key(domain, subdomain, token_standard))]
-#[diesel(table_name = current_ans_lookup_v2)]
-#[diesel(treat_none_as_null = true)]
+#[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct CurrentAnsLookupV2 {
     pub domain: String,
     pub subdomain: String,
     pub token_standard: String,
     pub registered_address: Option<String>,
     pub last_transaction_version: i64,
+    #[allocative(skip)]
     pub expiration_timestamp: chrono::NaiveDateTime,
     pub token_name: String,
     pub is_deleted: bool,
     pub subdomain_expiration_policy: Option<i64>,
+}
+
+impl NamedTable for CurrentAnsLookupV2 {
+    const TABLE_NAME: &'static str = "current_ans_lookup_v2";
+}
+
+impl HasVersion for CurrentAnsLookupV2 {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl GetTimeStamp for CurrentAnsLookupV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        #[warn(deprecated)]
+        chrono::NaiveDateTime::default()
+    }
 }
 
 impl CurrentAnsLookupV2Convertible for CurrentAnsLookupV2 {
