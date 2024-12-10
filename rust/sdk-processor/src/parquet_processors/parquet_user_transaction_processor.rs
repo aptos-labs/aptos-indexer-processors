@@ -12,7 +12,7 @@ use crate::{
             parquet_version_tracker_step::ParquetVersionTrackerStep,
             processor_status_saver::get_processor_status_saver,
         },
-        parquet_default_processor::parquet_default_extractor::ParquetDefaultExtractor,
+        parquet_user_transaction_processor::parquet_user_transaction_extractor::ParquetUserTransactionExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -112,7 +112,7 @@ impl ProcessorTrait for ParquetUserTransactionsProcessor {
         .await?;
 
         let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
-        let parquet_default_extractor = ParquetDefaultExtractor {
+        let parquet_user_txn_extractor = ParquetUserTransactionExtractor {
             opt_in_tables: backfill_table,
         };
 
@@ -149,7 +149,10 @@ impl ProcessorTrait for ParquetUserTransactionsProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(parquet_default_extractor.into_runnable_step(), channel_size)
+        .connect_to(
+            parquet_user_txn_extractor.into_runnable_step(),
+            channel_size,
+        )
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
         .connect_to(
             parquet_version_tracker_step.into_runnable_step(),

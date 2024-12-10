@@ -6,8 +6,10 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::parquet::models::user_transaction_models::parquet_user_transactions::UserTransaction,
-    db::postgres::models::fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
+    db::{
+        parquet::models::user_transaction_models::parquet_user_transactions::UserTransaction,
+        postgres::models::fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
+    },
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool},
@@ -120,7 +122,7 @@ pub async fn process_transactions(
             user_transactions.push(user_transaction);
         }
     }
-    return (user_transactions, transaction_version_to_struct_count);
+    (user_transactions, transaction_version_to_struct_count)
 }
 
 #[async_trait]

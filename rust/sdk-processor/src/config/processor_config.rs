@@ -87,7 +87,8 @@ impl ProcessorConfig {
     pub fn get_processor_status_table_names(&self) -> anyhow::Result<Vec<String>> {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config)
-            | ProcessorConfig::ParquetEventsProcessor(config) => {
+            | ProcessorConfig::ParquetEventsProcessor(config)
+            | ProcessorConfig::ParquetUserTransactionsProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 
