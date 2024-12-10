@@ -78,6 +78,7 @@ impl Debug for ParquetUserTransactionsProcessor {
         )
     }
 }
+
 pub async fn process_transactions(
     transactions: Vec<Transaction>,
 ) -> (Vec<UserTransaction>, AHashMap<i64, i64>) {
