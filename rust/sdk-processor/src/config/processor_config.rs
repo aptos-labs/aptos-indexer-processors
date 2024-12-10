@@ -1,4 +1,5 @@
 use crate::{
+    parquet_processors::parquet_ans_processor::ParquetAnsProcessorConfig,
     processors::{
         ans_processor::AnsProcessorConfig, objects_processor::ObjectsProcessorConfig,
         stake_processor::StakeProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
@@ -9,6 +10,10 @@ use ahash::AHashMap;
 use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
     db::parquet::models::{
+        ans_models::{
+            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
+        },
         default_models::{
             parquet_block_metadata_transactions::BlockMetadataTransaction,
             parquet_move_modules::MoveModule,
@@ -70,6 +75,7 @@ pub enum ProcessorConfig {
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
+    ParquetAnsProcessor(ParquetAnsProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -125,6 +131,12 @@ impl ProcessorConfig {
                 BlockMetadataTransaction::TABLE_NAME.to_string(),
                 CurrentTableItem::TABLE_NAME.to_string(),
                 TableMetadata::TABLE_NAME.to_string(),
+            ]),
+            ProcessorName::ParquetAnsProcessor => HashSet::from([
+                AnsLookupV2::TABLE_NAME.to_string(),
+                AnsPrimaryNameV2::TABLE_NAME.to_string(),
+                CurrentAnsLookupV2::TABLE_NAME.to_string(),
+                CurrentAnsPrimaryNameV2::TABLE_NAME.to_string(),
             ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }

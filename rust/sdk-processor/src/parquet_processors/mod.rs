@@ -12,20 +12,21 @@ use enum_dispatch::enum_dispatch;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
 use processor::{
-    db::{
-        parquet::models::{
-            default_models::{
-                parquet_block_metadata_transactions::BlockMetadataTransaction,
-                parquet_move_modules::MoveModule,
-                parquet_move_resources::MoveResource,
-                parquet_move_tables::{CurrentTableItem, TableItem},
-                parquet_table_metadata::TableMetadata,
-                parquet_transactions::Transaction as ParquetTransaction,
-                parquet_write_set_changes::WriteSetChangeModel,
-            },
-            event_models::parquet_events::Event,
+    db::parquet::models::{
+        ans_models::{
+            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
         },
-        postgres::models::ans_models::parquet_ans_lookup_v2::AnsPrimaryNameV2,
+        default_models::{
+            parquet_block_metadata_transactions::BlockMetadataTransaction,
+            parquet_move_modules::MoveModule,
+            parquet_move_resources::MoveResource,
+            parquet_move_tables::{CurrentTableItem, TableItem},
+            parquet_table_metadata::TableMetadata,
+            parquet_transactions::Transaction as ParquetTransaction,
+            parquet_write_set_changes::WriteSetChangeModel,
+        },
+        event_models::parquet_events::Event,
     },
     worker::TableFlags,
 };
@@ -76,6 +77,9 @@ pub enum ParquetTypeEnum {
 
     // ANS types
     AnsPrimaryNameV2,
+    CurrentAnsPrimaryNameV2,
+    AnsLookupV2,
+    CurrentAnsLookupV2,
 }
 
 /// Trait for handling various Parquet types.
@@ -134,6 +138,12 @@ impl_parquet_trait!(
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
 impl_parquet_trait!(Event, ParquetTypeEnum::Event);
 impl_parquet_trait!(AnsPrimaryNameV2, ParquetTypeEnum::AnsPrimaryNameV2);
+impl_parquet_trait!(
+    CurrentAnsPrimaryNameV2,
+    ParquetTypeEnum::CurrentAnsPrimaryNameV2
+);
+impl_parquet_trait!(AnsLookupV2, ParquetTypeEnum::AnsLookupV2);
+impl_parquet_trait!(CurrentAnsLookupV2, ParquetTypeEnum::CurrentAnsLookupV2);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -147,7 +157,11 @@ pub enum ParquetTypeStructs {
     CurrentTableItem(Vec<CurrentTableItem>),
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
     TableMetadata(Vec<TableMetadata>),
+    // ANS types
     AnsPrimaryNameV2(Vec<AnsPrimaryNameV2>),
+    CurrentAnsPrimaryNameV2(Vec<CurrentAnsPrimaryNameV2>),
+    AnsLookupV2(Vec<AnsLookupV2>),
+    CurrentAnsLookupV2(Vec<CurrentAnsLookupV2>),
 }
 
 impl ParquetTypeStructs {
@@ -164,7 +178,13 @@ impl ParquetTypeStructs {
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
             ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
+            // ANS types
             ParquetTypeEnum::AnsPrimaryNameV2 => ParquetTypeStructs::AnsPrimaryNameV2(Vec::new()),
+            ParquetTypeEnum::CurrentAnsPrimaryNameV2 => {
+                ParquetTypeStructs::CurrentTableItem(Vec::new())
+            },
+            ParquetTypeEnum::AnsLookupV2 => ParquetTypeStructs::MoveResource(Vec::new()),
+            ParquetTypeEnum::CurrentAnsLookupV2 => ParquetTypeStructs::MoveResource(Vec::new()),
         }
     }
 
@@ -229,9 +249,28 @@ impl ParquetTypeStructs {
             ) => {
                 handle_append!(self_data, other_data)
             },
+            // ANS types
             (
                 ParquetTypeStructs::AnsPrimaryNameV2(self_data),
                 ParquetTypeStructs::AnsPrimaryNameV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentAnsPrimaryNameV2(self_data),
+                ParquetTypeStructs::CurrentAnsPrimaryNameV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::AnsLookupV2(self_data),
+                ParquetTypeStructs::AnsLookupV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentAnsLookupV2(self_data),
+                ParquetTypeStructs::CurrentAnsLookupV2(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
