@@ -1,0 +1,25 @@
+health_check_port: 8085
+server_config:
+  processor_config:
+    type: "parquet_ans_processor"
+    channel_size: 100
+    max_buffer_size: 100
+    upload_interval: 10
+
+    ans_v1_primary_names_table_handle: "0x1d5f57aa505a2fa463b7a46341913b65757e3177c46a5e483a29d953627bee62"
+    ans_v1_name_records_table_handle: "0x21a0fd41330f3a0a38173c7c0e4ac59cd51505f0594f64d3d637c12425c3c155"
+    ans_v2_contract_address: "0x867ed1f6bf916171b1de3ee92849b8978b7d1b9e0a8cc982a3d19d535dfd9c0c"
+
+  transaction_stream_config:
+    indexer_grpc_data_service_address: "https://grpc.mainnet.aptoslabs.com:443"
+    auth_token: "aptoslabs_RBjvZ3eXfue_H77nhLmLDBLmdBFFbC49kEq7muj88UPzX"
+    request_name_header: "parquet_ans_processor" 
+  db_config:
+    type: parquet_config
+    connection_string: postgresql://postgres:@localhost:5432/example
+    bucket_name: "aptos-indexer-data-etl-yuunnet"
+    bucket_root: "sdk-processor-dq-check"
+
+
+#  backfill_config:
+#   backfill_alias: "backfill_parquet_default_processor_move_resources" 
