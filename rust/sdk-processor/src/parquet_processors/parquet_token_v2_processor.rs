@@ -30,7 +30,9 @@ use aptos_indexer_processor_sdk::{
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::parquet::models::token_v2_models::token_claims::CurrentTokenPendingClaim,
+    db::parquet::models::token_v2_models::{
+        token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
+    },
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
@@ -121,10 +123,16 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
 
         // TODO: Update this
-        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [(
-            ParquetTypeEnum::CurrentTokenPendingClaims,
-            CurrentTokenPendingClaim::schema(),
-        )]
+        let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
+            (
+                ParquetTypeEnum::CurrentTokenPendingClaims,
+                CurrentTokenPendingClaim::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentTokenRoyaltiesV1,
+                CurrentTokenRoyaltyV1::schema(),
+            ),
+        ]
         .into_iter()
         .collect();
 

@@ -33,7 +33,9 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
-        token_v2_models::token_claims::CurrentTokenPendingClaim,
+        token_v2_models::{
+            token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
+        },
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
     },
@@ -109,6 +111,7 @@ pub enum ParquetTypeEnum {
     AccountTransactions,
     // token v2
     CurrentTokenPendingClaims,
+    CurrentTokenRoyaltiesV1,
 }
 
 /// Trait for handling various Parquet types.
@@ -191,6 +194,10 @@ impl_parquet_trait!(
     CurrentTokenPendingClaim,
     ParquetTypeEnum::CurrentTokenPendingClaims
 );
+impl_parquet_trait!(
+    CurrentTokenRoyaltyV1,
+    ParquetTypeEnum::CurrentTokenRoyaltiesV1
+);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -214,6 +221,7 @@ pub enum ParquetTypeStructs {
     WriteSetSize(Vec<WriteSetSize>),
     AccountTransaction(Vec<AccountTransaction>),
     CurrentTokenPendingClaim(Vec<CurrentTokenPendingClaim>),
+    CurrentTokenRoyaltyV1(Vec<CurrentTokenRoyaltyV1>),
 }
 
 impl ParquetTypeStructs {
@@ -253,6 +261,9 @@ impl ParquetTypeStructs {
             },
             ParquetTypeEnum::CurrentTokenPendingClaims => {
                 ParquetTypeStructs::CurrentTokenPendingClaim(Vec::new())
+            },
+            ParquetTypeEnum::CurrentTokenRoyaltiesV1 => {
+                ParquetTypeStructs::CurrentTokenRoyaltyV1(Vec::new())
             },
         }
     }
@@ -375,6 +386,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentTokenPendingClaim(self_data),
                 ParquetTypeStructs::CurrentTokenPendingClaim(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentTokenRoyaltyV1(self_data),
+                ParquetTypeStructs::CurrentTokenRoyaltyV1(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

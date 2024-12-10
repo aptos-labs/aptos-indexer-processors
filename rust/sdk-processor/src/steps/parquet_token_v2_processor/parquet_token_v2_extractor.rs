@@ -11,8 +11,13 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::token_v2_models::raw_token_claims::CurrentTokenPendingClaimConvertible,
-        parquet::models::token_v2_models::token_claims::CurrentTokenPendingClaim,
+        common::models::token_v2_models::{
+            raw_token_claims::CurrentTokenPendingClaimConvertible,
+            raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
+        },
+        parquet::models::token_v2_models::{
+            token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
+        },
         postgres::models::token_models::tokens::TableMetadataForToken,
     },
     processors::token_v2_processor::parse_v2_token,
@@ -85,7 +90,7 @@ impl Processable for ParquetTokenV2Extractor {
             _current_deleted_token_ownerships_v2,
             _token_activities_v2,
             _current_token_v2_metadata,
-            _current_token_royalties_v1,
+            raw_current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
             &transactions.data,
@@ -101,21 +106,38 @@ impl Processable for ParquetTokenV2Extractor {
             .map(CurrentTokenPendingClaim::from_raw)
             .collect();
 
+        let parquet_current_token_royalties_v1: Vec<CurrentTokenRoyaltyV1> =
+            raw_current_token_royalties_v1
+                .into_iter()
+                .map(CurrentTokenRoyaltyV1::from_raw)
+                .collect();
+
         // Print the size of each extracted data type
         debug!("Processed data sizes:");
         debug!(
             " - CurrentTokenPendingClaim: {}",
             parquet_current_token_claims.len()
         );
+        debug!(
+            " - CurrentTokenRoyaltyV1: {}",
+            parquet_current_token_royalties_v1.len()
+        );
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
         // Array of tuples for each data type and its corresponding enum variant and flag
-        let data_types = [(
-            TableFlags::CURRENT_TOKEN_PENDING_CLAIMS,
-            ParquetTypeEnum::CurrentTokenPendingClaims,
-            ParquetTypeStructs::CurrentTokenPendingClaim(parquet_current_token_claims),
-        )];
+        let data_types = [
+            (
+                TableFlags::CURRENT_TOKEN_PENDING_CLAIMS,
+                ParquetTypeEnum::CurrentTokenPendingClaims,
+                ParquetTypeStructs::CurrentTokenPendingClaim(parquet_current_token_claims),
+            ),
+            (
+                TableFlags::CURRENT_TOKEN_ROYALTY_V1,
+                ParquetTypeEnum::CurrentTokenRoyaltiesV1,
+                ParquetTypeStructs::CurrentTokenRoyaltyV1(parquet_current_token_royalties_v1),
+            ),
+        ];
 
         // Populate the map based on opt-in tables
         add_to_map_if_opted_in_for_backfill(self.opt_in_tables, &mut map, data_types.to_vec());
