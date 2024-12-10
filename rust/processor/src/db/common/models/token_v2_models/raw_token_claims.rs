@@ -6,9 +6,9 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
-        token_v2_models::v2_token_activities::TokenActivityHelperV1,
+    db::{
+        common::models::token_v2_models::raw_v2_token_activities::TokenActivityHelperV1,
+        postgres::models::token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
     },
     utils::util::standardize_address,
 };
