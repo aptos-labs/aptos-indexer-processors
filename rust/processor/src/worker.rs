@@ -73,51 +73,53 @@ pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
-    pub struct TableFlags: u64 {
+    pub struct TableFlags: u128 {
+        // Default
         const TRANSACTIONS = 1 << 0;
         const WRITE_SET_CHANGES = 1 << 1;
         const MOVE_RESOURCES = 1 << 2;
         const TABLE_ITEMS = 1 << 3;
         const TABLE_METADATAS = 1 << 4;
         const MOVE_MODULES = 1 << 5;
+        const CURRENT_TABLE_ITEMS = 1 << 6;
+        const BLOCK_METADATA_TRANSACTIONS = 1 << 7;
 
         // Fungible asset
-        const FUNGIBLE_ASSET_BALANCES = 1 << 6;
-        const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 7;
-        const COIN_SUPPLY = 1 << 8;
-        const CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES = 1 << 24;
+        const FUNGIBLE_ASSET_BALANCES = 1 << 10;
+        const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 11;
+        const COIN_SUPPLY = 1 << 12;
+        const CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES = 1 << 13;
 
         // Objects
-        const OBJECTS = 1 << 9;
+        const OBJECTS = 1 << 20;
 
         // Ans
-        const CURRENT_ANS_LOOKUP = 1 << 10;
-        const CURRENT_ANS_PRIMARY_NAME = 1 << 11;
-        const ANS_PRIMARY_NAME_V2 = 1 << 12;
-        const ANS_LOOKUP = 1 << 13;
-        const ANS_PRIMARY_NAME = 1 << 14;
+        const CURRENT_ANS_LOOKUP = 1 << 30;
+        const CURRENT_ANS_PRIMARY_NAME = 1 << 31;
+        const ANS_LOOKUP = 1 << 32;
+        const ANS_PRIMARY_NAME = 1 << 33;
+        const ANS_LOOKUP_V2 = 1 << 34;
+        const CURRENT_ANS_LOOKUP_V2 = 1 << 35;
+        const ANS_PRIMARY_NAME_V2 = 1 << 36;
+        const CURRENT_ANS_PRIMARY_NAME_V2 = 1 << 37;
 
         // Coin
-        const COIN_ACTIVITIES = 1 << 15;
-        const COIN_BALANCES = 1 << 16;
-        const CURRENT_COIN_BALANCES = 1 << 17;
-        const COIN_INFOS = 1 << 18;
+        const COIN_ACTIVITIES = 1 << 40;
+        const COIN_BALANCES = 1 << 41;
+        const CURRENT_COIN_BALANCES = 1 << 42;
+        const COIN_INFOS = 1 << 43;
 
         // Token_v2 processor flags
-        const TOKEN_OWNERSHIPS_V2 = 1 << 19;
-        const TOKEN_DATAS_V2 = 1 << 20;
-        const COLLECTIONS_V2 = 1 << 21;
-        const CURRENT_TOKEN_V2_METADATA = 1 << 22;
+        const TOKEN_OWNERSHIPS_V2 = 1 << 50;
+        const TOKEN_DATAS_V2 = 1 << 51;
+        const COLLECTIONS_V2 = 1 << 52;
+        const CURRENT_TOKEN_V2_METADATA = 1 << 53;
 
         // User transaction
-        const SIGNATURES = 1 << 23;
-
-        // More tables
-        const CURRENT_TABLE_ITEMS = 1 << 24;
-        const BLOCK_METADATA_TRANSACTIONS = 1 << 25;
+        const SIGNATURES = 1 << 60;
 
         // Events
-        const EVENTS = 1 << 30; // start at 30 to avoid conflicts with other flags.
+        const EVENTS = 1 << 70;
     }
 }
 
