@@ -70,6 +70,7 @@ pub enum ProcessorConfig {
     // ParquetProcessor
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
+    ParquetUserTransactionsProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {

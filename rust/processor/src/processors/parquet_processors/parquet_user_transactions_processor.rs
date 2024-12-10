@@ -6,10 +6,8 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::postgres::models::{
-        fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
-        user_transactions_models::parquet_user_transactions::UserTransaction,
-    },
+    db::parquet::models::user_transaction_models::parquet_user_transactions::UserTransaction,
+    db::postgres::models::fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool},
@@ -78,6 +76,52 @@ impl Debug for ParquetUserTransactionsProcessor {
         )
     }
 }
+pub async fn process_transactions(
+    transactions: Vec<Transaction>,
+) -> (Vec<UserTransaction>, AHashMap<i64, i64>) {
+    let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
+    let mut user_transactions = vec![];
+    for txn in &transactions {
+        let txn_version = txn.version as i64;
+        let block_height = txn.block_height as i64;
+        let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
+
+        let txn_data = match txn.txn_data.as_ref() {
+            Some(txn_data) => txn_data,
+            None => {
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["UserTransactionProcessor"])
+                    .inc();
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
+                continue;
+            },
+        };
+        if let TxnData::User(inner) = txn_data {
+            let fee_statement = inner.events.iter().find_map(|event| {
+                let event_type = event.type_str.as_str();
+                FeeStatement::from_event(event_type, &event.data, txn_version)
+            });
+            let user_transaction = UserTransaction::from_transaction(
+                inner,
+                transaction_info,
+                fee_statement,
+                txn.timestamp.as_ref().unwrap(),
+                block_height,
+                txn.epoch as i64,
+                txn_version,
+            );
+            transaction_version_to_struct_count
+                .entry(txn_version)
+                .and_modify(|e| *e += 1)
+                .or_insert(1);
+            user_transactions.push(user_transaction);
+        }
+    }
+    return (user_transactions, transaction_version_to_struct_count);
+}
 
 #[async_trait]
 impl ProcessorTrait for ParquetUserTransactionsProcessor {
@@ -93,48 +137,8 @@ impl ProcessorTrait for ParquetUserTransactionsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-        let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
-
-        let mut user_transactions = vec![];
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let block_height = txn.block_height as i64;
-            let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
-
-            let txn_data = match txn.txn_data.as_ref() {
-                Some(txn_data) => txn_data,
-                None => {
-                    PROCESSOR_UNKNOWN_TYPE_COUNT
-                        .with_label_values(&["UserTransactionProcessor"])
-                        .inc();
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        "Transaction data doesn't exist"
-                    );
-                    continue;
-                },
-            };
-            if let TxnData::User(inner) = txn_data {
-                let fee_statement = inner.events.iter().find_map(|event| {
-                    let event_type = event.type_str.as_str();
-                    FeeStatement::from_event(event_type, &event.data, txn_version)
-                });
-                let user_transaction = UserTransaction::from_transaction(
-                    inner,
-                    transaction_info,
-                    fee_statement,
-                    txn.timestamp.as_ref().unwrap(),
-                    block_height,
-                    txn.epoch as i64,
-                    txn_version,
-                );
-                transaction_version_to_struct_count
-                    .entry(txn_version)
-                    .and_modify(|e| *e += 1)
-                    .or_insert(1);
-                user_transactions.push(user_transaction);
-            }
-        }
+        let (user_transactions, transaction_version_to_struct_count) =
+            process_transactions(transactions).await;
 
         let user_transaction_parquet_data = ParquetDataGeneric {
             data: user_transactions,

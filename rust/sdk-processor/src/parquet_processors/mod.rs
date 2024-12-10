@@ -23,6 +23,7 @@ use processor::{
             parquet_write_set_changes::WriteSetChangeModel,
         },
         event_models::parquet_events::Event,
+        user_transaction_models::parquet_user_transactions::UserTransaction,
     },
     worker::TableFlags,
 };
@@ -37,6 +38,7 @@ use strum::{Display, EnumIter};
 
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
+pub mod parquet_user_transaction_processor;
 
 const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -69,6 +71,7 @@ pub enum ParquetTypeEnum {
     CurrentTableItems,
     BlockMetadataTransactions,
     TableMetadata,
+    UserTransaction,
 }
 
 /// Trait for handling various Parquet types.
@@ -126,6 +129,7 @@ impl_parquet_trait!(
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
 impl_parquet_trait!(Event, ParquetTypeEnum::Event);
+impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransaction);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -138,6 +142,7 @@ pub enum ParquetTypeStructs {
     Event(Vec<Event>),
     CurrentTableItem(Vec<CurrentTableItem>),
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
+    UserTransaction(Vec<UserTransaction>),
     TableMetadata(Vec<TableMetadata>),
 }
 
@@ -155,6 +160,7 @@ impl ParquetTypeStructs {
             },
             ParquetTypeEnum::TableMetadata => ParquetTypeStructs::TableMetadata(Vec::new()),
             ParquetTypeEnum::Event => ParquetTypeStructs::Event(Vec::new()),
+            ParquetTypeEnum::UserTransaction => ParquetTypeStructs::UserTransaction(Vec::new()),
         }
     }
 
@@ -216,6 +222,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::TableMetadata(self_data),
                 ParquetTypeStructs::TableMetadata(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::UserTransaction(self_data),
+                ParquetTypeStructs::UserTransaction(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
