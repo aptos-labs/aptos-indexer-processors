@@ -545,6 +545,13 @@ pub fn parse_ans(
             .info
             .as_ref()
             .expect("Transaction info doesn't exist!");
+        let timestamp = transaction
+            .timestamp
+            .as_ref()
+            .expect("Transaction timestamp doesn't exist!");
+        #[allow(deprecated)]
+        let block_timestamp = chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, 0)
+            .expect("Txn Timestamp is invalid!");
 
         // Extracts from user transactions. Other transactions won't have any ANS changes
 
@@ -569,6 +576,7 @@ pub fn parse_ans(
                         txn_version,
                         event_index as i64,
                         &ans_v2_contract_address,
+                        block_timestamp,
                     )
                     .unwrap()
                 {
@@ -657,7 +665,7 @@ pub fn parse_ans(
 
                             // Include all v1 primary names in v2 data
                             let (current_primary_name_v2, primary_name_v2) =
-                                RawCurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
+                                RawCurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone(), block_timestamp);
                             all_current_ans_primary_names_v2
                                 .insert(current_primary_name_v2.pk(), current_primary_name_v2);
                             all_ans_primary_names_v2.push(primary_name_v2);
@@ -714,7 +722,7 @@ pub fn parse_ans(
 
                             // Include all v1 primary names in v2 data
                             let (current_primary_name_v2, primary_name_v2) =
-                                RawCurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
+                                RawCurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name, block_timestamp);
                             all_current_ans_primary_names_v2
                                 .insert(current_primary_name_v2.pk(), current_primary_name_v2);
                             all_ans_primary_names_v2.push(primary_name_v2);

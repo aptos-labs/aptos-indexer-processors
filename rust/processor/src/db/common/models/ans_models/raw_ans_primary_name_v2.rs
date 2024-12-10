@@ -29,6 +29,7 @@ pub struct RawAnsPrimaryNameV2 {
     pub subdomain: Option<String>,
     pub token_name: Option<String>,
     pub is_deleted: bool,
+    pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
 pub trait AnsPrimaryNameV2Convertible {
@@ -66,6 +67,7 @@ impl RawCurrentAnsPrimaryNameV2 {
     pub fn get_v2_from_v1(
         v1_current_primary_name: CurrentAnsPrimaryName,
         v1_primary_name: AnsPrimaryName,
+        txn_timestamp: chrono::NaiveDateTime,
     ) -> (Self, RawAnsPrimaryNameV2) {
         (
             Self {
@@ -86,6 +88,7 @@ impl RawCurrentAnsPrimaryNameV2 {
                 subdomain: v1_primary_name.subdomain,
                 token_name: v1_primary_name.token_name,
                 is_deleted: v1_primary_name.is_deleted,
+                transaction_timestamp: txn_timestamp,
             },
         )
     }
@@ -96,6 +99,7 @@ impl RawCurrentAnsPrimaryNameV2 {
         txn_version: i64,
         event_index: i64,
         ans_v2_contract_address: &str,
+        txn_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(Self, RawAnsPrimaryNameV2)>> {
         if let Some(set_reverse_lookup_event) =
             SetReverseLookupEvent::from_event(event, ans_v2_contract_address, txn_version).unwrap()
@@ -121,6 +125,7 @@ impl RawCurrentAnsPrimaryNameV2 {
                         subdomain: None,
                         token_name: None,
                         is_deleted: true,
+                        transaction_timestamp: txn_timestamp,
                     },
                 )));
             } else {
@@ -144,6 +149,7 @@ impl RawCurrentAnsPrimaryNameV2 {
                         subdomain: Some(set_reverse_lookup_event.get_curr_subdomain_trunc()),
                         token_name: Some(set_reverse_lookup_event.get_curr_token_name()),
                         is_deleted: false,
+                        transaction_timestamp: txn_timestamp,
                     },
                 )));
             }
