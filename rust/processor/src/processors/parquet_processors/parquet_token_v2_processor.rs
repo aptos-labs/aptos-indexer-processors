@@ -7,19 +7,21 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::postgres::models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-        },
-        resources::{FromWriteResource, V2TokenResource},
-        token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
-        token_v2_models::{
-            parquet_v2_token_datas::TokenDataV2,
-            parquet_v2_token_ownerships::TokenOwnershipV2,
-            v2_token_ownerships::NFTOwnershipV2,
-            v2_token_utils::{
-                Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+    db::{
+        parquet::models::token_v2_models::v2_token_ownerships::TokenOwnershipV2,
+        postgres::models::{
+            fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            },
+            resources::{FromWriteResource, V2TokenResource},
+            token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
+            token_v2_models::{
+                parquet_v2_token_datas::TokenDataV2,
+                v2_token_ownerships::NFTOwnershipV2,
+                v2_token_utils::{
+                    Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                },
             },
         },
     },
