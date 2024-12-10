@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db::postgres::models::{
-    default_models::move_resources::MoveResource,
-    fungible_asset_models::v2_fungible_asset_utils::{
-        ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FungibleAssetMetadata,
-        FungibleAssetStore, FungibleAssetSupply,
-    },
-    object_models::v2_object_utils::{ObjectCore, Untransferable},
-    token_v2_models::v2_token_utils::{
+use crate::db::{
+    common::models::token_v2_models::v2_token_utils::{
         AptosCollection, Collection, ConcurrentSupply, FixedSupply, PropertyMapModel,
         TokenIdentifiers, TokenV2, UnlimitedSupply,
+    },
+    postgres::models::{
+        default_models::move_resources::MoveResource,
+        fungible_asset_models::v2_fungible_asset_utils::{
+            ConcurrentFungibleAssetBalance, ConcurrentFungibleAssetSupply, FungibleAssetMetadata,
+            FungibleAssetStore, FungibleAssetSupply,
+        },
+        object_models::v2_object_utils::{ObjectCore, Untransferable},
     },
 };
 use anyhow::Result;

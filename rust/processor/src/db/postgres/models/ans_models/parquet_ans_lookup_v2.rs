@@ -7,12 +7,12 @@
 
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::postgres::models::{
-        ans_models::{
+    db::{
+        common::models::token_v2_models::v2_token_utils::TokenStandard,
+        postgres::models::ans_models::{
             ans_lookup::{AnsPrimaryName, CurrentAnsPrimaryName},
             ans_utils::SetReverseLookupEvent,
         },
-        token_v2_models::v2_token_utils::TokenStandard,
     },
 };
 use allocative_derive::Allocative;
