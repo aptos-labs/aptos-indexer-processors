@@ -1,6 +1,6 @@
 use crate::{
     parquet_processors::{ParquetTypeEnum, ParquetTypeStructs},
-    utils::{database::ArcDbPool, parquet_extractor_helper::add_to_map_if_opted_in_for_backfill},
+    utils::parquet_extractor_helper::add_to_map_if_opted_in_for_backfill,
 };
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
@@ -17,6 +17,9 @@ use processor::{
             raw_v2_token_activities::TokenActivityV2Convertible,
             raw_v2_token_datas::{CurrentTokenDataV2Convertible, TokenDataV2Convertible},
             raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
+            raw_v2_token_ownerships::{
+                CurrentTokenOwnershipV2Convertible, TokenOwnershipV2Convertible,
+            },
         },
         parquet::models::token_v2_models::{
             token_claims::CurrentTokenPendingClaim,
@@ -24,6 +27,7 @@ use processor::{
             v2_token_activities::TokenActivityV2,
             v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
             v2_token_metadata::CurrentTokenV2Metadata,
+            v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
         },
         postgres::models::token_models::tokens::TableMetadataForToken,
     },
@@ -39,27 +43,8 @@ where
     Self: Processable + Send + Sized + 'static,
 {
     pub opt_in_tables: TableFlags,
-    // TODO: Revisit and remove
-    query_retries: u32,
-    query_retry_delay_ms: u64,
-    conn_pool: ArcDbPool,
 }
 
-impl ParquetTokenV2Extractor {
-    pub fn new(
-        opt_in_tables: TableFlags,
-        query_retries: u32,
-        query_retry_delay_ms: u64,
-        conn_pool: ArcDbPool,
-    ) -> Self {
-        Self {
-            opt_in_tables,
-            query_retries,
-            query_retry_delay_ms,
-            conn_pool,
-        }
-    }
-}
 type ParquetTypeMap = HashMap<ParquetTypeEnum, ParquetTypeStructs>;
 
 #[async_trait]
@@ -72,15 +57,6 @@ impl Processable for ParquetTokenV2Extractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
-        let mut conn = self
-            .conn_pool
-            .get()
-            .await
-            .map_err(|e| ProcessorError::DBStoreError {
-                message: format!("Failed to get connection from pool: {:?}", e),
-                query: None,
-            })?;
-
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
         let table_handle_to_owner: ahash::AHashMap<String, TableMetadataForToken> =
@@ -89,24 +65,17 @@ impl Processable for ParquetTokenV2Extractor {
         let (
             _collections_v2,
             raw_token_datas_v2,
-            _token_ownerships_v2,
+            raw_token_ownerships_v2,
             _current_collections_v2,
             raw_current_token_datas_v2,
             raw_current_deleted_token_datas_v2,
-            _current_token_ownerships_v2,
-            _current_deleted_token_ownerships_v2,
+            raw_current_token_ownerships_v2,
+            raw_current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
             raw_current_token_v2_metadata,
             raw_current_token_royalties_v1,
             raw_current_token_claims,
-        ) = parse_v2_token(
-            &transactions.data,
-            &table_handle_to_owner,
-            &mut conn,
-            self.query_retries,
-            self.query_retry_delay_ms,
-        )
-        .await;
+        ) = parse_v2_token(&transactions.data, &table_handle_to_owner, &mut None, 0, 0).await;
 
         let parquet_current_token_claims: Vec<CurrentTokenPendingClaim> = raw_current_token_claims
             .into_iter()
@@ -146,6 +115,23 @@ impl Processable for ParquetTokenV2Extractor {
                 .map(CurrentTokenDataV2::from_raw)
                 .collect();
 
+        let parquet_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+            .into_iter()
+            .map(TokenOwnershipV2::from_raw)
+            .collect();
+
+        let parquet_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+            raw_current_token_ownerships_v2
+                .into_iter()
+                .map(CurrentTokenOwnershipV2::from_raw)
+                .collect();
+
+        let parquet_deleted_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+            raw_current_deleted_token_ownerships_v2
+                .into_iter()
+                .map(CurrentTokenOwnershipV2::from_raw)
+                .collect();
+
         // Print the size of each extracted data type
         debug!("Processed data sizes:");
         debug!(
@@ -170,6 +156,15 @@ impl Processable for ParquetTokenV2Extractor {
             " - CurrentDeletedTokenDataV2: {}",
             parquet_deleted_current_token_datss_v2.len()
         );
+        debug!(" - TokenOwnershipV2: {}", parquet_token_ownerships_v2.len());
+        debug!(
+            " - CurrentTokenOwnershipV2: {}",
+            parquet_current_token_ownerships_v2.len()
+        );
+        debug!(
+            " - CurrentDeletedTokenOwnershipV2: {}",
+            parquet_deleted_current_token_ownerships_v2.len()
+        );
 
         // We are merging these two tables, b/c they are essentially the same table
         let mut combined_current_token_datas_v2: Vec<CurrentTokenDataV2> = Vec::new();
@@ -179,6 +174,14 @@ impl Processable for ParquetTokenV2Extractor {
         parquet_deleted_current_token_datss_v2
             .iter()
             .for_each(|x| combined_current_token_datas_v2.push(x.clone()));
+
+        let mut merged_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> = Vec::new();
+        parquet_current_token_ownerships_v2
+            .iter()
+            .for_each(|x| merged_current_token_ownerships_v2.push(x.clone()));
+        parquet_deleted_current_token_ownerships_v2
+            .iter()
+            .for_each(|x| merged_current_token_ownerships_v2.push(x.clone()));
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
@@ -213,6 +216,16 @@ impl Processable for ParquetTokenV2Extractor {
                 TableFlags::CURRENT_TOKEN_DATAS_V2,
                 ParquetTypeEnum::CurrentTokenDatasV2,
                 ParquetTypeStructs::CurrentTokenDataV2(combined_current_token_datas_v2),
+            ),
+            (
+                TableFlags::TOKEN_OWNERSHIPS_V2,
+                ParquetTypeEnum::TokenOwnershipsV2,
+                ParquetTypeStructs::TokenOwnershipV2(parquet_token_ownerships_v2),
+            ),
+            (
+                TableFlags::CURRENT_TOKEN_OWNERSHIPS_V2,
+                ParquetTypeEnum::CurrentTokenOwnershipsV2,
+                ParquetTypeStructs::CurrentTokenOwnershipV2(merged_current_token_ownerships_v2),
             ),
         ];
 

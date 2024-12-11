@@ -94,7 +94,7 @@ impl Processable for TokenV2Extractor {
         >,
         ProcessorError,
     > {
-        let mut conn = self
+        let conn = self
             .conn_pool
             .get()
             .await
@@ -124,7 +124,7 @@ impl Processable for TokenV2Extractor {
         ) = parse_v2_token(
             &transactions.data,
             &table_handle_to_owner,
-            &mut conn,
+            &mut Some(conn),
             self.query_retries,
             self.query_retry_delay_ms,
         )
