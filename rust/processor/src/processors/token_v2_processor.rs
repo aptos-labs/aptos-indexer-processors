@@ -4,30 +4,37 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::token_v2_models::{
-            raw_token_claims::{
-                CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim, TokenV1Claimed,
+        common::models::{
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
-            raw_v1_token_royalty::{CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1},
-            raw_v2_token_activities::{RawTokenActivityV2, TokenActivityV2Convertible},
-            raw_v2_token_datas::{
-                CurrentTokenDataV2Convertible, RawCurrentTokenDataV2, RawTokenDataV2,
-                TokenDataV2Convertible,
-            },
-            raw_v2_token_metadata::{CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata},
-            raw_v2_token_ownerships::{
-                CurrentTokenOwnershipV2Convertible, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
-                RawCurrentTokenOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
-            },
-            v2_token_utils::{
-                Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+            token_v2_models::{
+                raw_token_claims::{
+                    CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim,
+                    TokenV1Claimed,
+                },
+                raw_v1_token_royalty::{
+                    CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1,
+                },
+                raw_v2_token_activities::{RawTokenActivityV2, TokenActivityV2Convertible},
+                raw_v2_token_datas::{
+                    CurrentTokenDataV2Convertible, RawCurrentTokenDataV2, RawTokenDataV2,
+                    TokenDataV2Convertible,
+                },
+                raw_v2_token_metadata::{
+                    CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata,
+                },
+                raw_v2_token_ownerships::{
+                    CurrentTokenOwnershipV2Convertible, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
+                    RawCurrentTokenOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+                },
+                v2_token_utils::{
+                    Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                },
             },
         },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-            object_models::v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-            },
             resources::{FromWriteResource, V2TokenResource},
             token_models::{
                 token_claims::CurrentTokenPendingClaim,

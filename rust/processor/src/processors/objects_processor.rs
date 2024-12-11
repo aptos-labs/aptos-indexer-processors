@@ -3,15 +3,20 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::postgres::models::{
-        object_models::{
+    db::{
+        common::models::object_models::{
+            raw_v2_objects::{
+                CurrentObjectConvertible, ObjectConvertible, RawCurrentObject, RawObject,
+            },
             v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
                 Untransferable,
             },
-            v2_objects::{CurrentObject, Object},
         },
-        resources::FromWriteResource,
+        postgres::models::{
+            object_models::v2_objects::{CurrentObject, Object},
+            resources::FromWriteResource,
+        },
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -195,7 +200,6 @@ impl ProcessorTrait for ObjectsProcessor {
                     )
                 })
                 .changes;
-
             // First pass to get all the object cores
             for wsc in changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
@@ -245,7 +249,8 @@ impl ProcessorTrait for ObjectsProcessor {
                 let index: i64 = index as i64;
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteResource(inner) => {
-                        if let Some((object, current_object)) = &Object::from_write_resource(
+                        println!("index: {:?}", index);
+                        if let Some((object, current_object)) = &RawObject::from_write_resource(
                             inner,
                             txn_version,
                             index,
@@ -261,7 +266,7 @@ impl ProcessorTrait for ObjectsProcessor {
                     Change::DeleteResource(inner) => {
                         // Passing all_current_objects into the function so that we can get the owner of the deleted
                         // resource if it was handled in the same batch
-                        if let Some((object, current_object)) = Object::from_delete_resource(
+                        if let Some((object, current_object)) = RawObject::from_delete_resource(
                             inner,
                             txn_version,
                             index,
@@ -286,12 +291,18 @@ impl ProcessorTrait for ObjectsProcessor {
         // Sort by PK
         let mut all_current_objects = all_current_objects
             .into_values()
-            .collect::<Vec<CurrentObject>>();
+            .collect::<Vec<RawCurrentObject>>();
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
         if self.deprecated_tables.contains(TableFlags::OBJECTS) {
             all_objects.clear();
         }
+
+        let postgres_objects: Vec<Object> = all_objects.into_iter().map(Object::from_raw).collect();
+        let postgres_current_objects: Vec<CurrentObject> = all_current_objects
+            .into_iter()
+            .map(CurrentObject::from_raw)
+            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -301,7 +312,7 @@ impl ProcessorTrait for ObjectsProcessor {
             self.name(),
             start_version,
             end_version,
-            (&all_objects, &all_current_objects),
+            (&postgres_objects, &postgres_current_objects),
             &self.per_table_chunk_sizes,
         )
         .await;
