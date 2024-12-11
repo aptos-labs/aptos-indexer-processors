@@ -4,19 +4,24 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::fungible_asset_models::{
-            raw_v2_fungible_asset_activities::{
-                FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+        common::models::{
+            fungible_asset_models::{
+                raw_v2_fungible_asset_activities::{
+                    FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+                },
+                raw_v2_fungible_asset_balances::{
+                    CurrentFungibleAssetBalanceConvertible, CurrentFungibleAssetMapping,
+                    CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
+                    RawCurrentFungibleAssetBalance, RawCurrentUnifiedFungibleAssetBalance,
+                    RawFungibleAssetBalance,
+                },
+                raw_v2_fungible_metadata::{
+                    FungibleAssetMetadataConvertible, FungibleAssetMetadataMapping,
+                    RawFungibleAssetMetadataModel,
+                },
             },
-            raw_v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalanceConvertible, CurrentFungibleAssetMapping,
-                CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
-                RawCurrentFungibleAssetBalance, RawCurrentUnifiedFungibleAssetBalance,
-                RawFungibleAssetBalance,
-            },
-            raw_v2_fungible_metadata::{
-                FungibleAssetMetadataConvertible, FungibleAssetMetadataMapping,
-                RawFungibleAssetMetadataModel,
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
         },
         postgres::models::{
@@ -29,9 +34,6 @@ use crate::{
                 },
                 v2_fungible_asset_utils::FeeStatement,
                 v2_fungible_metadata::FungibleAssetMetadataModel,
-            },
-            object_models::v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
             resources::{FromWriteResource, V2FungibleAssetResource},
         },

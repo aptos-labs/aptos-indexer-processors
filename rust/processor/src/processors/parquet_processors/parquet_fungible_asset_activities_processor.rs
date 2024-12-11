@@ -8,19 +8,21 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::fungible_asset_models::{
-            raw_v2_fungible_asset_activities::{
-                EventToCoinType, FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+        common::models::{
+            fungible_asset_models::{
+                raw_v2_fungible_asset_activities::{
+                    EventToCoinType, FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+                },
+                raw_v2_fungible_asset_balances::RawFungibleAssetBalance,
             },
-            raw_v2_fungible_asset_balances::RawFungibleAssetBalance,
-        },
-        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
-        postgres::models::{
-            fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
                 Untransferable,
             },
+        },
+        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+        postgres::models::{
+            fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
             resources::{FromWriteResource, V2FungibleAssetResource},
         },
     },

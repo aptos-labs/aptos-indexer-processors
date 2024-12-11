@@ -4,13 +4,13 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::token_v2_models::raw_v2_token_datas::{
-            RawCurrentTokenDataV2, RawTokenDataV2,
-        },
-        postgres::models::{
+        common::models::{
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
+            token_v2_models::raw_v2_token_datas::{RawCurrentTokenDataV2, RawTokenDataV2},
+        },
+        postgres::models::{
             resources::FromWriteResource,
             token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
             token_v2_models::{
