@@ -35,7 +35,7 @@ use crate::{
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{ArcDbPool, DbPoolConnection},
+        database::{ArcDbPool, DbContext},
         util::{parse_timestamp, standardize_address},
     },
 };
@@ -139,8 +139,6 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             &transactions,
             &table_handle_to_owner,
             &mut None,
-            0,
-            0,
             &mut transaction_version_to_struct_count,
         )
         .await;
@@ -193,9 +191,7 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut Option<DbPoolConnection<'_>>,
-    query_retries: u32,
-    query_retry_delay_ms: u64,
+    db_context: &mut Option<DbContext<'_>>,
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
 ) -> (Vec<RawTokenDataV2>, Vec<RawTokenOwnershipV2>) {
     // Token V2 and V1 combined
@@ -459,9 +455,7 @@ async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 &token_v2_metadata_helper,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
+                                db_context,
                             )
                             .await
                             .unwrap()
@@ -490,9 +484,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
+                                db_context,
                             )
                             .await
                             .unwrap()

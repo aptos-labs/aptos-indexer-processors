@@ -31,6 +31,7 @@ use processor::{
         },
     },
     processors::token_v2_processor::parse_v2_token,
+    utils::database::DbContext,
 };
 
 /// Extracts fungible asset events, metadata, balances, and v1 supply from transactions
@@ -107,6 +108,11 @@ impl Processable for TokenV2Extractor {
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
         let table_handle_to_owner: ahash::AHashMap<String, TableMetadataForToken> =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions.data);
+        let db_connection = DbContext {
+            conn,
+            query_retries: self.query_retries,
+            query_retry_delay_ms: self.query_retry_delay_ms,
+        };
 
         let (
             collections_v2,
@@ -124,9 +130,7 @@ impl Processable for TokenV2Extractor {
         ) = parse_v2_token(
             &transactions.data,
             &table_handle_to_owner,
-            &mut Some(conn),
-            self.query_retries,
-            self.query_retry_delay_ms,
+            &mut Some(db_connection),
         )
         .await;
 
