@@ -115,7 +115,7 @@ async fn get_min_processed_version_from_db(
                     Some(status.last_success_version as u64)
                 },
                 // Handle specific cases where `Ok` contains `None` (no status found)
-                Ok(None) => Some(0),
+                Ok(None) => None,
                 // TODO: If the result is an `Err`, what should we do?
                 Err(e) => {
                     eprintln!("Error fetching processor status: {:?}", e);
