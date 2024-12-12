@@ -12,6 +12,7 @@ use processor::{
             raw_token_claims::CurrentTokenPendingClaimConvertible,
             raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
             raw_v2_token_activities::TokenActivityV2Convertible,
+            raw_v2_token_datas::{CurrentTokenDataV2Convertible, TokenDataV2Convertible},
             raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
         },
         postgres::models::{
@@ -106,11 +107,11 @@ impl Processable for TokenV2Extractor {
 
         let (
             collections_v2,
-            token_datas_v2,
+            raw_token_datas_v2,
             token_ownerships_v2,
             current_collections_v2,
-            current_token_datas_v2,
-            current_deleted_token_datas_v2,
+            raw_current_token_datas_v2,
+            raw_current_deleted_token_datas_v2,
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
@@ -148,14 +149,30 @@ impl Processable for TokenV2Extractor {
             .map(TokenActivityV2::from_raw)
             .collect();
 
+        let postgres_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+            .into_iter()
+            .map(TokenDataV2::from_raw)
+            .collect();
+
+        let postgres_current_token_datas_v2: Vec<CurrentTokenDataV2> = raw_current_token_datas_v2
+            .into_iter()
+            .map(CurrentTokenDataV2::from_raw)
+            .collect();
+
+        let postgress_current_deleted_token_datas_v2: Vec<CurrentTokenDataV2> =
+            raw_current_deleted_token_datas_v2
+                .into_iter()
+                .map(CurrentTokenDataV2::from_raw)
+                .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 collections_v2,
-                token_datas_v2,
+                postgres_token_datas_v2,
                 token_ownerships_v2,
                 current_collections_v2,
-                current_token_datas_v2,
-                current_deleted_token_datas_v2,
+                postgres_current_token_datas_v2,
+                postgress_current_deleted_token_datas_v2,
                 current_token_ownerships_v2,
                 current_deleted_token_ownerships_v2,
                 postgres_token_activities_v2,

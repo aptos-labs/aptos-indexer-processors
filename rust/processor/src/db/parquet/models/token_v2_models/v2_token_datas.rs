@@ -6,86 +6,115 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::token_v2_models::raw_v2_token_datas::{
         CurrentTokenDataV2Convertible, RawCurrentTokenDataV2, RawTokenDataV2,
         TokenDataV2Convertible,
     },
-    schema::{current_token_datas_v2, token_datas_v2},
 };
-use bigdecimal::BigDecimal;
-use diesel::prelude::*;
-use field_count::FieldCount;
+use allocative_derive::Allocative;
+use anyhow::Context;
+use bigdecimal::ToPrimitive;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-// PK of current_token_datas_v2, i.e. token_data_id
-pub type CurrentTokenDataV2PK = String;
-
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(transaction_version, write_set_change_index))]
-#[diesel(table_name = token_datas_v2)]
+#[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct TokenDataV2 {
-    pub transaction_version: i64,
+    pub txn_version: i64,
     pub write_set_change_index: i64,
     pub token_data_id: String,
     pub collection_id: String,
     pub token_name: String,
-    pub maximum: Option<BigDecimal>,
-    pub supply: Option<BigDecimal>,
-    pub largest_property_version_v1: Option<BigDecimal>,
+    pub largest_property_version_v1: Option<u64>,
     pub token_uri: String,
-    pub token_properties: serde_json::Value,
+    pub token_properties: String,
     pub description: String,
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
-    pub transaction_timestamp: chrono::NaiveDateTime,
-    // Deprecated, but still here for backwards compatibility
-    pub decimals: Option<i64>,
-    // Here for consistency but we don't need to actually fill it
-    // pub is_deleted_v2: Option<bool>,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
+    pub is_deleted_v2: Option<bool>,
+}
+
+impl NamedTable for TokenDataV2 {
+    const TABLE_NAME: &'static str = "token_datas_v2";
+}
+
+impl HasVersion for TokenDataV2 {
+    fn version(&self) -> i64 {
+        self.txn_version
+    }
+}
+
+impl GetTimeStamp for TokenDataV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
 }
 
 impl TokenDataV2Convertible for TokenDataV2 {
     fn from_raw(raw_item: RawTokenDataV2) -> Self {
         Self {
-            transaction_version: raw_item.transaction_version,
+            txn_version: raw_item.transaction_version,
             write_set_change_index: raw_item.write_set_change_index,
             token_data_id: raw_item.token_data_id,
             collection_id: raw_item.collection_id,
             token_name: raw_item.token_name,
-            maximum: raw_item.maximum,
-            supply: raw_item.supply,
-            largest_property_version_v1: raw_item.largest_property_version_v1,
+            largest_property_version_v1: Some(
+                raw_item
+                    .largest_property_version_v1
+                    .unwrap()
+                    .to_u64()
+                    .unwrap(),
+            ),
             token_uri: raw_item.token_uri,
-            token_properties: raw_item.token_properties,
+            token_properties: canonical_json::to_string(&raw_item.token_properties.clone())
+                .context("Failed to serialize token properties")
+                .unwrap(),
             description: raw_item.description,
             token_standard: raw_item.token_standard,
             is_fungible_v2: raw_item.is_fungible_v2,
-            transaction_timestamp: raw_item.transaction_timestamp,
-            decimals: raw_item.decimals,
+            block_timestamp: raw_item.transaction_timestamp,
+            is_deleted_v2: raw_item.is_deleted_v2,
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(token_data_id))]
-#[diesel(table_name = current_token_datas_v2)]
+#[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct CurrentTokenDataV2 {
     pub token_data_id: String,
     pub collection_id: String,
     pub token_name: String,
-    pub maximum: Option<BigDecimal>,
-    pub supply: Option<BigDecimal>,
-    pub largest_property_version_v1: Option<BigDecimal>,
+    pub maximum: Option<String>, // BigDecimal
+    pub supply: Option<String>,
+    pub largest_property_version_v1: Option<u64>,
     pub token_uri: String,
-    pub token_properties: serde_json::Value,
+    pub token_properties: String, // serde_json::Value,
     pub description: String,
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
+    #[allocative(skip)]
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     // Deprecated, but still here for backwards compatibility
     pub decimals: Option<i64>,
     pub is_deleted_v2: Option<bool>,
+}
+
+impl NamedTable for CurrentTokenDataV2 {
+    const TABLE_NAME: &'static str = "current_token_datas_v2";
+}
+
+impl HasVersion for CurrentTokenDataV2 {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl GetTimeStamp for CurrentTokenDataV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.last_transaction_timestamp
+    }
 }
 
 impl CurrentTokenDataV2Convertible for CurrentTokenDataV2 {
@@ -94,11 +123,11 @@ impl CurrentTokenDataV2Convertible for CurrentTokenDataV2 {
             token_data_id: raw_item.token_data_id,
             collection_id: raw_item.collection_id,
             token_name: raw_item.token_name,
-            maximum: raw_item.maximum,
-            supply: raw_item.supply,
-            largest_property_version_v1: raw_item.largest_property_version_v1,
+            maximum: Some(raw_item.maximum.unwrap().to_string()), // todo: handle error
+            supply: Some(raw_item.supply.unwrap().to_string()),   // todo: handle error
+            largest_property_version_v1: raw_item.largest_property_version_v1.unwrap().to_u64(),
             token_uri: raw_item.token_uri,
-            token_properties: raw_item.token_properties,
+            token_properties: canonical_json::to_string(&raw_item.token_properties).unwrap(), // todo: handle error
             description: raw_item.description,
             token_standard: raw_item.token_standard,
             is_fungible_v2: raw_item.is_fungible_v2,
