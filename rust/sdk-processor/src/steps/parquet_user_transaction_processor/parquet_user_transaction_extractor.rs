@@ -11,7 +11,7 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     processors::parquet_processors::parquet_user_transactions_processor::process_transactions,
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 use std::collections::HashMap;
 use tracing::debug;

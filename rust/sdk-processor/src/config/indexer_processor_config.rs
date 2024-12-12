@@ -6,6 +6,7 @@ use crate::{
     parquet_processors::{
         parquet_default_processor::ParquetDefaultProcessor,
         parquet_events_processor::ParquetEventsProcessor,
+        parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
         parquet_user_transaction_processor::ParquetUserTransactionsProcessor,
     },
     processors::{
@@ -93,6 +94,11 @@ impl RunnableConfig for IndexerProcessorConfig {
                 let parquet_user_transactions_processor =
                     ParquetUserTransactionsProcessor::new(self.clone()).await?;
                 parquet_user_transactions_processor.run_processor().await
+            },
+            ProcessorConfig::ParquetFungibleAssetProcessor(_) => {
+                let parquet_fungible_asset_processor =
+                    ParquetFungibleAssetProcessor::new(self.clone()).await?;
+                parquet_fungible_asset_processor.run_processor().await
             },
         }
     }

@@ -18,6 +18,14 @@ use processor::{
             parquet_write_set_changes::WriteSetChangeModel,
         },
         event_models::parquet_events::Event as EventPQ,
+        fungible_asset_models::{
+            parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+            parquet_v2_fungible_asset_balances::{
+                CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                FungibleAssetBalance,
+            },
+            parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+        },
         user_transaction_models::parquet_user_transactions::UserTransaction,
     },
 };
@@ -72,6 +80,7 @@ pub enum ProcessorConfig {
     ParquetDefaultProcessor(ParquetDefaultProcessorConfig),
     ParquetEventsProcessor(ParquetDefaultProcessorConfig),
     ParquetUserTransactionsProcessor(ParquetDefaultProcessorConfig),
+    ParquetFungibleAssetProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -89,7 +98,8 @@ impl ProcessorConfig {
         match self {
             ProcessorConfig::ParquetDefaultProcessor(config)
             | ProcessorConfig::ParquetEventsProcessor(config)
-            | ProcessorConfig::ParquetUserTransactionsProcessor(config) => {
+            | ProcessorConfig::ParquetUserTransactionsProcessor(config)
+            | ProcessorConfig::ParquetFungibleAssetProcessor(config) => {
                 // Get the processor name as a prefix
                 let processor_name = self.name();
 
@@ -134,6 +144,13 @@ impl ProcessorConfig {
             ProcessorName::ParquetUserTransactionsProcessor => {
                 HashSet::from([UserTransaction::TABLE_NAME.to_string()])
             },
+            ProcessorName::ParquetFungibleAssetProcessor => HashSet::from([
+                FungibleAssetActivity::TABLE_NAME.to_string(),
+                FungibleAssetBalance::TABLE_NAME.to_string(),
+                CurrentFungibleAssetBalance::TABLE_NAME.to_string(),
+                CurrentUnifiedFungibleAssetBalance::TABLE_NAME.to_string(),
+                FungibleAssetMetadataModel::TABLE_NAME.to_string(),
+            ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }
     }

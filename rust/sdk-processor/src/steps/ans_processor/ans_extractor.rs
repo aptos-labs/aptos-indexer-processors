@@ -21,7 +21,7 @@ use processor::{
         },
     },
     processors::ans_processor::parse_ans,
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 
 pub struct AnsExtractor

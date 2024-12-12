@@ -7,16 +7,22 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::postgres::models::{
-        fungible_asset_models::{
-            parquet_v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
-            parquet_v2_fungible_asset_balances::FungibleAssetBalance,
-            v2_fungible_asset_utils::FeeStatement,
+    db::{
+        common::models::fungible_asset_models::{
+            raw_v2_fungible_asset_activities::{
+                EventToCoinType, FungibleAssetActivityConvertible, RawFungibleAssetActivity,
+            },
+            raw_v2_fungible_asset_balances::RawFungibleAssetBalance,
         },
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
+        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+        postgres::models::{
+            fungible_asset_models::v2_fungible_asset_utils::FeeStatement,
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+                Untransferable,
+            },
+            resources::{FromWriteResource, V2FungibleAssetResource},
         },
-        resources::{FromWriteResource, V2FungibleAssetResource},
     },
     gap_detectors::ProcessingResult,
     processors::{ProcessorName, ProcessorTrait},
@@ -109,10 +115,16 @@ impl ProcessorTrait for ParquetFungibleAssetActivitiesProcessor {
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
-        let fungible_asset_activities =
+        let raw_fungible_asset_activities =
             parse_activities(&transactions, &mut transaction_version_to_struct_count).await;
+        let parquet_fungible_asset_activities: Vec<FungibleAssetActivity> =
+            raw_fungible_asset_activities
+                .into_iter()
+                .map(FungibleAssetActivity::from_raw)
+                .collect();
+
         let parquet_fungible_asset_activities = ParquetDataGeneric {
-            data: fungible_asset_activities,
+            data: parquet_fungible_asset_activities,
         };
 
         self.fungible_asset_activities_sender
@@ -140,7 +152,7 @@ impl ProcessorTrait for ParquetFungibleAssetActivitiesProcessor {
 async fn parse_activities(
     transactions: &[Transaction],
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
-) -> Vec<FungibleAssetActivity> {
+) -> Vec<RawFungibleAssetActivity> {
     let mut fungible_asset_activities = vec![];
 
     let data: Vec<_> = transactions
@@ -211,7 +223,7 @@ async fn parse_activities(
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                     if let Some((_, _, event_to_coin)) =
-                        FungibleAssetBalance::get_v1_from_write_resource(
+                        RawFungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
                             index as i64,
                             txn_version,
@@ -269,7 +281,7 @@ async fn parse_activities(
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
                     if let Some((_, _, event_to_coin)) =
-                        FungibleAssetBalance::get_v1_from_delete_resource(
+                        RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
                             txn_version,
@@ -288,7 +300,7 @@ async fn parse_activities(
                     let event_type = event.type_str.as_str();
                     FeeStatement::from_event(event_type, &event.data, txn_version)
                 });
-                let gas_event = FungibleAssetActivity::get_gas_event(
+                let gas_event = RawFungibleAssetActivity::get_gas_event(
                     transaction_info,
                     req,
                     &entry_function_id_str,
@@ -306,7 +318,7 @@ async fn parse_activities(
 
             // Loop to handle events and collect additional metadata from events for v2
             for (index, event) in events.iter().enumerate() {
-                if let Some(v1_activity) = FungibleAssetActivity::get_v1_from_event(
+                if let Some(v1_activity) = RawFungibleAssetActivity::get_v1_from_event(
                     event,
                     txn_version,
                     block_height,
@@ -329,7 +341,7 @@ async fn parse_activities(
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
                 }
-                if let Some(v2_activity) = FungibleAssetActivity::get_v2_from_event(
+                if let Some(v2_activity) = RawFungibleAssetActivity::get_v2_from_event(
                     event,
                     txn_version,
                     block_height,

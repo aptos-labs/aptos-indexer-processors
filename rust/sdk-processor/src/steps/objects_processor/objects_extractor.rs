@@ -17,7 +17,7 @@ use processor::{
         },
         resources::FromWriteResource,
     },
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 
 /// Extracts fungible asset events, metadata, balances, and v1 supply from transactions
