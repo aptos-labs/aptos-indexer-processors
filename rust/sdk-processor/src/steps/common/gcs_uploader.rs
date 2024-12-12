@@ -127,7 +127,7 @@ impl GCSUploader {
         for<'a> &'a [ParquetType]: RecordWriter<ParquetType>,
     {
         if data.is_empty() {
-            debug!("Buffer is empty, skipping upload.");
+            println!("Buffer is empty, skipping upload.");
             return Ok(());
         }
 
