@@ -9,12 +9,12 @@ use crate::{
     db::{
         common::models::{
             fungible_asset_models::raw_v2_fungible_asset_activities::EventToCoinType,
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
             token_v2_models::v2_token_utils::{TokenStandard, V2_STANDARD},
         },
         postgres::models::{
             coin_models::coin_utils::{CoinInfoType, CoinResource},
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetStore,
-            object_models::v2_object_utils::ObjectAggregatedDataMapping,
             resources::FromWriteResource,
         },
     },

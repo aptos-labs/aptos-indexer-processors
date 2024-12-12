@@ -5,9 +5,9 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    db::postgres::models::{
-        object_models::v2_object_utils::CurrentObjectPK,
-        token_models::token_utils::{NAME_LENGTH, URI_LENGTH},
+    db::{
+        common::models::object_models::v2_object_utils::CurrentObjectPK,
+        postgres::models::token_models::token_utils::{NAME_LENGTH, URI_LENGTH},
     },
     utils::util::{
         deserialize_from_string, deserialize_token_object_property_map_from_bcs_hexstring,

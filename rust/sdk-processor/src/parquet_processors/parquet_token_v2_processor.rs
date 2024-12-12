@@ -36,11 +36,11 @@ use processor::{
         v2_token_activities::TokenActivityV2,
         v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
         v2_token_metadata::CurrentTokenV2Metadata,
+        v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
     },
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};
-use processor::db::parquet::models::token_v2_models::v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2};
 
 pub struct ParquetTokenV2Processor {
     pub config: IndexerProcessorConfig,
@@ -158,7 +158,7 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             (
                 ParquetTypeEnum::CurrentTokenOwnershipsV2,
                 CurrentTokenOwnershipV2::schema(),
-            )
+            ),
         ]
         .into_iter()
         .collect();
