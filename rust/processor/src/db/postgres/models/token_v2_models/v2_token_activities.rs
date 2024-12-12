@@ -7,11 +7,11 @@
 
 use super::v2_token_utils::{TokenStandard, V2TokenEvent};
 use crate::{
-    db::postgres::models::{
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::{
-            token_claims::TokenV1Claimed,
-            token_utils::{TokenDataIdType, TokenEvent},
+    db::{
+        common::models::token_v2_models::raw_token_claims::TokenV1Claimed,
+        postgres::models::{
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            token_models::token_utils::{TokenDataIdType, TokenEvent},
         },
     },
     schema::token_activities_v2,
