@@ -61,13 +61,19 @@ pub async fn get_min_last_success_version_parquet(
             .context("Failed to get minimum last success version from DB")?
     };
 
-    // If nothing checkpointed, return the `starting_version` from the config, or 0 if not set.
-    Ok(min_processed_version.unwrap_or(
-        indexer_processor_config
-            .transaction_stream_config
-            .starting_version
-            .unwrap_or(0),
-    ))
+    let config_starting_version = indexer_processor_config
+        .transaction_stream_config
+        .starting_version
+        .unwrap_or(0);
+
+    if let Some(min_processed_version) = min_processed_version {
+        Ok(std::cmp::max(
+            min_processed_version + 1,
+            config_starting_version,
+        ))
+    } else {
+        Ok(config_starting_version)
+    }
 }
 
 /// Get the minimum last success version from the database for the given processors.
