@@ -1,0 +1,72 @@
+name: Create Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of release (patch/minor)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all tags and branches
+
+      - name: Get latest tag and create new version
+        id: generate_version
+        run: |
+          # Get the latest tag that matches our pattern
+          latest_tag=$(git tag -l "aptos-indexer-processors-v*" | sort -V | tail -n 1)
+          
+          if [ -z "$latest_tag" ]; then
+            # If no tags exist, start with 1.20.0.
+            # Last release was 1.19.1.
+            current_version="1.20.0"
+          else
+            # Extract version number from tag
+            current_version=$(echo $latest_tag | sed 's/aptos-indexer-processors-v//')
+          fi
+          
+          # Split version into components
+          major=$(echo $current_version | cut -d. -f1)
+          minor=$(echo $current_version | cut -d. -f2)
+          patch=$(echo $current_version | cut -d. -f3)
+          
+          # Calculate new version based on input
+          if [ "${{ inputs.release_type }}" = "minor" ]; then
+            new_version="${major}.$((minor + 1)).0"
+          else
+            new_version="${major}.${minor}.$((patch + 1))"
+          fi
+          
+          echo "New version will be: $new_version"
+          echo "new_version=${new_version}" >> $GITHUB_OUTPUT
+          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          new_tag="aptos-indexer-processors-v${{ steps.generate_version.outputs.new_version }}"
+          git tag -a "$new_tag" -m "Release $new_tag"
+          git push origin "$new_tag"
+      # TODO: roll docker image release into this workflow.
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: aptos-indexer-processors-v${{ steps.generate_version.outputs.new_version }}
+          name: Release ${{ steps.generate_version.outputs.new_version }}
+          body: |
+            Automated release from ${{ steps.generate_version.outputs.current_version }} to ${{ steps.generate_version.outputs.new_version }}
+            
+            Type: ${{ inputs.release_type }} release
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
