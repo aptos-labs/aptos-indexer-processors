@@ -6,14 +6,16 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        coin_models::{
-            coin_activities::CoinActivity,
-            coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
+    db::{
+        common::models::token_v2_models::v2_token_utils::TokenStandard,
+        postgres::models::{
+            coin_models::{
+                coin_activities::CoinActivity,
+                coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
+            },
+            fungible_asset_models::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
         },
-        fungible_asset_models::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_v2_models::v2_token_utils::TokenStandard,
     },
     utils::util::standardize_address,
 };
@@ -22,7 +24,6 @@ use anyhow::Context;
 use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
 use bigdecimal::{BigDecimal, Zero};
 use serde::{Deserialize, Serialize};
-
 pub const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
 pub const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
