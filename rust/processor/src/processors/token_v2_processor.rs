@@ -15,6 +15,13 @@ use crate::{
                 TokenDataV2Convertible,
             },
             raw_v2_token_metadata::{CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata},
+            raw_v2_token_ownerships::{
+                CurrentTokenOwnershipV2Convertible, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
+                RawCurrentTokenOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+            },
+            v2_token_utils::{
+                Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+            },
         },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
@@ -32,13 +39,7 @@ use crate::{
                 v2_token_activities::TokenActivityV2,
                 v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
                 v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
-                v2_token_ownerships::{
-                    CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
-                    TokenOwnershipV2,
-                },
-                v2_token_utils::{
-                    Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
-                },
+                v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
             },
         },
     },
@@ -618,12 +619,12 @@ impl ProcessorTrait for TokenV2Processor {
         let (
             mut collections_v2,
             raw_token_datas_v2,
-            mut token_ownerships_v2,
+            raw_token_ownerships_v2,
             current_collections_v2,
             raw_current_token_datas_v2,
             raw_current_deleted_token_datas_v2,
-            current_token_ownerships_v2,
-            current_deleted_token_ownerships_v2,
+            raw_current_token_ownerships_v2,
+            raw_current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
             raw_current_token_v2_metadata,
             raw_current_token_royalties_v1,
@@ -675,6 +676,23 @@ impl ProcessorTrait for TokenV2Processor {
                 .map(CurrentTokenDataV2::from_raw)
                 .collect();
 
+        let mut postgres_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+            .into_iter()
+            .map(TokenOwnershipV2::from_raw)
+            .collect();
+
+        let postgres_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+            raw_current_token_ownerships_v2
+                .into_iter()
+                .map(CurrentTokenOwnershipV2::from_raw)
+                .collect();
+
+        let postgres_current_deleted_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+            raw_current_deleted_token_ownerships_v2
+                .into_iter()
+                .map(CurrentTokenOwnershipV2::from_raw)
+                .collect();
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -682,7 +700,7 @@ impl ProcessorTrait for TokenV2Processor {
             .deprecated_tables
             .contains(TableFlags::TOKEN_OWNERSHIPS_V2)
         {
-            token_ownerships_v2.clear();
+            postgres_token_ownerships_v2.clear();
         }
         if self.deprecated_tables.contains(TableFlags::TOKEN_DATAS_V2) {
             postgres_token_datas_v2.clear();
@@ -704,15 +722,15 @@ impl ProcessorTrait for TokenV2Processor {
             end_version,
             &collections_v2,
             &postgres_token_datas_v2,
-            &token_ownerships_v2,
+            &postgres_token_ownerships_v2,
             &current_collections_v2,
             (
                 &postgres_current_token_datas_v2,
                 &postgres_current_deleted_token_datas_v2,
             ),
             (
-                &current_token_ownerships_v2,
-                &current_deleted_token_ownerships_v2,
+                &postgres_current_token_ownerships_v2,
+                &postgres_current_deleted_token_ownerships_v2,
             ),
             &postgres_token_activities_v2,
             &postgres_current_token_v2_metadata,
@@ -760,12 +778,12 @@ pub async fn parse_v2_token(
 ) -> (
     Vec<CollectionV2>,
     Vec<RawTokenDataV2>,
-    Vec<TokenOwnershipV2>,
+    Vec<RawTokenOwnershipV2>,
     Vec<CurrentCollectionV2>,
     Vec<RawCurrentTokenDataV2>,
     Vec<RawCurrentTokenDataV2>,
-    Vec<CurrentTokenOwnershipV2>,
-    Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
+    Vec<RawCurrentTokenOwnershipV2>,
+    Vec<RawCurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<RawTokenActivityV2>,
     Vec<RawCurrentTokenV2Metadata>,
     Vec<RawCurrentTokenRoyaltyV1>,
@@ -785,7 +803,7 @@ pub async fn parse_v2_token(
         AHashMap::new();
     let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
-        CurrentTokenOwnershipV2,
+        RawCurrentTokenOwnershipV2,
     > = AHashMap::new();
     let mut current_deleted_token_ownerships_v2 = AHashMap::new();
     // Optimization to track prior ownership in case a token gets burned so we can lookup the ownership
@@ -1027,7 +1045,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some((token_ownership, current_token_ownership)) =
-                            TokenOwnershipV2::get_v1_from_write_table_item(
+                            RawTokenOwnershipV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -1079,7 +1097,7 @@ pub async fn parse_v2_token(
                     },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
-                            TokenOwnershipV2::get_v1_from_delete_table_item(
+                            RawTokenOwnershipV2::get_v1_from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -1159,8 +1177,8 @@ pub async fn parse_v2_token(
                         {
                             // Add NFT ownership
                             let (mut ownerships, current_ownerships) =
-                                TokenOwnershipV2::get_nft_v2_from_token_data(
-                                    &TokenDataV2::from_raw(raw_token_data.clone()),
+                                RawTokenOwnershipV2::get_nft_v2_from_token_data(
+                                    &raw_token_data,
                                     &token_v2_metadata_helper,
                                 )
                                 .unwrap();
@@ -1210,7 +1228,7 @@ pub async fn parse_v2_token(
                         // Add burned NFT handling
                         // This handles the case where token is burned but objectCore is still there
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
+                            RawTokenOwnershipV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -1282,7 +1300,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
+                            RawTokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -1334,13 +1352,13 @@ pub async fn parse_v2_token(
         .collect::<Vec<RawCurrentTokenDataV2>>();
     let mut current_token_ownerships_v2 = current_token_ownerships_v2
         .into_values()
-        .collect::<Vec<CurrentTokenOwnershipV2>>();
+        .collect::<Vec<RawCurrentTokenOwnershipV2>>();
     let mut current_token_v2_metadata = current_token_v2_metadata
         .into_values()
         .collect::<Vec<RawCurrentTokenV2Metadata>>();
     let mut current_deleted_token_ownerships_v2 = current_deleted_token_ownerships_v2
         .into_values()
-        .collect::<Vec<CurrentTokenOwnershipV2>>();
+        .collect::<Vec<RawCurrentTokenOwnershipV2>>();
     let mut current_token_royalties_v1 = current_token_royalties_v1
         .into_values()
         .collect::<Vec<RawCurrentTokenRoyaltyV1>>();
