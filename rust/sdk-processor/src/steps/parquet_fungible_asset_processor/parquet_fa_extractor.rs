@@ -119,7 +119,6 @@ impl Processable for ParquetFungibleAssetExtractor {
 
         let mut map: HashMap<ParquetTypeEnum, ParquetTypeStructs> = HashMap::new();
 
-        // Array of tuples for each data type and its corresponding enum variant and flag
         let data_types = [
             (
                 TableFlags::FUNGIBLE_ASSET_ACTIVITIES,
