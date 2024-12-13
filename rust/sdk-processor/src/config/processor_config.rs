@@ -27,7 +27,9 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
-        token_v2_models::token_claims::CurrentTokenPendingClaim,
+        token_v2_models::{
+            token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
+        },
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
     },
@@ -166,9 +168,10 @@ impl ProcessorConfig {
             ProcessorName::ParquetAccountTransactionsProcessor => {
                 HashSet::from([AccountTransaction::TABLE_NAME.to_string()])
             },
-            ProcessorName::ParquetTokenV2Processor => {
-                HashSet::from([CurrentTokenPendingClaim::TABLE_NAME.to_string()])
-            },
+            ProcessorName::ParquetTokenV2Processor => HashSet::from([
+                CurrentTokenPendingClaim::TABLE_NAME.to_string(),
+                CurrentTokenRoyaltyV1::TABLE_NAME.to_string(),
+            ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }
     }
