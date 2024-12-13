@@ -9,6 +9,7 @@ use crate::{
                 CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim, TokenV1Claimed,
             },
             raw_v1_token_royalty::{CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1},
+            raw_v2_token_metadata::{CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata},
         },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
@@ -619,7 +620,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
             token_activities_v2,
-            mut current_token_v2_metadata,
+            raw_current_token_v2_metadata,
             raw_current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
@@ -642,6 +643,12 @@ impl ProcessorTrait for TokenV2Processor {
                 .map(CurrentTokenRoyaltyV1::from_raw)
                 .collect();
 
+        let mut postgres_current_token_v2_metadata: Vec<CurrentTokenV2Metadata> =
+            raw_current_token_v2_metadata
+                .into_iter()
+                .map(CurrentTokenV2Metadata::from_raw)
+                .collect();
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -661,7 +668,7 @@ impl ProcessorTrait for TokenV2Processor {
             .deprecated_tables
             .contains(TableFlags::CURRENT_TOKEN_V2_METADATA)
         {
-            current_token_v2_metadata.clear();
+            postgres_current_token_v2_metadata.clear();
         }
 
         let tx_result = insert_to_db(
@@ -679,7 +686,7 @@ impl ProcessorTrait for TokenV2Processor {
                 &current_deleted_token_ownerships_v2,
             ),
             &token_activities_v2,
-            &current_token_v2_metadata,
+            &postgres_current_token_v2_metadata,
             &postgres_current_token_royalties_v1,
             &postgres_current_token_claims,
             &self.per_table_chunk_sizes,
@@ -731,7 +738,7 @@ pub async fn parse_v2_token(
     Vec<CurrentTokenOwnershipV2>,
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<TokenActivityV2>,
-    Vec<CurrentTokenV2Metadata>,
+    Vec<RawCurrentTokenV2Metadata>,
     Vec<RawCurrentTokenRoyaltyV1>,
     Vec<RawCurrentTokenPendingClaim>,
 ) {
@@ -759,8 +766,10 @@ pub async fn parse_v2_token(
     // we can still get the object core metadata for it
     let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
     // Basically token properties
-    let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
-        AHashMap::new();
+    let mut current_token_v2_metadata: AHashMap<
+        CurrentTokenV2MetadataPK,
+        RawCurrentTokenV2Metadata,
+    > = AHashMap::new();
     let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenRoyaltyV1> =
         AHashMap::new();
     // migrating this from v1 token model as we don't have any replacement table for this
@@ -1208,12 +1217,14 @@ pub async fn parse_v2_token(
                         }
 
                         // Track token properties
-                        if let Some(token_metadata) = CurrentTokenV2Metadata::from_write_resource(
-                            resource,
-                            txn_version,
-                            &token_v2_metadata_helper,
-                        )
-                        .unwrap()
+                        if let Some(token_metadata) =
+                            RawCurrentTokenV2Metadata::from_write_resource(
+                                resource,
+                                txn_version,
+                                &token_v2_metadata_helper,
+                                txn_timestamp,
+                            )
+                            .unwrap()
                         {
                             current_token_v2_metadata.insert(
                                 (
@@ -1297,7 +1308,7 @@ pub async fn parse_v2_token(
         .collect::<Vec<CurrentTokenOwnershipV2>>();
     let mut current_token_v2_metadata = current_token_v2_metadata
         .into_values()
-        .collect::<Vec<CurrentTokenV2Metadata>>();
+        .collect::<Vec<RawCurrentTokenV2Metadata>>();
     let mut current_deleted_token_ownerships_v2 = current_deleted_token_ownerships_v2
         .into_values()
         .collect::<Vec<CurrentTokenOwnershipV2>>();

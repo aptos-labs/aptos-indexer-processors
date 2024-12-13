@@ -29,6 +29,7 @@ use processor::{
         },
         token_v2_models::{
             token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
+            v2_token_metadata::CurrentTokenV2Metadata,
         },
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
@@ -171,6 +172,7 @@ impl ProcessorConfig {
             ProcessorName::ParquetTokenV2Processor => HashSet::from([
                 CurrentTokenPendingClaim::TABLE_NAME.to_string(),
                 CurrentTokenRoyaltyV1::TABLE_NAME.to_string(),
+                CurrentTokenV2Metadata::TABLE_NAME.to_string(),
             ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }
