@@ -8,7 +8,15 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::stake_models::delegator_pools::DelegatorPool,
+        common::models::stake_models::{
+            delegator_balances::{
+                RawCurrentDelegatorBalanceConvertible, RawDelegatorBalanceConvertible,
+            },
+            delegator_pools::{
+                DelegatorPool, RawCurrentDelegatorPoolBalanceConvertible,
+                RawDelegatorPoolBalanceConvertible,
+            },
+        },
         postgres::models::stake_models::{
             current_delegated_voter::CurrentDelegatedVoter,
             delegator_activities::DelegatedStakingActivity,
@@ -95,11 +103,11 @@ impl Processable for StakeExtractor {
             all_current_stake_pool_voters,
             all_proposal_votes,
             all_delegator_activities,
-            all_delegator_balances,
-            all_current_delegator_balances,
+            raw_all_delegator_balances,
+            raw_all_current_delegator_balances,
             all_delegator_pools,
-            all_delegator_pool_balances,
-            all_current_delegator_pool_balances,
+            raw_all_delegator_pool_balances,
+            raw_all_current_delegator_pool_balances,
             all_current_delegated_voter,
         ) = match parse_stake_data(
             &transactions.data,
@@ -123,6 +131,23 @@ impl Processable for StakeExtractor {
                 });
             },
         };
+
+        let all_delegator_balances: Vec<DelegatorBalance> = raw_all_delegator_balances
+            .into_iter()
+            .map(DelegatorBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_delegator_balances = raw_all_current_delegator_balances
+            .into_iter()
+            .map(CurrentDelegatorBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_delegator_pool_balances = raw_all_delegator_pool_balances
+            .into_iter()
+            .map(DelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_delegator_pool_balances = raw_all_current_delegator_pool_balances
+            .into_iter()
+            .map(CurrentDelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
 
         Ok(Some(TransactionContext {
             data: (

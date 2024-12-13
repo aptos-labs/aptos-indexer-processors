@@ -4,7 +4,8 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::delegator_balances::{CurrentDelegatorBalance, ShareToStakingPoolMapping};
+use super::delegator_balances::ShareToStakingPoolMapping;
+use crate::db::common::models::stake_models::delegator_balances::RawCurrentDelegatorBalance;
 use crate::db::common::models::stake_models::stake_utils::VoteDelegationTableItem;
 use crate::{
     schema::current_delegated_voter,
@@ -140,7 +141,7 @@ impl CurrentDelegatedVoter {
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<Self>> {
         if let Some((_, active_balance)) =
-            CurrentDelegatorBalance::get_active_share_from_write_table_item(
+            RawCurrentDelegatorBalance::get_active_share_from_write_table_item(
                 write_table_item,
                 txn_version,
                 0, // placeholder

@@ -4,8 +4,13 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::db::{
     common::models::stake_models::{
+        delegator_balances::{
+            RawCurrentDelegatorBalance, RawCurrentDelegatorBalanceConvertible,
+            RawCurrentDelegatorBalanceMap, RawDelegatorBalance, RawDelegatorBalanceConvertible,
+        },
         delegator_pools::{
-            DelegatorPool, DelegatorPoolMap, RawCurrentDelegatorPoolBalanceConvertible,
+            DelegatorPool, DelegatorPoolMap, RawCurrentDelegatorPoolBalance,
+            RawCurrentDelegatorPoolBalanceConvertible, RawDelegatorPoolBalance,
             RawDelegatorPoolBalanceConvertible,
         },
         stake_utils::DelegationVoteGovernanceRecordsResource,
@@ -18,9 +23,7 @@ use crate::{
     db::postgres::models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
-        delegator_balances::{
-            CurrentDelegatorBalance, CurrentDelegatorBalanceMap, DelegatorBalance,
-        },
+        delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
         proposal_votes::ProposalVote,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
@@ -401,11 +404,11 @@ pub async fn parse_stake_data(
         Vec<CurrentStakingPoolVoter>,
         Vec<ProposalVote>,
         Vec<DelegatedStakingActivity>,
-        Vec<DelegatorBalance>,
-        Vec<CurrentDelegatorBalance>,
+        Vec<RawDelegatorBalance>,
+        Vec<RawCurrentDelegatorBalance>,
         Vec<DelegatorPool>,
-        Vec<DelegatorPoolBalance>,
-        Vec<CurrentDelegatorPoolBalance>,
+        Vec<RawDelegatorPoolBalance>,
+        Vec<RawCurrentDelegatorPoolBalance>,
         Vec<CurrentDelegatedVoter>,
     ),
     anyhow::Error,
@@ -414,7 +417,7 @@ pub async fn parse_stake_data(
     let mut all_proposal_votes = vec![];
     let mut all_delegator_activities = vec![];
     let mut all_delegator_balances = vec![];
-    let mut all_current_delegator_balances: CurrentDelegatorBalanceMap = AHashMap::new();
+    let mut all_current_delegator_balances: RawCurrentDelegatorBalanceMap = AHashMap::new();
     let mut all_delegator_pools: DelegatorPoolMap = AHashMap::new();
     let mut all_delegator_pool_balances = vec![];
     let mut all_current_delegator_pool_balances = AHashMap::new();
@@ -464,11 +467,12 @@ pub async fn parse_stake_data(
                     all_vote_delegation_handle_to_pool_address
                         .insert(vote_delegation_handle, delegation_pool_address.clone());
                 }
-                if let Some(map) = CurrentDelegatorBalance::get_active_pool_to_staking_pool_mapping(
-                    write_resource,
-                    txn_version,
-                )
-                .unwrap()
+                if let Some(map) =
+                    RawCurrentDelegatorBalance::get_active_pool_to_staking_pool_mapping(
+                        write_resource,
+                        txn_version,
+                    )
+                    .unwrap()
                 {
                     active_pool_to_staking_pool.extend(map);
                 }
@@ -477,7 +481,7 @@ pub async fn parse_stake_data(
 
         // Add delegator balances
         let (mut delegator_balances, current_delegator_balances) =
-            CurrentDelegatorBalance::from_transaction(
+            RawCurrentDelegatorBalance::from_transaction(
                 txn,
                 &active_pool_to_staking_pool,
                 &mut conn,
@@ -536,21 +540,16 @@ pub async fn parse_stake_data(
         .collect::<Vec<CurrentStakingPoolVoter>>();
     let mut all_current_delegator_balances = all_current_delegator_balances
         .into_values()
-        .collect::<Vec<CurrentDelegatorBalance>>();
+        .collect::<Vec<RawCurrentDelegatorBalance>>();
     let mut all_delegator_pools = all_delegator_pools
         .into_values()
         .collect::<Vec<DelegatorPool>>();
-    let mut pg_all_current_delegator_pool_balances = all_current_delegator_pool_balances
+    let mut all_current_delegator_pool_balances = all_current_delegator_pool_balances
         .into_values()
-        .map(CurrentDelegatorPoolBalance::from_raw)
-        .collect::<Vec<_>>();
+        .collect::<Vec<RawCurrentDelegatorPoolBalance>>();
     let mut all_current_delegated_voter = all_current_delegated_voter
         .into_values()
         .collect::<Vec<CurrentDelegatedVoter>>();
-    let pg_all_delegator_pool_balances = all_delegator_pool_balances
-        .into_iter()
-        .map(DelegatorPoolBalance::from_raw)
-        .collect::<Vec<_>>();
 
     // Sort by PK
     all_current_stake_pool_voters
@@ -564,7 +563,7 @@ pub async fn parse_stake_data(
     });
 
     all_delegator_pools.sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
-    pg_all_current_delegator_pool_balances
+    all_current_delegator_pool_balances
         .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
     all_current_delegated_voter.sort();
 
@@ -575,8 +574,8 @@ pub async fn parse_stake_data(
         all_delegator_balances,
         all_current_delegator_balances,
         all_delegator_pools,
-        pg_all_delegator_pool_balances,
-        pg_all_current_delegator_pool_balances,
+        all_delegator_pool_balances,
+        all_current_delegator_pool_balances,
         all_current_delegated_voter,
     ))
 }
@@ -605,11 +604,11 @@ impl ProcessorTrait for StakeProcessor {
             all_current_stake_pool_voters,
             all_proposal_votes,
             all_delegator_activities,
-            all_delegator_balances,
-            all_current_delegator_balances,
+            raw_all_delegator_balances,
+            raw_all_current_delegator_balances,
             all_delegator_pools,
-            all_delegator_pool_balances,
-            all_current_delegator_pool_balances,
+            raw_all_delegator_pool_balances,
+            raw_all_current_delegator_pool_balances,
             all_current_delegated_voter,
         ) = match parse_stake_data(&transactions, conn, query_retries, query_retry_delay_ms).await {
             Ok(data) => data,
@@ -624,6 +623,22 @@ impl ProcessorTrait for StakeProcessor {
                 bail!(e)
             },
         };
+        let all_delegator_balances: Vec<DelegatorBalance> = raw_all_delegator_balances
+            .into_iter()
+            .map(DelegatorBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_delegator_balances = raw_all_current_delegator_balances
+            .into_iter()
+            .map(CurrentDelegatorBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_delegator_pool_balances = raw_all_delegator_pool_balances
+            .into_iter()
+            .map(DelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_delegator_pool_balances = raw_all_current_delegator_pool_balances
+            .into_iter()
+            .map(CurrentDelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
