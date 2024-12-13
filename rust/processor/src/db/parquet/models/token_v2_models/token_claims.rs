@@ -6,65 +6,70 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::token_v2_models::raw_token_claims::{
         CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim,
     },
-    schema::current_token_pending_claims,
 };
-use bigdecimal::BigDecimal;
+use allocative_derive::Allocative;
+use bigdecimal::ToPrimitive;
 use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
 )]
-#[diesel(primary_key(token_data_id_hash, property_version, from_address, to_address))]
-#[diesel(table_name = current_token_pending_claims)]
 pub struct CurrentTokenPendingClaim {
     pub token_data_id_hash: String,
-    pub property_version: BigDecimal,
+    pub property_version: u64,
     pub from_address: String,
     pub to_address: String,
     pub collection_data_id_hash: String,
     pub creator_address: String,
     pub collection_name: String,
     pub name: String,
-    pub amount: BigDecimal,
+    pub amount: String, // String format of BigDecimal
     pub table_handle: String,
     pub last_transaction_version: i64,
+    #[allocative(skip)]
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub token_data_id: String,
     pub collection_id: String,
 }
 
-impl Ord for CurrentTokenPendingClaim {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.token_data_id_hash
-            .cmp(&other.token_data_id_hash)
-            .then(self.property_version.cmp(&other.property_version))
-            .then(self.from_address.cmp(&other.from_address))
-            .then(self.to_address.cmp(&other.to_address))
+impl NamedTable for CurrentTokenPendingClaim {
+    const TABLE_NAME: &'static str = "current_token_pending_claims";
+}
+
+impl HasVersion for CurrentTokenPendingClaim {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
     }
 }
 
-impl PartialOrd for CurrentTokenPendingClaim {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+impl GetTimeStamp for CurrentTokenPendingClaim {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.last_transaction_timestamp
     }
 }
 
 impl CurrentTokenPendingClaimConvertible for CurrentTokenPendingClaim {
+    // TODO: consider returning a Result
     fn from_raw(raw_item: RawCurrentTokenPendingClaim) -> Self {
         Self {
             token_data_id_hash: raw_item.token_data_id_hash,
-            property_version: raw_item.property_version,
+            property_version: raw_item
+                .property_version
+                .to_u64()
+                .expect("Failed to convert property_version to u64"),
             from_address: raw_item.from_address,
             to_address: raw_item.to_address,
             collection_data_id_hash: raw_item.collection_data_id_hash,
             creator_address: raw_item.creator_address,
             collection_name: raw_item.collection_name,
             name: raw_item.name,
-            amount: raw_item.amount,
+            amount: raw_item.amount.to_string(), // (assuming amount is non-critical)
             table_handle: raw_item.table_handle,
             last_transaction_version: raw_item.last_transaction_version,
             last_transaction_timestamp: raw_item.last_transaction_timestamp,
