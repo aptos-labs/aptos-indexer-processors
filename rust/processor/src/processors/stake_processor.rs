@@ -2,6 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
+use crate::db::{
+    common::models::stake_models::{
+        delegator_pools::{
+            DelegatorPool, DelegatorPoolMap, RawCurrentDelegatorPoolBalanceConvertible,
+            RawDelegatorPoolBalanceConvertible,
+        },
+        stake_utils::DelegationVoteGovernanceRecordsResource,
+    },
+    postgres::models::stake_models::delegator_pools::{
+        CurrentDelegatorPoolBalance, DelegatorPoolBalance,
+    },
+};
 use crate::{
     db::postgres::models::stake_models::{
         current_delegated_voter::CurrentDelegatedVoter,
@@ -9,11 +21,7 @@ use crate::{
         delegator_balances::{
             CurrentDelegatorBalance, CurrentDelegatorBalanceMap, DelegatorBalance,
         },
-        delegator_pools::{
-            CurrentDelegatorPoolBalance, DelegatorPool, DelegatorPoolBalance, DelegatorPoolMap,
-        },
         proposal_votes::ProposalVote,
-        stake_utils::DelegationVoteGovernanceRecordsResource,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },
     gap_detectors::ProcessingResult,
@@ -24,6 +32,7 @@ use crate::{
     },
     IndexerGrpcProcessorConfig,
 };
+
 use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
@@ -531,12 +540,17 @@ pub async fn parse_stake_data(
     let mut all_delegator_pools = all_delegator_pools
         .into_values()
         .collect::<Vec<DelegatorPool>>();
-    let mut all_current_delegator_pool_balances = all_current_delegator_pool_balances
+    let mut pg_all_current_delegator_pool_balances = all_current_delegator_pool_balances
         .into_values()
-        .collect::<Vec<CurrentDelegatorPoolBalance>>();
+        .map(CurrentDelegatorPoolBalance::from_raw)
+        .collect::<Vec<_>>();
     let mut all_current_delegated_voter = all_current_delegated_voter
         .into_values()
         .collect::<Vec<CurrentDelegatedVoter>>();
+    let pg_all_delegator_pool_balances = all_delegator_pool_balances
+        .into_iter()
+        .map(DelegatorPoolBalance::from_raw)
+        .collect::<Vec<_>>();
 
     // Sort by PK
     all_current_stake_pool_voters
@@ -550,7 +564,7 @@ pub async fn parse_stake_data(
     });
 
     all_delegator_pools.sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
-    all_current_delegator_pool_balances
+    pg_all_current_delegator_pool_balances
         .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
     all_current_delegated_voter.sort();
 
@@ -561,8 +575,8 @@ pub async fn parse_stake_data(
         all_delegator_balances,
         all_current_delegator_balances,
         all_delegator_pools,
-        all_delegator_pool_balances,
-        all_current_delegator_pool_balances,
+        pg_all_delegator_pool_balances,
+        pg_all_current_delegator_pool_balances,
         all_current_delegated_voter,
     ))
 }

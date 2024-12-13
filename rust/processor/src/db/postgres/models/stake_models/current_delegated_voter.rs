@@ -4,10 +4,8 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::{
-    delegator_balances::{CurrentDelegatorBalance, ShareToStakingPoolMapping},
-    stake_utils::VoteDelegationTableItem,
-};
+use super::delegator_balances::{CurrentDelegatorBalance, ShareToStakingPoolMapping};
+use crate::db::common::models::stake_models::stake_utils::VoteDelegationTableItem;
 use crate::{
     schema::current_delegated_voter,
     utils::{database::DbPoolConnection, util::standardize_address},

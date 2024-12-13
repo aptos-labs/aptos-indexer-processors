@@ -2,8 +2,9 @@
 
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
-
-use super::delegator_pools::{DelegatorPool, DelegatorPoolBalanceMetadata, PoolBalanceMetadata};
+use crate::db::common::models::stake_models::delegator_pools::{
+    DelegatorPool, RawDelegatorPoolBalanceMetadata, RawPoolBalanceMetadata,
+};
 use crate::{
     db::{
         common::models::default_models::raw_table_items::RawTableItem,
@@ -29,8 +30,8 @@ use serde::{Deserialize, Serialize};
 
 pub type TableHandle = String;
 pub type Address = String;
-pub type ShareToStakingPoolMapping = AHashMap<TableHandle, DelegatorPoolBalanceMetadata>;
-pub type ShareToPoolMapping = AHashMap<TableHandle, PoolBalanceMetadata>;
+pub type ShareToStakingPoolMapping = AHashMap<TableHandle, RawDelegatorPoolBalanceMetadata>;
+pub type ShareToPoolMapping = AHashMap<TableHandle, RawPoolBalanceMetadata>;
 pub type CurrentDelegatorBalancePK = (Address, Address, String);
 pub type CurrentDelegatorBalanceMap = AHashMap<CurrentDelegatorBalancePK, CurrentDelegatorBalance>;
 

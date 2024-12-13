@@ -7,13 +7,16 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::postgres::models::stake_models::{
-        current_delegated_voter::CurrentDelegatedVoter,
-        delegator_activities::DelegatedStakingActivity,
-        delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
-        delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPool, DelegatorPoolBalance},
-        proposal_votes::ProposalVote,
-        staking_pool_voter::CurrentStakingPoolVoter,
+    db::{
+        common::models::stake_models::delegator_pools::DelegatorPool,
+        postgres::models::stake_models::{
+            current_delegated_voter::CurrentDelegatedVoter,
+            delegator_activities::DelegatedStakingActivity,
+            delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
+            delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
+            proposal_votes::ProposalVote,
+            staking_pool_voter::CurrentStakingPoolVoter,
+        },
     },
     processors::stake_processor::parse_stake_data,
 };
