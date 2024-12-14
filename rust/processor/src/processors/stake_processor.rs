@@ -4,6 +4,9 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::db::{
     common::models::stake_models::{
+        delegator_activities::{
+            RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
+        },
         delegator_balances::{
             RawCurrentDelegatorBalance, RawCurrentDelegatorBalanceConvertible,
             RawCurrentDelegatorBalanceMap, RawDelegatorBalance, RawDelegatorBalanceConvertible,
@@ -403,7 +406,7 @@ pub async fn parse_stake_data(
     (
         Vec<CurrentStakingPoolVoter>,
         Vec<ProposalVote>,
-        Vec<DelegatedStakingActivity>,
+        Vec<RawDelegatedStakingActivity>,
         Vec<RawDelegatorBalance>,
         Vec<RawCurrentDelegatorBalance>,
         Vec<DelegatorPool>,
@@ -435,7 +438,7 @@ pub async fn parse_stake_data(
         all_proposal_votes.append(&mut proposal_votes);
 
         // Add delegator activities
-        let mut delegator_activities = DelegatedStakingActivity::from_transaction(txn).unwrap();
+        let mut delegator_activities = RawDelegatedStakingActivity::from_transaction(txn).unwrap();
         all_delegator_activities.append(&mut delegator_activities);
 
         // Add delegator pools
@@ -603,7 +606,7 @@ impl ProcessorTrait for StakeProcessor {
         let (
             all_current_stake_pool_voters,
             all_proposal_votes,
-            all_delegator_activities,
+            raw_all_delegator_activities,
             raw_all_delegator_balances,
             raw_all_current_delegator_balances,
             all_delegator_pools,
@@ -638,6 +641,10 @@ impl ProcessorTrait for StakeProcessor {
         let all_current_delegator_pool_balances = raw_all_current_delegator_pool_balances
             .into_iter()
             .map(CurrentDelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_delegator_activities = raw_all_delegator_activities
+            .into_iter()
+            .map(DelegatedStakingActivity::from_raw)
             .collect::<Vec<_>>();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();

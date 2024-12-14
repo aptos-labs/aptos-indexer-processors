@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use processor::{
     db::{
         common::models::stake_models::{
+            delegator_activities::RawDelegatedStakingActivityConvertible,
             delegator_balances::{
                 RawCurrentDelegatorBalanceConvertible, RawDelegatorBalanceConvertible,
             },
@@ -102,7 +103,7 @@ impl Processable for StakeExtractor {
         let (
             all_current_stake_pool_voters,
             all_proposal_votes,
-            all_delegator_activities,
+            raw_all_delegator_activities,
             raw_all_delegator_balances,
             raw_all_current_delegator_balances,
             all_delegator_pools,
@@ -147,6 +148,10 @@ impl Processable for StakeExtractor {
         let all_current_delegator_pool_balances = raw_all_current_delegator_pool_balances
             .into_iter()
             .map(CurrentDelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_delegator_activities = raw_all_delegator_activities
+            .into_iter()
+            .map(DelegatedStakingActivity::from_raw)
             .collect::<Vec<_>>();
 
         Ok(Some(TransactionContext {
