@@ -9,6 +9,7 @@ use crate::{
                 CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim, TokenV1Claimed,
             },
             raw_v1_token_royalty::{CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1},
+            raw_v2_token_activities::{RawTokenActivityV2, TokenActivityV2Convertible},
             raw_v2_token_metadata::{CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata},
         },
         postgres::models::{
@@ -619,7 +620,7 @@ impl ProcessorTrait for TokenV2Processor {
             current_deleted_token_datas_v2,
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
-            token_activities_v2,
+            raw_token_activities_v2,
             raw_current_token_v2_metadata,
             raw_current_token_royalties_v1,
             raw_current_token_claims,
@@ -648,6 +649,11 @@ impl ProcessorTrait for TokenV2Processor {
                 .into_iter()
                 .map(CurrentTokenV2Metadata::from_raw)
                 .collect();
+
+        let postgres_token_activities_v2: Vec<TokenActivityV2> = raw_token_activities_v2
+            .into_iter()
+            .map(TokenActivityV2::from_raw)
+            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -685,7 +691,7 @@ impl ProcessorTrait for TokenV2Processor {
                 &current_token_ownerships_v2,
                 &current_deleted_token_ownerships_v2,
             ),
-            &token_activities_v2,
+            &postgres_token_activities_v2,
             &postgres_current_token_v2_metadata,
             &postgres_current_token_royalties_v1,
             &postgres_current_token_claims,
@@ -737,7 +743,7 @@ pub async fn parse_v2_token(
     Vec<CurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
-    Vec<TokenActivityV2>,
+    Vec<RawTokenActivityV2>,
     Vec<RawCurrentTokenV2Metadata>,
     Vec<RawCurrentTokenRoyaltyV1>,
     Vec<RawCurrentTokenPendingClaim>,
@@ -916,7 +922,7 @@ pub async fn parse_v2_token(
                     }
                 }
                 // handling all the token v1 events
-                if let Some(event) = TokenActivityV2::get_v1_from_parsed_event(
+                if let Some(event) = RawTokenActivityV2::get_v1_from_parsed_event(
                     event,
                     txn_version,
                     txn_timestamp,
@@ -929,7 +935,7 @@ pub async fn parse_v2_token(
                     token_activities_v2.push(event);
                 }
                 // handling all the token v2 events
-                if let Some(event) = TokenActivityV2::get_nft_v2_from_parsed_event(
+                if let Some(event) = RawTokenActivityV2::get_nft_v2_from_parsed_event(
                     event,
                     txn_version,
                     txn_timestamp,

@@ -11,6 +11,7 @@ use processor::{
         common::models::token_v2_models::{
             raw_token_claims::CurrentTokenPendingClaimConvertible,
             raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
+            raw_v2_token_activities::TokenActivityV2Convertible,
             raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
         },
         postgres::models::{
@@ -112,7 +113,7 @@ impl Processable for TokenV2Extractor {
             current_deleted_token_datas_v2,
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
-            token_activities_v2,
+            raw_token_activities_v2,
             raw_current_token_v2_metadata,
             raw_current_token_royalties_v1,
             raw_current_token_claims,
@@ -142,6 +143,11 @@ impl Processable for TokenV2Extractor {
                 .map(CurrentTokenV2Metadata::from_raw)
                 .collect();
 
+        let postgres_token_activities_v2: Vec<TokenActivityV2> = raw_token_activities_v2
+            .into_iter()
+            .map(TokenActivityV2::from_raw)
+            .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 collections_v2,
@@ -152,7 +158,7 @@ impl Processable for TokenV2Extractor {
                 current_deleted_token_datas_v2,
                 current_token_ownerships_v2,
                 current_deleted_token_ownerships_v2,
-                token_activities_v2,
+                postgres_token_activities_v2,
                 postgres_current_token_v2_metadata,
                 postgres_current_token_royalties_v1,
                 postgres_current_token_claims,

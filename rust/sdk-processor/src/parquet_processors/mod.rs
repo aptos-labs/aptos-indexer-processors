@@ -35,7 +35,7 @@ use processor::{
         },
         token_v2_models::{
             token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_token_metadata::CurrentTokenV2Metadata,
+            v2_token_activities::TokenActivityV2, v2_token_metadata::CurrentTokenV2Metadata,
         },
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
@@ -114,6 +114,7 @@ pub enum ParquetTypeEnum {
     CurrentTokenPendingClaims,
     CurrentTokenRoyaltiesV1,
     CurrentTokenV2Metadata,
+    TokenActivitiesV2,
 }
 
 /// Trait for handling various Parquet types.
@@ -204,6 +205,7 @@ impl_parquet_trait!(
     CurrentTokenV2Metadata,
     ParquetTypeEnum::CurrentTokenV2Metadata
 );
+impl_parquet_trait!(TokenActivityV2, ParquetTypeEnum::TokenActivitiesV2);
 
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
@@ -229,6 +231,7 @@ pub enum ParquetTypeStructs {
     CurrentTokenPendingClaim(Vec<CurrentTokenPendingClaim>),
     CurrentTokenRoyaltyV1(Vec<CurrentTokenRoyaltyV1>),
     CurrentTokenV2Metadata(Vec<CurrentTokenV2Metadata>),
+    TokenActivityV2(Vec<TokenActivityV2>),
 }
 
 impl ParquetTypeStructs {
@@ -275,6 +278,7 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::CurrentTokenV2Metadata => {
                 ParquetTypeStructs::CurrentTokenV2Metadata(Vec::new())
             },
+            ParquetTypeEnum::TokenActivitiesV2 => ParquetTypeStructs::TokenActivityV2(Vec::new()),
         }
     }
 
@@ -408,6 +412,12 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentTokenV2Metadata(self_data),
                 ParquetTypeStructs::CurrentTokenV2Metadata(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::TokenActivityV2(self_data),
+                ParquetTypeStructs::TokenActivityV2(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
