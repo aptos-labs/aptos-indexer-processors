@@ -4,6 +4,7 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::db::{
     common::models::stake_models::{
+        current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::{
             RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
         },
@@ -24,7 +25,6 @@ use crate::db::{
 };
 use crate::{
     db::postgres::models::stake_models::{
-        current_delegated_voter::CurrentDelegatedVoter,
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
         proposal_votes::ProposalVote,

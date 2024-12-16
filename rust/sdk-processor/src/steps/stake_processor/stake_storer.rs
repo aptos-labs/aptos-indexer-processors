@@ -12,9 +12,10 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::{
     db::{
-        common::models::stake_models::delegator_pools::DelegatorPool,
+        common::models::stake_models::{
+            current_delegated_voter::CurrentDelegatedVoter, delegator_pools::DelegatorPool,
+        },
         postgres::models::stake_models::{
-            current_delegated_voter::CurrentDelegatedVoter,
             delegator_activities::DelegatedStakingActivity,
             delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
             delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},

@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use processor::{
     db::{
         common::models::stake_models::{
+            current_delegated_voter::CurrentDelegatedVoter,
             delegator_activities::RawDelegatedStakingActivityConvertible,
             delegator_balances::{
                 RawCurrentDelegatorBalanceConvertible, RawDelegatorBalanceConvertible,
@@ -19,7 +20,6 @@ use processor::{
             },
         },
         postgres::models::stake_models::{
-            current_delegated_voter::CurrentDelegatedVoter,
             delegator_activities::DelegatedStakingActivity,
             delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
             delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
