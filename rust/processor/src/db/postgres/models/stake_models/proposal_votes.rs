@@ -4,6 +4,9 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
+use crate::db::common::models::stake_models::proposal_voters::{
+    RawProposalVote, RawProposalVoteConvertible,
+};
 use crate::db::common::models::stake_models::stake_utils::StakeEvent;
 use crate::{
     schema::proposal_votes,
@@ -12,7 +15,7 @@ use crate::{
         util::{parse_timestamp, standardize_address},
     },
 };
-use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
+
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -30,44 +33,16 @@ pub struct ProposalVote {
     pub transaction_timestamp: chrono::NaiveDateTime,
 }
 
-impl ProposalVote {
-    pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<Vec<Self>> {
-        let mut proposal_votes = vec![];
-        let txn_data = match transaction.txn_data.as_ref() {
-            Some(data) => data,
-            None => {
-                PROCESSOR_UNKNOWN_TYPE_COUNT
-                    .with_label_values(&["ProposalVote"])
-                    .inc();
-                tracing::warn!(
-                    transaction_version = transaction.version,
-                    "Transaction data doesn't exist",
-                );
-                return Ok(proposal_votes);
-            },
-        };
-        let txn_version = transaction.version as i64;
-
-        if let TxnData::User(user_txn) = txn_data {
-            for event in user_txn.events.iter() {
-                if let Some(StakeEvent::GovernanceVoteEvent(ev)) =
-                    StakeEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
-                {
-                    proposal_votes.push(Self {
-                        transaction_version: txn_version,
-                        proposal_id: ev.proposal_id as i64,
-                        voter_address: standardize_address(&ev.voter),
-                        staking_pool_address: standardize_address(&ev.stake_pool),
-                        num_votes: ev.num_votes.clone(),
-                        should_pass: ev.should_pass,
-                        transaction_timestamp: parse_timestamp(
-                            transaction.timestamp.as_ref().unwrap(),
-                            txn_version,
-                        ),
-                    });
-                }
-            }
+impl RawProposalVoteConvertible for ProposalVote {
+    fn from_raw(raw: RawProposalVote) -> Self {
+        Self {
+            transaction_version: raw.transaction_version,
+            proposal_id: raw.proposal_id,
+            voter_address: raw.voter_address,
+            staking_pool_address: raw.staking_pool_address,
+            num_votes: raw.num_votes,
+            should_pass: raw.should_pass,
+            transaction_timestamp: raw.transaction_timestamp,
         }
-        Ok(proposal_votes)
     }
 }

@@ -17,6 +17,7 @@ use crate::db::{
             RawCurrentDelegatorPoolBalanceConvertible, RawDelegatorPoolBalance,
             RawDelegatorPoolBalanceConvertible,
         },
+        proposal_voters::{RawProposalVote, RawProposalVoteConvertible},
         stake_utils::DelegationVoteGovernanceRecordsResource,
     },
     postgres::models::stake_models::delegator_pools::{
@@ -405,7 +406,7 @@ pub async fn parse_stake_data(
 ) -> Result<
     (
         Vec<CurrentStakingPoolVoter>,
-        Vec<ProposalVote>,
+        Vec<RawProposalVote>,
         Vec<RawDelegatedStakingActivity>,
         Vec<RawDelegatorBalance>,
         Vec<RawCurrentDelegatorBalance>,
@@ -434,7 +435,7 @@ pub async fn parse_stake_data(
         // Add votes data
         let current_stake_pool_voter = CurrentStakingPoolVoter::from_transaction(txn).unwrap();
         all_current_stake_pool_voters.extend(current_stake_pool_voter);
-        let mut proposal_votes = ProposalVote::from_transaction(txn).unwrap();
+        let mut proposal_votes = RawProposalVote::from_transaction(txn).unwrap();
         all_proposal_votes.append(&mut proposal_votes);
 
         // Add delegator activities
@@ -605,7 +606,7 @@ impl ProcessorTrait for StakeProcessor {
 
         let (
             all_current_stake_pool_voters,
-            all_proposal_votes,
+            raw_all_proposal_votes,
             raw_all_delegator_activities,
             raw_all_delegator_balances,
             raw_all_current_delegator_balances,
@@ -645,6 +646,10 @@ impl ProcessorTrait for StakeProcessor {
         let all_delegator_activities = raw_all_delegator_activities
             .into_iter()
             .map(DelegatedStakingActivity::from_raw)
+            .collect::<Vec<_>>();
+        let all_proposal_votes = raw_all_proposal_votes
+            .into_iter()
+            .map(ProposalVote::from_raw)
             .collect::<Vec<_>>();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
