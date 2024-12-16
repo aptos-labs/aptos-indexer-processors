@@ -5,27 +5,25 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent};
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::postgres::models::{
-        coin_models::{
-            coin_activities::CoinActivity,
-            coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
+    db::{
+        common::models::token_v2_models::v2_token_utils::TokenStandard,
+        postgres::models::{
+            coin_models::{
+                coin_activities::CoinActivity,
+                coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
+            },
+            fungible_asset_models::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
         },
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_v2_models::v2_token_utils::TokenStandard,
     },
-    utils::util::{bigdecimal_to_u64, standardize_address},
+    utils::util::standardize_address,
 };
 use ahash::AHashMap;
-use allocative::Allocative;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{Event, TransactionInfo, UserTransactionRequest};
-use field_count::FieldCount;
-use parquet_derive::ParquetRecordWriter;
+use bigdecimal::{BigDecimal, Zero};
 use serde::{Deserialize, Serialize};
-
 pub const GAS_FEE_EVENT: &str = "0x1::aptos_coin::GasFeeEvent";
 // We will never have a negative number on chain so this will avoid collision in postgres
 pub const BURN_GAS_EVENT_CREATION_NUM: i64 = -1;
@@ -37,19 +35,15 @@ pub type CoinType = String;
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
 pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
 
-/// TODO: This is just a copy of v2_fungible_asset_activities.rs. We should unify the 2 implementations
-/// and have parquet as an output.
-#[derive(
-    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
-)]
-pub struct FungibleAssetActivity {
-    pub txn_version: i64,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RawFungibleAssetActivity {
+    pub transaction_version: i64,
     pub event_index: i64,
     pub owner_address: Option<String>,
     pub storage_id: String,
     pub asset_type: Option<String>,
     pub is_frozen: Option<bool>,
-    pub amount: Option<String>, // it is a string representation of the u128
+    pub amount: Option<BigDecimal>,
     pub event_type: String,
     pub is_gas_fee: bool,
     pub gas_fee_payer_address: Option<String>,
@@ -57,28 +51,11 @@ pub struct FungibleAssetActivity {
     pub entry_function_id_str: Option<String>,
     pub block_height: i64,
     pub token_standard: String,
-    #[allocative(skip)]
-    pub block_timestamp: chrono::NaiveDateTime,
-    pub storage_refund_octa: u64,
+    pub transaction_timestamp: chrono::NaiveDateTime,
+    pub storage_refund_amount: BigDecimal,
 }
 
-impl NamedTable for FungibleAssetActivity {
-    const TABLE_NAME: &'static str = "fungible_asset_activities";
-}
-
-impl HasVersion for FungibleAssetActivity {
-    fn version(&self) -> i64 {
-        self.txn_version
-    }
-}
-
-impl GetTimeStamp for FungibleAssetActivity {
-    fn get_timestamp(&self) -> chrono::NaiveDateTime {
-        self.block_timestamp
-    }
-}
-
-impl FungibleAssetActivity {
+impl RawFungibleAssetActivity {
     pub fn get_v2_from_event(
         event: &Event,
         txn_version: i64,
@@ -96,12 +73,12 @@ impl FungibleAssetActivity {
                 FungibleAssetEvent::WithdrawEvent(inner) => (
                     standardize_address(&event.key.as_ref().unwrap().account_address),
                     None,
-                    Some(inner.amount.to_string()),
+                    Some(inner.amount.clone()),
                 ),
                 FungibleAssetEvent::DepositEvent(inner) => (
                     standardize_address(&event.key.as_ref().unwrap().account_address),
                     None,
-                    Some(inner.amount.to_string()),
+                    Some(inner.amount.clone()),
                 ),
                 FungibleAssetEvent::FrozenEvent(inner) => (
                     standardize_address(&event.key.as_ref().unwrap().account_address),
@@ -111,32 +88,34 @@ impl FungibleAssetActivity {
                 FungibleAssetEvent::WithdrawEventV2(inner) => (
                     standardize_address(&inner.store),
                     None,
-                    Some(inner.amount.to_string()),
+                    Some(inner.amount.clone()),
                 ),
                 FungibleAssetEvent::DepositEventV2(inner) => (
                     standardize_address(&inner.store),
                     None,
-                    Some(inner.amount.to_string()),
+                    Some(inner.amount.clone()),
                 ),
                 FungibleAssetEvent::FrozenEventV2(inner) => {
                     (standardize_address(&inner.store), Some(inner.frozen), None)
                 },
             };
 
-            // The event account address will also help us find fungible store which tells us where to find
-            // the metadata
+            // Lookup the event address in the object_aggregated_data_mapping to get additional metadata
+            // The events are emitted on the address of the fungible store.
             let maybe_object_metadata = object_aggregated_data_mapping.get(&storage_id);
-            // The ObjectCore might not exist in the transaction if the object got deleted
+            // Get the store's owner address from ObjectCore.
+            // The ObjectCore might not exist in the transaction if the object got deleted in the same transaction
             let maybe_owner_address = maybe_object_metadata
                 .map(|metadata| &metadata.object.object_core)
                 .map(|object_core| object_core.get_owner_address());
-            // The FungibleStore might not exist in the transaction if it's a secondary store that got burnt
+            // Get the store's asset type
+            // The FungibleStore might not exist in the transaction if it's a secondary store that got burnt in the same transaction
             let maybe_asset_type = maybe_object_metadata
                 .and_then(|metadata| metadata.fungible_asset_store.as_ref())
                 .map(|fa| fa.metadata.get_reference_address());
 
             return Ok(Some(Self {
-                txn_version,
+                transaction_version: txn_version,
                 event_index,
                 owner_address: maybe_owner_address,
                 storage_id: storage_id.clone(),
@@ -150,8 +129,8 @@ impl FungibleAssetActivity {
                 entry_function_id_str: entry_function_id_str.clone(),
                 block_height,
                 token_standard: TokenStandard::V2.to_string(),
-                block_timestamp: txn_timestamp,
-                storage_refund_octa: 0,
+                transaction_timestamp: txn_timestamp,
+                storage_refund_amount: BigDecimal::zero(),
             }));
         }
         Ok(None)
@@ -161,7 +140,7 @@ impl FungibleAssetActivity {
         event: &Event,
         txn_version: i64,
         block_height: i64,
-        block_timestamp: chrono::NaiveDateTime,
+        transaction_timestamp: chrono::NaiveDateTime,
         entry_function_id_str: &Option<String>,
         event_to_coin_type: &EventToCoinType,
         event_index: i64,
@@ -172,22 +151,22 @@ impl FungibleAssetActivity {
             let (owner_address, amount, coin_type_option) = match inner {
                 CoinEvent::WithdrawCoinEvent(inner) => (
                     standardize_address(&event.key.as_ref().unwrap().account_address),
-                    inner.amount.to_string(),
+                    inner.amount.clone(),
                     None,
                 ),
                 CoinEvent::DepositCoinEvent(inner) => (
                     standardize_address(&event.key.as_ref().unwrap().account_address),
-                    inner.amount.to_string(),
+                    inner.amount.clone(),
                     None,
                 ),
                 CoinEvent::WithdrawCoinEventV2(inner) => (
                     standardize_address(&inner.account),
-                    inner.amount.to_string(),
+                    inner.amount,
                     Some(inner.coin_type.clone()),
                 ),
                 CoinEvent::DepositCoinEventV2(inner) => (
                     standardize_address(&inner.account),
-                    inner.amount.to_string(),
+                    inner.amount,
                     Some(inner.coin_type.clone()),
                 ),
             };
@@ -217,7 +196,7 @@ impl FungibleAssetActivity {
                 CoinInfoType::get_storage_id(coin_type.as_str(), owner_address.as_str());
 
             Ok(Some(Self {
-                txn_version,
+                transaction_version: txn_version,
                 event_index,
                 owner_address: Some(owner_address),
                 storage_id,
@@ -231,8 +210,8 @@ impl FungibleAssetActivity {
                 entry_function_id_str: entry_function_id_str.clone(),
                 block_height,
                 token_standard: TokenStandard::V1.to_string(),
-                block_timestamp,
-                storage_refund_octa: 0,
+                transaction_timestamp,
+                storage_refund_amount: BigDecimal::zero(),
             }))
         } else {
             Ok(None)
@@ -245,8 +224,8 @@ impl FungibleAssetActivity {
         txn_info: &TransactionInfo,
         user_transaction_request: &UserTransactionRequest,
         entry_function_id_str: &Option<String>,
-        txn_version: i64,
-        block_timestamp: chrono::NaiveDateTime,
+        transaction_version: i64,
+        transaction_timestamp: chrono::NaiveDateTime,
         block_height: i64,
         fee_statement: Option<FeeStatement>,
     ) -> Self {
@@ -254,8 +233,8 @@ impl FungibleAssetActivity {
             txn_info,
             user_transaction_request,
             entry_function_id_str,
-            txn_version,
-            block_timestamp,
+            transaction_version,
+            transaction_timestamp,
             block_height,
             fee_statement,
         );
@@ -264,13 +243,13 @@ impl FungibleAssetActivity {
             v1_activity.owner_address.as_str(),
         );
         Self {
-            txn_version,
+            transaction_version,
             event_index: v1_activity.event_index.unwrap(),
             owner_address: Some(v1_activity.owner_address),
             storage_id,
             asset_type: Some(v1_activity.coin_type),
             is_frozen: None,
-            amount: Some(v1_activity.amount.to_string()),
+            amount: Some(v1_activity.amount),
             event_type: v1_activity.activity_type,
             is_gas_fee: v1_activity.is_gas_fee,
             gas_fee_payer_address: v1_activity.gas_fee_payer_address,
@@ -278,8 +257,12 @@ impl FungibleAssetActivity {
             entry_function_id_str: v1_activity.entry_function_id_str,
             block_height,
             token_standard: TokenStandard::V1.to_string(),
-            block_timestamp,
-            storage_refund_octa: bigdecimal_to_u64(&v1_activity.storage_refund_amount),
+            transaction_timestamp,
+            storage_refund_amount: v1_activity.storage_refund_amount,
         }
     }
+}
+
+pub trait FungibleAssetActivityConvertible {
+    fn from_raw(raw_item: RawFungibleAssetActivity) -> Self;
 }

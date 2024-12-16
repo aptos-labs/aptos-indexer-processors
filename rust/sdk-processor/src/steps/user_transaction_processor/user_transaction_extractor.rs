@@ -10,8 +10,9 @@ use processor::{
         signatures::Signature, user_transactions::UserTransactionModel,
     },
     processors::user_transaction_processor::user_transaction_parse,
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
+
 pub struct UserTransactionExtractor
 where
     Self: Sized + Send + 'static,

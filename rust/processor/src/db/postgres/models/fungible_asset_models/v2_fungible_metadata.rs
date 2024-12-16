@@ -5,28 +5,15 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::v2_fungible_asset_utils::FungibleAssetMetadata;
 use crate::{
-    db::postgres::models::{
-        coin_models::coin_utils::{CoinInfoType, CoinResource},
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        resources::FromWriteResource,
-        token_v2_models::v2_token_utils::TokenStandard,
+    db::common::models::fungible_asset_models::raw_v2_fungible_metadata::{
+        FungibleAssetMetadataConvertible, RawFungibleAssetMetadataModel,
     },
     schema::fungible_asset_metadata,
-    utils::util::standardize_address,
 };
-use ahash::AHashMap;
-use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
-use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-// This is the asset type
-pub type FungibleAssetMetadataPK = String;
-pub type FungibleAssetMetadataMapping =
-    AHashMap<FungibleAssetMetadataPK, FungibleAssetMetadataModel>;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(asset_type))]
@@ -49,147 +36,24 @@ pub struct FungibleAssetMetadataModel {
     pub maximum_v2: Option<BigDecimal>,
 }
 
-impl FungibleAssetMetadataModel {
-    /// Fungible asset is part of an object and we need to get the object first to get owner address
-    pub fn get_v2_from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
-        object_metadatas: &ObjectAggregatedDataMapping,
-    ) -> anyhow::Result<Option<Self>> {
-        if let Some(inner) = &FungibleAssetMetadata::from_write_resource(write_resource)? {
-            // the new coin type
-            let asset_type = standardize_address(&write_resource.address.to_string());
-            if let Some(object_metadata) = object_metadatas.get(&asset_type) {
-                let object = &object_metadata.object.object_core;
-                let (maximum_v2, supply_v2) = if let Some(fungible_asset_supply) =
-                    object_metadata.fungible_asset_supply.as_ref()
-                {
-                    (
-                        fungible_asset_supply.get_maximum(),
-                        Some(fungible_asset_supply.current.clone()),
-                    )
-                } else if let Some(concurrent_fungible_asset_supply) =
-                    object_metadata.concurrent_fungible_asset_supply.as_ref()
-                {
-                    (
-                        Some(concurrent_fungible_asset_supply.current.max_value.clone()),
-                        Some(concurrent_fungible_asset_supply.current.value.clone()),
-                    )
-                } else {
-                    (None, None)
-                };
-
-                return Ok(Some(Self {
-                    asset_type: asset_type.clone(),
-                    creator_address: object.get_owner_address(),
-                    name: inner.get_name(),
-                    symbol: inner.get_symbol(),
-                    decimals: inner.decimals,
-                    icon_uri: Some(inner.get_icon_uri()),
-                    project_uri: Some(inner.get_project_uri()),
-                    last_transaction_version: txn_version,
-                    last_transaction_timestamp: txn_timestamp,
-                    supply_aggregator_table_handle_v1: None,
-                    supply_aggregator_table_key_v1: None,
-                    token_standard: TokenStandard::V2.to_string(),
-                    is_token_v2: None,
-                    supply_v2,
-                    maximum_v2,
-                }));
-            }
-        }
-        Ok(None)
-    }
-
-    /// We can find v1 coin info from resources
-    pub fn get_v1_from_write_resource(
-        write_resource: &WriteResource,
-        write_set_change_index: i64,
-        txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
-    ) -> anyhow::Result<Option<Self>> {
-        match &CoinResource::from_write_resource(write_resource, txn_version)? {
-            Some(CoinResource::CoinInfoResource(inner)) => {
-                let coin_info_type = &CoinInfoType::from_move_type(
-                    &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
-                    write_resource.type_str.as_ref(),
-                    txn_version,
-                    write_set_change_index,
-                );
-                let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
-                    .get_aggregator_metadata()
-                    .map(|agg| (Some(agg.handle), Some(agg.key)))
-                    .unwrap_or((None, None));
-                // If asset type is too long, just ignore
-                if let Some(asset_type) = coin_info_type.get_coin_type_below_max() {
-                    Ok(Some(Self {
-                        asset_type,
-                        creator_address: coin_info_type.get_creator_address(),
-                        name: inner.get_name_trunc(),
-                        symbol: inner.get_symbol_trunc(),
-                        decimals: inner.decimals,
-                        icon_uri: None,
-                        project_uri: None,
-                        last_transaction_version: txn_version,
-                        last_transaction_timestamp: txn_timestamp,
-                        supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
-                        supply_aggregator_table_key_v1: supply_aggregator_table_key,
-                        token_standard: TokenStandard::V1.to_string(),
-                        is_token_v2: None,
-                        supply_v2: None,
-                        maximum_v2: None,
-                    }))
-                } else {
-                    Ok(None)
-                }
-            },
-            _ => Ok(None),
-        }
-    }
-
-    pub fn get_v1_from_delete_resource(
-        delete_resource: &DeleteResource,
-        write_set_change_index: i64,
-        txn_version: i64,
-        txn_timestamp: chrono::NaiveDateTime,
-    ) -> anyhow::Result<Option<Self>> {
-        match &CoinResource::from_delete_resource(delete_resource, txn_version)? {
-            Some(CoinResource::CoinInfoResource(inner)) => {
-                let coin_info_type = &CoinInfoType::from_move_type(
-                    &delete_resource.r#type.as_ref().unwrap().generic_type_params[0],
-                    delete_resource.type_str.as_ref(),
-                    txn_version,
-                    write_set_change_index,
-                );
-                let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
-                    .get_aggregator_metadata()
-                    .map(|agg| (Some(agg.handle), Some(agg.key)))
-                    .unwrap_or((None, None));
-                // If asset type is too long, just ignore
-                if let Some(asset_type) = coin_info_type.get_coin_type_below_max() {
-                    Ok(Some(Self {
-                        asset_type,
-                        creator_address: coin_info_type.get_creator_address(),
-                        name: inner.get_name_trunc(),
-                        symbol: inner.get_symbol_trunc(),
-                        decimals: inner.decimals,
-                        icon_uri: None,
-                        project_uri: None,
-                        last_transaction_version: txn_version,
-                        last_transaction_timestamp: txn_timestamp,
-                        supply_aggregator_table_handle_v1: supply_aggregator_table_handle,
-                        supply_aggregator_table_key_v1: supply_aggregator_table_key,
-                        token_standard: TokenStandard::V1.to_string(),
-                        is_token_v2: None,
-                        supply_v2: None,
-                        maximum_v2: None,
-                    }))
-                } else {
-                    Ok(None)
-                }
-            },
-            _ => Ok(None),
+impl FungibleAssetMetadataConvertible for FungibleAssetMetadataModel {
+    fn from_raw(raw_item: RawFungibleAssetMetadataModel) -> Self {
+        Self {
+            asset_type: raw_item.asset_type,
+            creator_address: raw_item.creator_address,
+            name: raw_item.name,
+            symbol: raw_item.symbol,
+            decimals: raw_item.decimals,
+            icon_uri: raw_item.icon_uri,
+            project_uri: raw_item.project_uri,
+            last_transaction_version: raw_item.last_transaction_version,
+            last_transaction_timestamp: raw_item.last_transaction_timestamp,
+            supply_aggregator_table_handle_v1: raw_item.supply_aggregator_table_handle_v1,
+            supply_aggregator_table_key_v1: raw_item.supply_aggregator_table_key_v1,
+            token_standard: raw_item.token_standard,
+            is_token_v2: raw_item.is_token_v2,
+            supply_v2: raw_item.supply_v2,
+            maximum_v2: raw_item.maximum_v2,
         }
     }
 }

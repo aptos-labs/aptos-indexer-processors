@@ -111,7 +111,6 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             processor_status_table_names,
         )
         .await?;
-        println!("Starting version: {:?}", starting_version);
 
         // Define processor transaction stream config
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
