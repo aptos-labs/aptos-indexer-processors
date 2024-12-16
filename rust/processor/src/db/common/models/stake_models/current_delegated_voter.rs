@@ -4,9 +4,11 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::db::common::models::stake_models::delegator_balances::RawCurrentDelegatorBalance;
-use crate::db::common::models::stake_models::stake_utils::VoteDelegationTableItem;
+use super::delegator_balances::ShareToRawStakingPoolMapping;
 use crate::{
+    db::common::models::stake_models::{
+        delegator_balances::RawCurrentDelegatorBalance, stake_utils::VoteDelegationTableItem,
+    },
     schema::current_delegated_voter,
     utils::{database::DbPoolConnection, util::standardize_address},
 };
@@ -16,8 +18,6 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-use super::delegator_balances::ShareToRawStakingPoolMapping;
 
 #[derive(Debug, Identifiable, Queryable)]
 #[diesel(primary_key(delegator_address, delegation_pool_address))]

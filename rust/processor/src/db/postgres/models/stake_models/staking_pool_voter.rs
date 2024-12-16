@@ -4,8 +4,10 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::db::common::models::stake_models::stake_utils::StakeResource;
-use crate::{schema::current_staking_pool_voter, utils::util::standardize_address};
+use crate::{
+    db::common::models::stake_models::stake_utils::StakeResource,
+    schema::current_staking_pool_voter, utils::util::standardize_address,
+};
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use field_count::FieldCount;
@@ -36,15 +38,12 @@ impl CurrentStakingPoolVoter {
                 {
                     let staking_pool_address =
                         standardize_address(&write_resource.address.to_string());
-                    staking_pool_voters.insert(
-                        staking_pool_address.clone(),
-                        Self {
-                            staking_pool_address,
-                            voter_address: inner.get_delegated_voter(),
-                            last_transaction_version: txn_version,
-                            operator_address: inner.get_operator_address(),
-                        },
-                    );
+                    staking_pool_voters.insert(staking_pool_address.clone(), Self {
+                        staking_pool_address,
+                        voter_address: inner.get_delegated_voter(),
+                        last_transaction_version: txn_version,
+                        operator_address: inner.get_operator_address(),
+                    });
                 }
             }
         }

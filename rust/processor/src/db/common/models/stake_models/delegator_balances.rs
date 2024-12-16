@@ -2,12 +2,14 @@
 
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::db::common::models::stake_models::delegator_pools::{
-    DelegatorPool, RawDelegatorPoolBalanceMetadata, RawPoolBalanceMetadata,
-};
 use crate::{
     db::{
-        common::models::default_models::raw_table_items::RawTableItem,
+        common::models::{
+            default_models::raw_table_items::RawTableItem,
+            stake_models::delegator_pools::{
+                DelegatorPool, RawDelegatorPoolBalanceMetadata, RawPoolBalanceMetadata,
+            },
+        },
         postgres::models::default_models::move_tables::TableItem,
     },
     schema::{current_delegator_balances, delegator_balances},

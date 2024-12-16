@@ -4,18 +4,12 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::db::common::models::stake_models::proposal_voters::{
-    RawProposalVote, RawProposalVoteConvertible,
-};
-use crate::db::common::models::stake_models::stake_utils::StakeEvent;
 use crate::{
-    schema::proposal_votes,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        util::{parse_timestamp, standardize_address},
+    db::common::models::stake_models::proposal_voters::{
+        RawProposalVote, RawProposalVoteConvertible,
     },
+    schema::proposal_votes,
 };
-
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

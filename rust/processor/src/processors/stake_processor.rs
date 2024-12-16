@@ -2,34 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
-use crate::db::{
-    common::models::stake_models::{
-        current_delegated_voter::CurrentDelegatedVoter,
-        delegator_activities::{
-            RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
-        },
-        delegator_balances::{
-            RawCurrentDelegatorBalance, RawCurrentDelegatorBalanceConvertible,
-            RawCurrentDelegatorBalanceMap, RawDelegatorBalance, RawDelegatorBalanceConvertible,
-        },
-        delegator_pools::{
-            DelegatorPool, DelegatorPoolMap, RawCurrentDelegatorPoolBalance,
-            RawCurrentDelegatorPoolBalanceConvertible, RawDelegatorPoolBalance,
-            RawDelegatorPoolBalanceConvertible,
-        },
-        proposal_voters::{RawProposalVote, RawProposalVoteConvertible},
-        stake_utils::DelegationVoteGovernanceRecordsResource,
-    },
-    postgres::models::stake_models::delegator_pools::{
-        CurrentDelegatorPoolBalance, DelegatorPoolBalance,
-    },
-};
 use crate::{
-    db::postgres::models::stake_models::{
-        delegator_activities::DelegatedStakingActivity,
-        delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
-        proposal_votes::ProposalVote,
-        staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
+    db::{
+        common::models::stake_models::{
+            current_delegated_voter::CurrentDelegatedVoter,
+            delegator_activities::{
+                RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
+            },
+            delegator_balances::{
+                RawCurrentDelegatorBalance, RawCurrentDelegatorBalanceConvertible,
+                RawCurrentDelegatorBalanceMap, RawDelegatorBalance, RawDelegatorBalanceConvertible,
+            },
+            delegator_pools::{
+                DelegatorPool, DelegatorPoolMap, RawCurrentDelegatorPoolBalance,
+                RawCurrentDelegatorPoolBalanceConvertible, RawDelegatorPoolBalance,
+                RawDelegatorPoolBalanceConvertible,
+            },
+            proposal_voters::{RawProposalVote, RawProposalVoteConvertible},
+            stake_utils::DelegationVoteGovernanceRecordsResource,
+        },
+        postgres::models::stake_models::{
+            delegator_activities::DelegatedStakingActivity,
+            delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
+            delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
+            proposal_votes::ProposalVote,
+            staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
+        },
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -39,7 +37,6 @@ use crate::{
     },
     IndexerGrpcProcessorConfig,
 };
-
 use ahash::AHashMap;
 use anyhow::bail;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};

@@ -3,8 +3,8 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::db::common::models::stake_models::stake_utils::StakeEvent;
 use crate::{
+    db::common::models::stake_models::stake_utils::StakeEvent,
     schema::delegated_staking_activities,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,

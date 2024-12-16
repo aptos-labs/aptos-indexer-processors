@@ -4,13 +4,15 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::db::common::models::stake_models::delegator_pools::{
-    DelegatorPool, RawCurrentDelegatorPoolBalance, RawCurrentDelegatorPoolBalanceConvertible,
-    RawDelegatorPoolBalance, RawDelegatorPoolBalanceConvertible, RawDelegatorPoolBalanceMetadata,
-    RawDelegatorPoolBalanceMetadataConvertible, RawPoolBalanceMetadata,
-    RawPoolBalanceMetadataConvertible,
+use crate::{
+    db::common::models::stake_models::delegator_pools::{
+        DelegatorPool, RawCurrentDelegatorPoolBalance, RawCurrentDelegatorPoolBalanceConvertible,
+        RawDelegatorPoolBalance, RawDelegatorPoolBalanceConvertible,
+        RawDelegatorPoolBalanceMetadata, RawDelegatorPoolBalanceMetadataConvertible,
+        RawPoolBalanceMetadata, RawPoolBalanceMetadataConvertible,
+    },
+    schema::{current_delegated_staking_pool_balances, delegated_staking_pool_balances},
 };
-use crate::schema::{current_delegated_staking_pool_balances, delegated_staking_pool_balances};
 use ahash::AHashMap;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;

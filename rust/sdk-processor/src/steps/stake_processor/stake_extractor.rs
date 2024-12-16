@@ -18,6 +18,7 @@ use processor::{
                 DelegatorPool, RawCurrentDelegatorPoolBalanceConvertible,
                 RawDelegatorPoolBalanceConvertible,
             },
+            proposal_voters::RawProposalVoteConvertible,
         },
         postgres::models::stake_models::{
             delegator_activities::DelegatedStakingActivity,
