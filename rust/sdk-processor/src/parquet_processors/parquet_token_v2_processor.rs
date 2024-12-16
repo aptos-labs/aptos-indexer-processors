@@ -31,8 +31,11 @@ use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
     db::parquet::models::token_v2_models::{
-        token_claims::CurrentTokenPendingClaim, v1_token_royalty::CurrentTokenRoyaltyV1,
-        v2_token_activities::TokenActivityV2, v2_token_metadata::CurrentTokenV2Metadata,
+        token_claims::CurrentTokenPendingClaim,
+        v1_token_royalty::CurrentTokenRoyaltyV1,
+        v2_token_activities::TokenActivityV2,
+        v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
+        v2_token_metadata::CurrentTokenV2Metadata,
     },
 };
 use std::{collections::HashMap, sync::Arc};
@@ -140,6 +143,15 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             (
                 ParquetTypeEnum::TokenActivitiesV2,
                 TokenActivityV2::schema(),
+            ),
+            (ParquetTypeEnum::TokenDatasV2, TokenDataV2::schema()),
+            (
+                ParquetTypeEnum::CurrentTokenDatasV2,
+                CurrentTokenDataV2::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentTokenDatasV2,
+                CurrentTokenDataV2::schema(),
             ),
         ]
         .into_iter()

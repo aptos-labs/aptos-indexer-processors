@@ -8,13 +8,13 @@
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::{
+        common::models::token_v2_models::raw_v2_token_datas::RawTokenDataV2,
         parquet::models::fungible_asset_models::parquet_v2_fungible_asset_balances::DEFAULT_AMOUNT_VALUE,
         postgres::models::{
             object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
             resources::FromWriteResource,
             token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
             token_v2_models::{
-                parquet_v2_token_datas::TokenDataV2,
                 v2_token_ownerships::{CurrentTokenOwnershipV2, NFTOwnershipV2},
                 v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
             },
@@ -75,7 +75,7 @@ impl TokenOwnershipV2 {
     /// For nfts it's the same resources that we parse tokendatas from so we leverage the work done in there to get ownership data
     /// Vecs are returned because there could be multiple transfers and we need to document each one here.
     pub fn get_nft_v2_from_token_data(
-        token_data: &TokenDataV2,
+        token_data: &RawTokenDataV2,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<Vec<Self>> {
         let mut ownerships = vec![];
@@ -99,7 +99,7 @@ impl TokenOwnershipV2 {
         let non_transferrable_by_owner = !object_core.allow_ungated_transfer;
 
         ownerships.push(Self {
-            txn_version: token_data.txn_version,
+            txn_version: token_data.transaction_version,
             write_set_change_index: token_data.write_set_change_index,
             token_data_id: token_data_id.clone(),
             property_version_v1: LEGACY_DEFAULT_PROPERTY_VERSION,
@@ -110,7 +110,7 @@ impl TokenOwnershipV2 {
             token_properties_mutated_v1: None,
             is_soulbound_v2: Some(is_soulbound),
             token_standard: TokenStandard::V2.to_string(),
-            block_timestamp: token_data.block_timestamp,
+            block_timestamp: token_data.transaction_timestamp,
             non_transferrable_by_owner: Some(non_transferrable_by_owner),
         });
 
@@ -121,7 +121,7 @@ impl TokenOwnershipV2 {
                 continue;
             }
             ownerships.push(Self {
-                txn_version: token_data.txn_version,
+                txn_version: token_data.transaction_version,
                 // set to negative of event index to avoid collison with write set index
                 write_set_change_index: -1 * event_index,
                 token_data_id: token_data_id.clone(),
@@ -135,7 +135,7 @@ impl TokenOwnershipV2 {
                 token_properties_mutated_v1: None,
                 is_soulbound_v2: Some(is_soulbound),
                 token_standard: TokenStandard::V2.to_string(),
-                block_timestamp: token_data.block_timestamp,
+                block_timestamp: token_data.transaction_timestamp,
                 non_transferrable_by_owner: Some(is_soulbound),
             });
         }

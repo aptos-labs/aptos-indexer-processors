@@ -10,6 +10,10 @@ use crate::{
             },
             raw_v1_token_royalty::{CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1},
             raw_v2_token_activities::{RawTokenActivityV2, TokenActivityV2Convertible},
+            raw_v2_token_datas::{
+                CurrentTokenDataV2Convertible, RawCurrentTokenDataV2, RawTokenDataV2,
+                TokenDataV2Convertible,
+            },
             raw_v2_token_metadata::{CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata},
         },
         postgres::models::{
@@ -613,11 +617,11 @@ impl ProcessorTrait for TokenV2Processor {
         // Token V2 processing which includes token v1
         let (
             mut collections_v2,
-            mut token_datas_v2,
+            raw_token_datas_v2,
             mut token_ownerships_v2,
             current_collections_v2,
-            current_token_datas_v2,
-            current_deleted_token_datas_v2,
+            raw_current_token_datas_v2,
+            raw_current_deleted_token_datas_v2,
             current_token_ownerships_v2,
             current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
@@ -655,6 +659,22 @@ impl ProcessorTrait for TokenV2Processor {
             .map(TokenActivityV2::from_raw)
             .collect();
 
+        let mut postgres_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+            .into_iter()
+            .map(TokenDataV2::from_raw)
+            .collect();
+
+        let postgres_current_token_datas_v2: Vec<CurrentTokenDataV2> = raw_current_token_datas_v2
+            .into_iter()
+            .map(CurrentTokenDataV2::from_raw)
+            .collect();
+
+        let postgres_current_deleted_token_datas_v2: Vec<CurrentTokenDataV2> =
+            raw_current_deleted_token_datas_v2
+                .into_iter()
+                .map(CurrentTokenDataV2::from_raw)
+                .collect();
+
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
@@ -665,7 +685,7 @@ impl ProcessorTrait for TokenV2Processor {
             token_ownerships_v2.clear();
         }
         if self.deprecated_tables.contains(TableFlags::TOKEN_DATAS_V2) {
-            token_datas_v2.clear();
+            postgres_token_datas_v2.clear();
         }
         if self.deprecated_tables.contains(TableFlags::COLLECTIONS_V2) {
             collections_v2.clear();
@@ -683,10 +703,13 @@ impl ProcessorTrait for TokenV2Processor {
             start_version,
             end_version,
             &collections_v2,
-            &token_datas_v2,
+            &postgres_token_datas_v2,
             &token_ownerships_v2,
             &current_collections_v2,
-            (&current_token_datas_v2, &current_deleted_token_datas_v2),
+            (
+                &postgres_current_token_datas_v2,
+                &postgres_current_deleted_token_datas_v2,
+            ),
             (
                 &current_token_ownerships_v2,
                 &current_deleted_token_ownerships_v2,
@@ -736,11 +759,11 @@ pub async fn parse_v2_token(
     query_retry_delay_ms: u64,
 ) -> (
     Vec<CollectionV2>,
-    Vec<TokenDataV2>,
+    Vec<RawTokenDataV2>,
     Vec<TokenOwnershipV2>,
     Vec<CurrentCollectionV2>,
-    Vec<CurrentTokenDataV2>,
-    Vec<CurrentTokenDataV2>,
+    Vec<RawCurrentTokenDataV2>,
+    Vec<RawCurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
     Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
     Vec<RawTokenActivityV2>,
@@ -756,9 +779,9 @@ pub async fn parse_v2_token(
 
     let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         AHashMap::new();
-    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenDataV2> =
         AHashMap::new();
-    let mut current_deleted_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+    let mut current_deleted_token_datas_v2: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenDataV2> =
         AHashMap::new();
     let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
@@ -976,7 +999,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some((token_data, current_token_data)) =
-                            TokenDataV2::get_v1_from_write_table_item(
+                            RawTokenDataV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -1124,8 +1147,8 @@ pub async fn parse_v2_token(
                                 current_collection,
                             );
                         }
-                        if let Some((token_data, current_token_data)) =
-                            TokenDataV2::get_v2_from_write_resource(
+                        if let Some((raw_token_data, current_token_data)) =
+                            RawTokenDataV2::get_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -1137,7 +1160,7 @@ pub async fn parse_v2_token(
                             // Add NFT ownership
                             let (mut ownerships, current_ownerships) =
                                 TokenOwnershipV2::get_nft_v2_from_token_data(
-                                    &token_data,
+                                    &TokenDataV2::from_raw(raw_token_data.clone()),
                                     &token_v2_metadata_helper,
                                 )
                                 .unwrap();
@@ -1160,7 +1183,7 @@ pub async fn parse_v2_token(
                             }
                             token_ownerships_v2.append(&mut ownerships);
                             current_token_ownerships_v2.extend(current_ownerships);
-                            token_datas_v2.push(token_data);
+                            token_datas_v2.push(raw_token_data);
                             current_token_datas_v2.insert(
                                 current_token_data.token_data_id.clone(),
                                 current_token_data,
@@ -1170,7 +1193,7 @@ pub async fn parse_v2_token(
                         // Add burned NFT handling for token datas (can probably be merged with below)
                         // This handles the case where token is burned but objectCore is still there
                         if let Some(deleted_token_data) =
-                            TokenDataV2::get_burned_nft_v2_from_write_resource(
+                            RawTokenDataV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 txn_timestamp,
@@ -1244,7 +1267,7 @@ pub async fn parse_v2_token(
                     Change::DeleteResource(resource) => {
                         // Add burned NFT handling for token datas (can probably be merged with below)
                         if let Some(deleted_token_data) =
-                            TokenDataV2::get_burned_nft_v2_from_delete_resource(
+                            RawTokenDataV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 txn_timestamp,
@@ -1305,10 +1328,10 @@ pub async fn parse_v2_token(
         .collect::<Vec<CurrentCollectionV2>>();
     let mut current_token_datas_v2 = current_token_datas_v2
         .into_values()
-        .collect::<Vec<CurrentTokenDataV2>>();
+        .collect::<Vec<RawCurrentTokenDataV2>>();
     let mut current_deleted_token_datas_v2 = current_deleted_token_datas_v2
         .into_values()
-        .collect::<Vec<CurrentTokenDataV2>>();
+        .collect::<Vec<RawCurrentTokenDataV2>>();
     let mut current_token_ownerships_v2 = current_token_ownerships_v2
         .into_values()
         .collect::<Vec<CurrentTokenOwnershipV2>>();

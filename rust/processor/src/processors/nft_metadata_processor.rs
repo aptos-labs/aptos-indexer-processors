@@ -3,15 +3,20 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::postgres::models::{
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+    db::{
+        common::models::token_v2_models::raw_v2_token_datas::{
+            RawCurrentTokenDataV2, RawTokenDataV2,
         },
-        resources::FromWriteResource,
-        token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
-        token_v2_models::{
-            v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
-            v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
+        postgres::models::{
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            },
+            resources::FromWriteResource,
+            token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
+            token_v2_models::{
+                v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
+                v2_token_datas::CurrentTokenDataV2PK,
+            },
         },
     },
     gap_detectors::ProcessingResult,
@@ -195,7 +200,7 @@ impl ProcessorTrait for NftMetadataProcessor {
     }
 }
 
-fn clean_token_pubsub_message(ctd: CurrentTokenDataV2, db_chain_id: u64) -> String {
+fn clean_token_pubsub_message(ctd: RawCurrentTokenDataV2, db_chain_id: u64) -> String {
     remove_null_bytes(&format!(
         "{},{},{},{},{},false",
         ctd.token_data_id,
@@ -224,8 +229,8 @@ async fn parse_v2_token(
     conn: &mut DbPoolConnection<'_>,
     query_retries: u32,
     query_retry_delay_ms: u64,
-) -> (Vec<CurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
-    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
+) -> (Vec<RawCurrentTokenDataV2>, Vec<CurrentCollectionV2>) {
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenDataV2> =
         AHashMap::new();
     let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         AHashMap::new();
@@ -268,7 +273,7 @@ async fn parse_v2_token(
             match wsc.change.as_ref().unwrap() {
                 Change::WriteTableItem(table_item) => {
                     if let Some((_, current_token_data)) =
-                        TokenDataV2::get_v1_from_write_table_item(
+                        RawTokenDataV2::get_v1_from_write_table_item(
                             table_item,
                             txn_version,
                             wsc_index,
@@ -298,14 +303,15 @@ async fn parse_v2_token(
                     }
                 },
                 Change::WriteResource(resource) => {
-                    if let Some((_, current_token_data)) = TokenDataV2::get_v2_from_write_resource(
-                        resource,
-                        txn_version,
-                        wsc_index,
-                        txn_timestamp,
-                        &token_v2_metadata_helper,
-                    )
-                    .unwrap()
+                    if let Some((_, current_token_data)) =
+                        RawTokenDataV2::get_v2_from_write_resource(
+                            resource,
+                            txn_version,
+                            wsc_index,
+                            txn_timestamp,
+                            &token_v2_metadata_helper,
+                        )
+                        .unwrap()
                     {
                         current_token_datas_v2
                             .insert(current_token_data.token_data_id.clone(), current_token_data);
@@ -331,7 +337,7 @@ async fn parse_v2_token(
 
     let current_token_datas_v2 = current_token_datas_v2
         .into_values()
-        .collect::<Vec<CurrentTokenDataV2>>();
+        .collect::<Vec<RawCurrentTokenDataV2>>();
     let current_collections_v2 = current_collections_v2
         .into_values()
         .collect::<Vec<CurrentCollectionV2>>();

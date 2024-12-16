@@ -6,3 +6,5 @@ pub mod fungible_asset_models;
 pub mod token_v2_models;
 pub mod transaction_metadata_model;
 pub mod user_transaction_models;
+
+const DEFAULT_NONE: &str = "NULL";
