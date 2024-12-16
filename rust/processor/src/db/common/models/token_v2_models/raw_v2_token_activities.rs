@@ -7,14 +7,14 @@
 
 use crate::{
     db::{
-        common::models::token_v2_models::{
-            raw_token_claims::TokenV1Claimed,
-            v2_token_utils::{TokenStandard, V2TokenEvent},
-        },
-        postgres::models::{
+        common::models::{
             object_models::v2_object_utils::ObjectAggregatedDataMapping,
-            token_models::token_utils::{TokenDataIdType, TokenEvent},
+            token_v2_models::{
+                raw_token_claims::TokenV1Claimed,
+                v2_token_utils::{TokenStandard, V2TokenEvent},
+            },
         },
+        postgres::models::token_models::token_utils::{TokenDataIdType, TokenEvent},
     },
     utils::util::standardize_address,
 };

@@ -8,14 +8,19 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::postgres::models::{
-        object_models::{
+    db::{
+        common::models::object_models::{
+            raw_v2_objects::{
+                CurrentObjectConvertible, ObjectConvertible, RawCurrentObject, RawObject,
+            },
             v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
-            v2_objects::{CurrentObject, Object},
         },
-        resources::FromWriteResource,
+        postgres::models::{
+            object_models::v2_objects::{CurrentObject, Object},
+            resources::FromWriteResource,
+        },
     },
     utils::table_flags::TableFlags,
 };
@@ -122,7 +127,7 @@ impl Processable for ObjectsExtractor {
                 let index: i64 = index as i64;
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteResource(inner) => {
-                        if let Some((object, current_object)) = &Object::from_write_resource(
+                        if let Some((object, current_object)) = &RawObject::from_write_resource(
                             inner,
                             txn_version,
                             index,
@@ -138,7 +143,7 @@ impl Processable for ObjectsExtractor {
                     Change::DeleteResource(inner) => {
                         // Passing all_current_objects into the function so that we can get the owner of the deleted
                         // resource if it was handled in the same batch
-                        if let Some((object, current_object)) = Object::from_delete_resource(
+                        if let Some((object, current_object)) = RawObject::from_delete_resource(
                             inner,
                             txn_version,
                             index,
@@ -163,15 +168,23 @@ impl Processable for ObjectsExtractor {
         // Sort by PK
         let mut all_current_objects = all_current_objects
             .into_values()
-            .collect::<Vec<CurrentObject>>();
+            .collect::<Vec<RawCurrentObject>>();
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
         if self.deprecated_tables.contains(TableFlags::OBJECTS) {
             all_objects.clear();
         }
 
+        let postgres_all_objects: Vec<Object> =
+            all_objects.into_iter().map(Object::from_raw).collect();
+
+        let postgres_all_current_objects: Vec<CurrentObject> = all_current_objects
+            .into_iter()
+            .map(CurrentObject::from_raw)
+            .collect();
+
         Ok(Some(TransactionContext {
-            data: (all_objects, all_current_objects),
+            data: (postgres_all_objects, postgres_all_current_objects),
             metadata: transactions.metadata,
         }))
     }

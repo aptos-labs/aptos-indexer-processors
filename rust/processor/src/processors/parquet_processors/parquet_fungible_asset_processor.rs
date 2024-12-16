@@ -8,16 +8,17 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::fungible_asset_models::raw_v2_fungible_asset_balances::{
-            FungibleAssetBalanceConvertible, RawFungibleAssetBalance,
-        },
-        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_balances::FungibleAssetBalance,
-        postgres::models::{
-            fungible_asset_models::parquet_coin_supply::CoinSupply,
+        common::models::{
+            fungible_asset_models::raw_v2_fungible_asset_balances::{
+                FungibleAssetBalanceConvertible, RawFungibleAssetBalance,
+            },
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
-            resources::FromWriteResource,
+        },
+        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_balances::FungibleAssetBalance,
+        postgres::models::{
+            fungible_asset_models::parquet_coin_supply::CoinSupply, resources::FromWriteResource,
         },
     },
     gap_detectors::ProcessingResult,

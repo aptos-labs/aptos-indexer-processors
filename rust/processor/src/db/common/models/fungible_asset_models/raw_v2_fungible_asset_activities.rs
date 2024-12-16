@@ -7,14 +7,16 @@
 
 use crate::{
     db::{
-        common::models::token_v2_models::v2_token_utils::TokenStandard,
+        common::models::{
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            token_v2_models::v2_token_utils::TokenStandard,
+        },
         postgres::models::{
             coin_models::{
                 coin_activities::CoinActivity,
                 coin_utils::{CoinEvent, CoinInfoType, EventGuidResource},
             },
             fungible_asset_models::v2_fungible_asset_utils::{FeeStatement, FungibleAssetEvent},
-            object_models::v2_object_utils::ObjectAggregatedDataMapping,
         },
     },
     utils::util::standardize_address,

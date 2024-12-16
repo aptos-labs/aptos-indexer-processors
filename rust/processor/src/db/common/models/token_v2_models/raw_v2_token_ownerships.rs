@@ -7,12 +7,14 @@
 
 use crate::{
     db::{
-        common::models::token_v2_models::{
-            raw_v2_token_datas::RawTokenDataV2,
-            v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
+        common::models::{
+            object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
+            token_v2_models::{
+                raw_v2_token_datas::RawTokenDataV2,
+                v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
+            },
         },
         postgres::models::{
-            object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
             resources::FromWriteResource,
             token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
         },

@@ -8,13 +8,18 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::token_v2_models::{
-            raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
-            raw_v2_token_ownerships::{
-                NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+        common::models::{
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
-            v2_token_utils::{
-                Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+            token_v2_models::{
+                raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
+                raw_v2_token_ownerships::{
+                    NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+                },
+                v2_token_utils::{
+                    Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                },
             },
         },
         parquet::models::token_v2_models::{
@@ -22,9 +27,6 @@ use crate::{
         },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-            object_models::v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-            },
             resources::{FromWriteResource, V2TokenResource},
             token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         },

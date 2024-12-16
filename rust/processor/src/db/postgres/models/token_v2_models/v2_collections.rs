@@ -7,9 +7,11 @@
 
 use crate::{
     db::{
-        common::models::token_v2_models::v2_token_utils::{Collection, TokenStandard},
-        postgres::models::{
+        common::models::{
             object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            token_v2_models::v2_token_utils::{Collection, TokenStandard},
+        },
+        postgres::models::{
             resources::FromWriteResource,
             token_models::{
                 collection_datas::CollectionData,
