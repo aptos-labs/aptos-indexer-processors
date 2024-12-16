@@ -38,6 +38,7 @@ use processor::{
             v2_token_activities::TokenActivityV2,
             v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
             v2_token_metadata::CurrentTokenV2Metadata,
+            v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
         },
         transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
         user_transaction_models::parquet_user_transactions::UserTransaction,
@@ -194,6 +195,8 @@ impl ProcessorConfig {
                 TokenActivityV2::TABLE_NAME.to_string(),
                 TokenDataV2::TABLE_NAME.to_string(),
                 CurrentTokenDataV2::TABLE_NAME.to_string(),
+                TokenOwnershipV2::TABLE_NAME.to_string(),
+                CurrentTokenOwnershipV2::TABLE_NAME.to_string(),
             ]),
             _ => HashSet::new(), // Default case for unsupported processors
         }

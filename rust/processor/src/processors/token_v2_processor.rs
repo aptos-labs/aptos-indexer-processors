@@ -606,7 +606,7 @@ impl ProcessorTrait for TokenV2Processor {
         let processing_start = std::time::Instant::now();
         let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
 
-        let mut conn = self.get_conn().await;
+        let conn = self.get_conn().await;
 
         // First get all token related table metadata from the batch of transactions. This is in case
         // an earlier transaction has metadata (in resources) that's missing from a later transaction.
@@ -632,7 +632,7 @@ impl ProcessorTrait for TokenV2Processor {
         ) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
-            &mut conn,
+            &mut Some(conn),
             query_retries,
             query_retry_delay_ms,
         )
@@ -769,10 +769,30 @@ impl ProcessorTrait for TokenV2Processor {
     }
 }
 
+pub async fn parse_v2_token_for_parquet(
+    transactions: &[Transaction],
+    table_handle_to_owner: &TableHandleToOwner,
+) -> (
+    Vec<CollectionV2>,
+    Vec<RawTokenDataV2>,
+    Vec<RawTokenOwnershipV2>,
+    Vec<CurrentCollectionV2>,
+    Vec<RawCurrentTokenDataV2>,
+    Vec<RawCurrentTokenDataV2>,
+    Vec<RawCurrentTokenOwnershipV2>,
+    Vec<RawCurrentTokenOwnershipV2>, // deleted token ownerships
+    Vec<RawTokenActivityV2>,
+    Vec<RawCurrentTokenV2Metadata>,
+    Vec<RawCurrentTokenRoyaltyV1>,
+    Vec<RawCurrentTokenPendingClaim>,
+) {
+    parse_v2_token(transactions, table_handle_to_owner, &mut None, 0, 0).await
+}
+
 pub async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut DbPoolConnection<'_>,
+    conn: &mut Option<DbPoolConnection<'_>>,
     query_retries: u32,
     query_retry_delay_ms: u64,
 ) -> (
@@ -996,26 +1016,31 @@ pub async fn parse_v2_token(
                 let wsc_index = index as i64;
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteTableItem(table_item) => {
-                        if let Some((collection, current_collection)) =
-                            CollectionV2::get_v1_from_write_table_item(
-                                table_item,
-                                txn_version,
-                                wsc_index,
-                                txn_timestamp,
-                                table_handle_to_owner,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
-                            )
-                            .await
-                            .unwrap()
-                        {
-                            collections_v2.push(collection);
-                            current_collections_v2.insert(
-                                current_collection.collection_id.clone(),
-                                current_collection,
-                            );
+                        // TODO: revisit when we migrate collection_v2 for parquet
+                        // for not it will be only handled for postgres
+                        if let Some(ref mut conn) = conn {
+                            if let Some((collection, current_collection)) =
+                                CollectionV2::get_v1_from_write_table_item(
+                                    table_item,
+                                    txn_version,
+                                    wsc_index,
+                                    txn_timestamp,
+                                    table_handle_to_owner,
+                                    conn,
+                                    query_retries,
+                                    query_retry_delay_ms,
+                                )
+                                .await
+                                .unwrap()
+                            {
+                                collections_v2.push(collection);
+                                current_collections_v2.insert(
+                                    current_collection.collection_id.clone(),
+                                    current_collection,
+                                );
+                            }
                         }
+
                         if let Some((token_data, current_token_data)) =
                             RawTokenDataV2::get_v1_from_write_table_item(
                                 table_item,

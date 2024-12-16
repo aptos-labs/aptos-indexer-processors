@@ -36,6 +36,7 @@ use processor::{
         v2_token_activities::TokenActivityV2,
         v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
         v2_token_metadata::CurrentTokenV2Metadata,
+        v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
     },
 };
 use std::{collections::HashMap, sync::Arc};
@@ -120,8 +121,9 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 
         let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
         // TODO: Update this
-        let parquet_token_v2_extractor =
-            ParquetTokenV2Extractor::new(backfill_table, 5, 500, self.db_pool.clone());
+        let parquet_token_v2_extractor = ParquetTokenV2Extractor {
+            opt_in_tables: backfill_table,
+        };
 
         let gcs_client =
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
@@ -150,8 +152,12 @@ impl ProcessorTrait for ParquetTokenV2Processor {
                 CurrentTokenDataV2::schema(),
             ),
             (
-                ParquetTypeEnum::CurrentTokenDatasV2,
-                CurrentTokenDataV2::schema(),
+                ParquetTypeEnum::TokenOwnershipsV2,
+                TokenOwnershipV2::schema(),
+            ),
+            (
+                ParquetTypeEnum::CurrentTokenOwnershipsV2,
+                CurrentTokenOwnershipV2::schema(),
             ),
         ]
         .into_iter()

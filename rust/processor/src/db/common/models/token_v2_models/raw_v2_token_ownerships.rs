@@ -257,7 +257,7 @@ impl RawTokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut DbPoolConnection<'_>,
+        conn: &mut Option<DbPoolConnection<'_>>,
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
@@ -344,7 +344,7 @@ impl RawTokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        conn: &mut DbPoolConnection<'_>,
+        conn: &mut Option<DbPoolConnection<'_>>,
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
@@ -370,7 +370,7 @@ impl RawTokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        conn: &mut DbPoolConnection<'_>,
+        conn: &mut Option<DbPoolConnection<'_>>,
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
@@ -387,16 +387,9 @@ impl RawTokenOwnershipV2 {
                 match prior_nft_ownership.get(&token_address) {
                     Some(inner) => inner.owner_address.clone(),
                     None => {
-                        match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                            conn,
-                            &token_address,
-                            query_retries,
-                            query_retry_delay_ms,
-                        )
-                        .await
-                        {
-                            Ok(nft) => nft.owner_address.clone(),
-                            Err(_) => {
+                        match conn {
+                            None => {
+                                // TODO: update message
                                 tracing::error!(
                                     transaction_version = txn_version,
                                     lookup_key = &token_address,
@@ -404,6 +397,26 @@ impl RawTokenOwnershipV2 {
                                 );
                                 DEFAULT_OWNER_ADDRESS.to_string()
                             },
+                            Some(ref mut conn) => {
+                                match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
+                                    conn,
+                                    &token_address,
+                                    query_retries,
+                                    query_retry_delay_ms,
+                                )
+                                    .await
+                                {
+                                    Ok(nft) => nft.owner_address.clone(),
+                                    Err(_) => {
+                                        tracing::error!(
+                                    transaction_version = txn_version,
+                                    lookup_key = &token_address,
+                                    "Failed to find current_token_ownership_v2 for burned token. You probably should backfill db."
+                                );
+                                        DEFAULT_OWNER_ADDRESS.to_string()
+                                    },
+                                }
+                            }
                         }
                     },
                 }

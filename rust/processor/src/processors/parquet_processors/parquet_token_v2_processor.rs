@@ -10,7 +10,9 @@ use crate::{
     db::{
         common::models::token_v2_models::{
             raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
-            raw_v2_token_ownerships::NFTOwnershipV2,
+            raw_v2_token_ownerships::{
+                NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+            },
             v2_token_utils::{
                 Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
             },
@@ -31,7 +33,7 @@ use crate::{
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::ArcDbPool,
+        database::{ArcDbPool, DbPoolConnection},
         util::{parse_timestamp, standardize_address},
     },
 };
@@ -131,9 +133,12 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
-        let (raw_token_datas_v2, token_ownerships_v2) = parse_v2_token(
+        let (raw_token_datas_v2, raw_token_ownerships_v2) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
+            &mut None,
+            0,
+            0,
             &mut transaction_version_to_struct_count,
         )
         .await;
@@ -152,8 +157,13 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             .await
             .context("Failed to send token data v2 parquet data")?;
 
+        let parquet_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+            .into_iter()
+            .map(TokenOwnershipV2::from_raw)
+            .collect();
+
         let token_ownerships_v2_parquet_data = ParquetDataGeneric {
-            data: token_ownerships_v2,
+            data: parquet_token_ownerships_v2,
         };
 
         self.v2_token_ownerships_sender
@@ -181,8 +191,11 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
+    conn: &mut Option<DbPoolConnection<'_>>,
+    query_retries: u32,
+    query_retry_delay_ms: u64,
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
-) -> (Vec<RawTokenDataV2>, Vec<TokenOwnershipV2>) {
+) -> (Vec<RawTokenDataV2>, Vec<RawTokenOwnershipV2>) {
     // Token V2 and V1 combined
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
@@ -338,7 +351,7 @@ async fn parse_v2_token(
                                 .or_insert(1);
                         }
                         if let Some((token_ownership, current_token_ownership)) =
-                            TokenOwnershipV2::get_v1_from_write_table_item(
+                            RawTokenOwnershipV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -366,7 +379,7 @@ async fn parse_v2_token(
                     },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
-                            TokenOwnershipV2::get_v1_from_delete_table_item(
+                            RawTokenOwnershipV2::get_v1_from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -404,11 +417,12 @@ async fn parse_v2_token(
                             .unwrap()
                         {
                             // Add NFT ownership
-                            let mut ownerships = TokenOwnershipV2::get_nft_v2_from_token_data(
-                                &raw_token_data,
-                                &token_v2_metadata_helper,
-                            )
-                            .unwrap();
+                            let (mut ownerships, _) =
+                                RawTokenOwnershipV2::get_nft_v2_from_token_data(
+                                    &raw_token_data,
+                                    &token_v2_metadata_helper,
+                                )
+                                .unwrap();
                             if let Some(current_nft_ownership) = ownerships.first() {
                                 // Note that the first element in ownerships is the current ownership. We need to cache
                                 // it in prior_nft_ownership so that moving forward if we see a burn we'll know
@@ -435,7 +449,7 @@ async fn parse_v2_token(
                         }
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
+                            RawTokenOwnershipV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -443,6 +457,9 @@ async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 &token_v2_metadata_helper,
+                                conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
                             .await
                             .unwrap()
@@ -464,14 +481,18 @@ async fn parse_v2_token(
                     },
                     Change::DeleteResource(resource) => {
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
+                            RawTokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
+                                conn,
+                                query_retries,
+                                query_retry_delay_ms,
                             )
+                            .await
                             .unwrap()
                         {
                             token_ownerships_v2.push(nft_ownership);
