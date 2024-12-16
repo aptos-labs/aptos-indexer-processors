@@ -6,12 +6,14 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        coin_models::coin_utils::{CoinInfoType, CoinResource},
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        resources::FromWriteResource,
-        token_v2_models::v2_token_utils::TokenStandard,
+    db::{
+        common::models::token_v2_models::v2_token_utils::TokenStandard,
+        postgres::models::{
+            coin_models::coin_utils::{CoinInfoType, CoinResource},
+            fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            resources::FromWriteResource,
+        },
     },
     utils::util::standardize_address,
 };
@@ -19,7 +21,6 @@ use ahash::AHashMap;
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
-
 // This is the asset type
 pub type FungibleAssetMetadataPK = String;
 pub type FungibleAssetMetadataMapping =

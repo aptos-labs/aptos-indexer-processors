@@ -8,8 +8,12 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::token_v2_models::raw_v2_token_datas::{
-            RawTokenDataV2, TokenDataV2Convertible,
+        common::models::token_v2_models::{
+            raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
+            raw_v2_token_ownerships::NFTOwnershipV2,
+            v2_token_utils::{
+                Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+            },
         },
         parquet::models::token_v2_models::{
             v2_token_datas::TokenDataV2, v2_token_ownerships::TokenOwnershipV2,
@@ -21,12 +25,6 @@ use crate::{
             },
             resources::{FromWriteResource, V2TokenResource},
             token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
-            token_v2_models::{
-                v2_token_ownerships::NFTOwnershipV2,
-                v2_token_utils::{
-                    Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
-                },
-            },
         },
     },
     gap_detectors::ProcessingResult,

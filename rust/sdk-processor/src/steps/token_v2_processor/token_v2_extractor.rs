@@ -14,6 +14,9 @@ use processor::{
             raw_v2_token_activities::TokenActivityV2Convertible,
             raw_v2_token_datas::{CurrentTokenDataV2Convertible, TokenDataV2Convertible},
             raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
+            raw_v2_token_ownerships::{
+                CurrentTokenOwnershipV2Convertible, TokenOwnershipV2Convertible,
+            },
         },
         postgres::models::{
             token_models::{token_claims::CurrentTokenPendingClaim, tokens::TableMetadataForToken},
@@ -108,12 +111,12 @@ impl Processable for TokenV2Extractor {
         let (
             collections_v2,
             raw_token_datas_v2,
-            token_ownerships_v2,
+            raw_token_ownerships_v2,
             current_collections_v2,
             raw_current_token_datas_v2,
             raw_current_deleted_token_datas_v2,
-            current_token_ownerships_v2,
-            current_deleted_token_ownerships_v2,
+            raw_current_token_ownerships_v2,
+            raw_current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
             raw_current_token_v2_metadata,
             raw_current_token_royalties_v1,
@@ -165,16 +168,33 @@ impl Processable for TokenV2Extractor {
                 .map(CurrentTokenDataV2::from_raw)
                 .collect();
 
+        let postgres_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+            .into_iter()
+            .map(TokenOwnershipV2::from_raw)
+            .collect();
+
+        let postgres_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+            raw_current_token_ownerships_v2
+                .into_iter()
+                .map(CurrentTokenOwnershipV2::from_raw)
+                .collect();
+
+        let postgres_current_deleted_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+            raw_current_deleted_token_ownerships_v2
+                .into_iter()
+                .map(CurrentTokenOwnershipV2::from_raw)
+                .collect();
+
         Ok(Some(TransactionContext {
             data: (
                 collections_v2,
                 postgres_token_datas_v2,
-                token_ownerships_v2,
+                postgres_token_ownerships_v2,
                 current_collections_v2,
                 postgres_current_token_datas_v2,
                 postgress_current_deleted_token_datas_v2,
-                current_token_ownerships_v2,
-                current_deleted_token_ownerships_v2,
+                postgres_current_token_ownerships_v2,
+                postgres_current_deleted_token_ownerships_v2,
                 postgres_token_activities_v2,
                 postgres_current_token_v2_metadata,
                 postgres_current_token_royalties_v1,
