@@ -49,16 +49,16 @@ impl GetTimeStamp for AnsLookupV2 {
 }
 
 impl AnsLookupV2Convertible for AnsLookupV2 {
-    fn from_raw(raw_item: &RawAnsLookupV2) -> Self {
+    fn from_raw(raw_item: RawAnsLookupV2) -> Self {
         AnsLookupV2 {
             transaction_version: raw_item.transaction_version,
             write_set_change_index: raw_item.write_set_change_index,
-            domain: raw_item.domain.clone(),
-            subdomain: raw_item.subdomain.clone(),
-            token_standard: raw_item.token_standard.clone(),
-            registered_address: raw_item.registered_address.clone(),
+            domain: raw_item.domain,
+            subdomain: raw_item.subdomain,
+            token_standard: raw_item.token_standard,
+            registered_address: raw_item.registered_address,
             expiration_timestamp: raw_item.expiration_timestamp,
-            token_name: raw_item.token_name.clone(),
+            token_name: raw_item.token_name,
             is_deleted: raw_item.is_deleted,
             subdomain_expiration_policy: raw_item.subdomain_expiration_policy,
         }
@@ -97,15 +97,15 @@ impl GetTimeStamp for CurrentAnsLookupV2 {
 }
 
 impl CurrentAnsLookupV2Convertible for CurrentAnsLookupV2 {
-    fn from_raw(raw_item: &RawCurrentAnsLookupV2) -> Self {
+    fn from_raw(raw_item: RawCurrentAnsLookupV2) -> Self {
         CurrentAnsLookupV2 {
-            domain: raw_item.domain.clone(),
-            subdomain: raw_item.subdomain.clone(),
-            token_standard: raw_item.token_standard.clone(),
-            registered_address: raw_item.registered_address.clone(),
+            domain: raw_item.domain,
+            subdomain: raw_item.subdomain,
+            token_standard: raw_item.token_standard,
+            registered_address: raw_item.registered_address,
             last_transaction_version: raw_item.last_transaction_version,
             expiration_timestamp: raw_item.expiration_timestamp,
-            token_name: raw_item.token_name.clone(),
+            token_name: raw_item.token_name,
             is_deleted: raw_item.is_deleted,
             subdomain_expiration_policy: raw_item.subdomain_expiration_policy,
         }

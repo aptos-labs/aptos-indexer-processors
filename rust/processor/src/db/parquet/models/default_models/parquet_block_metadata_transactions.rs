@@ -50,16 +50,16 @@ impl GetTimeStamp for BlockMetadataTransaction {
 }
 
 impl BlockMetadataTransactionConvertible for BlockMetadataTransaction {
-    fn from_raw(raw_item: &RawBlockMetadataTransaction) -> Self {
+    fn from_raw(raw_item: RawBlockMetadataTransaction) -> Self {
         BlockMetadataTransaction {
             txn_version: raw_item.version,
             block_height: raw_item.block_height,
-            block_id: raw_item.id.clone(),
+            block_id: raw_item.id,
             round: raw_item.round,
             epoch: raw_item.epoch,
-            previous_block_votes_bitvec: raw_item.previous_block_votes_bitvec.clone(),
-            proposer: raw_item.proposer.clone(),
-            failed_proposer_indices: raw_item.failed_proposer_indices.clone(),
+            previous_block_votes_bitvec: raw_item.previous_block_votes_bitvec,
+            proposer: raw_item.proposer,
+            failed_proposer_indices: raw_item.failed_proposer_indices,
             block_timestamp: raw_item.timestamp,
             since_unix_epoch: raw_item.ns_since_unix_epoch,
         }
@@ -120,7 +120,7 @@ mod tests {
             ns_since_unix_epoch: compute_nanos_since_epoch(time_stamp),
         };
 
-        let block_metadata_transaction = BlockMetadataTransaction::from_raw(&raw);
+        let block_metadata_transaction = BlockMetadataTransaction::from_raw(raw);
 
         assert_eq!(block_metadata_transaction.txn_version, 1);
         assert_eq!(block_metadata_transaction.block_height, 1);

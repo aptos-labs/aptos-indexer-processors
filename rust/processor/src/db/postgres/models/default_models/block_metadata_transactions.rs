@@ -30,11 +30,11 @@ pub struct BlockMetadataTransactionPG {
 }
 
 impl BlockMetadataTransactionConvertible for BlockMetadataTransactionPG {
-    fn from_raw(raw_item: &RawBlockMetadataTransaction) -> Self {
+    fn from_raw(raw_item: RawBlockMetadataTransaction) -> Self {
         BlockMetadataTransactionPG {
             version: raw_item.version,
             block_height: raw_item.block_height,
-            id: raw_item.id.clone(),
+            id: raw_item.id,
             round: raw_item.round,
             epoch: raw_item.epoch,
             previous_block_votes_bitvec: serde_json::from_str(
@@ -45,7 +45,7 @@ impl BlockMetadataTransactionConvertible for BlockMetadataTransactionPG {
                 raw_item.failed_proposer_indices.as_str(),
             )
             .unwrap(),
-            proposer: raw_item.proposer.clone(),
+            proposer: raw_item.proposer,
             timestamp: raw_item.timestamp,
         }
     }

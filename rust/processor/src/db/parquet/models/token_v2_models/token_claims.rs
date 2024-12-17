@@ -55,7 +55,6 @@ impl GetTimeStamp for CurrentTokenPendingClaim {
 }
 
 impl CurrentTokenPendingClaimConvertible for CurrentTokenPendingClaim {
-    // TODO: consider returning a Result
     fn from_raw(raw_item: RawCurrentTokenPendingClaim) -> Self {
         Self {
             token_data_id_hash: raw_item.token_data_id_hash,

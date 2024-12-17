@@ -7,14 +7,18 @@
 
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::common::models::token_v2_models::raw_v2_token_metadata::{
-        CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata,
+    db::{
+        common::models::token_v2_models::raw_v2_token_metadata::{
+            CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata,
+        },
+        parquet::models::DEFAULT_NONE,
     },
 };
 use allocative_derive::Allocative;
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
@@ -50,7 +54,10 @@ impl CurrentTokenV2MetadataConvertible for CurrentTokenV2Metadata {
         Self {
             object_address: raw_item.object_address,
             resource_type: raw_item.resource_type,
-            data: canonical_json::to_string(&raw_item.data).unwrap(), // TODO: handle better
+            data: canonical_json::to_string(&raw_item.data).unwrap_or_else(|_| {
+                error!("Failed to serialize data to JSON: {:?}", raw_item.data);
+                DEFAULT_NONE.to_string()
+            }),
             state_key_hash: raw_item.state_key_hash,
             last_transaction_version: raw_item.last_transaction_version,
             last_transaction_timestamp: raw_item.last_transaction_timestamp,

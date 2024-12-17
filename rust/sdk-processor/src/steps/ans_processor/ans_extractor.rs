@@ -124,18 +124,18 @@ impl Processable for AnsExtractor {
         }
 
         let postgres_current_ans_lookups_v2: Vec<CurrentAnsLookupV2> = raw_current_ans_lookups_v2
-            .iter()
+            .into_iter()
             .map(CurrentAnsLookupV2::from_raw)
             .collect();
 
         let postgres_ans_lookups_v2: Vec<AnsLookupV2> = raw_ans_lookups_v2
-            .iter()
+            .into_iter()
             .map(AnsLookupV2::from_raw)
             .collect();
 
         let postgres_current_ans_primary_names_v2: Vec<CurrentAnsPrimaryNameV2> =
             raw_current_ans_primary_names_v2
-                .iter()
+                .into_iter()
                 .map(CurrentAnsPrimaryNameV2::from_raw)
                 .collect();
 

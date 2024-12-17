@@ -17,9 +17,9 @@ use crate::{
 };
 use allocative_derive::Allocative;
 use anyhow::Context;
-use bigdecimal::ToPrimitive;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct TokenDataV2 {
@@ -28,7 +28,7 @@ pub struct TokenDataV2 {
     pub token_data_id: String,
     pub collection_id: String,
     pub token_name: String,
-    pub largest_property_version_v1: Option<u64>,
+    pub largest_property_version_v1: Option<String>, // String format of BigDecimal
     pub token_uri: String,
     pub token_properties: String,
     pub description: String,
@@ -63,13 +63,9 @@ impl TokenDataV2Convertible for TokenDataV2 {
             token_data_id: raw_item.token_data_id,
             collection_id: raw_item.collection_id,
             token_name: raw_item.token_name,
-            largest_property_version_v1: Some(
-                raw_item
-                    .largest_property_version_v1
-                    .unwrap()
-                    .to_u64()
-                    .unwrap(),
-            ),
+            largest_property_version_v1: raw_item
+                .largest_property_version_v1
+                .map(|v| v.to_string()),
             token_uri: raw_item.token_uri,
             token_properties: canonical_json::to_string(&raw_item.token_properties.clone())
                 .context("Failed to serialize token properties")
@@ -88,9 +84,9 @@ pub struct CurrentTokenDataV2 {
     pub token_data_id: String,
     pub collection_id: String,
     pub token_name: String,
-    pub maximum: Option<String>, // BigDecimal
-    pub supply: Option<String>,
-    pub largest_property_version_v1: Option<u64>,
+    pub maximum: Option<String>,                     // BigDecimal
+    pub supply: Option<String>,                      // BigDecimal
+    pub largest_property_version_v1: Option<String>, // String format of BigDecimal
     pub token_uri: String,
     pub token_properties: String, // serde_json::Value,
     pub description: String,
@@ -126,25 +122,28 @@ impl CurrentTokenDataV2Convertible for CurrentTokenDataV2 {
             token_data_id: raw_item.token_data_id,
             collection_id: raw_item.collection_id,
             token_name: raw_item.token_name,
-            maximum: raw_item
-                .maximum
-                .map_or(Some(DEFAULT_NONE.to_string()), |v| Some(v.to_string())),
-            supply: raw_item
-                .supply
-                .map_or(Some(DEFAULT_NONE.to_string()), |v| Some(v.to_string())),
+            maximum: raw_item.maximum.map(|v| v.to_string()),
+            supply: raw_item.supply.map(|v| v.to_string()),
             largest_property_version_v1: raw_item
                 .largest_property_version_v1
-                .map(|v| v.to_u64().unwrap_or(0)),
+                .map(|v| v.to_string()),
             token_uri: raw_item.token_uri,
-            token_properties: canonical_json::to_string(&raw_item.token_properties)
-                .unwrap_or_else(|_| DEFAULT_NONE.to_string()),
+            token_properties: canonical_json::to_string(&raw_item.token_properties).unwrap_or_else(
+                |_| {
+                    error!(
+                        "Failed to serialize token_properties to JSON: {:?}",
+                        raw_item.token_properties
+                    );
+                    DEFAULT_NONE.to_string()
+                },
+            ),
             description: raw_item.description,
             token_standard: raw_item.token_standard,
-            is_fungible_v2: raw_item.is_fungible_v2.or(Some(false)), // Defaulting to false if None
+            is_fungible_v2: raw_item.is_fungible_v2,
             last_transaction_version: raw_item.last_transaction_version,
             last_transaction_timestamp: raw_item.last_transaction_timestamp,
             decimals: raw_item.decimals,
-            is_deleted_v2: raw_item.is_deleted_v2.or(Some(false)), // Defaulting to false if None
+            is_deleted_v2: raw_item.is_deleted_v2,
         }
     }
 }

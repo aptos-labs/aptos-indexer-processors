@@ -66,7 +66,7 @@ impl Processable for ParquetDefaultExtractor {
             .collect();
         let parquet_block_metadata_transactions: Vec<BlockMetadataTransaction> =
             raw_block_metadata_transactions
-                .iter()
+                .into_iter()
                 .map(BlockMetadataTransaction::from_raw)
                 .collect();
         let parquet_table_metadata: Vec<TableMetadata> = raw_table_metadata

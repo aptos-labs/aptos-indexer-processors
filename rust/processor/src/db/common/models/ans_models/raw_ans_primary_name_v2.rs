@@ -32,7 +32,7 @@ pub struct RawAnsPrimaryNameV2 {
 }
 
 pub trait AnsPrimaryNameV2Convertible {
-    fn from_raw(raw_item: &RawAnsPrimaryNameV2) -> Self;
+    fn from_raw(raw_item: RawAnsPrimaryNameV2) -> Self;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -158,5 +158,5 @@ impl RawCurrentAnsPrimaryNameV2 {
 }
 
 pub trait CurrentAnsPrimaryNameV2Convertible {
-    fn from_raw(raw_item: &RawCurrentAnsPrimaryNameV2) -> Self;
+    fn from_raw(raw_item: RawCurrentAnsPrimaryNameV2) -> Self;
 }
