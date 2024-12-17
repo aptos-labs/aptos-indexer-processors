@@ -12,7 +12,7 @@ use crate::{
         },
         postgres::models::default_models::move_tables::TableItem,
     },
-    schema::{current_delegator_balances, delegator_balances},
+    schema::current_delegator_balances,
     utils::{
         database::DbPoolConnection,
         util::{parse_timestamp, standardize_address},
@@ -27,7 +27,6 @@ use bigdecimal::{BigDecimal, Zero};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 pub type TableHandle = String;
@@ -38,9 +37,7 @@ pub type RawCurrentDelegatorBalancePK = (Address, Address, String);
 pub type RawCurrentDelegatorBalanceMap =
     AHashMap<RawCurrentDelegatorBalancePK, RawCurrentDelegatorBalance>;
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(delegator_address, pool_address, pool_type))]
-#[diesel(table_name = current_delegator_balances)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RawCurrentDelegatorBalance {
     pub delegator_address: String,
     pub pool_address: String,
@@ -49,15 +46,14 @@ pub struct RawCurrentDelegatorBalance {
     pub last_transaction_version: i64,
     pub shares: BigDecimal,
     pub parent_table_handle: String,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 pub trait RawCurrentDelegatorBalanceConvertible {
     fn from_raw(raw: RawCurrentDelegatorBalance) -> Self;
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(transaction_version, write_set_change_index))]
-#[diesel(table_name = delegator_balances)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RawDelegatorBalance {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
@@ -67,6 +63,7 @@ pub struct RawDelegatorBalance {
     pub table_handle: String,
     pub shares: BigDecimal,
     pub parent_table_handle: String,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 pub trait RawDelegatorBalanceConvertible {
@@ -134,6 +131,7 @@ impl RawCurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: shares.clone(),
                     parent_table_handle: table_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -143,6 +141,7 @@ impl RawCurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares,
                     parent_table_handle: table_handle,
+                    block_timestamp,
                 },
             )))
         } else {
@@ -228,6 +227,7 @@ impl RawCurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: shares.clone(),
                     parent_table_handle: inactive_pool_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -237,6 +237,7 @@ impl RawCurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares,
                     parent_table_handle: inactive_pool_handle,
+                    block_timestamp,
                 },
             )))
         } else {
@@ -250,9 +251,11 @@ impl RawCurrentDelegatorBalance {
         txn_version: i64,
         write_set_change_index: i64,
         active_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(RawDelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item is an active share table
+
         if let Some(pool_balance) = active_pool_to_staking_pool.get(&table_handle) {
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
@@ -266,6 +269,7 @@ impl RawCurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: BigDecimal::zero(),
                     parent_table_handle: table_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -275,6 +279,7 @@ impl RawCurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares: BigDecimal::zero(),
                     parent_table_handle: table_handle,
+                    block_timestamp,
                 },
             )));
         }
@@ -291,6 +296,7 @@ impl RawCurrentDelegatorBalance {
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(RawDelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
@@ -327,6 +333,7 @@ impl RawCurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: BigDecimal::zero(),
                     parent_table_handle: inactive_pool_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -336,6 +343,7 @@ impl RawCurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares: BigDecimal::zero(),
                     parent_table_handle: table_handle,
+                    block_timestamp,
                 },
             )));
         }
@@ -469,6 +477,7 @@ impl RawCurrentDelegatorBalance {
                             txn_version,
                             index as i64,
                             active_pool_to_staking_pool,
+                            txn_timestamp,
                         )
                         .unwrap()
                     {
@@ -483,6 +492,7 @@ impl RawCurrentDelegatorBalance {
                             conn,
                             query_retries,
                             query_retry_delay_ms,
+                            txn_timestamp,
                         )
                         .await
                         .unwrap()
