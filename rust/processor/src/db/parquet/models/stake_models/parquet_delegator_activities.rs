@@ -1,5 +1,5 @@
 use crate::{
-    bq_analytics::generic_parquet_processor::NamedTable,
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::stake_models::delegator_activities::{
         RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
     },
@@ -23,8 +23,20 @@ pub struct DelegatedStakingActivity {
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
+impl HasVersion for DelegatedStakingActivity {
+    fn version(&self) -> i64 {
+        self.transaction_version
+    }
+}
+
 impl NamedTable for DelegatedStakingActivity {
     const TABLE_NAME: &'static str = "delegated_staking_activities";
+}
+
+impl GetTimeStamp for DelegatedStakingActivity {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
 }
 
 impl RawDelegatedStakingActivityConvertible for DelegatedStakingActivity {

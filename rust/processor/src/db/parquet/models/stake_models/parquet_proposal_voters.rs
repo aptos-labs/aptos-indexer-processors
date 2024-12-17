@@ -1,5 +1,5 @@
 use crate::{
-    bq_analytics::generic_parquet_processor::NamedTable,
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::stake_models::proposal_voters::{
         RawProposalVote, RawProposalVoteConvertible,
     },
@@ -25,6 +25,18 @@ pub struct ProposalVote {
 
 impl NamedTable for ProposalVote {
     const TABLE_NAME: &'static str = "proposal_votes";
+}
+
+impl HasVersion for ProposalVote {
+    fn version(&self) -> i64 {
+        self.transaction_version
+    }
+}
+
+impl GetTimeStamp for ProposalVote {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.transaction_timestamp
+    }
 }
 
 impl RawProposalVoteConvertible for ProposalVote {

@@ -4,7 +4,7 @@ use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bq_analytics::generic_parquet_processor::NamedTable,
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::stake_models::delegator_balances::{
         RawCurrentDelegatorBalance, RawCurrentDelegatorBalanceConvertible, RawDelegatorBalance,
         RawDelegatorBalanceConvertible,
@@ -25,9 +25,6 @@ pub struct CurrentDelegatorBalance {
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }
-impl NamedTable for CurrentDelegatorBalance {
-    const TABLE_NAME: &'static str = "current_delegator_balances";
-}
 
 impl RawCurrentDelegatorBalanceConvertible for CurrentDelegatorBalance {
     fn from_raw(raw: RawCurrentDelegatorBalance) -> Self {
@@ -41,6 +38,22 @@ impl RawCurrentDelegatorBalanceConvertible for CurrentDelegatorBalance {
             parent_table_handle: raw.parent_table_handle,
             block_timestamp: raw.block_timestamp,
         }
+    }
+}
+
+impl HasVersion for CurrentDelegatorBalance {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl NamedTable for CurrentDelegatorBalance {
+    const TABLE_NAME: &'static str = "current_delegator_balances";
+}
+
+impl GetTimeStamp for CurrentDelegatorBalance {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
     }
 }
 
@@ -62,6 +75,18 @@ pub struct DelegatorBalance {
 
 impl NamedTable for DelegatorBalance {
     const TABLE_NAME: &'static str = "delegator_balances";
+}
+
+impl HasVersion for DelegatorBalance {
+    fn version(&self) -> i64 {
+        self.transaction_version
+    }
+}
+
+impl GetTimeStamp for DelegatorBalance {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
 }
 
 impl RawDelegatorBalanceConvertible for DelegatorBalance {

@@ -14,13 +14,13 @@ use processor::{
     db::{
         common::models::stake_models::{
             current_delegated_voter::CurrentDelegatedVoter, delegator_pools::DelegatorPool,
-            staking_pool_voter::CurrentStakingPoolVoter,
         },
         postgres::models::stake_models::{
             delegator_activities::DelegatedStakingActivity,
             delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
             delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
             proposal_votes::ProposalVote,
+            staking_pool_voter::CurrentStakingPoolVoter,
         },
     },
     processors::stake_processor::{

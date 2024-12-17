@@ -30,7 +30,7 @@ use crate::{
             delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
             delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
             proposal_votes::ProposalVote,
-            staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
+            staking_pool_voter::CurrentStakingPoolVoter,
         },
     },
     gap_detectors::ProcessingResult,

@@ -6,14 +6,10 @@
 
 use crate::{
     db::common::models::stake_models::stake_utils::StakeResource,
-    schema::current_staking_pool_voter,
     utils::util::{parse_timestamp, standardize_address},
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
-use field_count::FieldCount;
-use serde::{Deserialize, Serialize};
-
 type StakingPoolAddress = String;
 pub type StakingPoolRawVoterMap = AHashMap<StakingPoolAddress, RawCurrentStakingPoolVoter>;
 
