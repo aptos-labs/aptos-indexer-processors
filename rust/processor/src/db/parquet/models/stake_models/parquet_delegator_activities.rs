@@ -1,12 +1,13 @@
-use crate::db::common::models::stake_models::delegator_activities::{
-    RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
+use crate::{
+    bq_analytics::generic_parquet_processor::NamedTable,
+    db::common::models::stake_models::delegator_activities::{
+        RawDelegatedStakingActivity, RawDelegatedStakingActivityConvertible,
+    },
 };
 use allocative_derive::Allocative;
 use field_count::FieldCount;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
-
-pub type BigDecimalString = String;
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
@@ -20,6 +21,10 @@ pub struct DelegatedStakingActivity {
     pub amount: String, // BigDecimal
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
+}
+
+impl NamedTable for DelegatedStakingActivity {
+    const TABLE_NAME: &'static str = "delegated_staking_activities";
 }
 
 impl RawDelegatedStakingActivityConvertible for DelegatedStakingActivity {

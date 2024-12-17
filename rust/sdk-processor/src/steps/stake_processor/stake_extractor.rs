@@ -102,7 +102,7 @@ impl Processable for StakeExtractor {
             })?;
 
         let (
-            all_current_stake_pool_voters,
+            raw_all_current_stake_pool_voters,
             raw_all_proposal_votes,
             raw_all_delegator_activities,
             raw_all_delegator_balances,
@@ -157,6 +157,10 @@ impl Processable for StakeExtractor {
         let all_proposal_votes = raw_all_proposal_votes
             .into_iter()
             .map(ProposalVote::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_stake_pool_voters = raw_all_current_stake_pool_voters
+            .into_iter()
+            .map(CurrentStakingPoolVoter::from_raw)
             .collect::<Vec<_>>();
 
         Ok(Some(TransactionContext {

@@ -20,13 +20,17 @@ use crate::{
             },
             proposal_voters::{RawProposalVote, RawProposalVoteConvertible},
             stake_utils::DelegationVoteGovernanceRecordsResource,
-            staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
+            staking_pool_voter::{
+                RawCurrentStakingPoolVoter, RawCurrentStakingPoolVoterConvertible,
+                StakingPoolRawVoterMap,
+            },
         },
         postgres::models::stake_models::{
             delegator_activities::DelegatedStakingActivity,
             delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
             delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
             proposal_votes::ProposalVote,
+            staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
         },
     },
     gap_detectors::ProcessingResult,
@@ -402,7 +406,7 @@ pub async fn parse_stake_data(
     query_retry_delay_ms: u64,
 ) -> Result<
     (
-        Vec<CurrentStakingPoolVoter>,
+        Vec<RawCurrentStakingPoolVoter>,
         Vec<RawProposalVote>,
         Vec<RawDelegatedStakingActivity>,
         Vec<RawDelegatorBalance>,
@@ -414,7 +418,7 @@ pub async fn parse_stake_data(
     ),
     anyhow::Error,
 > {
-    let mut all_current_stake_pool_voters: StakingPoolVoterMap = AHashMap::new();
+    let mut all_current_stake_pool_voters: StakingPoolRawVoterMap = AHashMap::new();
     let mut all_proposal_votes = vec![];
     let mut all_delegator_activities = vec![];
     let mut all_delegator_balances = vec![];
@@ -430,7 +434,7 @@ pub async fn parse_stake_data(
 
     for txn in transactions {
         // Add votes data
-        let current_stake_pool_voter = CurrentStakingPoolVoter::from_transaction(txn).unwrap();
+        let current_stake_pool_voter = RawCurrentStakingPoolVoter::from_transaction(txn).unwrap();
         all_current_stake_pool_voters.extend(current_stake_pool_voter);
         let mut proposal_votes = RawProposalVote::from_transaction(txn).unwrap();
         all_proposal_votes.append(&mut proposal_votes);
@@ -538,7 +542,7 @@ pub async fn parse_stake_data(
     // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
     let mut all_current_stake_pool_voters = all_current_stake_pool_voters
         .into_values()
-        .collect::<Vec<CurrentStakingPoolVoter>>();
+        .collect::<Vec<RawCurrentStakingPoolVoter>>();
     let mut all_current_delegator_balances = all_current_delegator_balances
         .into_values()
         .collect::<Vec<RawCurrentDelegatorBalance>>();
@@ -602,7 +606,7 @@ impl ProcessorTrait for StakeProcessor {
         let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
         let (
-            all_current_stake_pool_voters,
+            raw_all_current_stake_pool_voters,
             raw_all_proposal_votes,
             raw_all_delegator_activities,
             raw_all_delegator_balances,
@@ -647,6 +651,10 @@ impl ProcessorTrait for StakeProcessor {
         let all_proposal_votes = raw_all_proposal_votes
             .into_iter()
             .map(ProposalVote::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_stake_pool_voters = raw_all_current_stake_pool_voters
+            .into_iter()
+            .map(CurrentStakingPoolVoter::from_raw)
             .collect::<Vec<_>>();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();

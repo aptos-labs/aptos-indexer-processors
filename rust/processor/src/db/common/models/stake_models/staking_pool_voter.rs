@@ -6,7 +6,8 @@
 
 use crate::{
     db::common::models::stake_models::stake_utils::StakeResource,
-    schema::current_staking_pool_voter, utils::util::standardize_address,
+    schema::current_staking_pool_voter,
+    utils::util::{parse_timestamp, standardize_address},
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
@@ -14,23 +15,30 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 type StakingPoolAddress = String;
-pub type StakingPoolVoterMap = AHashMap<StakingPoolAddress, CurrentStakingPoolVoter>;
+pub type StakingPoolRawVoterMap = AHashMap<StakingPoolAddress, RawCurrentStakingPoolVoter>;
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(staking_pool_address))]
-#[diesel(table_name = current_staking_pool_voter)]
-pub struct CurrentStakingPoolVoter {
+pub struct RawCurrentStakingPoolVoter {
     pub staking_pool_address: String,
     pub voter_address: String,
     pub last_transaction_version: i64,
     pub operator_address: String,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
-impl CurrentStakingPoolVoter {
-    pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<StakingPoolVoterMap> {
+pub trait RawCurrentStakingPoolVoterConvertible {
+    fn from_raw(raw: RawCurrentStakingPoolVoter) -> Self;
+}
+
+impl RawCurrentStakingPoolVoter {
+    pub fn from_transaction(transaction: &Transaction) -> anyhow::Result<StakingPoolRawVoterMap> {
         let mut staking_pool_voters = AHashMap::new();
 
         let txn_version = transaction.version as i64;
+        let timestamp = transaction
+            .timestamp
+            .as_ref()
+            .expect("Transaction timestamp doesn't exist!");
+        let block_timestamp = parse_timestamp(timestamp, txn_version);
         for wsc in &transaction.info.as_ref().unwrap().changes {
             if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                 if let Some(StakeResource::StakePool(inner)) =
@@ -38,12 +46,16 @@ impl CurrentStakingPoolVoter {
                 {
                     let staking_pool_address =
                         standardize_address(&write_resource.address.to_string());
-                    staking_pool_voters.insert(staking_pool_address.clone(), Self {
-                        staking_pool_address,
-                        voter_address: inner.get_delegated_voter(),
-                        last_transaction_version: txn_version,
-                        operator_address: inner.get_operator_address(),
-                    });
+                    staking_pool_voters.insert(
+                        staking_pool_address.clone(),
+                        Self {
+                            staking_pool_address,
+                            voter_address: inner.get_delegated_voter(),
+                            last_transaction_version: txn_version,
+                            operator_address: inner.get_operator_address(),
+                            block_timestamp,
+                        },
+                    );
                 }
             }
         }
