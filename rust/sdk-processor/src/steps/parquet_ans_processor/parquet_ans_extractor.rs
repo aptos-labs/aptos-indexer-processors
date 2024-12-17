@@ -67,23 +67,23 @@ impl Processable for ParquetAnsExtractor {
         );
 
         let parquet_ans_lookup_v2: Vec<AnsLookupV2> = raw_ans_lookups_v2
-            .iter()
+            .into_iter()
             .map(AnsLookupV2::from_raw)
             .collect();
 
         let parquet_current_ans_lookup_v2: Vec<CurrentAnsLookupV2> = raw_current_ans_lookups_v2
-            .iter()
+            .into_iter()
             .map(CurrentAnsLookupV2::from_raw)
             .collect();
 
         let parquet_current_ans_primary_name_v2: Vec<CurrentAnsPrimaryNameV2> =
             raw_current_ans_primary_names_v2
-                .iter()
+                .into_iter()
                 .map(CurrentAnsPrimaryNameV2::from_raw)
                 .collect();
 
         let parquet_ans_primary_name_v2: Vec<AnsPrimaryNameV2> = raw_ans_primary_name_v2
-            .iter()
+            .into_iter()
             .map(AnsPrimaryNameV2::from_raw)
             .collect();
 

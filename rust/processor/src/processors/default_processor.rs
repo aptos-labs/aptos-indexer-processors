@@ -244,7 +244,7 @@ impl ProcessorTrait for DefaultProcessor {
 
         let postgres_block_metadata_transactions: Vec<BlockMetadataTransactionModel> =
             raw_block_metadata_transactions
-                .iter()
+                .into_iter()
                 .map(BlockMetadataTransactionModel::from_raw)
                 .collect();
 
