@@ -36,6 +36,7 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
+        object_models::v2_objects::{CurrentObject, Object},
         stake_models::{
             parquet_delegator_activities::DelegatedStakingActivity,
             parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
@@ -68,6 +69,7 @@ pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_objects_processor;
 pub mod parquet_stake_processor;
 pub mod parquet_token_v2_processor;
 pub mod parquet_transaction_metadata_processor;
@@ -140,6 +142,9 @@ pub enum ParquetTypeEnum {
     CurrentDelegatorBalances,
     DelegatorBalances,
     ProposalVotes,
+    // Objects
+    Objects,
+    CurrentObjects,
 }
 
 /// Trait for handling various Parquet types.
@@ -254,7 +259,8 @@ impl_parquet_trait!(
 );
 impl_parquet_trait!(DelegatorBalance, ParquetTypeEnum::DelegatorBalances);
 impl_parquet_trait!(ProposalVote, ParquetTypeEnum::ProposalVotes);
-
+impl_parquet_trait!(Object, ParquetTypeEnum::Objects);
+impl_parquet_trait!(CurrentObject, ParquetTypeEnum::CurrentObjects);
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
 pub enum ParquetTypeStructs {
@@ -300,6 +306,9 @@ pub enum ParquetTypeStructs {
     CurrentDelegatorBalance(Vec<CurrentDelegatorBalance>),
     DelegatorBalance(Vec<DelegatorBalance>),
     ProposalVote(Vec<ProposalVote>),
+    // Objects
+    Object(Vec<Object>),
+    CurrentObject(Vec<CurrentObject>),
 }
 
 impl ParquetTypeStructs {
@@ -370,6 +379,8 @@ impl ParquetTypeStructs {
             },
             ParquetTypeEnum::DelegatorBalances => ParquetTypeStructs::DelegatorBalance(Vec::new()),
             ParquetTypeEnum::ProposalVotes => ParquetTypeStructs::ProposalVote(Vec::new()),
+            ParquetTypeEnum::Objects => ParquetTypeStructs::Object(Vec::new()),
+            ParquetTypeEnum::CurrentObjects => ParquetTypeStructs::CurrentObject(Vec::new()),
         }
     }
 
@@ -576,6 +587,15 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::ProposalVote(self_data),
                 ParquetTypeStructs::ProposalVote(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (ParquetTypeStructs::Object(self_data), ParquetTypeStructs::Object(other_data)) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentObject(self_data),
+                ParquetTypeStructs::CurrentObject(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

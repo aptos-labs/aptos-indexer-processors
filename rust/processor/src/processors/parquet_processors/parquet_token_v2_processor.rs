@@ -8,13 +8,18 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::token_v2_models::{
-            raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
-            raw_v2_token_ownerships::{
-                NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+        common::models::{
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
-            v2_token_utils::{
-                Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+            token_v2_models::{
+                raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
+                raw_v2_token_ownerships::{
+                    NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+                },
+                v2_token_utils::{
+                    Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                },
             },
         },
         parquet::models::token_v2_models::{
@@ -22,9 +27,6 @@ use crate::{
         },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-            object_models::v2_object_utils::{
-                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
-            },
             resources::{FromWriteResource, V2TokenResource},
             token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         },
@@ -33,7 +35,7 @@ use crate::{
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{ArcDbPool, DbPoolConnection},
+        database::{ArcDbPool, DbContext},
         util::{parse_timestamp, standardize_address},
     },
 };
@@ -137,8 +139,6 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             &transactions,
             &table_handle_to_owner,
             &mut None,
-            0,
-            0,
             &mut transaction_version_to_struct_count,
         )
         .await;
@@ -191,9 +191,7 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut Option<DbPoolConnection<'_>>,
-    query_retries: u32,
-    query_retry_delay_ms: u64,
+    db_context: &mut Option<DbContext<'_>>,
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
 ) -> (Vec<RawTokenDataV2>, Vec<RawTokenOwnershipV2>) {
     // Token V2 and V1 combined
@@ -457,9 +455,7 @@ async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 &token_v2_metadata_helper,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
+                                db_context,
                             )
                             .await
                             .unwrap()
@@ -488,9 +484,7 @@ async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
+                                db_context,
                             )
                             .await
                             .unwrap()

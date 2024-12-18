@@ -6,9 +6,12 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::postgres::models::{
-        object_models::v2_object_utils::ObjectWithMetadata, resources::FromWriteResource,
-        user_transactions_models::user_transactions::UserTransaction,
+    db::{
+        common::models::object_models::v2_object_utils::ObjectWithMetadata,
+        postgres::models::{
+            resources::FromWriteResource,
+            user_transactions_models::user_transactions::UserTransaction,
+        },
     },
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, util::standardize_address},
 };

@@ -40,7 +40,7 @@ pub struct RawAnsLookupV2 {
 }
 
 pub trait AnsLookupV2Convertible {
-    fn from_raw(raw_item: &RawAnsLookupV2) -> Self;
+    fn from_raw(raw_item: RawAnsLookupV2) -> Self;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -165,5 +165,5 @@ impl RawCurrentAnsLookupV2 {
 }
 
 pub trait CurrentAnsLookupV2Convertible {
-    fn from_raw(raw_item: &RawCurrentAnsLookupV2) -> Self;
+    fn from_raw(raw_item: RawCurrentAnsLookupV2) -> Self;
 }

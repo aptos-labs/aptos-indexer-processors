@@ -24,7 +24,7 @@ pub struct AccountTransaction {
 }
 
 impl NamedTable for AccountTransaction {
-    const TABLE_NAME: &'static str = "fungible_asset_activities";
+    const TABLE_NAME: &'static str = "account_transactions";
 }
 
 impl HasVersion for AccountTransaction {

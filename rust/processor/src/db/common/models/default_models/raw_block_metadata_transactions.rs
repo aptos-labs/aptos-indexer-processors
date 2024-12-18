@@ -56,5 +56,5 @@ impl RawBlockMetadataTransaction {
 pub type RawBlockMetadataTransactionModel = RawBlockMetadataTransaction;
 
 pub trait BlockMetadataTransactionConvertible {
-    fn from_raw(raw_item: &RawBlockMetadataTransaction) -> Self;
+    fn from_raw(raw_item: RawBlockMetadataTransaction) -> Self;
 }

@@ -7,19 +7,21 @@
 
 use crate::{
     db::{
-        common::models::token_v2_models::{
-            raw_v2_token_datas::RawTokenDataV2,
-            v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
+        common::models::{
+            object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
+            token_v2_models::{
+                raw_v2_token_datas::RawTokenDataV2,
+                v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
+            },
         },
         postgres::models::{
-            object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
             resources::FromWriteResource,
             token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
         },
     },
     schema::current_token_ownerships_v2,
     utils::{
-        database::DbPoolConnection,
+        database::{DbContext, DbPoolConnection},
         util::{ensure_not_negative, standardize_address},
     },
 };
@@ -257,9 +259,7 @@ impl RawTokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         object_metadatas: &ObjectAggregatedDataMapping,
-        conn: &mut Option<DbPoolConnection<'_>>,
-        query_retries: u32,
-        query_retry_delay_ms: u64,
+        db_context: &mut Option<DbContext<'_>>,
     ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
         let token_data_id = standardize_address(&write_resource.address.to_string());
         if tokens_burned
@@ -326,9 +326,7 @@ impl RawTokenOwnershipV2 {
                     txn_timestamp,
                     prior_nft_ownership,
                     tokens_burned,
-                    conn,
-                    query_retries,
-                    query_retry_delay_ms,
+                    db_context,
                 )
                 .await;
             }
@@ -344,9 +342,7 @@ impl RawTokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        conn: &mut Option<DbPoolConnection<'_>>,
-        query_retries: u32,
-        query_retry_delay_ms: u64,
+        db_context: &mut Option<DbContext<'_>>,
     ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
         let token_address = standardize_address(&delete_resource.address.to_string());
         Self::get_burned_nft_v2_helper(
@@ -356,9 +352,7 @@ impl RawTokenOwnershipV2 {
             txn_timestamp,
             prior_nft_ownership,
             tokens_burned,
-            conn,
-            query_retries,
-            query_retry_delay_ms,
+            db_context,
         )
         .await
     }
@@ -370,9 +364,7 @@ impl RawTokenOwnershipV2 {
         txn_timestamp: chrono::NaiveDateTime,
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
-        conn: &mut Option<DbPoolConnection<'_>>,
-        query_retries: u32,
-        query_retry_delay_ms: u64,
+        db_context: &mut Option<DbContext<'_>>,
     ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
         let token_address = standardize_address(token_address);
         if let Some(burn_event) = tokens_burned.get(&token_address) {
@@ -387,7 +379,7 @@ impl RawTokenOwnershipV2 {
                 match prior_nft_ownership.get(&token_address) {
                     Some(inner) => inner.owner_address.clone(),
                     None => {
-                        match conn {
+                        match db_context {
                             None => {
                                 // TODO: update message
                                 tracing::error!(
@@ -397,12 +389,12 @@ impl RawTokenOwnershipV2 {
                                 );
                                 DEFAULT_OWNER_ADDRESS.to_string()
                             },
-                            Some(ref mut conn) => {
+                            Some(db_context) => {
                                 match CurrentTokenOwnershipV2Query::get_latest_owned_nft_by_token_data_id(
-                                    conn,
+                                    &mut db_context.conn,
                                     &token_address,
-                                    query_retries,
-                                    query_retry_delay_ms,
+                                    db_context.query_retries,
+                                    db_context.query_retry_delay_ms,
                                 )
                                     .await
                                 {
