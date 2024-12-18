@@ -36,6 +36,7 @@ use processor::{
             },
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
+        object_models::v2_objects::{CurrentObject, Object},
         token_v2_models::{
             token_claims::CurrentTokenPendingClaim,
             v1_token_royalty::CurrentTokenRoyaltyV1,
@@ -63,6 +64,7 @@ pub mod parquet_ans_processor;
 pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_fungible_asset_processor;
+pub mod parquet_objects_processor;
 pub mod parquet_token_v2_processor;
 pub mod parquet_transaction_metadata_processor;
 pub mod parquet_user_transaction_processor;
@@ -129,6 +131,9 @@ pub enum ParquetTypeEnum {
     CurrentTokenDatasV2,
     TokenOwnershipsV2,
     CurrentTokenOwnershipsV2,
+    // Objects
+    Objects,
+    CurrentObjects,
 }
 
 /// Trait for handling various Parquet types.
@@ -233,7 +238,8 @@ impl_parquet_trait!(
     CurrentTokenOwnershipV2,
     ParquetTypeEnum::CurrentTokenOwnershipsV2
 );
-
+impl_parquet_trait!(Object, ParquetTypeEnum::Objects);
+impl_parquet_trait!(CurrentObject, ParquetTypeEnum::CurrentObjects);
 #[derive(Debug, Clone)]
 #[enum_dispatch(ParquetTypeTrait)]
 pub enum ParquetTypeStructs {
@@ -274,6 +280,8 @@ pub enum ParquetTypeStructs {
     CurrentTokenDataV2(Vec<CurrentTokenDataV2>),
     TokenOwnershipV2(Vec<TokenOwnershipV2>),
     CurrentTokenOwnershipV2(Vec<CurrentTokenOwnershipV2>),
+    Object(Vec<Object>),
+    CurrentObject(Vec<CurrentObject>),
 }
 
 impl ParquetTypeStructs {
@@ -336,6 +344,8 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::CurrentTokenOwnershipsV2 => {
                 ParquetTypeStructs::CurrentTokenOwnershipV2(Vec::new())
             },
+            ParquetTypeEnum::Objects => ParquetTypeStructs::Object(Vec::new()),
+            ParquetTypeEnum::CurrentObjects => ParquetTypeStructs::CurrentObject(Vec::new()),
         }
     }
 
@@ -518,6 +528,15 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentTokenOwnershipV2(self_data),
                 ParquetTypeStructs::CurrentTokenOwnershipV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (ParquetTypeStructs::Object(self_data), ParquetTypeStructs::Object(other_data)) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentObject(self_data),
+                ParquetTypeStructs::CurrentObject(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },

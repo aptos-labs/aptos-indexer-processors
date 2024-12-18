@@ -54,7 +54,7 @@ use crate::{
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool, DbPoolConnection},
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool, DbContext},
         table_flags::TableFlags,
         util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
@@ -620,8 +620,11 @@ impl ProcessorTrait for TokenV2Processor {
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
-        let query_retries = self.config.query_retries;
-        let query_retry_delay_ms = self.config.query_retry_delay_ms;
+        let db_connection = DbContext {
+            conn,
+            query_retries: self.config.query_retries,
+            query_retry_delay_ms: self.config.query_retry_delay_ms,
+        };
         // Token V2 processing which includes token v1
         let (
             mut collections_v2,
@@ -639,9 +642,7 @@ impl ProcessorTrait for TokenV2Processor {
         ) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
-            &mut Some(conn),
-            query_retries,
-            query_retry_delay_ms,
+            &mut Some(db_connection),
         )
         .await;
 
@@ -793,15 +794,13 @@ pub async fn parse_v2_token_for_parquet(
     Vec<RawCurrentTokenRoyaltyV1>,
     Vec<RawCurrentTokenPendingClaim>,
 ) {
-    parse_v2_token(transactions, table_handle_to_owner, &mut None, 0, 0).await
+    parse_v2_token(transactions, table_handle_to_owner, &mut None).await
 }
 
 pub async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
-    conn: &mut Option<DbPoolConnection<'_>>,
-    query_retries: u32,
-    query_retry_delay_ms: u64,
+    db_context: &mut Option<DbContext<'_>>,
 ) -> (
     Vec<CollectionV2>,
     Vec<RawTokenDataV2>,
@@ -1025,7 +1024,7 @@ pub async fn parse_v2_token(
                     Change::WriteTableItem(table_item) => {
                         // TODO: revisit when we migrate collection_v2 for parquet
                         // for not it will be only handled for postgres
-                        if let Some(ref mut conn) = conn {
+                        if let Some(ref mut db_context) = db_context {
                             if let Some((collection, current_collection)) =
                                 CollectionV2::get_v1_from_write_table_item(
                                     table_item,
@@ -1033,9 +1032,9 @@ pub async fn parse_v2_token(
                                     wsc_index,
                                     txn_timestamp,
                                     table_handle_to_owner,
-                                    conn,
-                                    query_retries,
-                                    query_retry_delay_ms,
+                                    &mut db_context.conn,
+                                    db_context.query_retries,
+                                    db_context.query_retry_delay_ms,
                                 )
                                 .await
                                 .unwrap()
@@ -1268,9 +1267,7 @@ pub async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 &token_v2_metadata_helper,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
+                                db_context,
                             )
                             .await
                             .unwrap()
@@ -1339,9 +1336,7 @@ pub async fn parse_v2_token(
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
-                                conn,
-                                query_retries,
-                                query_retry_delay_ms,
+                                db_context,
                             )
                             .await
                             .unwrap()

@@ -9,7 +9,10 @@ use super::v2_object_utils::{CurrentObjectPK, ObjectAggregatedDataMapping};
 use crate::{
     db::postgres::models::default_models::move_resources::MoveResource,
     schema::current_objects,
-    utils::{database::DbPoolConnection, util::standardize_address},
+    utils::{
+        database::{DbContext, DbPoolConnection},
+        util::standardize_address,
+    },
 };
 use ahash::AHashMap;
 use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
@@ -18,6 +21,8 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+
+const DELETED_RESOURCE_OWNER_ADDRESS: &str = "Unknown";
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
 pub struct RawObject {
@@ -30,6 +35,7 @@ pub struct RawObject {
     pub allow_ungated_transfer: bool,
     pub is_deleted: bool,
     pub untransferrable: bool,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 pub trait ObjectConvertible {
@@ -46,6 +52,7 @@ pub struct RawCurrentObject {
     pub last_transaction_version: i64,
     pub is_deleted: bool,
     pub untransferrable: bool,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
 pub trait CurrentObjectConvertible {
@@ -73,14 +80,10 @@ impl RawObject {
         txn_version: i64,
         write_set_change_index: i64,
         object_metadata_mapping: &ObjectAggregatedDataMapping,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(Self, RawCurrentObject)>> {
         let address = standardize_address(&write_resource.address.to_string());
-        println!("address: {:?}", address);
         if let Some(object_aggregated_metadata) = object_metadata_mapping.get(&address) {
-            println!(
-                "object_aggregated_metadata: {:?}",
-                object_aggregated_metadata
-            );
             // do something
             let object_with_metadata = object_aggregated_metadata.object.clone();
             let object_core = object_with_metadata.object_core;
@@ -101,6 +104,7 @@ impl RawObject {
                     allow_ungated_transfer: object_core.allow_ungated_transfer,
                     is_deleted: false,
                     untransferrable,
+                    block_timestamp,
                 },
                 RawCurrentObject {
                     object_address: address,
@@ -111,6 +115,7 @@ impl RawObject {
                     last_transaction_version: txn_version,
                     is_deleted: false,
                     untransferrable,
+                    block_timestamp,
                 },
             )))
         } else {
@@ -126,9 +131,8 @@ impl RawObject {
         txn_version: i64,
         write_set_change_index: i64,
         object_mapping: &AHashMap<CurrentObjectPK, RawCurrentObject>,
-        conn: &mut DbPoolConnection<'_>,
-        query_retries: u32,
-        query_retry_delay_ms: u64,
+        db_context: &mut Option<DbContext<'_>>,
+        block_timestamp: chrono::NaiveDateTime,
     ) -> anyhow::Result<Option<(Self, RawCurrentObject)>> {
         if delete_resource.type_str == "0x1::object::ObjectGroup" {
             let resource = MoveResource::from_delete_resource(
@@ -137,52 +141,91 @@ impl RawObject {
                 txn_version,
                 0, // Placeholder, this isn't used anyway
             );
-            let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
-                object.clone()
+            // Add a logid here to handle None conn
+            if db_context.is_none() {
+                // This is a hack to prevent the program for parquet
+                Ok(Some((
+                    Self {
+                        transaction_version: txn_version,
+                        write_set_change_index,
+                        object_address: resource.address.clone(),
+                        owner_address: DELETED_RESOURCE_OWNER_ADDRESS.to_string(),
+                        state_key_hash: resource.state_key_hash.clone(),
+                        guid_creation_num: BigDecimal::default(),
+                        allow_ungated_transfer: false,
+                        is_deleted: true,
+                        untransferrable: false,
+                        block_timestamp,
+                    },
+                    RawCurrentObject {
+                        object_address: resource.address.clone(),
+                        owner_address: DELETED_RESOURCE_OWNER_ADDRESS.to_string(),
+                        state_key_hash: resource.state_key_hash.clone(),
+                        last_guid_creation_num: BigDecimal::default(),
+                        allow_ungated_transfer: false,
+                        last_transaction_version: txn_version,
+                        is_deleted: true,
+                        untransferrable: false,
+                        block_timestamp,
+                    },
+                )))
             } else {
-                match Self::get_current_object(
-                    conn,
-                    &resource.address,
-                    query_retries,
-                    query_retry_delay_ms,
-                )
-                .await
-                {
-                    Ok(object) => object,
-                    Err(_) => {
-                        tracing::error!(
+                let previous_object = if let Some(object) = object_mapping.get(&resource.address) {
+                    object.clone()
+                } else if let Some(db_context) = db_context {
+                    match Self::get_current_object(
+                        &mut db_context.conn,
+                        &resource.address,
+                        db_context.query_retries,
+                        db_context.query_retry_delay_ms,
+                    )
+                    .await
+                    {
+                        Ok(object) => object,
+                        Err(_) => {
+                            tracing::error!(
                             transaction_version = txn_version,
                             lookup_key = &resource.address,
                             "Missing current_object for object_address: {}. You probably should backfill db.",
                             resource.address,
                         );
-                        return Ok(None);
+                            return Ok(None);
+                        },
+                    }
+                } else {
+                    tracing::error!(
+                        transaction_version = txn_version,
+                        lookup_key = &resource.address,
+                        "Connection to DB is missing. You may need to investigate",
+                    );
+                    return Ok(None);
+                };
+                Ok(Some((
+                    Self {
+                        transaction_version: txn_version,
+                        write_set_change_index,
+                        object_address: resource.address.clone(),
+                        owner_address: previous_object.owner_address.clone(),
+                        state_key_hash: resource.state_key_hash.clone(),
+                        guid_creation_num: previous_object.last_guid_creation_num.clone(),
+                        allow_ungated_transfer: previous_object.allow_ungated_transfer,
+                        is_deleted: true,
+                        untransferrable: previous_object.untransferrable,
+                        block_timestamp,
                     },
-                }
-            };
-            Ok(Some((
-                Self {
-                    transaction_version: txn_version,
-                    write_set_change_index,
-                    object_address: resource.address.clone(),
-                    owner_address: previous_object.owner_address.clone(),
-                    state_key_hash: resource.state_key_hash.clone(),
-                    guid_creation_num: previous_object.last_guid_creation_num.clone(),
-                    allow_ungated_transfer: previous_object.allow_ungated_transfer,
-                    is_deleted: true,
-                    untransferrable: previous_object.untransferrable,
-                },
-                RawCurrentObject {
-                    object_address: resource.address,
-                    owner_address: previous_object.owner_address.clone(),
-                    state_key_hash: resource.state_key_hash,
-                    last_guid_creation_num: previous_object.last_guid_creation_num.clone(),
-                    allow_ungated_transfer: previous_object.allow_ungated_transfer,
-                    last_transaction_version: txn_version,
-                    is_deleted: true,
-                    untransferrable: previous_object.untransferrable,
-                },
-            )))
+                    RawCurrentObject {
+                        object_address: resource.address,
+                        owner_address: previous_object.owner_address.clone(),
+                        state_key_hash: resource.state_key_hash,
+                        last_guid_creation_num: previous_object.last_guid_creation_num.clone(),
+                        allow_ungated_transfer: previous_object.allow_ungated_transfer,
+                        last_transaction_version: txn_version,
+                        is_deleted: true,
+                        untransferrable: previous_object.untransferrable,
+                        block_timestamp,
+                    },
+                )))
+            }
         } else {
             Ok(None)
         }
@@ -210,6 +253,7 @@ impl RawObject {
                         last_transaction_version: res.last_transaction_version,
                         is_deleted: res.is_deleted,
                         untransferrable: res.untransferrable,
+                        block_timestamp: chrono::NaiveDateTime::default(), // this won't be used
                     });
                 },
                 Err(_) => {

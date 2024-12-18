@@ -284,3 +284,9 @@ where
         Ok(())
     }
 }
+
+pub struct DbContext<'a> {
+    pub conn: DbPoolConnection<'a>,
+    pub query_retries: u32,
+    pub query_retry_delay_ms: u64,
+}
