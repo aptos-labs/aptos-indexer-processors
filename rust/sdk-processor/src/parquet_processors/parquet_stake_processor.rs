@@ -12,7 +12,7 @@ use crate::{
             parquet_version_tracker_step::ParquetVersionTrackerStep,
             processor_status_saver::get_processor_status_saver,
         },
-        parquet_fungible_asset_processor::parquet_fa_extractor::ParquetFungibleAssetExtractor,
+        parquet_stake_processor::parquet_stake_extractor::ParquetStakeExtractor,
     },
     utils::{
         chain_id::check_or_update_chain_id,
@@ -116,16 +116,12 @@ impl ProcessorTrait for ParquetStakeProcessor {
         .await?;
 
         let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
-        let parquet_fa_extractor = ParquetFungibleAssetExtractor {
+        let parquet_stake_extractor = ParquetStakeExtractor {
             opt_in_tables: backfill_table,
         };
 
         let gcs_client =
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;
-
-        //     parquet_delegator_activities::DelegatedStakingActivity,
-        // parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
-        // parquet_proposal_voters::ProposalVote,
 
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
             (
@@ -170,7 +166,7 @@ impl ProcessorTrait for ParquetStakeProcessor {
         let (_, buffer_receiver) = ProcessorBuilder::new_with_inputless_first_step(
             transaction_stream.into_runnable_step(),
         )
-        .connect_to(parquet_fa_extractor.into_runnable_step(), channel_size)
+        .connect_to(parquet_stake_extractor.into_runnable_step(), channel_size)
         .connect_to(default_size_buffer_step.into_runnable_step(), channel_size)
         .connect_to(
             parquet_version_tracker_step.into_runnable_step(),
