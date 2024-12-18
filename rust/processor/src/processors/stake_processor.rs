@@ -401,7 +401,7 @@ pub fn insert_current_delegated_voter_query(
 
 pub async fn parse_stake_data(
     transactions: &Vec<Transaction>,
-    mut conn: DbPoolConnection<'_>,
+    mut conn: Option<DbPoolConnection<'_>>,
     query_retries: u32,
     query_retry_delay_ms: u64,
 ) -> Result<
@@ -484,56 +484,59 @@ pub async fn parse_stake_data(
             }
         }
 
-        // Add delegator balances
-        let (mut delegator_balances, current_delegator_balances) =
-            RawCurrentDelegatorBalance::from_transaction(
-                txn,
-                &active_pool_to_staking_pool,
-                &mut conn,
-                query_retries,
-                query_retry_delay_ms,
-            )
-            .await
-            .unwrap();
-        all_delegator_balances.append(&mut delegator_balances);
-        all_current_delegator_balances.extend(current_delegator_balances);
-
-        // this write table item indexing is to get delegator address, table handle, and voter & pending voter
-        for wsc in &transaction_info.changes {
-            if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
-                let voter_map = CurrentDelegatedVoter::from_write_table_item(
-                    write_table_item,
-                    txn_version,
-                    txn_timestamp,
-                    &all_vote_delegation_handle_to_pool_address,
-                    &mut conn,
+        if let Some(ref mut conn) = conn {
+            // Add delegator balances
+            let (mut delegator_balances, current_delegator_balances) =
+                RawCurrentDelegatorBalance::from_transaction(
+                    txn,
+                    &active_pool_to_staking_pool,
+                    conn,
                     query_retries,
                     query_retry_delay_ms,
                 )
                 .await
                 .unwrap();
+            all_delegator_balances.append(&mut delegator_balances);
+            all_current_delegator_balances.extend(current_delegator_balances);
 
-                all_current_delegated_voter.extend(voter_map);
+            // this write table item indexing is to get delegator address, table handle, and voter & pending voter
+            for wsc in &transaction_info.changes {
+                if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
+                    let voter_map = CurrentDelegatedVoter::from_write_table_item(
+                        write_table_item,
+                        txn_version,
+                        txn_timestamp,
+                        &all_vote_delegation_handle_to_pool_address,
+                        conn,
+                        query_retries,
+                        query_retry_delay_ms,
+                    )
+                    .await
+                    .unwrap();
+
+                    all_current_delegated_voter.extend(voter_map);
+                }
             }
-        }
 
-        // we need one last loop to prefill delegators that got in before the delegated voting contract was deployed
-        for wsc in &transaction_info.changes {
-            if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
-                if let Some(voter) = CurrentDelegatedVoter::get_delegators_pre_contract_deployment(
-                    write_table_item,
-                    txn_version,
-                    txn_timestamp,
-                    &active_pool_to_staking_pool,
-                    &all_current_delegated_voter,
-                    &mut conn,
-                    query_retries,
-                    query_retry_delay_ms,
-                )
-                .await
-                .unwrap()
-                {
-                    all_current_delegated_voter.insert(voter.pk(), voter);
+            // we need one last loop to prefill delegators that got in before the delegated voting contract was deployed
+            for wsc in &transaction_info.changes {
+                if let Change::WriteTableItem(write_table_item) = wsc.change.as_ref().unwrap() {
+                    if let Some(voter) =
+                        CurrentDelegatedVoter::get_delegators_pre_contract_deployment(
+                            write_table_item,
+                            txn_version,
+                            txn_timestamp,
+                            &active_pool_to_staking_pool,
+                            &all_current_delegated_voter,
+                            conn,
+                            query_retries,
+                            query_retry_delay_ms,
+                        )
+                        .await
+                        .unwrap()
+                    {
+                        all_current_delegated_voter.insert(voter.pk(), voter);
+                    }
                 }
             }
         }
@@ -615,7 +618,14 @@ impl ProcessorTrait for StakeProcessor {
             raw_all_delegator_pool_balances,
             raw_all_current_delegator_pool_balances,
             all_current_delegated_voter,
-        ) = match parse_stake_data(&transactions, conn, query_retries, query_retry_delay_ms).await {
+        ) = match parse_stake_data(
+            &transactions,
+            Some(conn),
+            query_retries,
+            query_retry_delay_ms,
+        )
+        .await
+        {
             Ok(data) => data,
             Err(e) => {
                 error!(

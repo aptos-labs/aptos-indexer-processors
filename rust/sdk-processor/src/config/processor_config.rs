@@ -100,6 +100,7 @@ pub enum ProcessorConfig {
     ParquetTransactionMetadataProcessor(ParquetDefaultProcessorConfig),
     ParquetAccountTransactionsProcessor(ParquetDefaultProcessorConfig),
     ParquetTokenV2Processor(ParquetDefaultProcessorConfig),
+    ParquetStakeProcessor(ParquetDefaultProcessorConfig),
 }
 
 impl ProcessorConfig {
@@ -121,7 +122,8 @@ impl ProcessorConfig {
             | ProcessorConfig::ParquetTransactionMetadataProcessor(config)
             | ProcessorConfig::ParquetAccountTransactionsProcessor(config)
             | ProcessorConfig::ParquetTokenV2Processor(config)
-            | ProcessorConfig::ParquetFungibleAssetProcessor(config) => config,
+            | ProcessorConfig::ParquetFungibleAssetProcessor(config)
+            | ProcessorConfig::ParquetStakeProcessor(config) => config,
             ProcessorConfig::ParquetAnsProcessor(config) => &config.default,
             _ => {
                 return Err(anyhow::anyhow!(

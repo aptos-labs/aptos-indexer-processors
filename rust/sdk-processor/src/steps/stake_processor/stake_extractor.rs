@@ -114,7 +114,7 @@ impl Processable for StakeExtractor {
             all_current_delegated_voter,
         ) = match parse_stake_data(
             &transactions.data,
-            conn,
+            Some(conn),
             self.query_retries,
             self.query_retry_delay_ms,
         )
