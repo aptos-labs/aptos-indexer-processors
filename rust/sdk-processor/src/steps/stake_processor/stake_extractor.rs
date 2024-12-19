@@ -7,13 +7,27 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::postgres::models::stake_models::{
-        current_delegated_voter::CurrentDelegatedVoter,
-        delegator_activities::DelegatedStakingActivity,
-        delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
-        delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPool, DelegatorPoolBalance},
-        proposal_votes::ProposalVote,
-        staking_pool_voter::CurrentStakingPoolVoter,
+    db::{
+        common::models::stake_models::{
+            current_delegated_voter::CurrentDelegatedVoter,
+            delegator_activities::RawDelegatedStakingActivityConvertible,
+            delegator_balances::{
+                RawCurrentDelegatorBalanceConvertible, RawDelegatorBalanceConvertible,
+            },
+            delegator_pools::{
+                DelegatorPool, RawCurrentDelegatorPoolBalanceConvertible,
+                RawDelegatorPoolBalanceConvertible,
+            },
+            proposal_voters::RawProposalVoteConvertible,
+            staking_pool_voter::RawCurrentStakingPoolVoterConvertible,
+        },
+        postgres::models::stake_models::{
+            delegator_activities::DelegatedStakingActivity,
+            delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
+            delegator_pools::{CurrentDelegatorPoolBalance, DelegatorPoolBalance},
+            proposal_votes::ProposalVote,
+            staking_pool_voter::CurrentStakingPoolVoter,
+        },
     },
     processors::stake_processor::parse_stake_data,
 };
@@ -89,18 +103,18 @@ impl Processable for StakeExtractor {
             })?;
 
         let (
-            all_current_stake_pool_voters,
-            all_proposal_votes,
-            all_delegator_activities,
-            all_delegator_balances,
-            all_current_delegator_balances,
+            raw_all_current_stake_pool_voters,
+            raw_all_proposal_votes,
+            raw_all_delegator_activities,
+            raw_all_delegator_balances,
+            raw_all_current_delegator_balances,
             all_delegator_pools,
-            all_delegator_pool_balances,
-            all_current_delegator_pool_balances,
+            raw_all_delegator_pool_balances,
+            raw_all_current_delegator_pool_balances,
             all_current_delegated_voter,
         ) = match parse_stake_data(
             &transactions.data,
-            conn,
+            Some(conn),
             self.query_retries,
             self.query_retry_delay_ms,
         )
@@ -120,6 +134,35 @@ impl Processable for StakeExtractor {
                 });
             },
         };
+
+        let all_delegator_balances: Vec<DelegatorBalance> = raw_all_delegator_balances
+            .into_iter()
+            .map(DelegatorBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_delegator_balances = raw_all_current_delegator_balances
+            .into_iter()
+            .map(CurrentDelegatorBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_delegator_pool_balances = raw_all_delegator_pool_balances
+            .into_iter()
+            .map(DelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_delegator_pool_balances = raw_all_current_delegator_pool_balances
+            .into_iter()
+            .map(CurrentDelegatorPoolBalance::from_raw)
+            .collect::<Vec<_>>();
+        let all_delegator_activities = raw_all_delegator_activities
+            .into_iter()
+            .map(DelegatedStakingActivity::from_raw)
+            .collect::<Vec<_>>();
+        let all_proposal_votes = raw_all_proposal_votes
+            .into_iter()
+            .map(ProposalVote::from_raw)
+            .collect::<Vec<_>>();
+        let all_current_stake_pool_voters = raw_all_current_stake_pool_voters
+            .into_iter()
+            .map(CurrentStakingPoolVoter::from_raw)
+            .collect::<Vec<_>>();
 
         Ok(Some(TransactionContext {
             data: (

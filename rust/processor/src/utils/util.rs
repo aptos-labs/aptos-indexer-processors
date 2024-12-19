@@ -23,6 +23,8 @@ use sha2::Digest;
 use std::str::FromStr;
 use tiny_keccak::{Hasher, Sha3};
 
+use super::database::DbPoolConnection;
+
 // 9999-12-31 23:59:59, this is the max supported by Google BigQuery
 pub const MAX_TIMESTAMP_SECS: i64 = 253_402_300_799;
 // Max length of entry function id string to ensure that db doesn't explode
@@ -39,6 +41,13 @@ lazy_static! {
     pub static ref APT_METADATA_ADDRESS_HEX: String =
         format!("0x{}", hex::encode(*APT_METADATA_ADDRESS_RAW));
 }
+
+pub struct DbConnectionConfig<'a> {
+    pub conn: DbPoolConnection<'a>,
+    pub query_retries: u32,
+    pub query_retry_delay_ms: u64,
+}
+
 // Supporting structs to get clean payload without escaped strings
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryFunctionPayloadClean {

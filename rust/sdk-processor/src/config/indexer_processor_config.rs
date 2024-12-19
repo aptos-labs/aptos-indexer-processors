@@ -10,6 +10,7 @@ use crate::{
         parquet_events_processor::ParquetEventsProcessor,
         parquet_fungible_asset_processor::ParquetFungibleAssetProcessor,
         parquet_objects_processor::ParquetObjectsProcessor,
+        parquet_stake_processor::ParquetStakeProcessor,
         parquet_token_v2_processor::ParquetTokenV2Processor,
         parquet_transaction_metadata_processor::ParquetTransactionMetadataProcessor,
         parquet_user_transaction_processor::ParquetUserTransactionsProcessor,
@@ -122,6 +123,10 @@ impl RunnableConfig for IndexerProcessorConfig {
             ProcessorConfig::ParquetAnsProcessor(_) => {
                 let parquet_ans_processor = ParquetAnsProcessor::new(self.clone()).await?;
                 parquet_ans_processor.run_processor().await
+            },
+            ProcessorConfig::ParquetStakeProcessor(_) => {
+                let parquet_stake_processor = ParquetStakeProcessor::new(self.clone()).await?;
+                parquet_stake_processor.run_processor().await
             },
             ProcessorConfig::ParquetObjectsProcessor(_) => {
                 let parquet_objects_processor = ParquetObjectsProcessor::new(self.clone()).await?;

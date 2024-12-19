@@ -37,6 +37,11 @@ use processor::{
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
         object_models::v2_objects::{CurrentObject, Object},
+        stake_models::{
+            parquet_delegator_activities::DelegatedStakingActivity,
+            parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
+            parquet_proposal_voters::ProposalVote,
+        },
         token_v2_models::{
             token_claims::CurrentTokenPendingClaim,
             v1_token_royalty::CurrentTokenRoyaltyV1,
@@ -65,6 +70,7 @@ pub mod parquet_default_processor;
 pub mod parquet_events_processor;
 pub mod parquet_fungible_asset_processor;
 pub mod parquet_objects_processor;
+pub mod parquet_stake_processor;
 pub mod parquet_token_v2_processor;
 pub mod parquet_transaction_metadata_processor;
 pub mod parquet_user_transaction_processor;
@@ -131,6 +137,11 @@ pub enum ParquetTypeEnum {
     CurrentTokenDatasV2,
     TokenOwnershipsV2,
     CurrentTokenOwnershipsV2,
+    // stake
+    DelegatedStakingActivities,
+    CurrentDelegatorBalances,
+    DelegatorBalances,
+    ProposalVotes,
     // Objects
     Objects,
     CurrentObjects,
@@ -238,6 +249,16 @@ impl_parquet_trait!(
     CurrentTokenOwnershipV2,
     ParquetTypeEnum::CurrentTokenOwnershipsV2
 );
+impl_parquet_trait!(
+    DelegatedStakingActivity,
+    ParquetTypeEnum::DelegatedStakingActivities
+);
+impl_parquet_trait!(
+    CurrentDelegatorBalance,
+    ParquetTypeEnum::CurrentDelegatorBalances
+);
+impl_parquet_trait!(DelegatorBalance, ParquetTypeEnum::DelegatorBalances);
+impl_parquet_trait!(ProposalVote, ParquetTypeEnum::ProposalVotes);
 impl_parquet_trait!(Object, ParquetTypeEnum::Objects);
 impl_parquet_trait!(CurrentObject, ParquetTypeEnum::CurrentObjects);
 #[derive(Debug, Clone)]
@@ -280,6 +301,12 @@ pub enum ParquetTypeStructs {
     CurrentTokenDataV2(Vec<CurrentTokenDataV2>),
     TokenOwnershipV2(Vec<TokenOwnershipV2>),
     CurrentTokenOwnershipV2(Vec<CurrentTokenOwnershipV2>),
+    // Stake
+    DelegatedStakingActivity(Vec<DelegatedStakingActivity>),
+    CurrentDelegatorBalance(Vec<CurrentDelegatorBalance>),
+    DelegatorBalance(Vec<DelegatorBalance>),
+    ProposalVote(Vec<ProposalVote>),
+    // Objects
     Object(Vec<Object>),
     CurrentObject(Vec<CurrentObject>),
 }
@@ -344,6 +371,14 @@ impl ParquetTypeStructs {
             ParquetTypeEnum::CurrentTokenOwnershipsV2 => {
                 ParquetTypeStructs::CurrentTokenOwnershipV2(Vec::new())
             },
+            ParquetTypeEnum::DelegatedStakingActivities => {
+                ParquetTypeStructs::DelegatedStakingActivity(Vec::new())
+            },
+            ParquetTypeEnum::CurrentDelegatorBalances => {
+                ParquetTypeStructs::CurrentDelegatorBalance(Vec::new())
+            },
+            ParquetTypeEnum::DelegatorBalances => ParquetTypeStructs::DelegatorBalance(Vec::new()),
+            ParquetTypeEnum::ProposalVotes => ParquetTypeStructs::ProposalVote(Vec::new()),
             ParquetTypeEnum::Objects => ParquetTypeStructs::Object(Vec::new()),
             ParquetTypeEnum::CurrentObjects => ParquetTypeStructs::CurrentObject(Vec::new()),
         }
@@ -528,6 +563,30 @@ impl ParquetTypeStructs {
             (
                 ParquetTypeStructs::CurrentTokenOwnershipV2(self_data),
                 ParquetTypeStructs::CurrentTokenOwnershipV2(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::DelegatedStakingActivity(self_data),
+                ParquetTypeStructs::DelegatedStakingActivity(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::CurrentDelegatorBalance(self_data),
+                ParquetTypeStructs::CurrentDelegatorBalance(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::DelegatorBalance(self_data),
+                ParquetTypeStructs::DelegatorBalance(other_data),
+            ) => {
+                handle_append!(self_data, other_data)
+            },
+            (
+                ParquetTypeStructs::ProposalVote(self_data),
+                ParquetTypeStructs::ProposalVote(other_data),
             ) => {
                 handle_append!(self_data, other_data)
             },
