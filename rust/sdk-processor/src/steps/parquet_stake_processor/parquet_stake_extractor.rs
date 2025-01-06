@@ -28,8 +28,7 @@ use processor::{
     utils::table_flags::TableFlags,
 };
 use std::collections::HashMap;
-use tracing::debug;
-use tracing::error;
+use tracing::{debug, error};
 
 /// Extracts parquet data from transactions, allowing optional selection of specific tables.
 pub struct ParquetStakeExtractor

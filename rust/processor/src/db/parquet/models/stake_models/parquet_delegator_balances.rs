@@ -1,8 +1,3 @@
-use allocative::Allocative;
-use field_count::FieldCount;
-use parquet_derive::ParquetRecordWriter;
-use serde::{Deserialize, Serialize};
-
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::common::models::stake_models::delegator_balances::{
@@ -10,6 +5,10 @@ use crate::{
         RawDelegatorBalanceConvertible,
     },
 };
+use allocative::Allocative;
+use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
+use serde::{Deserialize, Serialize};
 
 #[derive(
     Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
