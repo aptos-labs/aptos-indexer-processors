@@ -11,7 +11,9 @@ use super::signatures::Signature;
 use crate::{
     schema::user_transactions,
     utils::util::{
-        get_entry_function_from_user_request, parse_timestamp, standardize_address,
+        get_entry_function_contract_address_from_user_request,
+        get_entry_function_from_user_request, get_entry_function_function_name_from_user_request,
+        get_entry_function_module_name_from_user_request, parse_timestamp, standardize_address,
         u64_to_bigdecimal,
     },
 };
@@ -38,6 +40,9 @@ pub struct UserTransaction {
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
     pub epoch: i64,
+    pub contract_address: String,
+    pub module_name: String,
+    pub function_name: String,
 }
 
 impl UserTransaction {
@@ -79,6 +84,14 @@ impl UserTransaction {
                 entry_function_id_str: get_entry_function_from_user_request(user_request)
                     .unwrap_or_default(),
                 epoch,
+                contract_address: get_entry_function_contract_address_from_user_request(
+                    user_request,
+                )
+                .unwrap_or_default(),
+                module_name: get_entry_function_module_name_from_user_request(user_request)
+                    .unwrap_or_default(),
+                function_name: get_entry_function_function_name_from_user_request(user_request)
+                    .unwrap_or_default(),
             },
             Self::get_signatures(user_request, version, block_height),
         )

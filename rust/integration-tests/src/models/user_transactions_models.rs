@@ -48,4 +48,7 @@ pub struct UserTransaction {
     pub entry_function_id_str: String,
     pub inserted_at: chrono::NaiveDateTime,
     pub epoch: i64,
+    pub contract_address: String,
+    pub module_name: String,
+    pub function_name: String,
 }
