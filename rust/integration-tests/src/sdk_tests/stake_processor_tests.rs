@@ -10,7 +10,7 @@ use sdk_processor::{
 };
 use std::collections::HashSet;
 
-pub async fn setup_stake_processor_config(
+pub fn setup_stake_processor_config(
     test_context: &SdkTestContext,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
@@ -139,7 +139,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_stake_processor_config(&test_context, &db_url).await;
+            setup_stake_processor_config(&test_context, &db_url);
 
         let stake_processor = StakeProcessor::new(indexer_processor_config)
             .await

@@ -7,7 +7,7 @@ use sdk_processor::config::{
 };
 use std::collections::HashSet;
 
-pub async fn setup_events_processor_config(
+pub fn setup_events_processor_config(
     test_context: &SdkTestContext,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
@@ -174,7 +174,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, _processor_name) =
-            setup_events_processor_config(&test_context, &db_url).await;
+            setup_events_processor_config(&test_context, &db_url);
 
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await
@@ -232,7 +232,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_events_processor_config(&test_context, &db_url).await;
+            setup_events_processor_config(&test_context, &db_url);
 
         let events_processor = EventsProcessor::new(indexer_processor_config)
             .await

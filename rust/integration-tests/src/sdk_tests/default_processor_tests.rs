@@ -7,7 +7,7 @@ use sdk_processor::config::{
 };
 use std::collections::HashSet;
 
-pub async fn setup_default_processor_config(
+pub fn setup_default_processor_config(
     test_context: &SdkTestContext,
     db_url: &str,
 ) -> (IndexerProcessorConfig, &'static str) {
@@ -102,7 +102,7 @@ mod tests {
 
         let db_url = db.get_db_url();
         let (indexer_processor_config, processor_name) =
-            setup_default_processor_config(&test_context, &db_url).await;
+            setup_default_processor_config(&test_context, &db_url);
 
         let default_processor = DefaultProcessor::new(indexer_processor_config)
             .await
