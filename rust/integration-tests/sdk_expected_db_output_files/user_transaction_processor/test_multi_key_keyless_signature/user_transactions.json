@@ -11,7 +11,7 @@
     "timestamp": "2024-10-16T17:07:21.987832",
     "entry_function_id_str": "0x1::aptos_account::transfer",
     "epoch": 8870,
-    "contract_address": "0x1",
+    "contract_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
     "module_name": "aptos_account",
     "function_name": "transfer"
   }
