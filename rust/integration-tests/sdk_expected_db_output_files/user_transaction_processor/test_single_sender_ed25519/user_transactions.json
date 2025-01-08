@@ -11,8 +11,8 @@
     "timestamp": "2024-05-09T01:18:59.975711",
     "entry_function_id_str": "0x1::aptos_account::transfer_coins",
     "epoch": 6924,
-    "contract_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "module_name": "aptos_account",
-    "function_name": "transfer_coins"
+    "entry_function_contract_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "entry_function_module_name": "aptos_account",
+    "entry_function_function_name": "transfer_coins"
   }
 ]
