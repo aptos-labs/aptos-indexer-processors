@@ -120,9 +120,7 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
     val
 }
 
-pub fn get_entry_function_from_user_request(
-    user_request: &UserTransactionRequest,
-) -> Option<String> {
+pub fn split_entry_function_id_str(user_request: &UserTransactionRequest) -> Option<String> {
     let entry_function_id_str: Option<String> = match &user_request.payload {
         Some(txn_payload) => match &txn_payload.payload {
             Some(PayloadType::EntryFunctionPayload(payload)) => {
@@ -143,8 +141,44 @@ pub fn get_entry_function_from_user_request(
         },
         None => return None,
     };
+    entry_function_id_str
+}
+
+pub fn get_entry_function_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    let entry_function_id_str: Option<String> = split_entry_function_id_str(user_request);
 
     entry_function_id_str.map(|s| truncate_str(&s, MAX_ENTRY_FUNCTION_LENGTH))
+}
+
+pub fn get_entry_function_contract_address_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    let contract_address = split_entry_function_id_str(user_request).and_then(|s| {
+        s.split("::").next().map(String::from) // Get the first element (contract address)
+    });
+    contract_address.map(|s| standardize_address(&s))
+}
+
+pub fn get_entry_function_module_name_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    split_entry_function_id_str(user_request).and_then(|s| {
+        s.split("::")
+            .nth(1) // Get the second element (module name)
+            .map(String::from)
+    })
+}
+
+pub fn get_entry_function_function_name_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    split_entry_function_id_str(user_request).and_then(|s| {
+        s.split("::")
+            .nth(2) // Get the third element (function name)
+            .map(String::from)
+    })
 }
 
 pub fn get_payload_type(payload: &TransactionPayload) -> String {

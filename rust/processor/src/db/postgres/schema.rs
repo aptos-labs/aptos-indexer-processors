@@ -1265,6 +1265,12 @@ diesel::table! {
         entry_function_id_str -> Varchar,
         inserted_at -> Timestamp,
         epoch -> Int8,
+        #[max_length = 66]
+        entry_function_contract_address -> Varchar,
+        #[max_length = 255]
+        entry_function_module_name -> Varchar,
+        #[max_length = 255]
+        entry_function_function_name -> Varchar,
     }
 }
 

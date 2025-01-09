@@ -10,6 +10,9 @@
     "gas_unit_price": "100",
     "timestamp": "2022-10-18T23:10:04.331016",
     "entry_function_id_str": "0xa3f6a53c57395401ce64f09a188e2259dc9b156387e76c88a7a80a8fe5254476::momentum_safe::register",
-    "epoch": 75
+    "epoch": 75,
+    "entry_function_contract_address": "0xa3f6a53c57395401ce64f09a188e2259dc9b156387e76c88a7a80a8fe5254476",
+    "entry_function_module_name": "momentum_safe",
+    "entry_function_function_name": "register"
   }
 ]
