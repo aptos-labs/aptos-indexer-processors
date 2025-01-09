@@ -14,8 +14,7 @@ use testcontainers::{
 
 mod diff_test_helper;
 mod models;
-mod scenarios_tests;
-#[cfg(test)]
+mod sanity_test;
 mod sdk_tests;
 
 use std::time::Duration;

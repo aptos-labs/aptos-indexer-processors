@@ -79,3 +79,9 @@ jobs:
           # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
           cargo test sdk_tests -- --nocapture
         working-directory: rust/integration-tests
+
+      # Run all Tests
+      - name: Run Sanity Tests
+        run: |
+          cargo test regression_tests -- --nocapture
+        working-directory: rust/integration-tests
