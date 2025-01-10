@@ -1266,11 +1266,11 @@ diesel::table! {
         inserted_at -> Timestamp,
         epoch -> Int8,
         #[max_length = 66]
-        entry_function_contract_address -> Varchar,
+        entry_function_contract_address -> Nullable<Varchar>,
         #[max_length = 255]
-        entry_function_module_name -> Varchar,
+        entry_function_module_name -> Nullable<Varchar>,
         #[max_length = 255]
-        entry_function_function_name -> Varchar,
+        entry_function_function_name -> Nullable<Varchar>,
     }
 }
 

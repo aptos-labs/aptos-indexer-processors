@@ -40,9 +40,9 @@ pub struct UserTransaction {
     pub timestamp: chrono::NaiveDateTime,
     pub entry_function_id_str: String,
     pub epoch: i64,
-    pub entry_function_contract_address: String,
-    pub entry_function_module_name: String,
-    pub entry_function_function_name: String,
+    pub entry_function_contract_address: Option<String>,
+    pub entry_function_module_name: Option<String>,
+    pub entry_function_function_name: Option<String>,
 }
 
 impl UserTransaction {
@@ -84,17 +84,18 @@ impl UserTransaction {
                 entry_function_id_str: get_entry_function_from_user_request(user_request)
                     .unwrap_or_default(),
                 epoch,
-                entry_function_contract_address:
+                entry_function_contract_address: Some(
                     get_entry_function_contract_address_from_user_request(user_request)
                         .unwrap_or_default(),
-                entry_function_module_name: get_entry_function_module_name_from_user_request(
-                    user_request,
-                )
-                .unwrap_or_default(),
-                entry_function_function_name: get_entry_function_function_name_from_user_request(
-                    user_request,
-                )
-                .unwrap_or_default(),
+                ),
+                entry_function_module_name: Some(
+                    get_entry_function_module_name_from_user_request(user_request)
+                        .unwrap_or_default(),
+                ),
+                entry_function_function_name: Some(
+                    get_entry_function_function_name_from_user_request(user_request)
+                        .unwrap_or_default(),
+                ),
             },
             Self::get_signatures(user_request, version, block_height),
         )
