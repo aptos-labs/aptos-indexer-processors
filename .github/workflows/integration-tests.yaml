@@ -75,6 +75,8 @@ jobs:
           
       # Run Integration Tests
       - name: Run Integration Tests
+        id: tests
+        continue-on-error: true
         run: |
           # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
           cargo test sdk_tests -- --nocapture
@@ -82,6 +84,28 @@ jobs:
 
       # Run all Tests
       - name: Run Sanity Tests
+        id: sanity-check
+        continue-on-error: true
         run: |
           cargo test regression_tests -- --nocapture
         working-directory: rust/integration-tests
+      
+      - name: Fail if tests fail
+        if: ${{ steps.sanity-check.outcome == 'failure' && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update') }}
+        run: |
+          echo "Integration failed"
+          exit 1
+
+      - name: Send Slack Notification to oncall
+        if: ${{ steps.sanity-check.outcome == 'failure' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update') }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          # eco-infra-oncall channel.
+          channel-id: 'C0468USBLQJ'
+          slack-message: |
+            :warning: Tests failed on PR with indexer-sdk-update label
+            PR: ${{ github.event.pull_request.html_url }}
+            Author: ${{ github.event.pull_request.user.login }}
+            Title: ${{ github.event.pull_request.title }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

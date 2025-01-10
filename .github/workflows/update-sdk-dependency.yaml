@@ -1,0 +1,57 @@
+name: Update SDK Dependency
+
+on:
+  repository_dispatch:
+    types: [sdk-dependency-update]
+jobs:
+  update-the-dependency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install toml
+        run: cargo install toml-cli
+      - name: Update the dependency
+        run: |
+          set -e
+          
+          # SDK commit hash
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk.rev ${{ github.event.client_payload.commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk-server-framework.rev ${{ github.event.client_payload.commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-testing-framework.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          # Protos commit hash
+          toml set Cargo.toml workspace.dependencies.aptos-protos.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml 
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
+        working-directory: rust/
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+      - name: Commit and Push Changes
+        run: |
+           set -e
+           branch_name="${{ github.event.client_payload.branch_name }}-update-sdk"
+           git checkout -b "$branch_name"
+           git add Cargo.toml
+           git commit -m "Update sdk to ${{ github.event.client_payload.commit_hash }}"
+           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+           git push origin "$branch_name" --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: rust/
+      - name: Create Pull Request
+        run: |
+          branch_name="${{ github.event.client_payload.branch_name }}-update-sdk"
+          gh pr create --title "Update sdk to upstream branch ${{ github.event.client_payload.branch_name }}" \
+                       --body "This PR updates sdk to new version." \
+                       --base main \
+                       --head "$branch_name" \
+                       --label "indexer-sdk-update"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Integration Tests
+        run: cargo test --manifest-path integration-tests/Cargo.toml
+        working-directory: rust
