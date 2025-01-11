@@ -28,8 +28,5 @@ CREATE TABLE auth_key_account_addresses (
   address VARCHAR(66) NOT NULL,
   verified BOOLEAN NOT NULL,
   -- Constraints
-  PRIMARY KEY (
-    auth_key,
-    address
-  )
+  PRIMARY KEY (address)
 );
