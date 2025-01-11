@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(clippy::extra_unused_lifetimes)]
-
 use crate::schema::auth_key_account_addresses::{self};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

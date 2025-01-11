@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(clippy::extra_unused_lifetimes)]
-
 use crate::schema::auth_key_multikey_layout::{self};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -13,6 +11,6 @@ use serde::{Deserialize, Serialize};
 pub struct AuthKeyMultikeyLayout {
     pub auth_key: String,
     pub signatures_required: i64,
-    pub multikey_layout: serde_json::Value, // TODO: this should include the type prefixes
+    pub multikey_layout_with_prefixes: serde_json::Value,
     pub multikey_type: String,
 }
