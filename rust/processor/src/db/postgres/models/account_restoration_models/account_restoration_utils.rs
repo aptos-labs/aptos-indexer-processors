@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(clippy::extra_unused_lifetimes)]
-
 use crate::{
     db::postgres::models::account_restoration_models::{
         auth_key_account_addresses::AuthKeyAccountAddress,
@@ -133,7 +131,7 @@ impl AuthKeyScheme for MultiKeyAuthKeyScheme {
         let mut preimage = vec![total_keys];
 
         for (key_type, public_key) in self.key_types.iter().zip(&self.public_keys) {
-            preimage.push(key_type.unwrap().to_u8());
+            preimage.push(key_type.expect("should not be None").to_u8());
             preimage.extend_from_slice(public_key);
         }
 
@@ -215,6 +213,15 @@ impl SignatureInfo {
             Self::MultiEd25519(info) => info.public_keys.clone(),
             Self::SingleKey(_) => vec![],
             Self::MultiKey(info) => info.public_keys.clone(),
+        }
+    }
+
+    fn multikey_key_types(&self) -> Vec<Option<AnyPublicKeyType>> {
+        match self {
+            Self::Ed25519(_) => vec![],
+            Self::MultiEd25519(info) => vec![None; info.public_keys.len()],
+            Self::SingleKey(_) => vec![],
+            Self::MultiKey(info) => info.key_types.clone(),
         }
     }
 
@@ -334,19 +341,34 @@ pub fn parse_account_restoration_models_from_transaction(
     };
 
     let (auth_key_multikey_layout, public_key_auth_keys) = if signature_info.is_multikey() {
-        let multikey_layout = signature_info
+        let multikey_layouts = signature_info
             .multikey_public_keys()
             .iter()
-            .map(|pk| format!("0x{}", hex::encode(pk)))
+            .zip(signature_info.multikey_key_types().iter())
+            .map(|(pk, prefix)| {
+                let pk_with_prefix = prefix.map_or_else(
+                    || pk.clone(),
+                    |key_type| {
+                        let mut extended = vec![key_type.to_u8()]; // Public key type prefix
+                        extended.extend(pk);
+                        extended
+                    },
+                );
+                format!("0x{}", hex::encode(pk_with_prefix))
+            })
             .collect::<Vec<_>>();
 
-        let multikey_pk_types = match signature_info {
-            SignatureInfo::MultiEd25519(_) => vec![String::from("ed25519"); multikey_layout.len()],
-            SignatureInfo::MultiKey(ref scheme) => scheme
+        let multikey_pk_types = match &signature_info {
+            SignatureInfo::MultiEd25519(_) => {
+                vec![String::from("ed25519"); multikey_layouts.len()]
+            },
+            SignatureInfo::MultiKey(scheme) => scheme
                 .key_types
                 .iter()
-                .filter_map(Option::as_ref)
-                .map(AnyPublicKeyType::key_type_string)
+                .map(|maybe_key_type| match maybe_key_type {
+                    Some(key_type) => key_type.key_type_string(),
+                    None => String::new(),
+                })
                 .collect(),
             _ => vec![],
         };
@@ -354,14 +376,22 @@ pub fn parse_account_restoration_models_from_transaction(
         let multikey_verified = signature_info.multikey_verified();
         let multikey_threshold = signature_info.multikey_threshold();
 
+        let multikey_layout_with_prefixes = match serde_json::to_value(&multikey_layouts) {
+            Ok(value) => value,
+            Err(_) => {
+                return Some((auth_key_account_address, vec![], None));
+            },
+        };
+
         let mut public_key_auth_keys = vec![];
-        for ((pk, pk_type), verified) in multikey_layout
+        for ((pk, pk_type), verified) in signature_info
+            .multikey_public_keys()
             .iter()
             .zip(multikey_pk_types.iter())
             .zip(multikey_verified.iter())
         {
             public_key_auth_keys.push(PublicKeyAuthKey {
-                public_key: pk.clone(),
+                public_key: format!("0x{}", hex::encode(pk)),
                 public_key_type: pk_type.clone(),
                 auth_key: auth_key.clone(),
                 verified: *verified,
@@ -371,8 +401,8 @@ pub fn parse_account_restoration_models_from_transaction(
         (
             Some(AuthKeyMultikeyLayout {
                 auth_key: auth_key.clone(),
-                signatures_required: multikey_threshold.unwrap() as i64,
-                multikey_layout: serde_json::to_value(multikey_layout.clone()).unwrap(),
+                signatures_required: multikey_threshold.expect("should not be None") as i64,
+                multikey_layout_with_prefixes,
                 multikey_type: signature_info.signature_type_string(),
             }),
             public_key_auth_keys,
