@@ -113,10 +113,10 @@ impl NamedStep for AccountRestorationStorer {
 fn deduplicate_auth_key_account_addresses(
     items_to_insert: Vec<AuthKeyAccountAddress>,
 ) -> Vec<AuthKeyAccountAddress> {
-    let mut seen: HashMap<(String, String), AuthKeyAccountAddress> = HashMap::new();
+    let mut seen: HashMap<String, AuthKeyAccountAddress> = HashMap::new();
 
     for item in items_to_insert {
-        seen.insert((item.auth_key.clone(), item.address.clone()), item);
+        seen.insert(item.address.clone(), item);
     }
 
     seen.into_values().collect()
@@ -135,10 +135,10 @@ fn insert_auth_key_account_addresses_query(
     (
         diesel::insert_into(schema::auth_key_account_addresses::table)
             .values(items_to_insert)
-            .on_conflict((auth_key, address))
+            .on_conflict(address)
             .do_update()
             .set((
-                address.eq(excluded(address)),
+                auth_key.eq(excluded(auth_key)),
                 verified.eq(excluded(verified)),
             )),
         None,
@@ -152,17 +152,12 @@ fn insert_auth_key_multikey_layouts_query(
     Option<&'static str>,
 ) {
     use schema::auth_key_multikey_layout::dsl::*;
+    // Assuming there cannot be two different multikey layouts that derives the same auth key
     (
         diesel::insert_into(schema::auth_key_multikey_layout::table)
             .values(items_to_insert)
             .on_conflict(auth_key)
-            .do_update()
-            .set((
-                auth_key.eq(excluded(auth_key)),
-                signatures_required.eq(excluded(signatures_required)),
-                multikey_layout.eq(excluded(multikey_layout)),
-                multikey_type.eq(excluded(multikey_type)),
-            )),
+            .do_nothing(),
         None,
     )
 }
@@ -200,12 +195,7 @@ fn insert_public_key_auth_keys_query(
             .values(items_to_insert)
             .on_conflict((public_key, public_key_type, auth_key))
             .do_update()
-            .set((
-                public_key.eq(excluded(public_key)),
-                public_key_type.eq(excluded(public_key_type)),
-                auth_key.eq(excluded(auth_key)),
-                verified.eq(excluded(verified)),
-            )),
+            .set((verified.eq(excluded(verified)),)),
         None,
     )
 }

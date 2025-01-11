@@ -85,7 +85,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    auth_key_account_addresses (auth_key, address) {
+    auth_key_account_addresses (address) {
         #[max_length = 66]
         auth_key -> Varchar,
         #[max_length = 66]

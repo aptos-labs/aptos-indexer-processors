@@ -8,7 +8,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(auth_key, address))]
+#[diesel(primary_key(address))]
 #[diesel(table_name = auth_key_account_addresses)]
 pub struct AuthKeyAccountAddress {
     pub auth_key: String,
