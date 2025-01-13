@@ -3,9 +3,21 @@ name: Update SDK Dependency
 on:
   repository_dispatch:
     types: [sdk-dependency-update]
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        type: string
+        default: "main"
+      commit_hash:
+        type: string
+        default: "main"
+      aptos_protos_commit_hash:
+        type: string
+        default: "main"
 
 permissions:
   contents: write
+  pull-requests: write
   id-token: write
 jobs:
   update-the-dependency:
@@ -33,14 +45,18 @@ jobs:
       - name: Update the dependency
         run: |
           set -e
+          # Use workflow_dispatch inputs if available, otherwise use repository_dispatch values
+          commit_hash="${{ github.event.inputs.commit_hash || github.event.client_payload.commit_hash }}"
+          aptos_protos_commit_hash="${{ github.event.inputs.aptos_protos_commit_hash || github.event.client_payload.aptos_protos_commit_hash }}"
+          branch_name="${{ github.event.inputs.branch_name || github.event.client_payload.branch_name }}"
           
           # SDK commit hash
-          toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk.rev ${{ github.event.client_payload.commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
-          toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk-server-framework.rev ${{ github.event.client_payload.commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
-          toml set Cargo.toml workspace.dependencies.aptos-indexer-testing-framework.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk.rev "$commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk-server-framework.rev "$commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-testing-framework.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
           # Protos commit hash
-          toml set Cargo.toml workspace.dependencies.aptos-protos.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml 
-          toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-protos.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml 
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
         working-directory: rust/
       - name: Configure Git user
         run: |
@@ -49,18 +65,19 @@ jobs:
       - name: Commit and Push Changes
         run: |
            set -e
-           branch_name="${{ github.event.client_payload.branch_name }}-update-sdk"
+           branch_name="${{ github.event.inputs.branch_name || github.event.client_payload.branch_name }}-update-sdk"
+           commit_hash="${{ github.event.inputs.commit_hash || github.event.client_payload.commit_hash }}"
            git checkout -b "$branch_name"
            git add Cargo.toml
-           git commit -m "Update sdk to ${{ github.event.client_payload.commit_hash }}"
+           git commit -m "Update sdk to $commit_hash"
            git push origin "$branch_name" --force
         env:
           GITHUB_TOKEN: ${{ steps.secrets.outputs.token }}
         working-directory: rust/
       - name: Create Pull Request
         run: |
-          branch_name="${{ github.event.client_payload.branch_name }}-update-sdk"
-          gh pr create --title "Update sdk to upstream branch ${{ github.event.client_payload.branch_name }}" \
+          branch_name="${{ github.event.inputs.branch_name || github.event.client_payload.branch_name }}-update-sdk"
+          gh pr create --title "Update sdk to upstream branch ${{ github.event.inputs.branch_name || github.event.client_payload.branch_name }}" \
                        --body "This PR updates sdk to new version." \
                        --base main \
                        --head "$branch_name" \
