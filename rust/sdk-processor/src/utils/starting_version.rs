@@ -240,6 +240,7 @@ mod tests {
     };
     use ahash::AHashMap;
     use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::TransactionStreamConfig;
+    use aptos_indexer_processor_sdk::aptos_indexer_transaction_stream::utils::AdditionalHeaders;
     use aptos_indexer_testing_framework::database::{PostgresTestDatabase, TestDatabase};
     use diesel_async::RunQueryDsl;
     use processor::schema::processor_status;
@@ -274,6 +275,7 @@ mod tests {
                 indexer_grpc_http2_ping_timeout_secs: 1,
                 indexer_grpc_reconnection_timeout_secs: 1,
                 indexer_grpc_response_item_timeout_secs: 1,
+                additional_headers: AdditionalHeaders::default(),
             },
             processor_config,
             backfill_config,

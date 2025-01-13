@@ -103,7 +103,7 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
 
         let account_transactions: Vec<_> = transactions
             .into_par_iter()

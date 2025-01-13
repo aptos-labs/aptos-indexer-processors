@@ -99,8 +99,7 @@ pub async fn create_gap_detector_status_tracker_loop(
                                             .update_last_processed_version(
                                                 res_last_success_batch.end_version,
                                                 res_last_success_batch
-                                                    .last_transaction_timestamp
-                                                    .clone(),
+                                                    .last_transaction_timestamp,
                                             )
                                             .await
                                             .unwrap();

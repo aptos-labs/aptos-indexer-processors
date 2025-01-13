@@ -205,7 +205,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
                     end_version,
                     processing_duration_in_secs,
                     db_insertion_duration_in_secs,
-                    last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
+                    last_transaction_timestamp: transactions.last().unwrap().timestamp,
                 },
             )),
             Err(e) => {

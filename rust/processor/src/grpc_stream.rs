@@ -372,10 +372,10 @@ pub async fn create_fetcher_loop(
                         reconnection_retries = 0;
                         let start_version = r.transactions.as_slice().first().unwrap().version;
                         let start_txn_timestamp =
-                            r.transactions.as_slice().first().unwrap().timestamp.clone();
+                            r.transactions.as_slice().first().unwrap().timestamp;
                         let end_version = r.transactions.as_slice().last().unwrap().version;
                         let end_txn_timestamp =
-                            r.transactions.as_slice().last().unwrap().timestamp.clone();
+                            r.transactions.as_slice().last().unwrap().timestamp;
 
                         next_version_to_fetch = end_version + 1;
 
@@ -498,8 +498,8 @@ pub async fn create_fetcher_loop(
                                     start_version,
                                     end_version,
                                     // TODO: this is only for gap checker + filtered txns, but this is wrong
-                                    start_txn_timestamp: start_txn_timestamp.clone(),
-                                    end_txn_timestamp: end_txn_timestamp.clone(),
+                                    start_txn_timestamp,
+                                    end_txn_timestamp,
                                     size_in_bytes,
                                 };
 
