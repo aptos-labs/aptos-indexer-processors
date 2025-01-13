@@ -1,5 +1,5 @@
 {
-  "resource_version": 38,
+  "resource_version": 9999,
   "metadata": {
     "version": 3,
     "sources": [
@@ -2327,6 +2327,9 @@
                   "columns": [
                     "block_height",
                     "entry_function_id_str",
+                    "entry_function_contract_address",
+                    "entry_function_module_name",
+                    "entry_function_function_name",
                     "epoch",
                     "expiration_timestamp_secs",
                     "gas_unit_price",
@@ -2357,6 +2360,43 @@
             "use_prepared_statements": false
           }
         }
+      }
+    ],
+    "query_collections": [
+      {
+        "name": "allowed-queries",
+        "definition": {
+          "queries": [
+            {
+              "name": "processor_status_for_probe",
+              "query": "query MyQuery {\n  processor_status {\n    last_success_version\n    processor\n    last_transaction_timestamp\n  }\n}"
+            }
+          ]
+        }
+      }
+    ],
+    "allowlist": [
+      {
+        "collection": "allowed-queries",
+        "scope": {
+          "global": true
+        }
+      }
+    ],
+    "rest_endpoints": [
+      {
+        "comment": "Only for use by the Cloud Run probes.",
+        "definition": {
+          "query": {
+            "collection_name": "allowed-queries",
+            "query_name": "processor_status_for_probe"
+          }
+        },
+        "methods": [
+          "GET"
+        ],
+        "name": "processor_status_for_probe",
+        "url": "processor_status_for_probe"
       }
     ],
     "api_limits": {
