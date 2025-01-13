@@ -3,12 +3,29 @@ name: Update SDK Dependency
 on:
   repository_dispatch:
     types: [sdk-dependency-update]
+
+permissions:
+  contents: write
+  id-token: write
 jobs:
   update-the-dependency:
     runs-on: ubuntu-latest
     steps:
+      - id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      - name: Get Secret Manager Secrets
+        id: secrets
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            token:aptos-ci/github-actions-repository-dispatch
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ steps.secrets.outputs.token }}
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install toml
@@ -25,11 +42,10 @@ jobs:
           toml set Cargo.toml workspace.dependencies.aptos-protos.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml 
           toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev ${{ github.event.client_payload.aptos_protos_commit_hash }} > Cargo.tmp && mv Cargo.tmp Cargo.toml
         working-directory: rust/
-      - name: Configure Git
+      - name: Configure Git user
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-    
+          git config --global user.name "Aptos Bot"
+          git config --global user.email "aptos-bot@aptoslabs.com"
       - name: Commit and Push Changes
         run: |
            set -e
@@ -37,10 +53,9 @@ jobs:
            git checkout -b "$branch_name"
            git add Cargo.toml
            git commit -m "Update sdk to ${{ github.event.client_payload.commit_hash }}"
-           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
            git push origin "$branch_name" --force
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.secrets.outputs.token }}
         working-directory: rust/
       - name: Create Pull Request
         run: |
@@ -51,7 +66,7 @@ jobs:
                        --head "$branch_name" \
                        --label "indexer-sdk-update"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.secrets.outputs.token }}
       - name: Run Integration Tests
         run: cargo test --manifest-path integration-tests/Cargo.toml
         working-directory: rust
