@@ -109,7 +109,9 @@ pub fn insert_user_transactions_query(
             .on_conflict(version)
             .do_update()
             .set((
-                expiration_timestamp_secs.eq(excluded(expiration_timestamp_secs)),
+                entry_function_contract_address.eq(excluded(entry_function_contract_address)),
+                entry_function_module_name.eq(excluded(entry_function_module_name)),
+                entry_function_function_name.eq(excluded(entry_function_function_name)),
                 inserted_at.eq(excluded(inserted_at)),
             )),
         None,
