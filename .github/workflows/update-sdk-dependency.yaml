@@ -57,6 +57,8 @@ jobs:
           # Protos commit hash
           toml set Cargo.toml workspace.dependencies.aptos-protos.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml 
           toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          # Refresh the lock file
+          cargo build
         working-directory: rust/
       - name: Configure Git user
         run: |
@@ -69,6 +71,7 @@ jobs:
            commit_hash="${{ github.event.inputs.commit_hash || github.event.client_payload.commit_hash }}"
            git checkout -b "$branch_name"
            git add Cargo.toml
+           git add Cargo.lock
            git commit -m "Update sdk to $commit_hash"
            git push origin "$branch_name" --force
         env:
