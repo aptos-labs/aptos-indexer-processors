@@ -50,10 +50,10 @@ jobs:
           aptos_protos_commit_hash="${{ github.event.inputs.aptos_protos_commit_hash || github.event.client_payload.aptos_protos_commit_hash }}"
           branch_name="${{ github.event.inputs.branch_name || github.event.client_payload.branch_name }}"
           
-          # SDK commit hash
+          # SDK commit hash SDK + framework + testing.
           toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk.rev "$commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
           toml set Cargo.toml workspace.dependencies.aptos-indexer-processor-sdk-server-framework.rev "$commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
-          toml set Cargo.toml workspace.dependencies.aptos-indexer-testing-framework.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
+          toml set Cargo.toml workspace.dependencies.aptos-indexer-testing-framework.rev "$commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
           # Protos commit hash
           toml set Cargo.toml workspace.dependencies.aptos-protos.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml 
           toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
