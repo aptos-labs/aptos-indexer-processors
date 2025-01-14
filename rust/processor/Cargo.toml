@@ -39,6 +39,7 @@ google-cloud-pubsub = { workspace = true }
 google-cloud-storage = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
+indexmap = { workspace = true }
 itertools = { workspace = true }
 kanal = { workspace = true }
 lazy_static = { workspace = true }

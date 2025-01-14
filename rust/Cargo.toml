@@ -78,6 +78,7 @@ google-cloud-googleapis = "0.10.0"
 google-cloud-pubsub = "0.18.0"
 hex = "0.4.3"
 itertools = "0.12.1"
+indexmap = { version = "2.7.0", features = ["serde"] }
 jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
