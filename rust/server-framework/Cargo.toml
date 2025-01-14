@@ -27,4 +27,4 @@ tracing-subscriber = { workspace = true }
 warp = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-aptos-system-utils = { workspace = true }
+aptos-system-utils = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "202bdccff2b2d333a385ae86a4fcf23e89da9f62" }
