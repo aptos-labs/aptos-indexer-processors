@@ -374,8 +374,7 @@ pub async fn create_fetcher_loop(
                         let start_txn_timestamp =
                             r.transactions.as_slice().first().unwrap().timestamp;
                         let end_version = r.transactions.as_slice().last().unwrap().version;
-                        let end_txn_timestamp =
-                            r.transactions.as_slice().last().unwrap().timestamp;
+                        let end_txn_timestamp = r.transactions.as_slice().last().unwrap().timestamp;
 
                         next_version_to_fetch = end_version + 1;
 
