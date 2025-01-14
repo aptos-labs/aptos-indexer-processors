@@ -163,13 +163,15 @@ CREATE TABLE user_transactions (
   -- from UserTransaction
   "timestamp" TIMESTAMP NOT NULL,
   entry_function_id_str text NOT NULL,
+  replay_protection_nonce BIGINT,
   -- Default time columns
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   CONSTRAINT fk_versions FOREIGN KEY (version) REFERENCES transactions (version),
-  UNIQUE (sender, sequence_number)
+  UNIQUE (sender, sequence_number, replay_protection_nonce)
 );
-CREATE INDEX ut_sender_seq_index ON user_transactions (sender, sequence_number);
+/* Question: Is it okay to change this index by adding `replay_protection_nonce` in the key? */
+CREATE INDEX ut_sender_seq_index ON user_transactions (sender, sequence_number, replay_protection_nonce);
 CREATE INDEX ut_insat_index ON user_transactions (inserted_at);
 -- tracks signatures for user transactions
 CREATE TABLE signatures (

@@ -11,6 +11,7 @@ use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
+// Question: Do we have to add a replay_protection_nonce here?
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = events)]

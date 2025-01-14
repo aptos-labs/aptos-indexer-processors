@@ -3,6 +3,8 @@
 
 include!(concat!(env!("OUT_DIR"), "/generate_transactions.rs"));
 
+// TODO: Add some orderless transactions here for testing.
+// Question: Should we do it after the orderless tranactions feature is deployed?
 #[cfg(test)]
 mod tests {
     use super::*;

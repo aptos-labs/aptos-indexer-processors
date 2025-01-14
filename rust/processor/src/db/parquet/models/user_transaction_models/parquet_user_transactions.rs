@@ -17,7 +17,7 @@ use allocative::Allocative;
 use anyhow::Result;
 use aptos_protos::{
     transaction::v1::{
-        TransactionInfo, UserTransaction as UserTransactionPB, UserTransactionRequest,
+        transaction_payload::ExtraConfig, ExtraConfigV1, TransactionInfo, UserTransaction as UserTransactionPB, UserTransactionRequest
     },
     util::timestamp::Timestamp,
 };
@@ -43,6 +43,8 @@ pub struct UserTransaction {
     pub storage_refund_octa: u64,
     pub is_transaction_success: bool,
     pub num_signatures: i64,
+    // Question: Is it okay to use u64 here?
+    pub replay_protection_nonce: Option<u64>,
 }
 
 impl NamedTable for UserTransaction {
@@ -112,6 +114,16 @@ impl UserTransaction {
                 .map(|fs| fs.storage_fee_refund_octas)
                 .unwrap_or(0),
             num_signatures,
+            replay_protection_nonce: user_request.payload.as_ref()
+                .and_then(|payload| payload.extra_config.as_ref())
+                .and_then(|extra_config| match extra_config {
+                    ExtraConfig::ExtraConfigV1(
+                        ExtraConfigV1 {
+                            replay_protection_nonce,
+                            multisig_address: _,
+                        }
+                    )  => replay_protection_nonce.clone()
+                })
         }
     }
 

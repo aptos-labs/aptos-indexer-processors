@@ -21,6 +21,7 @@ const EVENT_TYPE_MAX_LENGTH: usize = 300;
 #[diesel(primary_key(transaction_version, event_index))]
 #[diesel(table_name = events)]
 pub struct Event {
+    // Question: Do we need to add a replay_protection_nonce here?
     pub sequence_number: i64,
     pub creation_number: i64,
     pub account_address: String,

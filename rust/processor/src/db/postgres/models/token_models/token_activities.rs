@@ -30,6 +30,7 @@ pub struct TokenActivity {
     pub transaction_version: i64,
     pub event_account_address: String,
     pub event_creation_number: i64,
+    // Question: Do we need to add a replay_protection_nonce here?
     pub event_sequence_number: i64,
     pub token_data_id_hash: String,
     pub property_version: BigDecimal,

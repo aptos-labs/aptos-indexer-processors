@@ -60,6 +60,8 @@ impl TransactionFilter {
 
                 if let Some(focus_contract_addresses) = &self.focus_contract_addresses {
                     // Skip if focus contract addresses are set and the transaction isn't in the list
+                    // Question: Entry function transactions and Multisig transactions with entry function payload are treated
+                    // the same way. Is this okay?
                     if let Some(payload) = utr.payload.as_ref() {
                         if let Some(Payload::EntryFunctionPayload(efp)) = payload.payload.as_ref() {
                             if let Some(function) = efp.function.as_ref() {

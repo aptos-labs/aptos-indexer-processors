@@ -2384,7 +2384,8 @@
                     "sender",
                     "sequence_number",
                     "timestamp",
-                    "version"
+                    "version",
+                    "replay_protection_nonce"
                   ],
                   "filter": {},
                   "limit": 100

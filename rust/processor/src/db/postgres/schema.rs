@@ -1271,6 +1271,7 @@ diesel::table! {
         entry_function_module_name -> Nullable<Varchar>,
         #[max_length = 255]
         entry_function_function_name -> Nullable<Varchar>,
+        replay_protection_nonce -> Nullable<Int8>,
     }
 }
 

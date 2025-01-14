@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use aptos_protos::{
-    transaction::v1::{UserTransaction as UserTransactionPB, UserTransactionRequest},
+    transaction::v1::{transaction_payload::ExtraConfig, ExtraConfigV1, UserTransaction as UserTransactionPB, UserTransactionRequest},
     util::timestamp::Timestamp,
 };
 use bigdecimal::BigDecimal;
@@ -43,6 +43,8 @@ pub struct UserTransaction {
     pub entry_function_contract_address: Option<String>,
     pub entry_function_module_name: Option<String>,
     pub entry_function_function_name: Option<String>,
+    // Question: Is it okay to use i64 here, as the nonce is defined as u64 in aptos-core repo?
+    pub replay_protection_nonce: Option<i64>,
 }
 
 impl UserTransaction {
@@ -96,6 +98,16 @@ impl UserTransaction {
                     get_entry_function_function_name_from_user_request(user_request)
                         .unwrap_or_default(),
                 ),
+                replay_protection_nonce: user_request.payload.as_ref()
+                .and_then(|payload| payload.extra_config.as_ref())
+                .and_then(|extra_config| match extra_config {
+                    ExtraConfig::ExtraConfigV1(
+                        ExtraConfigV1 {
+                            replay_protection_nonce,
+                            multisig_address: _,
+                        }
+                    )  => replay_protection_nonce.map(|nonce| nonce as i64)
+                }),
             },
             Self::get_signatures(user_request, version, block_height),
         )

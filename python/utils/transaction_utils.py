@@ -31,7 +31,8 @@ def get_sender(
     user_transaction_request = get_user_transaction_request(user_transaction)
     return user_transaction_request.sender
 
-
+# Question: Multisig transactions could also have an entry function payload inside them.
+# Is it okay to ignore that entry function payload here?
 def get_entry_function_payload(
     user_transaction: transaction_pb2.UserTransaction,
 ) -> transaction_pb2.EntryFunctionPayload:

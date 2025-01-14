@@ -7,10 +7,7 @@ use crate::{
 };
 use aptos_protos::{
     transaction::v1::{
-        multisig_transaction_payload::Payload as MultisigPayloadType,
-        transaction_payload::Payload as PayloadType, write_set::WriteSet as WriteSetType,
-        EntryFunctionId, EntryFunctionPayload, MoveScriptBytecode, MoveType, ScriptPayload,
-        TransactionPayload, UserTransactionRequest, WriteSet,
+        multisig_transaction_payload::Payload as MultisigPayloadType, transaction_payload::{ExtraConfig, Payload as PayloadType}, write_set::WriteSet as WriteSetType, EntryFunctionId, EntryFunctionPayload, ExtraConfigV1, MoveScriptBytecode, MoveType, ScriptPayload, TransactionPayload, UserTransactionRequest, WriteSet
     },
     util::timestamp::Timestamp,
 };
@@ -181,8 +178,19 @@ pub fn get_entry_function_function_name_from_user_request(
     })
 }
 
-pub fn get_payload_type(payload: &TransactionPayload) -> String {
-    payload.r#type().as_str_name().to_string()
+// Question: Should we convert entry function payload to multisig payload here if the mutlisig_address is set in extra config?
+pub fn get_payload_type(payload: &TransactionPayload) -> String {    
+    let multisig_address = payload.extra_config.as_ref().and_then(|extra_config| match extra_config {
+        ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
+            multisig_address, ..
+        }) => multisig_address.clone()
+    });
+    let payload_type = payload.r#type().as_str_name().to_string();
+    if multisig_address.is_some() && payload.r#type().as_str_name().to_string() == "TYPE_ENTRY_FUNCTION_PAYLOAD" {
+        "TYPE_MULTISIG_PAYLOAD".to_string()
+    } else {
+        payload_type
+    }
 }
 
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
@@ -199,15 +207,44 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
         );
         return None;
     }
+    // Question: Should we convert entry function payload to multisig payload here if the mutlisig_address is set in extra config?
+    let multisig_address = payload.extra_config.as_ref().and_then(|extra_config| match extra_config {
+        ExtraConfig::ExtraConfigV1(ExtraConfigV1 {
+            multisig_address, ..
+        }) => multisig_address.clone()
+    });
     match payload.payload.as_ref().unwrap() {
         PayloadType::EntryFunctionPayload(inner) => {
-            let clean = get_clean_entry_function_payload(inner, version);
-            Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                tracing::error!(version = version, "Unable to serialize payload into value");
-                panic!()
-            }))
+            if let Some(multisig_address) = multisig_address {
+                let payload_clean = get_clean_entry_function_payload(inner, version);
+                let clean = MultisigPayloadClean {
+                    multisig_address: multisig_address.clone(),
+                    transaction_payload: Some(serde_json::to_value(payload_clean).unwrap_or_else(|_| {
+                        tracing::error!(
+                            version = version,
+                            "Unable to serialize payload into value"
+                        );
+                        panic!()
+                    })),
+                };
+                Some(serde_json::to_value(clean).unwrap_or_else(|_| {
+                    tracing::error!(version = version, "Unable to serialize payload into value");
+                    panic!()
+                }))
+            } else {
+                let clean = get_clean_entry_function_payload(inner, version);
+                Some(serde_json::to_value(clean).unwrap_or_else(|_| {
+                    tracing::error!(version = version, "Unable to serialize payload into value");
+                    panic!()
+                }))
+            }
         },
         PayloadType::ScriptPayload(inner) => {
+            // TODO: We are assuming that multisig transactions do not use script payload.
+            // If that changes in the future, update this.
+            if multisig_address.is_some() {
+                tracing::error!(version = version, "Multisig address cannot be set for script payloads");
+            }
             let clean = get_clean_script_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
                 tracing::error!(version = version, "Unable to serialize payload into value");

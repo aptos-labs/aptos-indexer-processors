@@ -319,6 +319,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-protos"
+version = "1.3.1"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=f3bbed37ea0fbd31c6ad56361724247e1a417d9b#f3bbed37ea0fbd31c6ad56361724247e1a417d9b"
+dependencies = [
+ "futures-core",
+ "pbjson",
+ "prost 0.12.6",
+ "serde",
+ "tonic 0.11.0",
+]
+
+[[package]]
 name = "aptos-system-utils"
 version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62#202bdccff2b2d333a385ae86a4fcf23e89da9f62"
@@ -2286,7 +2298,7 @@ dependencies = [
  "aptos-indexer-processor-sdk",
  "aptos-indexer-test-transactions",
  "aptos-indexer-testing-framework",
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=f3bbed37ea0fbd31c6ad56361724247e1a417d9b)",
  "assert-json-diff",
  "bigdecimal",
  "chrono",
@@ -3377,7 +3389,7 @@ dependencies = [
  "allocative_derive",
  "anyhow",
  "aptos-moving-average 0.1.0",
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=f3bbed37ea0fbd31c6ad56361724247e1a417d9b)",
  "async-trait",
  "bcs",
  "bigdecimal",
@@ -4729,7 +4741,7 @@ dependencies = [
 name = "testing-transactions"
 version = "0.1.0"
 dependencies = [
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=f3bbed37ea0fbd31c6ad56361724247e1a417d9b)",
  "serde_json",
 ]
 
