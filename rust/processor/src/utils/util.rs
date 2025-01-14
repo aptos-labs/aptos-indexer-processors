@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::database::DbPoolConnection;
 use crate::{
     db::postgres::models::property_map::{PropertyMap, TokenObjectPropertyMap},
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
@@ -39,6 +40,13 @@ lazy_static! {
     pub static ref APT_METADATA_ADDRESS_HEX: String =
         format!("0x{}", hex::encode(*APT_METADATA_ADDRESS_RAW));
 }
+
+pub struct DbConnectionConfig<'a> {
+    pub conn: DbPoolConnection<'a>,
+    pub query_retries: u32,
+    pub query_retry_delay_ms: u64,
+}
+
 // Supporting structs to get clean payload without escaped strings
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryFunctionPayloadClean {
