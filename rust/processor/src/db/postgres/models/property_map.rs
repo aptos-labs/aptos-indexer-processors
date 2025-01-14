@@ -3,6 +3,7 @@
 
 use crate::utils::util;
 use ahash::AHashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
 
@@ -21,14 +22,14 @@ pub fn create_property_value(typ: String, value: String) -> Result<PropertyValue
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PropertyMap {
-    data: AHashMap<String, PropertyValue>,
+    data: IndexMap<String, PropertyValue>,
 }
 
 impl PropertyMap {
     /// Deserializes PropertyValue from bcs encoded json
     pub fn from_bcs_encode_str(val: Value) -> Option<Value> {
         let mut pm = PropertyMap {
-            data: AHashMap::new(),
+            data: IndexMap::new(),
         };
         let records: &Vec<Value> = val.get("map")?.get("data")?.as_array()?;
         for entry in records {
@@ -71,14 +72,14 @@ pub fn create_token_object_property_value(
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenObjectPropertyMap {
-    data: AHashMap<String, TokenObjectPropertyValue>,
+    data: IndexMap<String, TokenObjectPropertyValue>,
 }
 
 impl TokenObjectPropertyMap {
     /// Deserializes PropertyValue from bcs encoded json
     pub fn from_bcs_encode_str(val: Value) -> Option<Value> {
         let mut pm = TokenObjectPropertyMap {
-            data: AHashMap::new(),
+            data: IndexMap::new(),
         };
         let records: &Vec<Value> = val.get("data")?.as_array()?;
         for entry in records {
@@ -95,7 +96,7 @@ impl TokenObjectPropertyMap {
     /// For example: Object {"data": Object {"creation_time_sec": Object {"value": String("1666125588")}}}
     /// becomes Object {"creation_time_sec": "1666125588"}
     fn to_flat_json_new(val: TokenObjectPropertyMap) -> Value {
-        let mut map = AHashMap::new();
+        let mut map = IndexMap::new();
         for (k, v) in val.data {
             map.insert(k, v.value);
         }
