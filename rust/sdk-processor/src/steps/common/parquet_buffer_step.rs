@@ -54,7 +54,7 @@ impl ParquetBuffer {
             buffer_metadata.end_version = cur_batch_metadata.end_version;
             buffer_metadata.total_size_in_bytes = cur_batch_metadata.total_size_in_bytes;
             buffer_metadata.end_transaction_timestamp =
-                cur_batch_metadata.end_transaction_timestamp.clone();
+                cur_batch_metadata.end_transaction_timestamp;
         } else {
             // Initialize the metadata with the current batch's start information
             self.current_batch_metadata = Some(cur_batch_metadata.clone());

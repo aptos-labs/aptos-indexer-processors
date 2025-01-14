@@ -139,7 +139,7 @@ impl ProcessorTrait for ParquetUserTransactionsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
         let (user_transactions, transaction_version_to_struct_count) =
             process_transactions(transactions).await;
 
@@ -156,7 +156,7 @@ impl ProcessorTrait for ParquetUserTransactionsProcessor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),

@@ -422,8 +422,8 @@ impl Worker {
                             .map(|t| t.version)
                             .unwrap_or_default();
                         let batch_last_txn_version = transactions_pb.end_version;
-                        let start_txn_timestamp = transactions_pb.start_txn_timestamp.clone();
-                        let end_txn_timestamp = transactions_pb.end_txn_timestamp.clone();
+                        let start_txn_timestamp = transactions_pb.start_txn_timestamp;
+                        let end_txn_timestamp = transactions_pb.end_txn_timestamp;
 
                         let start_txn_timestamp_unix = start_txn_timestamp
                             .as_ref()

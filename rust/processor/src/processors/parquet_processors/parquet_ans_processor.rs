@@ -101,7 +101,7 @@ impl ProcessorTrait for ParquetAnsProcessor {
         end_version: u64,
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
         let all_ans_primary_names_v2 = parse_ans(
@@ -124,7 +124,7 @@ impl ProcessorTrait for ParquetAnsProcessor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),
