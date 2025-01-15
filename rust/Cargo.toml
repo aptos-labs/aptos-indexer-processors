@@ -8,7 +8,6 @@ members = [
     "processor",
     "sdk-processor",
     "server-framework",
-    "testing-transactions",
 ]
 
 [workspace.package]
@@ -26,7 +25,6 @@ server-framework = { path = "server-framework" }
 aptos-moving-average = { path = "moving-average" }
 integration-tests = { path = "integration-tests" }
 sdk-processor = { path = "sdk-processor" }
-testing-transactions = { path = "testing-transactions" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
