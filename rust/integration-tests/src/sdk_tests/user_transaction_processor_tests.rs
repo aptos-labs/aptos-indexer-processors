@@ -48,7 +48,7 @@ mod sdk_user_txn_processor_tests {
             run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::{
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_MAINNET_TXNS_1803170308_USER_TXN_MULTI_KEY_KEYLESS,
         IMPORTED_MAINNET_TXNS_2175935_USER_TXN_MULTI_ED25519,
         IMPORTED_MAINNET_TXNS_407418623_USER_TXN_SINGLE_KEY_SECP256K1_ECDSA,
