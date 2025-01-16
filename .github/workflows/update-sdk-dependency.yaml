@@ -34,12 +34,16 @@ jobs:
         with:
           secrets: |-
             token:aptos-ci/github-actions-repository-dispatch
+      - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld libdw-dev --no-install-recommends --assume-yes
+        shell: bash
       - name: Checkout
         uses: actions/checkout@v4
         with:
           token: ${{ steps.secrets.outputs.token }}
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: --cfg tokio_unstable
       - name: Install toml
         run: cargo install toml-cli
       - name: Update the dependency
@@ -58,7 +62,7 @@ jobs:
           toml set Cargo.toml workspace.dependencies.aptos-protos.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml 
           toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
           # Refresh the lock file
-          cargo build
+          cargo build -v
         working-directory: rust/
       - name: Configure Git user
         run: |
