@@ -57,8 +57,8 @@ mod sdk_token_v2_processor_tests {
             run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::{
-        // IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM,
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
+        IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM,
         IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_MAINNET_TXNS_1058723093_TOKEN_V1_MINT_WITHDRAW_DEPOSIT_EVENTS,
@@ -315,14 +315,14 @@ mod sdk_token_v2_processor_tests {
         .await;
     }
 
-    // #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    // async fn test_token_v1_offer_claim_no_table_metadata() {
-    //     process_single_transaction(
-    //         IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM,
-    //         Some("test_token_v1_offer_claim_no_table_metadata".to_string()),
-    //     )
-    //     .await;
-    // }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_token_v1_offer_claim_no_table_metadata() {
+        process_single_transaction(
+            IMPORTED_DEVNET_TXNS_19922017_TOKEN_V1_OFFER_CLAIM,
+            Some("test_token_v1_offer_claim_no_table_metadata".to_string()),
+        )
+        .await;
+    }
 
     /**
     * This test includes processing for the following:
@@ -351,6 +351,7 @@ mod sdk_token_v2_processor_tests {
         )
         .await;
     }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_v2_with_module_events() {
         process_single_transaction(

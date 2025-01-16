@@ -48,7 +48,7 @@ mod sdk_fungible_asset_processor_tests {
             setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::{
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
         IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,

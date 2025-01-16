@@ -47,7 +47,7 @@ mod tests {
             run_processor_test, setup_test_environment, validate_json, DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::{
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION,
         IMPORTED_MAINNET_TXNS_423176063_ACCOUNT_TRANSACTION_DELETE,
     };

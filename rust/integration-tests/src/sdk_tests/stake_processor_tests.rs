@@ -56,7 +56,7 @@ mod tests {
             DEFAULT_OUTPUT_FOLDER,
         },
     };
-    use aptos_indexer_test_transactions::{
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_MAINNET_TXNS_121508544_STAKE_DISTRIBUTE,
         IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
         IMPORTED_MAINNET_TXNS_1830706009_STAKER_GOVERNANCE_RECORD,

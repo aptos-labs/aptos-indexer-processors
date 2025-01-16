@@ -48,7 +48,7 @@ mod tests {
         },
     };
     use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
-    use aptos_indexer_test_transactions::{
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,

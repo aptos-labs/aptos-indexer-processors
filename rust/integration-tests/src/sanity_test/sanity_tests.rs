@@ -26,7 +26,7 @@ mod tests {
             user_transaction_processor_tests::setup_user_txn_processor_config,
         },
     };
-    use aptos_indexer_test_transactions::{
+    use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         ALL_IMPORTED_MAINNET_TXNS, ALL_IMPORTED_TESTNET_TXNS, ALL_SCRIPTED_TRANSACTIONS,
     };
     use aptos_indexer_testing_framework::{
