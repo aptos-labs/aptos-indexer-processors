@@ -9,11 +9,15 @@ use std::fmt::Debug;
 
 pub struct MonitoringProcessor {
     connection_pool: ArcDbPool,
+    db_row_name: String,
 }
 
 impl MonitoringProcessor {
-    pub fn new(connection_pool: ArcDbPool) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: ArcDbPool, db_row_name: String) -> Self {
+        Self {
+            connection_pool,
+            db_row_name,
+        }
     }
 }
 
@@ -32,6 +36,10 @@ impl Debug for MonitoringProcessor {
 impl ProcessorTrait for MonitoringProcessor {
     fn name(&self) -> &'static str {
         ProcessorName::MonitoringProcessor.into()
+    }
+
+    fn db_row_name(&self) -> &str {
+        &self.db_row_name
     }
 
     async fn process_transactions(
