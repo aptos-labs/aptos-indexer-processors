@@ -28,11 +28,11 @@ sdk-processor = { path = "sdk-processor" }
 
 ahash = { version = "0.8.7", features = ["serde"] }
 anyhow = "1.0.86"
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "a56b641a6aaca60092fcc9bbd98252f3cd703299" }
-aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "a56b641a6aaca60092fcc9bbd98252f3cd703299" }
-aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "6116af69aa173ca49e1761daabd6fe103fe2c65e" }
-aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "6116af69aa173ca49e1761daabd6fe103fe2c65e" }
-aptos-indexer-testing-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "a56b641a6aaca60092fcc9bbd98252f3cd703299" }
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "18c9e98b21d8aeca15c2c9958bd3dbaa1a1d2ab5" }
+aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "18c9e98b21d8aeca15c2c9958bd3dbaa1a1d2ab5" }
+aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "95f7a059974ed18d9ae40703c99a48c1f2882892" }
+aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "95f7a059974ed18d9ae40703c99a48c1f2882892" }
+aptos-indexer-testing-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "18c9e98b21d8aeca15c2c9958bd3dbaa1a1d2ab5" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"
 base64 = "0.13.0"
