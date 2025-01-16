@@ -1,0 +1,74 @@
+[
+  {
+    "transaction_version": 2080538,
+    "write_set_change_index": 9,
+    "domain": "god",
+    "subdomain": "",
+    "token_standard": "v1",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "token_name": "god.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "transaction_version": 2080538,
+    "write_set_change_index": 10,
+    "domain": "max",
+    "subdomain": "",
+    "token_standard": "v1",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "token_name": "max.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "transaction_version": 2080538,
+    "write_set_change_index": 11,
+    "domain": "asha",
+    "subdomain": "",
+    "token_standard": "v1",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "token_name": "asha.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "transaction_version": 2080538,
+    "write_set_change_index": 12,
+    "domain": "chris",
+    "subdomain": "",
+    "token_standard": "v1",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "token_name": "chris.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "transaction_version": 2080538,
+    "write_set_change_index": 13,
+    "domain": "david",
+    "subdomain": "",
+    "token_standard": "v1",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "token_name": "david.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "transaction_version": 2080538,
+    "write_set_change_index": 14,
+    "domain": "maayan",
+    "subdomain": "",
+    "token_standard": "v1",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "token_name": "maayan.apt",
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  }
+]

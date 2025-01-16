@@ -50,6 +50,8 @@ mod tests {
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION,
         IMPORTED_MAINNET_TXNS_423176063_ACCOUNT_TRANSACTION_DELETE,
+        IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
+        IMPORTED_TESTNET_TXNS_1_GENESIS, IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::account_transactions_processor::AccountTransactionsProcessor;
@@ -80,6 +82,33 @@ mod tests {
         process_single_mainnet_txn(
             IMPORTED_MAINNET_TXNS_423176063_ACCOUNT_TRANSACTION_DELETE,
             Some("account_transaction_delete_test".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_testnet_validator_transaction() {
+        process_single_mainnet_txn(
+            IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
+            Some("test_testnet_validator_transaction".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_testnet_genesis_transaction() {
+        process_single_mainnet_txn(
+            IMPORTED_TESTNET_TXNS_1_GENESIS,
+            Some("test_testnet_genesis_transaction".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_mainnet_block_metadata_transaction() {
+        process_single_mainnet_txn(
+            IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
+            Some("test_mainnet_block_metadata_transaction".to_string()),
         )
         .await;
     }

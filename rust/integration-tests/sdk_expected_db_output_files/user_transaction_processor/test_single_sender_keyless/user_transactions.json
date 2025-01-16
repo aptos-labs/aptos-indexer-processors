@@ -10,9 +10,9 @@
     "gas_unit_price": "100",
     "timestamp": "2024-06-10T15:51:10.170250",
     "entry_function_id_str": "0x1::aptos_account::transfer_coins",
+    "entry_function_function_name": "transfer_coins",
     "epoch": 7324,
     "entry_function_contract_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
-    "entry_function_module_name": "aptos_account",
-    "entry_function_function_name": "transfer_coins"
+    "entry_function_module_name": "aptos_account"
   }
 ]

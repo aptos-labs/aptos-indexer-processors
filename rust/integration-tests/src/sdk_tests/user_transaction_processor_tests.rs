@@ -49,6 +49,7 @@ mod sdk_user_txn_processor_tests {
         },
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
+        IMPORTED_MAINNET_TXNS_103958588_MULTI_AGENTS,
         IMPORTED_MAINNET_TXNS_1803170308_USER_TXN_MULTI_KEY_KEYLESS,
         IMPORTED_MAINNET_TXNS_2175935_USER_TXN_MULTI_ED25519,
         IMPORTED_MAINNET_TXNS_407418623_USER_TXN_SINGLE_KEY_SECP256K1_ECDSA,
@@ -58,6 +59,7 @@ mod sdk_user_txn_processor_tests {
         IMPORTED_MAINNET_TXNS_590098441_USER_TXN_SINGLE_SENDER_ED25519,
         IMPORTED_MAINNET_TXNS_685_USER_TXN_ED25519,
         IMPORTED_MAINNET_TXNS_976087151_USER_TXN_SINGLE_SENDER_KEYLESS,
+        IMPORTED_TESTNET_TXNS_769222973_MULTISIG,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::user_transaction_processor::UserTransactionProcessor;
@@ -139,6 +141,24 @@ mod sdk_user_txn_processor_tests {
         process_single_transactions(
             IMPORTED_MAINNET_TXNS_976087151_USER_TXN_SINGLE_SENDER_KEYLESS,
             Some("test_single_sender_keyless".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_multi_sig() {
+        process_single_transactions(
+            IMPORTED_TESTNET_TXNS_769222973_MULTISIG,
+            Some("test_multi_sig".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_multi_agent() {
+        process_single_transactions(
+            IMPORTED_MAINNET_TXNS_103958588_MULTI_AGENTS,
+            Some("test_multi_agent".to_string()),
         )
         .await;
     }

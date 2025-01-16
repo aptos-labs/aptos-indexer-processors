@@ -1,0 +1,68 @@
+[
+  {
+    "domain": "asha",
+    "subdomain": "",
+    "token_standard": "v1",
+    "token_name": "asha.apt",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "last_transaction_version": 2080538,
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "domain": "chris",
+    "subdomain": "",
+    "token_standard": "v1",
+    "token_name": "chris.apt",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "last_transaction_version": 2080538,
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "domain": "david",
+    "subdomain": "",
+    "token_standard": "v1",
+    "token_name": "david.apt",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "last_transaction_version": 2080538,
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "domain": "god",
+    "subdomain": "",
+    "token_standard": "v1",
+    "token_name": "god.apt",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "last_transaction_version": 2080538,
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "domain": "maayan",
+    "subdomain": "",
+    "token_standard": "v1",
+    "token_name": "maayan.apt",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "last_transaction_version": 2080538,
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  },
+  {
+    "domain": "max",
+    "subdomain": "",
+    "token_standard": "v1",
+    "token_name": "max.apt",
+    "registered_address": null,
+    "expiration_timestamp": "2023-10-18T16:54:32",
+    "last_transaction_version": 2080538,
+    "is_deleted": false,
+    "subdomain_expiration_policy": null
+  }
+]
