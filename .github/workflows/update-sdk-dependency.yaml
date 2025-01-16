@@ -34,6 +34,8 @@ jobs:
         with:
           secrets: |-
             token:aptos-ci/github-actions-repository-dispatch
+      - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld libdw-dev --no-install-recommends --assume-yes
+        shell: bash
       - name: Checkout
         uses: actions/checkout@v4
         with:
