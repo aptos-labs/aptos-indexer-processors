@@ -91,6 +91,7 @@ diesel::table! {
         #[max_length = 66]
         address -> Varchar,
         verified -> Bool,
+        last_transaction_version -> Int8,
     }
 }
 
@@ -102,6 +103,7 @@ diesel::table! {
         multikey_layout_with_prefixes -> Jsonb,
         #[max_length = 50]
         multikey_type -> Varchar,
+        last_transaction_version -> Int8,
     }
 }
 
@@ -996,6 +998,7 @@ diesel::table! {
         #[max_length = 66]
         auth_key -> Varchar,
         verified -> Bool,
+        last_transaction_version -> Int8,
     }
 }
 

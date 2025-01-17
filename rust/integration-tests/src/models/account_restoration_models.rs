@@ -17,6 +17,7 @@ pub struct AuthKeyAccountAddress {
     pub auth_key: String,
     pub address: String,
     pub verified: bool,
+    pub last_transaction_version: i64,
 }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
@@ -27,6 +28,7 @@ pub struct AuthKeyMultikeyLayout {
     pub signatures_required: i64,
     pub multikey_layout_with_prefixes: serde_json::Value,
     pub multikey_type: String,
+    pub last_transaction_version: i64,
 }
 
 #[derive(
@@ -39,4 +41,5 @@ pub struct PublicKeyAuthKey {
     pub public_key_type: String,
     pub auth_key: String,
     pub verified: bool,
+    pub last_transaction_version: i64,
 }

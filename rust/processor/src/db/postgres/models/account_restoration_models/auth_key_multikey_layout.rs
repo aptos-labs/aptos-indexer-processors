@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 ///   (e.g., `0x00` for Ed25519 Generalized).
 ///   For MultiEd25519 keys, the prefixes are omitted (legacy Ed25519 format).
 /// * `multikey_type` - The high-level classification of the multi-key (`multi_ed25519` or `multi_key`).
+/// * `last_transaction_version` - The last transaction version where the mapping was detected.
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(auth_key))]
 #[diesel(table_name = auth_key_multikey_layout)]
@@ -26,4 +27,5 @@ pub struct AuthKeyMultikeyLayout {
     pub signatures_required: i64,
     pub multikey_layout_with_prefixes: serde_json::Value,
     pub multikey_type: String,
+    pub last_transaction_version: i64,
 }

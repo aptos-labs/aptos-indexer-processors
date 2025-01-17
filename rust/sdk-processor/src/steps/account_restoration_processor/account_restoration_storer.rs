@@ -140,6 +140,7 @@ fn insert_auth_key_account_addresses_query(
             .set((
                 auth_key.eq(excluded(auth_key)),
                 verified.eq(excluded(verified)),
+                last_transaction_version.eq(last_transaction_version),
             )),
         None,
     )
@@ -157,7 +158,8 @@ fn insert_auth_key_multikey_layouts_query(
         diesel::insert_into(schema::auth_key_multikey_layout::table)
             .values(items_to_insert)
             .on_conflict(auth_key)
-            .do_nothing(),
+            .do_update()
+            .set(last_transaction_version.eq(last_transaction_version)),
         None,
     )
 }
@@ -195,7 +197,10 @@ fn insert_public_key_auth_keys_query(
             .values(items_to_insert)
             .on_conflict((public_key, public_key_type, auth_key))
             .do_update()
-            .set((verified.eq(excluded(verified)),)),
+            .set((
+                verified.eq(excluded(verified)),
+                last_transaction_version.eq(last_transaction_version),
+            )),
         None,
     )
 }

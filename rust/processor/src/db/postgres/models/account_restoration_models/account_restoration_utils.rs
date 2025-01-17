@@ -333,11 +333,13 @@ pub fn parse_account_restoration_models_from_transaction(
             .as_ref()?,
     )?;
     let auth_key = signature_info.auth_key().unwrap_or_default();
+    let txn_version = txn.version as i64;
 
     let auth_key_account_address = AuthKeyAccountAddress {
         auth_key: auth_key.clone(),
         address,
         verified: true,
+        last_transaction_version: txn_version,
     };
 
     let (auth_key_multikey_layout, public_key_auth_keys) = if signature_info.is_multikey() {
@@ -395,6 +397,7 @@ pub fn parse_account_restoration_models_from_transaction(
                 public_key_type: pk_type.clone(),
                 auth_key: auth_key.clone(),
                 verified: *verified,
+                last_transaction_version: txn_version,
             });
         }
 
@@ -404,6 +407,7 @@ pub fn parse_account_restoration_models_from_transaction(
                 signatures_required: multikey_threshold.expect("should not be None") as i64,
                 multikey_layout_with_prefixes,
                 multikey_type: signature_info.signature_type_string(),
+                last_transaction_version: txn_version,
             }),
             public_key_auth_keys,
         )

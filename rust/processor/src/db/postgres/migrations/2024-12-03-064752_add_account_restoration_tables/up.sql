@@ -4,6 +4,7 @@ CREATE TABLE public_key_auth_keys (
   public_key_type VARCHAR(50) NOT NULL,
   auth_key VARCHAR(66) NOT NULL,
   verified BOOLEAN NOT NULL,
+  last_transaction_version BIGINT NOT NULL,
   -- Constraints
   PRIMARY KEY (
     public_key,
@@ -17,12 +18,14 @@ CREATE TABLE auth_key_multikey_layout (
   auth_key VARCHAR(66) PRIMARY KEY NOT NULL,
   signatures_required BIGINT NOT NULL,
   multikey_layout_with_prefixes jsonb NOT NULL,
-  multikey_type VARCHAR(50) NOT NULL
+  multikey_type VARCHAR(50) NOT NULL,
+  last_transaction_version BIGINT NOT NULL
 );
 
 -- Auth key to account addresses
 CREATE TABLE auth_key_account_addresses (
   auth_key VARCHAR(66) NOT NULL,
   address VARCHAR(66) PRIMARY KEY NOT NULL,
-  verified BOOLEAN NOT NULL
+  verified BOOLEAN NOT NULL,
+  last_transaction_version BIGINT NOT NULL
 );
