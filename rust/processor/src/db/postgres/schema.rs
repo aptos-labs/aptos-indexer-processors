@@ -85,6 +85,29 @@ diesel::table! {
 }
 
 diesel::table! {
+    auth_key_account_addresses (address) {
+        #[max_length = 66]
+        auth_key -> Varchar,
+        #[max_length = 66]
+        address -> Varchar,
+        verified -> Bool,
+        last_transaction_version -> Int8,
+    }
+}
+
+diesel::table! {
+    auth_key_multikey_layout (auth_key) {
+        #[max_length = 66]
+        auth_key -> Varchar,
+        signatures_required -> Int8,
+        multikey_layout_with_prefixes -> Jsonb,
+        #[max_length = 50]
+        multikey_type -> Varchar,
+        last_transaction_version -> Int8,
+    }
+}
+
+diesel::table! {
     backfill_processor_status (backfill_alias) {
         #[max_length = 50]
         backfill_alias -> Varchar,
@@ -967,6 +990,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    public_key_auth_keys (public_key, public_key_type, auth_key) {
+        #[max_length = 200]
+        public_key -> Varchar,
+        #[max_length = 50]
+        public_key_type -> Varchar,
+        #[max_length = 66]
+        auth_key -> Varchar,
+        verified -> Bool,
+        last_transaction_version -> Int8,
+    }
+}
+
+diesel::table! {
     signatures (transaction_version, multi_agent_index, multi_sig_index, is_sender_primary) {
         transaction_version -> Int8,
         multi_agent_index -> Int8,
@@ -1305,6 +1341,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     ans_lookup_v2,
     ans_primary_name,
     ans_primary_name_v2,
+    auth_key_account_addresses,
+    auth_key_multikey_layout,
     backfill_processor_status,
     block_metadata_transactions,
     coin_activities,
@@ -1352,6 +1390,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     objects,
     processor_status,
     proposal_votes,
+    public_key_auth_keys,
     signatures,
     spam_assets,
     table_items,
