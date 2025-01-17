@@ -1,5 +1,5 @@
 {
-  "resource_version": 9999,
+  "resource_version": 999,
   "metadata": {
     "version": 3,
     "sources": [
@@ -2317,6 +2317,12 @@
           },
           {
             "table": {
+              "name": "token_datas_v2",
+              "schema": "public"
+            }
+          },
+          {
+            "table": {
               "name": "user_transactions",
               "schema": "public"
             },
@@ -2355,7 +2361,7 @@
             "isolation_level": "read-committed",
             "pool_settings": {
               "connection_lifetime": 600,
-              "max_connections": 100
+              "max_connections": 16
             },
             "use_prepared_statements": false
           }
