@@ -1,10 +1,8 @@
-# Transaction Stream Processor
+# Aptos Core Processors (DEPRECATED)
 
-Processors that index data from the Aptos Transaction Stream (GRPC).
+The processors in this crate are deprecated. The new processors are in [`sdk-processor`](https://github.com/aptos-labs/aptos-indexer-processors/tree/main/rust/sdk-processor) and you should follow the guide there. 
 
-- **Note: We'll launch an official endpoint soon; stay tuned!**
-
-## Tutorial
+## How to run these processors 
 
 ### Prerequisite
 
@@ -74,8 +72,3 @@ transactions are splitted into tasks and inserted with random order.
 
 ### Manually running diesel-cli
 - `cd` into the database folder you use under `src/db/` (e.g. `src/db/postgres`), then run it.
-
-## Processor Specific Notes
-
-### Supported Coin Type Mappings
-See mapping in [v2_fungible_asset_balances.rs](https://github.com/aptos-labs/aptos-indexer-processors/blob/main/rust/processor/src/db/common/models/fungible_asset_models/v2_fungible_asset_balances.rs#L40) for a list supported coin type mappings.
