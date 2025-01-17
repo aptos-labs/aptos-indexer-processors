@@ -61,7 +61,7 @@ mod tests {
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_MAINNET_TXNS_1056780409_ANS_CURRENT_ANS_PRIMARY_NAME_V2,
-        IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2,
+        IMPORTED_MAINNET_TXNS_2080538_ANS_LOOKUP_V1, IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2,
         IMPORTED_MAINNET_TXNS_438536688_ANS_CURRENT_ANS_LOOKUP_V2,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
@@ -113,6 +113,16 @@ mod tests {
         )
         .await;
     }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_mainnet_ans_lookup_v1() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_2080538_ANS_LOOKUP_V1,
+            Some("test_mainnet_ans_lookup_v1".to_string()),
+        )
+        .await;
+    }
+
     // Helper function to abstract out the single transaction processing
     async fn process_single_mainnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
         let (diff_flag, custom_output_path) = get_test_config();

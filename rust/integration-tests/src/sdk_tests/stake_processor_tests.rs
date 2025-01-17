@@ -57,6 +57,7 @@ mod tests {
         },
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
+        IMPORTED_MAINNET_TXNS_118489_PROPOSAL_VOTE,
         IMPORTED_MAINNET_TXNS_121508544_STAKE_DISTRIBUTE,
         IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
         IMPORTED_MAINNET_TXNS_1830706009_STAKER_GOVERNANCE_RECORD,
@@ -125,6 +126,33 @@ mod tests {
         process_single_mainnet_event_txn(
             IMPORTED_MAINNET_TXNS_4827964_STAKE_INITIALIZE,
             Some("stake_initialize_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * - 0x1::voting::VoteEvent
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_proposal_vote() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_118489_PROPOSAL_VOTE,
+            Some("mainnet_proposal_vote_test".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * - 0x1::delegation_pool::DistributeCommissionEvent
+     * - 0x1::delegation_pool::DistributeCommission
+     * - 0x1::stake::UnlockStakeEvent
+     * - 0x1::delegation_pool::UnlockStakeEvent
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_stake_delegation_pool() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_1831971037_STAKE_DELEGATION_POOL,
+            Some("mainnet_stake_delegation_pool".to_string()),
         )
         .await;
     }

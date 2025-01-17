@@ -31,7 +31,7 @@ anyhow = "1.0.86"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "a56b641a6aaca60092fcc9bbd98252f3cd703299" }
 aptos-indexer-processor-sdk-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "a56b641a6aaca60092fcc9bbd98252f3cd703299" }
 aptos-protos = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "6116af69aa173ca49e1761daabd6fe103fe2c65e" }
-aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "60262d93f9a16b286034227018807610f35ceba5" }
+aptos-indexer-test-transactions = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "ef80673093aa4df271ad33c2401421d642e7ff3c" }
 aptos-indexer-testing-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "a56b641a6aaca60092fcc9bbd98252f3cd703299" }
 async-trait = "0.1.53"
 backtrace = "0.3.58"

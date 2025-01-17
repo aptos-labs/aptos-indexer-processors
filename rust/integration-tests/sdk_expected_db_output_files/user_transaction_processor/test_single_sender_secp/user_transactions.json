@@ -10,9 +10,9 @@
     "gas_unit_price": "100",
     "timestamp": "2024-03-29T13:51:13.448212",
     "entry_function_id_str": "0x190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12::scripts_v2::swap",
+    "entry_function_function_name": "swap",
     "epoch": 6429,
     "entry_function_contract_address": "0x190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12",
-    "entry_function_module_name": "scripts_v2",
-    "entry_function_function_name": "swap"
+    "entry_function_module_name": "scripts_v2"
   }
 ]

@@ -1,0 +1,18 @@
+[
+  {
+    "version": 769222973,
+    "block_height": 168057583,
+    "parent_signature_type": "single_key_signature",
+    "sender": "0xf394d0ecffd4a498ab19347d0f5dff37da6d73a5ebbbeaf03d3079603f1bbeaf",
+    "sequence_number": 0,
+    "max_gas_amount": "200000",
+    "expiration_timestamp_secs": "2023-11-14T10:28:37",
+    "gas_unit_price": "100",
+    "timestamp": "2023-11-14T10:28:17.493428",
+    "entry_function_id_str": "0x1::code::publish_package_txn",
+    "entry_function_function_name": "publish_package_txn",
+    "epoch": 10348,
+    "entry_function_contract_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "entry_function_module_name": "code"
+  }
+]
