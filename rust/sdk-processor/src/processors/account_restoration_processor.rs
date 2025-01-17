@@ -52,7 +52,7 @@ impl AccountRestorationProcessor {
                 })
             },
             _ => Err(anyhow::anyhow!(
-                "Invalid db config for AccountTransactionsProcessor {:?}",
+                "Invalid db config for AccountRestorationProcessor {:?}",
                 config.db_config
             )),
         }
@@ -89,7 +89,7 @@ impl ProcessorTrait for AccountRestorationProcessor {
             ProcessorConfig::AccountRestorationProcessor(processor_config) => processor_config,
             _ => {
                 return Err(anyhow::anyhow!(
-                    "Invalid processor config for Account Restoration Processor: {:?}",
+                    "Invalid processor config for AccountRestorationProcessor: {:?}",
                     self.config.processor_config
                 ))
             },
