@@ -62,8 +62,6 @@ jobs:
           # Protos commit hash
           toml set Cargo.toml workspace.dependencies.aptos-protos.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml 
           toml set Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$aptos_protos_commit_hash" > Cargo.tmp && mv Cargo.tmp Cargo.toml
-          # Refresh the lock file
-          cargo build
         working-directory: rust/
       - name: Configure Git user
         run: |
