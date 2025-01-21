@@ -12,6 +12,7 @@ use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignature, signature::Signature, transaction::TxnData,
     Transaction,
 };
+use tracing::warn;
 
 trait AuthKeyScheme {
     const SCHEME: u8;
@@ -265,7 +266,10 @@ impl SignatureInfo {
             },
             Signature::SingleSender(single_sender) => {
                 let account_signature = single_sender.sender.as_ref().unwrap();
-
+                if account_signature.signature.is_none() {
+                    warn!("Transaction signature is unknown");
+                    return None;
+                }
                 let signature_info = match account_signature.signature.as_ref().unwrap() {
                     AccountSignature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
                     AccountSignature::MultiEd25519(sigs) => {
@@ -301,6 +305,7 @@ impl SignatureInfo {
                             .collect::<Vec<_>>();
                         Self::multi_key(threshold, prefixes, public_keys, verified)
                     },
+                    AccountSignature::Abstraction(_sig) => return None,
                 };
                 signature_info
             },

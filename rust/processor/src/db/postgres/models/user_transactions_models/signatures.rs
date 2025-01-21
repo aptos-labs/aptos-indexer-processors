@@ -9,17 +9,11 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
-    account_signature::Signature as AccountSignatureEnum,
-    any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb},
-    signature::Signature as SignatureEnum,
-    AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
-    FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
-    MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
-    Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
-    SingleSender as SingleSenderPb,
+    account_signature::Signature as AccountSignatureEnum, any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb}, signature::Signature as SignatureEnum, AbstractionSignature as AbstractionSignaturePb, AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature, MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb, Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb, SingleSender as SingleSenderPb
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(
@@ -111,8 +105,12 @@ impl Signature {
                     AccountSignatureEnum::MultiKeySignature(_) => {
                         String::from("multi_key_signature")
                     },
+                    AccountSignatureEnum::Abstraction(_) => {
+                        String::from("abstraction_signature")
+                    }
                 }
             },
+
         }
     }
 
@@ -153,6 +151,31 @@ impl Signature {
             threshold: 1,
             public_key_indices: serde_json::Value::Array(vec![]),
             signature: format!("0x{}", hex::encode(s.signature.as_slice())),
+            multi_agent_index,
+            multi_sig_index: 0,
+        }
+    }
+
+    fn parse_abstraction_signature(
+        _s: &AbstractionSignaturePb,
+        sender: &String,
+        transaction_version: i64,
+        transaction_block_height: i64,
+        is_sender_primary: bool,
+        multi_agent_index: i64,
+        override_address: Option<&String>,
+    ) -> Self {
+        let signer = standardize_address(override_address.unwrap_or(sender));
+        Self {
+            transaction_version,
+            transaction_block_height,
+            signer,
+            is_sender_primary,
+            type_: String::from("abstraction_signature"),
+            public_key: "Not implemented".into(),
+            threshold: 1,
+            public_key_indices: serde_json::Value::Array(vec![]),
+            signature: "Not implemented".into(),
             multi_agent_index,
             multi_sig_index: 0,
         }
@@ -284,6 +307,15 @@ impl Signature {
         multi_agent_index: i64,
         override_address: Option<&String>,
     ) -> Vec<Self> {
+        // Skip parsing if unknow signagure is found.
+        if s.signature.as_ref().is_none() {
+            warn!(
+                transaction_version=transaction_version,
+                "Unknown signature is found!"
+            );
+            return vec![];
+        }
+
         let signature = s.signature.as_ref().unwrap();
         match signature {
             AccountSignatureEnum::Ed25519(sig) => vec![Self::parse_ed25519_signature(
@@ -324,6 +356,19 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
+            AccountSignatureEnum::Abstraction(sig) => {
+                vec![
+                    Self::parse_abstraction_signature(
+                        sig,
+                        sender,
+                        transaction_version,
+                        transaction_block_height,
+                        is_sender_primary,
+                        multi_agent_index,
+                        override_address,
+                    )
+                ]
+            }
         }
     }
 
@@ -528,6 +573,13 @@ impl Signature {
         transaction_block_height: i64,
     ) -> Vec<Self> {
         let signature = s.sender.as_ref().unwrap();
+        if signature.signature.is_none() {
+            warn!(
+                transaction_version = transaction_version,
+                "Transaction signature is unknown"
+            );
+            return vec![];
+        }
         match signature.signature.as_ref() {
             Some(AccountSignatureEnum::SingleKeySignature(s)) => {
                 vec![Self::parse_single_key_signature(
@@ -567,6 +619,15 @@ impl Signature {
                 0,
                 None,
             ),
+            Some(AccountSignatureEnum::Abstraction(s)) => vec![Self::parse_abstraction_signature(
+                s,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                true,
+                0,
+                None,
+            )],
             None => vec![],
         }
     }
