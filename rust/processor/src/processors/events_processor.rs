@@ -3,7 +3,7 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::events_models::events::EventModel,
+    db::postgres::models::events_models::events::EventModel,
     gap_detectors::ProcessingResult,
     schema,
     utils::{
@@ -106,37 +106,9 @@ impl ProcessorTrait for EventsProcessor {
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
 
-        let mut events = vec![];
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let block_height = txn.block_height as i64;
-            let txn_data = match txn.txn_data.as_ref() {
-                Some(data) => data,
-                None => {
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        "Transaction data doesn't exist"
-                    );
-                    PROCESSOR_UNKNOWN_TYPE_COUNT
-                        .with_label_values(&["EventsProcessor"])
-                        .inc();
-                    continue;
-                },
-            };
-            let default = vec![];
-            let raw_events = match txn_data {
-                TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-                TxnData::Genesis(tx_inner) => &tx_inner.events,
-                TxnData::User(tx_inner) => &tx_inner.events,
-                TxnData::Validator(tx_inner) => &tx_inner.events,
-                _ => &default,
-            };
-
-            let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
-            events.extend(txn_events);
-        }
+        let events = process_transactions(transactions);
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -178,4 +150,37 @@ impl ProcessorTrait for EventsProcessor {
     fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
+}
+
+pub fn process_transactions(transactions: Vec<Transaction>) -> Vec<EventModel> {
+    let mut events = vec![];
+    for txn in &transactions {
+        let txn_version = txn.version as i64;
+        let block_height = txn.block_height as i64;
+        let txn_data = match txn.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["EventsProcessor"])
+                    .inc();
+                continue;
+            },
+        };
+        let default = vec![];
+        let raw_events = match txn_data {
+            TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
+            TxnData::Genesis(tx_inner) => &tx_inner.events,
+            TxnData::User(tx_inner) => &tx_inner.events,
+            TxnData::Validator(tx_inner) => &tx_inner.events,
+            _ => &default,
+        };
+
+        let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
+        events.extend(txn_events);
+    }
+    events
 }

@@ -1,10 +1,8 @@
-# Indexer GRPC Parser
+# Aptos Core Processors (DEPRECATED)
 
-Indexer GRPC parser is to indexer data processor that leverages the indexer grpc data.
+The processors in this crate are deprecated. The new processors are in [`sdk-processor`](https://github.com/aptos-labs/aptos-indexer-processors/tree/main/rust/sdk-processor) and you should follow the guide there. 
 
-- **Note: We'll launch an official endpoint soon; stay tuned!**
-
-## Tutorial
+## How to run these processors 
 
 ### Prerequisite
 

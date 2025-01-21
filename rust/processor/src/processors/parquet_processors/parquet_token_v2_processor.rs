@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -6,28 +7,35 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::{
-        fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata, Untransferable,
-        },
-        token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
-        token_v2_models::{
-            parquet_v2_token_datas::TokenDataV2,
-            parquet_v2_token_ownerships::TokenOwnershipV2,
-            v2_token_ownerships::NFTOwnershipV2,
-            v2_token_utils::{
-                AptosCollection, Burn, BurnEvent, ConcurrentSupply, FixedSupply, MintEvent,
-                PropertyMapModel, TokenIdentifiers, TokenV2, TokenV2Burned, TokenV2Minted,
-                TransferEvent, UnlimitedSupply,
+    db::{
+        common::models::{
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
+            token_v2_models::{
+                raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
+                raw_v2_token_ownerships::{
+                    NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+                },
+                v2_token_utils::{
+                    Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
+                },
+            },
+        },
+        parquet::models::token_v2_models::{
+            v2_token_datas::TokenDataV2, v2_token_ownerships::TokenOwnershipV2,
+        },
+        postgres::models::{
+            fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
+            resources::{FromWriteResource, V2TokenResource},
+            token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         },
     },
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::ArcDbPool,
+        database::{ArcDbPool, DbContext},
         util::{parse_timestamp, standardize_address},
     },
 };
@@ -121,21 +129,27 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
         let table_handle_to_owner =
             TableMetadataForToken::get_table_handle_to_owner_from_transactions(&transactions);
 
-        let (token_datas_v2, token_ownerships_v2) = parse_v2_token(
+        let (raw_token_datas_v2, raw_token_ownerships_v2) = parse_v2_token(
             &transactions,
             &table_handle_to_owner,
+            &mut None,
             &mut transaction_version_to_struct_count,
         )
         .await;
 
+        let parquet_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+            .into_iter()
+            .map(TokenDataV2::from_raw)
+            .collect();
+
         let token_data_v2_parquet_data = ParquetDataGeneric {
-            data: token_datas_v2,
+            data: parquet_token_datas_v2,
         };
 
         self.v2_token_datas_sender
@@ -143,8 +157,13 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             .await
             .context("Failed to send token data v2 parquet data")?;
 
+        let parquet_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+            .into_iter()
+            .map(TokenOwnershipV2::from_raw)
+            .collect();
+
         let token_ownerships_v2_parquet_data = ParquetDataGeneric {
-            data: token_ownerships_v2,
+            data: parquet_token_ownerships_v2,
         };
 
         self.v2_token_ownerships_sender
@@ -156,7 +175,7 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),
@@ -172,8 +191,9 @@ impl ProcessorTrait for ParquetTokenV2Processor {
 async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
+    db_context: &mut Option<DbContext<'_>>,
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
-) -> (Vec<TokenDataV2>, Vec<TokenOwnershipV2>) {
+) -> (Vec<RawTokenDataV2>, Vec<RawTokenOwnershipV2>) {
     // Token V2 and V1 combined
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
@@ -213,9 +233,7 @@ async fn parse_v2_token(
             // Need to do a first pass to get all the objects
             for wsc in transaction_info.changes.iter() {
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    if let Some(object) =
-                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                    {
+                    if let Some(object) = ObjectWithMetadata::from_write_resource(wr).unwrap() {
                         token_v2_metadata_helper.insert(
                             standardize_address(&wr.address.to_string()),
                             ObjectAggregatedData {
@@ -232,49 +250,41 @@ async fn parse_v2_token(
                 if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
                     let address = standardize_address(&wr.address.to_string());
                     if let Some(aggregated_data) = token_v2_metadata_helper.get_mut(&address) {
-                        if let Some(fixed_supply) =
-                            FixedSupply::from_write_resource(wr, txn_version).unwrap()
+                        if let Some(token_v2_resource) =
+                            V2TokenResource::from_write_resource(wr).unwrap()
                         {
-                            aggregated_data.fixed_supply = Some(fixed_supply);
-                        }
-                        if let Some(unlimited_supply) =
-                            UnlimitedSupply::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.unlimited_supply = Some(unlimited_supply);
-                        }
-                        if let Some(aptos_collection) =
-                            AptosCollection::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.aptos_collection = Some(aptos_collection);
-                        }
-                        if let Some(property_map) =
-                            PropertyMapModel::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.property_map = Some(property_map);
-                        }
-                        if let Some(concurrent_supply) =
-                            ConcurrentSupply::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.concurrent_supply = Some(concurrent_supply);
-                        }
-                        if let Some(token) = TokenV2::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.token = Some(token);
+                            match token_v2_resource {
+                                V2TokenResource::FixedSupply(fixed_supply) => {
+                                    aggregated_data.fixed_supply = Some(fixed_supply);
+                                },
+                                V2TokenResource::UnlimitedSupply(unlimited_supply) => {
+                                    aggregated_data.unlimited_supply = Some(unlimited_supply);
+                                },
+                                V2TokenResource::AptosCollection(aptos_collection) => {
+                                    aggregated_data.aptos_collection = Some(aptos_collection);
+                                },
+                                V2TokenResource::PropertyMapModel(property_map) => {
+                                    aggregated_data.property_map = Some(property_map);
+                                },
+                                V2TokenResource::ConcurrentSupply(concurrent_supply) => {
+                                    aggregated_data.concurrent_supply = Some(concurrent_supply);
+                                },
+                                V2TokenResource::TokenV2(token) => {
+                                    aggregated_data.token = Some(token);
+                                },
+                                V2TokenResource::TokenIdentifiers(token_identifier) => {
+                                    aggregated_data.token_identifier = Some(token_identifier);
+                                },
+                                V2TokenResource::Untransferable(untransferable) => {
+                                    aggregated_data.untransferable = Some(untransferable);
+                                },
+                                _ => {},
+                            }
                         }
                         if let Some(fungible_asset_metadata) =
-                            FungibleAssetMetadata::from_write_resource(wr, txn_version).unwrap()
+                            FungibleAssetMetadata::from_write_resource(wr).unwrap()
                         {
                             aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
-                        }
-                        if let Some(token_identifier) =
-                            TokenIdentifiers::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.token_identifier = Some(token_identifier);
-                        }
-                        if let Some(untransferable) =
-                            Untransferable::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.untransferable = Some(untransferable);
                         }
                     }
                 }
@@ -290,6 +300,7 @@ async fn parse_v2_token(
                 if let Some(old_burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
                     let burn_event = Burn::new(
                         standardize_address(event.key.as_ref().unwrap().account_address.as_str()),
+                        old_burn_event.index.clone(),
                         old_burn_event.get_token_address(),
                         "".to_string(),
                     );
@@ -322,22 +333,23 @@ async fn parse_v2_token(
                 let wsc_index = index as i64;
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteTableItem(table_item) => {
-                        if let Some(token_data) = TokenDataV2::get_v1_from_write_table_item(
-                            table_item,
-                            txn_version,
-                            wsc_index,
-                            txn_timestamp,
-                        )
-                        .unwrap()
+                        if let Some((raw_token_data, _)) =
+                            RawTokenDataV2::get_v1_from_write_table_item(
+                                table_item,
+                                txn_version,
+                                wsc_index,
+                                txn_timestamp,
+                            )
+                            .unwrap()
                         {
-                            token_datas_v2.push(token_data);
+                            token_datas_v2.push(raw_token_data);
                             transaction_version_to_struct_count
                                 .entry(txn_version)
                                 .and_modify(|e| *e += 1)
                                 .or_insert(1);
                         }
                         if let Some((token_ownership, current_token_ownership)) =
-                            TokenOwnershipV2::get_v1_from_write_table_item(
+                            RawTokenOwnershipV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -365,7 +377,7 @@ async fn parse_v2_token(
                     },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
-                            TokenOwnershipV2::get_v1_from_delete_table_item(
+                            RawTokenOwnershipV2::get_v1_from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -392,21 +404,23 @@ async fn parse_v2_token(
                         }
                     },
                     Change::WriteResource(resource) => {
-                        if let Some(token_data) = TokenDataV2::get_v2_from_write_resource(
-                            resource,
-                            txn_version,
-                            wsc_index,
-                            txn_timestamp,
-                            &token_v2_metadata_helper,
-                        )
-                        .unwrap()
-                        {
-                            // Add NFT ownership
-                            let mut ownerships = TokenOwnershipV2::get_nft_v2_from_token_data(
-                                &token_data,
+                        if let Some((raw_token_data, _current_token_data)) =
+                            RawTokenDataV2::get_v2_from_write_resource(
+                                resource,
+                                txn_version,
+                                wsc_index,
+                                txn_timestamp,
                                 &token_v2_metadata_helper,
                             )
-                            .unwrap();
+                            .unwrap()
+                        {
+                            // Add NFT ownership
+                            let (mut ownerships, _) =
+                                RawTokenOwnershipV2::get_nft_v2_from_token_data(
+                                    &raw_token_data,
+                                    &token_v2_metadata_helper,
+                                )
+                                .unwrap();
                             if let Some(current_nft_ownership) = ownerships.first() {
                                 // Note that the first element in ownerships is the current ownership. We need to cache
                                 // it in prior_nft_ownership so that moving forward if we see a burn we'll know
@@ -429,11 +443,11 @@ async fn parse_v2_token(
                                 .and_modify(|e| *e += ownerships.len() as i64 + 1)
                                 .or_insert(ownerships.len() as i64 + 1);
                             token_ownerships_v2.append(&mut ownerships);
-                            token_datas_v2.push(token_data);
+                            token_datas_v2.push(raw_token_data);
                         }
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
+                            RawTokenOwnershipV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -441,6 +455,7 @@ async fn parse_v2_token(
                                 &prior_nft_ownership,
                                 &tokens_burned,
                                 &token_v2_metadata_helper,
+                                db_context,
                             )
                             .await
                             .unwrap()
@@ -462,14 +477,16 @@ async fn parse_v2_token(
                     },
                     Change::DeleteResource(resource) => {
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
+                            RawTokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
                                 txn_timestamp,
                                 &prior_nft_ownership,
                                 &tokens_burned,
+                                db_context,
                             )
+                            .await
                             .unwrap()
                         {
                             token_ownerships_v2.push(nft_ownership);

@@ -6,40 +6,42 @@ edition = "2021"
 
 [dependencies]
 ahash = { workspace = true }
+allocative = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-processor-sdk = { workspace = true }
 aptos-indexer-processor-sdk-server-framework = { workspace = true }
+aptos-indexer-testing-framework = { workspace = true }
 async-trait = { workspace = true }
-bcs = { workspace = true }
-bigdecimal = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 diesel = { workspace = true }
 diesel-async = { workspace = true }
 diesel_migrations = { workspace = true }
+enum_dispatch = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
-hex = { workspace = true }
+
+google-cloud-storage = { workspace = true }
 jemallocator = { workspace = true }
-kanal = { workspace = true }
 lazy_static = { workspace = true }
+log = "0.4.22"
+
+# Postgres SSL support
+native-tls = { workspace = true }
 num_cpus = { workspace = true }
+# Parquet support
+parquet = { workspace = true }
+postgres-native-tls = { workspace = true }
 processor = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
 strum = { workspace = true }
-tiny-keccak = { workspace = true }
 tokio = { workspace = true }
+tokio-postgres = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
-
-# Postgres SSL support
-native-tls = { workspace = true }
-postgres-native-tls = { workspace = true }
-tokio-postgres = { workspace = true }
 
 [features]
 libpq = ["diesel/postgres"]

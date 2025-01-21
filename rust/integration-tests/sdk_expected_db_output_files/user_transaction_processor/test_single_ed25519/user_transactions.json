@@ -1,0 +1,18 @@
+[
+  {
+    "version": 685,
+    "block_height": 343,
+    "parent_signature_type": "ed25519_signature",
+    "sender": "0xfda457fe15be3102b748877e674b4b076b06e4c13e8eaf4d817b5baa77889bf9",
+    "sequence_number": 0,
+    "max_gas_amount": "861",
+    "expiration_timestamp_secs": "2022-10-12T21:26:49",
+    "gas_unit_price": "100",
+    "timestamp": "2022-10-12T21:26:20.299882",
+    "entry_function_id_str": "0x1::stake::update_network_and_fullnode_addresses",
+    "entry_function_function_name": "update_network_and_fullnode_addresses",
+    "epoch": 2,
+    "entry_function_contract_address": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "entry_function_module_name": "stake"
+  }
+]

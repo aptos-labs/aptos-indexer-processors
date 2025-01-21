@@ -3,7 +3,10 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::account_transaction_models::account_transactions::AccountTransaction,
+    db::{
+        common::models::account_transaction_models::raw_account_transactions::RawAccountTransaction,
+        postgres::models::account_transaction_models::account_transactions::AccountTransaction,
+    },
     gap_detectors::ProcessingResult,
     schema,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
@@ -69,7 +72,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_account_transactions_query(
+pub fn insert_account_transactions_query(
     item_to_insert: Vec<AccountTransaction>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -100,13 +103,13 @@ impl ProcessorTrait for AccountTransactionsProcessor {
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
 
         let account_transactions: Vec<_> = transactions
             .into_par_iter()
             .map(|txn| {
                 let transaction_version = txn.version as i64;
-                let accounts = AccountTransaction::get_accounts(&txn);
+                let accounts = RawAccountTransaction::get_accounts(&txn);
                 accounts
                     .into_iter()
                     .map(|account_address| AccountTransaction {

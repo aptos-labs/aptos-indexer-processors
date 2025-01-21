@@ -1,0 +1,19 @@
+[
+  {
+    "collection_id": "0x58677eec16fc1a3d37dcfe5fa3ab62081d0838a694612a34e757caa7f7f2adb0",
+    "creator_address": "0xc8185b4484917ffda406f31fb71ab9a2b9ac7387041235b21dd7e4e5bdccb838",
+    "collection_name": "Ambassador Collection Name",
+    "description": "Ambassador Collection Description",
+    "uri": "Ambassador Collection URI",
+    "current_supply": "133740",
+    "max_supply": null,
+    "total_minted_v2": "133740",
+    "mutable_description": null,
+    "mutable_uri": null,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "last_transaction_version": 78753832,
+    "last_transaction_timestamp": "2024-12-02T19:50:23.770129",
+    "collection_properties": null
+  }
+]

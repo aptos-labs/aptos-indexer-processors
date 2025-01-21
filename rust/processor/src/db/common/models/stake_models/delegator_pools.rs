@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 type StakingPoolAddress = String;
 pub type DelegatorPoolMap = AHashMap<StakingPoolAddress, DelegatorPool>;
-pub type DelegatorPoolBalanceMap = AHashMap<StakingPoolAddress, CurrentDelegatorPoolBalance>;
+pub type DelegatorPoolBalanceMap = AHashMap<StakingPoolAddress, RawCurrentDelegatorPoolBalance>;
 
 // All pools
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -35,7 +35,7 @@ pub struct DelegatorPool {
 
 // Metadata to fill pool balances and delegator balance
 #[derive(Debug, Deserialize, Serialize)]
-pub struct DelegatorPoolBalanceMetadata {
+pub struct RawDelegatorPoolBalanceMetadata {
     pub transaction_version: i64,
     pub staking_pool_address: String,
     pub total_coins: BigDecimal,
@@ -46,9 +46,13 @@ pub struct DelegatorPoolBalanceMetadata {
     pub inactive_share_table_handle: String,
 }
 
+pub trait RawDelegatorPoolBalanceMetadataConvertible {
+    fn from_raw(raw: RawDelegatorPoolBalanceMetadata) -> Self;
+}
+
 // Similar metadata but specifically for 0x1::pool_u64_unbound::Pool
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PoolBalanceMetadata {
+pub struct RawPoolBalanceMetadata {
     pub transaction_version: i64,
     pub total_coins: BigDecimal,
     pub total_shares: BigDecimal,
@@ -56,12 +60,15 @@ pub struct PoolBalanceMetadata {
     pub shares_table_handle: String,
     pub parent_table_handle: String,
 }
+pub trait RawPoolBalanceMetadataConvertible {
+    fn from_raw(raw: RawPoolBalanceMetadata) -> Self;
+}
 
 // Pools balances
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, staking_pool_address))]
 #[diesel(table_name = delegated_staking_pool_balances)]
-pub struct DelegatorPoolBalance {
+pub struct RawDelegatorPoolBalance {
     pub transaction_version: i64,
     pub staking_pool_address: String,
     pub total_coins: BigDecimal,
@@ -70,12 +77,15 @@ pub struct DelegatorPoolBalance {
     pub inactive_table_handle: String,
     pub active_table_handle: String,
 }
+pub trait RawDelegatorPoolBalanceConvertible {
+    fn from_raw(raw: RawDelegatorPoolBalance) -> Self;
+}
 
 // All pools w latest balances (really a more comprehensive version than DelegatorPool)
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(staking_pool_address))]
 #[diesel(table_name = current_delegated_staking_pool_balances)]
-pub struct CurrentDelegatorPoolBalance {
+pub struct RawCurrentDelegatorPoolBalance {
     pub staking_pool_address: String,
     pub total_coins: BigDecimal,
     pub total_shares: BigDecimal,
@@ -85,12 +95,16 @@ pub struct CurrentDelegatorPoolBalance {
     pub active_table_handle: String,
 }
 
+pub trait RawCurrentDelegatorPoolBalanceConvertible {
+    fn from_raw(raw: RawCurrentDelegatorPoolBalance) -> Self;
+}
+
 impl DelegatorPool {
     pub fn from_transaction(
         transaction: &Transaction,
     ) -> anyhow::Result<(
         DelegatorPoolMap,
-        Vec<DelegatorPoolBalance>,
+        Vec<RawDelegatorPoolBalance>,
         DelegatorPoolBalanceMap,
     )> {
         let mut delegator_pool_map = AHashMap::new();
@@ -147,7 +161,7 @@ impl DelegatorPool {
     pub fn get_delegated_pool_metadata_from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-    ) -> anyhow::Result<Option<DelegatorPoolBalanceMetadata>> {
+    ) -> anyhow::Result<Option<RawDelegatorPoolBalanceMetadata>> {
         if let Some(StakeResource::DelegationPool(inner)) =
             StakeResource::from_write_resource(write_resource, txn_version)?
         {
@@ -155,7 +169,7 @@ impl DelegatorPool {
             let total_coins = inner.active_shares.total_coins;
             let total_shares =
                 &inner.active_shares.total_shares / &inner.active_shares.scaling_factor;
-            Ok(Some(DelegatorPoolBalanceMetadata {
+            Ok(Some(RawDelegatorPoolBalanceMetadata {
                 transaction_version: txn_version,
                 staking_pool_address,
                 total_coins,
@@ -173,7 +187,7 @@ impl DelegatorPool {
     pub fn get_inactive_pool_metadata_from_write_table_item(
         write_table_item: &WriteTableItem,
         txn_version: i64,
-    ) -> anyhow::Result<Option<PoolBalanceMetadata>> {
+    ) -> anyhow::Result<Option<RawPoolBalanceMetadata>> {
         let table_item_data = write_table_item.data.as_ref().unwrap();
 
         if let Some(StakeTableItem::Pool(inner)) = &StakeTableItem::from_table_item_type(
@@ -183,7 +197,7 @@ impl DelegatorPool {
         )? {
             let total_coins = inner.total_coins.clone();
             let total_shares = &inner.total_shares / &inner.scaling_factor;
-            Ok(Some(PoolBalanceMetadata {
+            Ok(Some(RawPoolBalanceMetadata {
                 transaction_version: txn_version,
                 total_coins,
                 total_shares,
@@ -199,7 +213,13 @@ impl DelegatorPool {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
-    ) -> anyhow::Result<Option<(Self, DelegatorPoolBalance, CurrentDelegatorPoolBalance)>> {
+    ) -> anyhow::Result<
+        Option<(
+            Self,
+            RawDelegatorPoolBalance,
+            RawCurrentDelegatorPoolBalance,
+        )>,
+    > {
         if let Some(balance) =
             &Self::get_delegated_pool_metadata_from_write_resource(write_resource, txn_version)?
         {
@@ -212,7 +232,7 @@ impl DelegatorPool {
                     staking_pool_address: staking_pool_address.clone(),
                     first_transaction_version: transaction_version,
                 },
-                DelegatorPoolBalance {
+                RawDelegatorPoolBalance {
                     transaction_version,
                     staking_pool_address: staking_pool_address.clone(),
                     total_coins: total_coins.clone(),
@@ -221,7 +241,7 @@ impl DelegatorPool {
                     inactive_table_handle: balance.inactive_share_table_handle.clone(),
                     active_table_handle: balance.active_share_table_handle.clone(),
                 },
-                CurrentDelegatorPoolBalance {
+                RawCurrentDelegatorPoolBalance {
                     staking_pool_address,
                     total_coins,
                     total_shares,

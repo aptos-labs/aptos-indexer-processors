@@ -2,12 +2,21 @@
 
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
-
-use super::delegator_pools::{DelegatorPool, DelegatorPoolBalanceMetadata, PoolBalanceMetadata};
 use crate::{
-    db::common::models::default_models::move_tables::TableItem,
-    schema::{current_delegator_balances, delegator_balances},
-    utils::{database::DbPoolConnection, util::standardize_address},
+    db::{
+        common::models::{
+            default_models::raw_table_items::RawTableItem,
+            stake_models::delegator_pools::{
+                DelegatorPool, RawDelegatorPoolBalanceMetadata, RawPoolBalanceMetadata,
+            },
+        },
+        postgres::models::default_models::move_tables::TableItem,
+    },
+    schema::current_delegator_balances,
+    utils::{
+        database::DbPoolConnection,
+        util::{parse_timestamp, standardize_address},
+    },
 };
 use ahash::AHashMap;
 use anyhow::Context;
@@ -15,22 +24,21 @@ use aptos_protos::transaction::v1::{
     write_set_change::Change, DeleteTableItem, Transaction, WriteResource, WriteTableItem,
 };
 use bigdecimal::{BigDecimal, Zero};
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 pub type TableHandle = String;
 pub type Address = String;
-pub type ShareToStakingPoolMapping = AHashMap<TableHandle, DelegatorPoolBalanceMetadata>;
-pub type ShareToPoolMapping = AHashMap<TableHandle, PoolBalanceMetadata>;
-pub type CurrentDelegatorBalancePK = (Address, Address, String);
-pub type CurrentDelegatorBalanceMap = AHashMap<CurrentDelegatorBalancePK, CurrentDelegatorBalance>;
+pub type ShareToRawStakingPoolMapping = AHashMap<TableHandle, RawDelegatorPoolBalanceMetadata>;
+pub type ShareToRawPoolMapping = AHashMap<TableHandle, RawPoolBalanceMetadata>;
+pub type RawCurrentDelegatorBalancePK = (Address, Address, String);
+pub type RawCurrentDelegatorBalanceMap =
+    AHashMap<RawCurrentDelegatorBalancePK, RawCurrentDelegatorBalance>;
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(delegator_address, pool_address, pool_type))]
-#[diesel(table_name = current_delegator_balances)]
-pub struct CurrentDelegatorBalance {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RawCurrentDelegatorBalance {
     pub delegator_address: String,
     pub pool_address: String,
     pub pool_type: String,
@@ -38,12 +46,15 @@ pub struct CurrentDelegatorBalance {
     pub last_transaction_version: i64,
     pub shares: BigDecimal,
     pub parent_table_handle: String,
+    pub block_timestamp: chrono::NaiveDateTime,
 }
 
-#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
-#[diesel(primary_key(transaction_version, write_set_change_index))]
-#[diesel(table_name = delegator_balances)]
-pub struct DelegatorBalance {
+pub trait RawCurrentDelegatorBalanceConvertible {
+    fn from_raw(raw: RawCurrentDelegatorBalance) -> Self;
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RawDelegatorBalance {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
     pub delegator_address: String,
@@ -52,6 +63,11 @@ pub struct DelegatorBalance {
     pub table_handle: String,
     pub shares: BigDecimal,
     pub parent_table_handle: String,
+    pub block_timestamp: chrono::NaiveDateTime,
+}
+
+pub trait RawDelegatorBalanceConvertible {
+    fn from_raw(raw: RawDelegatorBalance) -> Self;
 }
 
 #[derive(Debug, Identifiable, Queryable)]
@@ -68,14 +84,15 @@ pub struct CurrentDelegatorBalanceQuery {
     pub parent_table_handle: String,
 }
 
-impl CurrentDelegatorBalance {
+impl RawCurrentDelegatorBalance {
     /// Getting active share balances. Only 1 active pool per staking pool tracked in a single table
     pub async fn get_active_share_from_write_table_item(
         write_table_item: &WriteTableItem,
         txn_version: i64,
         write_set_change_index: i64,
-        active_pool_to_staking_pool: &ShareToStakingPoolMapping,
-    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
+        active_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
+        block_timestamp: NaiveDateTime,
+    ) -> anyhow::Result<Option<(RawDelegatorBalance, Self)>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item is an active share table
         if let Some(pool_balance) = active_pool_to_staking_pool.get(&table_handle) {
@@ -83,8 +100,13 @@ impl CurrentDelegatorBalance {
             let delegator_address = standardize_address(&write_table_item.key.to_string());
 
             // Convert to TableItem model. Some fields are just placeholders
-            let (table_item_model, _) =
-                TableItem::from_write_table_item(write_table_item, 0, txn_version, 0);
+            let table_item_model: TableItem = RawTableItem::postgres_table_item_from_write_item(
+                write_table_item,
+                0,
+                txn_version,
+                0,
+                block_timestamp,
+            );
 
             let shares: BigDecimal = table_item_model
                 .decoded_value
@@ -100,7 +122,7 @@ impl CurrentDelegatorBalance {
                 ))?;
             let shares = shares / &pool_balance.scaling_factor;
             Ok(Some((
-                DelegatorBalance {
+                RawDelegatorBalance {
                     transaction_version: txn_version,
                     write_set_change_index,
                     delegator_address: delegator_address.clone(),
@@ -109,6 +131,7 @@ impl CurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: shares.clone(),
                     parent_table_handle: table_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -118,6 +141,7 @@ impl CurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares,
                     parent_table_handle: table_handle,
+                    block_timestamp,
                 },
             )))
         } else {
@@ -131,12 +155,13 @@ impl CurrentDelegatorBalance {
         write_table_item: &WriteTableItem,
         txn_version: i64,
         write_set_change_index: i64,
-        inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
-        inactive_share_to_pool: &ShareToPoolMapping,
+        inactive_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
+        inactive_share_to_pool: &ShareToRawPoolMapping,
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
-    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
+        block_timestamp: chrono::NaiveDateTime,
+    ) -> anyhow::Result<Option<(RawDelegatorBalance, Self)>> {
         let table_handle = standardize_address(&write_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
         if let Some(pool_balance) = inactive_share_to_pool.get(&table_handle) {
@@ -171,8 +196,13 @@ impl CurrentDelegatorBalance {
             };
             let delegator_address = standardize_address(&write_table_item.key.to_string());
             // Convert to TableItem model. Some fields are just placeholders
-            let (table_item_model, _) =
-                TableItem::from_write_table_item(write_table_item, 0, txn_version, 0);
+            let table_item_model = RawTableItem::postgres_table_item_from_write_item(
+                write_table_item,
+                0,
+                txn_version,
+                0,
+                block_timestamp,
+            );
 
             let shares: BigDecimal = table_item_model
                 .decoded_value
@@ -188,7 +218,7 @@ impl CurrentDelegatorBalance {
                 ))?;
             let shares = shares / &pool_balance.scaling_factor;
             Ok(Some((
-                DelegatorBalance {
+                RawDelegatorBalance {
                     transaction_version: txn_version,
                     write_set_change_index,
                     delegator_address: delegator_address.clone(),
@@ -197,6 +227,7 @@ impl CurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: shares.clone(),
                     parent_table_handle: inactive_pool_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -206,6 +237,7 @@ impl CurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares,
                     parent_table_handle: inactive_pool_handle,
+                    block_timestamp,
                 },
             )))
         } else {
@@ -218,15 +250,17 @@ impl CurrentDelegatorBalance {
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
         write_set_change_index: i64,
-        active_pool_to_staking_pool: &ShareToStakingPoolMapping,
-    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
+        active_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
+        block_timestamp: chrono::NaiveDateTime,
+    ) -> anyhow::Result<Option<(RawDelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item is an active share table
+
         if let Some(pool_balance) = active_pool_to_staking_pool.get(&table_handle) {
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
             return Ok(Some((
-                DelegatorBalance {
+                RawDelegatorBalance {
                     transaction_version: txn_version,
                     write_set_change_index,
                     delegator_address: delegator_address.clone(),
@@ -235,6 +269,7 @@ impl CurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: BigDecimal::zero(),
                     parent_table_handle: table_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -244,6 +279,7 @@ impl CurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares: BigDecimal::zero(),
                     parent_table_handle: table_handle,
+                    block_timestamp,
                 },
             )));
         }
@@ -255,12 +291,13 @@ impl CurrentDelegatorBalance {
         delete_table_item: &DeleteTableItem,
         txn_version: i64,
         write_set_change_index: i64,
-        inactive_pool_to_staking_pool: &ShareToStakingPoolMapping,
-        inactive_share_to_pool: &ShareToPoolMapping,
+        inactive_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
+        inactive_share_to_pool: &ShareToRawPoolMapping,
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
-    ) -> anyhow::Result<Option<(DelegatorBalance, Self)>> {
+        block_timestamp: chrono::NaiveDateTime,
+    ) -> anyhow::Result<Option<(RawDelegatorBalance, Self)>> {
         let table_handle = standardize_address(&delete_table_item.handle.to_string());
         // The mapping will tell us if the table item belongs to an inactive pool
         if let Some(pool_balance) = inactive_share_to_pool.get(&table_handle) {
@@ -287,7 +324,7 @@ impl CurrentDelegatorBalance {
             let delegator_address = standardize_address(&delete_table_item.key.to_string());
 
             return Ok(Some((
-                DelegatorBalance {
+                RawDelegatorBalance {
                     transaction_version: txn_version,
                     write_set_change_index,
                     delegator_address: delegator_address.clone(),
@@ -296,6 +333,7 @@ impl CurrentDelegatorBalance {
                     table_handle: table_handle.clone(),
                     shares: BigDecimal::zero(),
                     parent_table_handle: inactive_pool_handle.clone(),
+                    block_timestamp,
                 },
                 Self {
                     delegator_address,
@@ -305,6 +343,7 @@ impl CurrentDelegatorBalance {
                     last_transaction_version: txn_version,
                     shares: BigDecimal::zero(),
                     parent_table_handle: table_handle,
+                    block_timestamp,
                 },
             )));
         }
@@ -316,7 +355,7 @@ impl CurrentDelegatorBalance {
     pub fn get_active_pool_to_staking_pool_mapping(
         write_resource: &WriteResource,
         txn_version: i64,
-    ) -> anyhow::Result<Option<ShareToStakingPoolMapping>> {
+    ) -> anyhow::Result<Option<ShareToRawStakingPoolMapping>> {
         if let Some(balance) = DelegatorPool::get_delegated_pool_metadata_from_write_resource(
             write_resource,
             txn_version,
@@ -335,7 +374,7 @@ impl CurrentDelegatorBalance {
     pub fn get_inactive_pool_to_staking_pool_mapping(
         write_resource: &WriteResource,
         txn_version: i64,
-    ) -> anyhow::Result<Option<ShareToStakingPoolMapping>> {
+    ) -> anyhow::Result<Option<ShareToRawStakingPoolMapping>> {
         if let Some(balance) = DelegatorPool::get_delegated_pool_metadata_from_write_resource(
             write_resource,
             txn_version,
@@ -354,7 +393,7 @@ impl CurrentDelegatorBalance {
     pub fn get_inactive_share_to_pool_mapping(
         write_table_item: &WriteTableItem,
         txn_version: i64,
-    ) -> anyhow::Result<Option<ShareToPoolMapping>> {
+    ) -> anyhow::Result<Option<ShareToRawPoolMapping>> {
         if let Some(balance) = DelegatorPool::get_inactive_pool_metadata_from_write_table_item(
             write_table_item,
             txn_version,
@@ -396,16 +435,17 @@ impl CurrentDelegatorBalance {
 
     pub async fn from_transaction(
         transaction: &Transaction,
-        active_pool_to_staking_pool: &ShareToStakingPoolMapping,
+        active_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
-    ) -> anyhow::Result<(Vec<DelegatorBalance>, CurrentDelegatorBalanceMap)> {
-        let mut inactive_pool_to_staking_pool: ShareToStakingPoolMapping = AHashMap::new();
-        let mut inactive_share_to_pool: ShareToPoolMapping = AHashMap::new();
-        let mut current_delegator_balances: CurrentDelegatorBalanceMap = AHashMap::new();
+    ) -> anyhow::Result<(Vec<RawDelegatorBalance>, RawCurrentDelegatorBalanceMap)> {
+        let mut inactive_pool_to_staking_pool: ShareToRawStakingPoolMapping = AHashMap::new();
+        let mut inactive_share_to_pool: ShareToRawPoolMapping = AHashMap::new();
+        let mut current_delegator_balances: RawCurrentDelegatorBalanceMap = AHashMap::new();
         let mut delegator_balances = vec![];
         let txn_version = transaction.version as i64;
+        let txn_timestamp = parse_timestamp(transaction.timestamp.as_ref().unwrap(), txn_version);
 
         let changes = &transaction.info.as_ref().unwrap().changes;
         // Do a first pass to get the mapping of active_share table handles to staking pool resource        let txn_version = transaction.version as i64;
@@ -437,6 +477,7 @@ impl CurrentDelegatorBalance {
                             txn_version,
                             index as i64,
                             active_pool_to_staking_pool,
+                            txn_timestamp,
                         )
                         .unwrap()
                     {
@@ -451,6 +492,7 @@ impl CurrentDelegatorBalance {
                             conn,
                             query_retries,
                             query_retry_delay_ms,
+                            txn_timestamp,
                         )
                         .await
                         .unwrap()
@@ -463,6 +505,7 @@ impl CurrentDelegatorBalance {
                             txn_version,
                             index as i64,
                             active_pool_to_staking_pool,
+                            txn_timestamp,
                         )
                         .await
                         .unwrap()
@@ -478,6 +521,7 @@ impl CurrentDelegatorBalance {
                             conn,
                             query_retries,
                             query_retry_delay_ms,
+                            txn_timestamp,
                         )
                         .await
                         .unwrap()

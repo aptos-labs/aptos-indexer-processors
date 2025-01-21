@@ -85,6 +85,43 @@ diesel::table! {
 }
 
 diesel::table! {
+    auth_key_account_addresses (address) {
+        #[max_length = 66]
+        auth_key -> Varchar,
+        #[max_length = 66]
+        address -> Varchar,
+        verified -> Bool,
+        last_transaction_version -> Int8,
+    }
+}
+
+diesel::table! {
+    auth_key_multikey_layout (auth_key) {
+        #[max_length = 66]
+        auth_key -> Varchar,
+        signatures_required -> Int8,
+        multikey_layout_with_prefixes -> Jsonb,
+        #[max_length = 50]
+        multikey_type -> Varchar,
+        last_transaction_version -> Int8,
+    }
+}
+
+diesel::table! {
+    backfill_processor_status (backfill_alias) {
+        #[max_length = 50]
+        backfill_alias -> Varchar,
+        #[max_length = 50]
+        backfill_status -> Varchar,
+        last_success_version -> Int8,
+        last_updated -> Timestamp,
+        last_transaction_timestamp -> Nullable<Timestamp>,
+        backfill_start_version -> Int8,
+        backfill_end_version -> Nullable<Int8>,
+    }
+}
+
+diesel::table! {
     block_metadata_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -837,8 +874,8 @@ diesel::table! {
         supply_aggregator_table_key_v1 -> Nullable<Text>,
         #[max_length = 10]
         token_standard -> Varchar,
-        is_token_v2 -> Nullable<Bool>,
         inserted_at -> Timestamp,
+        is_token_v2 -> Nullable<Bool>,
         supply_v2 -> Nullable<Numeric>,
         maximum_v2 -> Nullable<Numeric>,
     }
@@ -929,7 +966,7 @@ diesel::table! {
 
 diesel::table! {
     processor_status (processor) {
-        #[max_length = 50]
+        #[max_length = 100]
         processor -> Varchar,
         last_success_version -> Int8,
         last_updated -> Timestamp,
@@ -949,6 +986,19 @@ diesel::table! {
         should_pass -> Bool,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    public_key_auth_keys (public_key, public_key_type, auth_key) {
+        #[max_length = 200]
+        public_key -> Varchar,
+        #[max_length = 50]
+        public_key_type -> Varchar,
+        #[max_length = 66]
+        auth_key -> Varchar,
+        verified -> Bool,
+        last_transaction_version -> Int8,
     }
 }
 
@@ -1251,6 +1301,12 @@ diesel::table! {
         entry_function_id_str -> Varchar,
         inserted_at -> Timestamp,
         epoch -> Int8,
+        #[max_length = 66]
+        entry_function_contract_address -> Nullable<Varchar>,
+        #[max_length = 255]
+        entry_function_module_name -> Nullable<Varchar>,
+        #[max_length = 255]
+        entry_function_function_name -> Nullable<Varchar>,
     }
 }
 
@@ -1285,6 +1341,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     ans_lookup_v2,
     ans_primary_name,
     ans_primary_name_v2,
+    auth_key_account_addresses,
+    auth_key_multikey_layout,
+    backfill_processor_status,
     block_metadata_transactions,
     coin_activities,
     coin_balances,
@@ -1331,6 +1390,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     objects,
     processor_status,
     proposal_votes,
+    public_key_auth_keys,
     signatures,
     spam_assets,
     table_items,

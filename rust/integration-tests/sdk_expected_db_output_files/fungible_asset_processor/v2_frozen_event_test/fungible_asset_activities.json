@@ -1,0 +1,38 @@
+[
+  {
+    "transaction_version": 1200394037,
+    "event_index": -1,
+    "owner_address": "0x8a735d61f2c98aa97f62fa3c328b63fc97b8a7d50cd8eda633124137639ce4fc",
+    "storage_id": "0x30ada02023d8f633496e5119bdf88f898ddb11e95bb2f1f73aedbf75b042e502",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_frozen": null,
+    "amount": "54200",
+    "type_": "0x1::aptos_coin::GasFeeEvent",
+    "is_gas_fee": true,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x8a735d61f2c98aa97f62fa3c328b63fc97b8a7d50cd8eda633124137639ce4fc::fa_coin::freeze_account",
+    "block_height": 275972253,
+    "token_standard": "v1",
+    "transaction_timestamp": "2024-05-22T05:52:52",
+    "storage_refund_amount": "0"
+  },
+  {
+    "transaction_version": 1200394037,
+    "event_index": 0,
+    "owner_address": "0xbc054b63705ba1440cd48527756adc0861310658dcb3b13b13f5193d447c1f1e",
+    "storage_id": "0x1fff287896925cd278649c9c18ccf22e8ee879964f0284f61df4fd811574cdb4",
+    "asset_type": "0xa0e8bee18e7ed6c7f52ff2708c367c7214083e16dc69827c0311dab87f17f554",
+    "is_frozen": true,
+    "amount": null,
+    "type_": "0x1::fungible_asset::Frozen",
+    "is_gas_fee": false,
+    "gas_fee_payer_address": null,
+    "is_transaction_success": true,
+    "entry_function_id_str": "0x8a735d61f2c98aa97f62fa3c328b63fc97b8a7d50cd8eda633124137639ce4fc::fa_coin::freeze_account",
+    "block_height": 275972253,
+    "token_standard": "v2",
+    "transaction_timestamp": "2024-05-22T05:52:52",
+    "storage_refund_amount": "0"
+  }
+]

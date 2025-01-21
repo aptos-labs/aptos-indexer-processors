@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::database::DbPoolConnection;
 use crate::{
-    db::common::models::property_map::{PropertyMap, TokenObjectPropertyMap},
+    db::postgres::models::property_map::{PropertyMap, TokenObjectPropertyMap},
     utils::counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
 };
 use aptos_protos::{
@@ -39,6 +40,13 @@ lazy_static! {
     pub static ref APT_METADATA_ADDRESS_HEX: String =
         format!("0x{}", hex::encode(*APT_METADATA_ADDRESS_RAW));
 }
+
+pub struct DbConnectionConfig<'a> {
+    pub conn: DbPoolConnection<'a>,
+    pub query_retries: u32,
+    pub query_retry_delay_ms: u64,
+}
+
 // Supporting structs to get clean payload without escaped strings
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryFunctionPayloadClean {
@@ -120,9 +128,7 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
     val
 }
 
-pub fn get_entry_function_from_user_request(
-    user_request: &UserTransactionRequest,
-) -> Option<String> {
+pub fn split_entry_function_id_str(user_request: &UserTransactionRequest) -> Option<String> {
     let entry_function_id_str: Option<String> = match &user_request.payload {
         Some(txn_payload) => match &txn_payload.payload {
             Some(PayloadType::EntryFunctionPayload(payload)) => {
@@ -143,8 +149,44 @@ pub fn get_entry_function_from_user_request(
         },
         None => return None,
     };
+    entry_function_id_str
+}
+
+pub fn get_entry_function_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    let entry_function_id_str: Option<String> = split_entry_function_id_str(user_request);
 
     entry_function_id_str.map(|s| truncate_str(&s, MAX_ENTRY_FUNCTION_LENGTH))
+}
+
+pub fn get_entry_function_contract_address_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    let contract_address = split_entry_function_id_str(user_request).and_then(|s| {
+        s.split("::").next().map(String::from) // Get the first element (contract address)
+    });
+    contract_address.map(|s| standardize_address(&s))
+}
+
+pub fn get_entry_function_module_name_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    split_entry_function_id_str(user_request).and_then(|s| {
+        s.split("::")
+            .nth(1) // Get the second element (module name)
+            .map(String::from)
+    })
+}
+
+pub fn get_entry_function_function_name_from_user_request(
+    user_request: &UserTransactionRequest,
+) -> Option<String> {
+    split_entry_function_id_str(user_request).and_then(|s| {
+        s.split("::")
+            .nth(2) // Get the third element (function name)
+            .map(String::from)
+    })
 }
 
 pub fn get_payload_type(payload: &TransactionPayload) -> String {
@@ -294,11 +336,22 @@ pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
             nanos: 0,
         }
     } else {
-        ts.clone()
+        *ts
     };
     #[allow(deprecated)]
     chrono::NaiveDateTime::from_timestamp_opt(final_ts.seconds, final_ts.nanos as u32)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+}
+
+pub fn compute_nanos_since_epoch(datetime: NaiveDateTime) -> u64 {
+    // The Unix epoch is 1970-01-01T00:00:00Z
+    #[allow(deprecated)]
+    let unix_epoch = NaiveDateTime::from_timestamp(0, 0);
+    let duration_since_epoch = datetime.signed_duration_since(unix_epoch);
+
+    // Convert the duration to nanoseconds and return
+    duration_since_epoch.num_seconds() as u64 * 1_000_000_000
+        + duration_since_epoch.subsec_nanos() as u64
 }
 
 pub fn parse_timestamp_secs(ts: u64, version: i64) -> chrono::NaiveDateTime {

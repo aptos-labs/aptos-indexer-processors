@@ -11,7 +11,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::common::models::{
+    db::postgres::models::{
         coin_models::coin_supply::CoinSupply,
         fungible_asset_models::{
             v2_fungible_asset_activities::FungibleAssetActivity,
@@ -29,7 +29,7 @@ use processor::{
         insert_fungible_asset_activities_query, insert_fungible_asset_balances_query,
         insert_fungible_asset_metadata_query,
     },
-    worker::TableFlags,
+    utils::table_flags::TableFlags,
 };
 
 pub struct FungibleAssetStorer

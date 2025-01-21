@@ -4,11 +4,11 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::{
-    delegator_balances::{CurrentDelegatorBalance, ShareToStakingPoolMapping},
-    stake_utils::VoteDelegationTableItem,
-};
+use super::delegator_balances::ShareToRawStakingPoolMapping;
 use crate::{
+    db::common::models::stake_models::{
+        delegator_balances::RawCurrentDelegatorBalance, stake_utils::VoteDelegationTableItem,
+    },
     schema::current_delegated_voter,
     utils::{database::DbPoolConnection, util::standardize_address},
 };
@@ -135,18 +135,19 @@ impl CurrentDelegatedVoter {
         write_table_item: &WriteTableItem,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        active_pool_to_staking_pool: &ShareToStakingPoolMapping,
+        active_pool_to_staking_pool: &ShareToRawStakingPoolMapping,
         previous_delegated_voters: &CurrentDelegatedVoterMap,
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
     ) -> anyhow::Result<Option<Self>> {
         if let Some((_, active_balance)) =
-            CurrentDelegatorBalance::get_active_share_from_write_table_item(
+            RawCurrentDelegatorBalance::get_active_share_from_write_table_item(
                 write_table_item,
                 txn_version,
                 0, // placeholder
                 active_pool_to_staking_pool,
+                txn_timestamp,
             )
             .await?
         {

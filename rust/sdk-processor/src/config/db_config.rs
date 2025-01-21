@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 )]
 pub enum DbConfig {
     PostgresConfig(PostgresConfig),
+    ParquetConfig(ParquetConfig),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -47,4 +48,20 @@ impl PostgresConfig {
     pub const fn default_db_pool_size() -> u32 {
         150
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParquetConfig {
+    pub connection_string: String,
+    // Size of the pool for writes/reads to the DB. Limits maximum number of queries in flight
+    #[serde(default = "PostgresConfig::default_db_pool_size")]
+    pub db_pool_size: u32,
+    // Optional Google application credentials for authentication
+    #[serde(default)]
+    pub google_application_credentials: Option<String>,
+    #[serde(default)]
+    pub bucket_name: String,
+    #[serde(default)]
+    pub bucket_root: String,
 }

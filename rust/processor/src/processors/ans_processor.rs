@@ -3,21 +3,32 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::ans_models::{
-        ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
-        ans_lookup_v2::{
-            AnsLookupV2, AnsPrimaryNameV2, CurrentAnsLookupV2, CurrentAnsPrimaryNameV2,
+    db::{
+        common::models::ans_models::{
+            raw_ans_lookup_v2::{
+                AnsLookupV2Convertible, CurrentAnsLookupV2Convertible, RawAnsLookupV2,
+                RawCurrentAnsLookupV2,
+            },
+            raw_ans_primary_name_v2::{
+                AnsPrimaryNameV2Convertible, CurrentAnsPrimaryNameV2Convertible,
+                RawAnsPrimaryNameV2, RawCurrentAnsPrimaryNameV2,
+            },
         },
-        ans_utils::{RenewNameEvent, SubdomainExtV2},
+        postgres::models::ans_models::{
+            ans_lookup::{AnsLookup, AnsPrimaryName, CurrentAnsLookup, CurrentAnsPrimaryName},
+            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
+            ans_utils::{RenewNameEvent, SubdomainExtV2},
+        },
     },
     gap_detectors::ProcessingResult,
     schema,
     utils::{
         counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
         database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
+        table_flags::TableFlags,
         util::standardize_address,
     },
-    worker::TableFlags,
 };
 use ahash::AHashMap;
 use anyhow::bail;
@@ -186,7 +197,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_current_ans_lookups_query(
+pub fn insert_current_ans_lookups_query(
     item_to_insert: Vec<CurrentAnsLookup>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -211,7 +222,7 @@ fn insert_current_ans_lookups_query(
     )
 }
 
-fn insert_ans_lookups_query(
+pub fn insert_ans_lookups_query(
     item_to_insert: Vec<AnsLookup>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -228,7 +239,7 @@ fn insert_ans_lookups_query(
     )
 }
 
-fn insert_current_ans_primary_names_query(
+pub fn insert_current_ans_primary_names_query(
     item_to_insert: Vec<CurrentAnsPrimaryName>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -253,7 +264,7 @@ fn insert_current_ans_primary_names_query(
     )
 }
 
-fn insert_ans_primary_names_query(
+pub fn insert_ans_primary_names_query(
     item_to_insert: Vec<AnsPrimaryName>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -270,7 +281,7 @@ fn insert_ans_primary_names_query(
     )
 }
 
-fn insert_current_ans_lookups_v2_query(
+pub fn insert_current_ans_lookups_v2_query(
     item_to_insert: Vec<CurrentAnsLookupV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -296,7 +307,7 @@ fn insert_current_ans_lookups_v2_query(
     )
 }
 
-fn insert_ans_lookups_v2_query(
+pub fn insert_ans_lookups_v2_query(
     item_to_insert: Vec<AnsLookupV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -317,7 +328,7 @@ fn insert_ans_lookups_v2_query(
     )
 }
 
-fn insert_current_ans_primary_names_v2_query(
+pub fn insert_current_ans_primary_names_v2_query(
     item_to_insert: Vec<CurrentAnsPrimaryNameV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -342,7 +353,7 @@ fn insert_current_ans_primary_names_v2_query(
     )
 }
 
-fn insert_ans_primary_names_v2_query(
+pub fn insert_ans_primary_names_v2_query(
     items_to_insert: Vec<AnsPrimaryNameV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -373,7 +384,7 @@ impl ProcessorTrait for AnsProcessor {
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
         let processing_start = std::time::Instant::now();
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
 
         let (
             mut all_current_ans_lookups,
@@ -383,13 +394,33 @@ impl ProcessorTrait for AnsProcessor {
             all_current_ans_lookups_v2,
             all_ans_lookups_v2,
             all_current_ans_primary_names_v2,
-            mut all_ans_primary_names_v2,
+            all_ans_primary_names_v2,
         ) = parse_ans(
             &transactions,
             self.config.ans_v1_primary_names_table_handle.clone(),
             self.config.ans_v1_name_records_table_handle.clone(),
             self.config.ans_v2_contract_address.clone(),
         );
+
+        let postgres_current_ans_lookup_v2: Vec<CurrentAnsLookupV2> = all_current_ans_lookups_v2
+            .into_iter()
+            .map(CurrentAnsLookupV2::from_raw)
+            .collect();
+
+        let postgres_ans_lookup_v2: Vec<AnsLookupV2> = all_ans_lookups_v2
+            .into_iter()
+            .map(AnsLookupV2::from_raw)
+            .collect();
+        let postgres_current_ans_primary_name_v2: Vec<CurrentAnsPrimaryNameV2> =
+            all_current_ans_primary_names_v2
+                .into_iter()
+                .map(CurrentAnsPrimaryNameV2::from_raw)
+                .collect();
+
+        let mut postgres_ans_primary_name_v2: Vec<AnsPrimaryNameV2> = all_ans_primary_names_v2
+            .into_iter()
+            .map(AnsPrimaryNameV2::from_raw)
+            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -404,7 +435,7 @@ impl ProcessorTrait for AnsProcessor {
             .deprecated_tables
             .contains(TableFlags::ANS_PRIMARY_NAME_V2)
         {
-            all_ans_primary_names_v2.clear();
+            postgres_ans_primary_name_v2.clear();
         }
         if self.deprecated_tables.contains(TableFlags::ANS_LOOKUP) {
             all_ans_lookups.clear();
@@ -432,10 +463,10 @@ impl ProcessorTrait for AnsProcessor {
             &all_ans_lookups,
             &all_current_ans_primary_names,
             &all_ans_primary_names,
-            &all_current_ans_lookups_v2,
-            &all_ans_lookups_v2,
-            &all_current_ans_primary_names_v2,
-            &all_ans_primary_names_v2,
+            &postgres_current_ans_lookup_v2,
+            &postgres_ans_lookup_v2,
+            &postgres_current_ans_primary_name_v2,
+            &postgres_ans_primary_name_v2,
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -470,7 +501,7 @@ impl ProcessorTrait for AnsProcessor {
     }
 }
 
-fn parse_ans(
+pub fn parse_ans(
     transactions: &[Transaction],
     ans_v1_primary_names_table_handle: String,
     ans_v1_name_records_table_handle: String,
@@ -480,10 +511,10 @@ fn parse_ans(
     Vec<AnsLookup>,
     Vec<CurrentAnsPrimaryName>,
     Vec<AnsPrimaryName>,
-    Vec<CurrentAnsLookupV2>,
-    Vec<AnsLookupV2>,
-    Vec<CurrentAnsPrimaryNameV2>,
-    Vec<AnsPrimaryNameV2>,
+    Vec<RawCurrentAnsLookupV2>,
+    Vec<RawAnsLookupV2>,
+    Vec<RawCurrentAnsPrimaryNameV2>,
+    Vec<RawAnsPrimaryNameV2>,
 ) {
     let mut all_current_ans_lookups = AHashMap::new();
     let mut all_ans_lookups = vec![];
@@ -513,6 +544,13 @@ fn parse_ans(
             .info
             .as_ref()
             .expect("Transaction info doesn't exist!");
+        let timestamp = transaction
+            .timestamp
+            .as_ref()
+            .expect("Transaction timestamp doesn't exist!");
+        #[allow(deprecated)]
+        let block_timestamp = chrono::NaiveDateTime::from_timestamp_opt(timestamp.seconds, 0)
+            .expect("Txn Timestamp is invalid!");
 
         // Extracts from user transactions. Other transactions won't have any ANS changes
 
@@ -532,11 +570,12 @@ fn parse_ans(
                     v2_renew_name_events.push(renew_name_event);
                 }
                 if let Some((current_ans_lookup_v2, ans_lookup_v2)) =
-                    CurrentAnsPrimaryNameV2::parse_v2_primary_name_record_from_event(
+                    RawCurrentAnsPrimaryNameV2::parse_v2_primary_name_record_from_event(
                         event,
                         txn_version,
                         event_index as i64,
                         &ans_v2_contract_address,
+                        block_timestamp,
                     )
                     .unwrap()
                 {
@@ -595,7 +634,10 @@ fn parse_ans(
 
                             // Include all v1 lookups in v2 data
                             let (current_ans_lookup_v2, ans_lookup_v2) =
-                                CurrentAnsLookupV2::get_v2_from_v1(current_ans_lookup, ans_lookup);
+                                RawCurrentAnsLookupV2::get_v2_from_v1(
+                                    current_ans_lookup,
+                                    ans_lookup,
+                                );
                             all_current_ans_lookups_v2
                                 .insert(current_ans_lookup_v2.pk(), current_ans_lookup_v2);
                             all_ans_lookups_v2.push(ans_lookup_v2);
@@ -622,7 +664,7 @@ fn parse_ans(
 
                             // Include all v1 primary names in v2 data
                             let (current_primary_name_v2, primary_name_v2) =
-                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone());
+                                RawCurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name.clone(), primary_name.clone(), block_timestamp);
                             all_current_ans_primary_names_v2
                                 .insert(current_primary_name_v2.pk(), current_primary_name_v2);
                             all_ans_primary_names_v2.push(primary_name_v2);
@@ -650,7 +692,10 @@ fn parse_ans(
 
                             // Include all v1 lookups in v2 data
                             let (current_ans_lookup_v2, ans_lookup_v2) =
-                                CurrentAnsLookupV2::get_v2_from_v1(current_ans_lookup, ans_lookup);
+                                RawCurrentAnsLookupV2::get_v2_from_v1(
+                                    current_ans_lookup,
+                                    ans_lookup,
+                                );
                             all_current_ans_lookups_v2
                                 .insert(current_ans_lookup_v2.pk(), current_ans_lookup_v2);
                             all_ans_lookups_v2.push(ans_lookup_v2);
@@ -676,7 +721,7 @@ fn parse_ans(
 
                             // Include all v1 primary names in v2 data
                             let (current_primary_name_v2, primary_name_v2) =
-                                CurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name);
+                                RawCurrentAnsPrimaryNameV2::get_v2_from_v1(current_primary_name, primary_name, block_timestamp);
                             all_current_ans_primary_names_v2
                                 .insert(current_primary_name_v2.pk(), current_primary_name_v2);
                             all_ans_primary_names_v2.push(primary_name_v2);
@@ -684,7 +729,7 @@ fn parse_ans(
                     },
                     WriteSetChange::WriteResource(write_resource) => {
                         if let Some((current_ans_lookup_v2, ans_lookup_v2)) =
-                            CurrentAnsLookupV2::parse_name_record_from_write_resource_v2(
+                            RawCurrentAnsLookupV2::parse_name_record_from_write_resource_v2(
                                 write_resource,
                                 &ans_v2_contract_address,
                                 txn_version,
@@ -722,10 +767,10 @@ fn parse_ans(
         .collect::<Vec<CurrentAnsPrimaryName>>();
     let mut all_current_ans_lookups_v2 = all_current_ans_lookups_v2
         .into_values()
-        .collect::<Vec<CurrentAnsLookupV2>>();
+        .collect::<Vec<RawCurrentAnsLookupV2>>();
     let mut all_current_ans_primary_names_v2 = all_current_ans_primary_names_v2
         .into_values()
-        .collect::<Vec<CurrentAnsPrimaryNameV2>>();
+        .collect::<Vec<RawCurrentAnsPrimaryNameV2>>();
 
     all_current_ans_lookups.sort();
     all_current_ans_primary_names.sort();

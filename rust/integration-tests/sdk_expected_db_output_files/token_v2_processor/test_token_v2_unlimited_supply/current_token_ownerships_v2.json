@@ -1,0 +1,32 @@
+[
+  {
+    "token_data_id": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "property_version_v1": "0",
+    "owner_address": "0x7efbc33cf69ad534412eab0ccd0f5fbec7793bdebf08a3620afe8e5f89ef13a0",
+    "storage_id": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "amount": "0",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": false,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "last_transaction_version": 325355235,
+    "last_transaction_timestamp": "2023-11-09T23:58:14.442073",
+    "non_transferrable_by_owner": false
+  },
+  {
+    "token_data_id": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "property_version_v1": "0",
+    "owner_address": "0xa281f5b2d909bfadf70099f6b9c24369e12c49f9035437526c53cd3e75d6f08f",
+    "storage_id": "0xff4ab259fd6773861c2046d1f89b5ff944d0229dd9c1f6952a3b6fd2d2885dfa",
+    "amount": "1",
+    "table_type_v1": null,
+    "token_properties_mutated_v1": null,
+    "is_soulbound_v2": false,
+    "token_standard": "v2",
+    "is_fungible_v2": null,
+    "last_transaction_version": 325355235,
+    "last_transaction_timestamp": "2023-11-09T23:58:14.442073",
+    "non_transferrable_by_owner": false
+  }
+]

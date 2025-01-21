@@ -6,7 +6,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::events_models::parquet_events::{Event, ParquetEventModel},
+    db::parquet::models::event_models::parquet_events::{Event, ParquetEventModel},
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
     utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool, util::parse_timestamp},
@@ -89,63 +89,10 @@ impl ProcessorTrait for ParquetEventsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-        let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
 
-        let mut events = vec![];
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let block_height = txn.block_height as i64;
-            let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
-            let size_info = match txn.size_info.as_ref() {
-                Some(size_info) => size_info,
-                None => {
-                    warn!(version = txn.version, "Transaction size info not found");
-                    continue;
-                },
-            };
-            let txn_data = match txn.txn_data.as_ref() {
-                Some(data) => data,
-                None => {
-                    tracing::warn!(
-                        transaction_version = txn_version,
-                        "Transaction data doesn't exist"
-                    );
-                    PROCESSOR_UNKNOWN_TYPE_COUNT
-                        .with_label_values(&["ParquetEventsProcessor"])
-                        .inc();
-
-                    continue;
-                },
-            };
-            let default = vec![];
-            let mut is_user_txn_type = false;
-            let raw_events = match txn_data {
-                TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-                TxnData::Genesis(tx_inner) => &tx_inner.events,
-                TxnData::User(tx_inner) => {
-                    is_user_txn_type = true;
-                    &tx_inner.events
-                },
-                TxnData::Validator(txn) => &txn.events,
-                _ => &default,
-            };
-
-            let txn_events = ParquetEventModel::from_events(
-                raw_events,
-                txn_version,
-                block_height,
-                size_info.event_size_info.as_slice(),
-                block_timestamp,
-                is_user_txn_type,
-            );
-            transaction_version_to_struct_count
-                .entry(txn_version)
-                .and_modify(|e| *e += txn_events.len() as i64)
-                .or_insert(txn_events.len() as i64);
-
-            events.extend(txn_events);
-        }
+        let (transaction_version_to_struct_count, events) =
+            process_transactions_parquet(transactions);
 
         let event_parquet_data = ParquetDataGeneric { data: events };
 
@@ -158,7 +105,7 @@ impl ProcessorTrait for ParquetEventsProcessor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),
@@ -169,4 +116,66 @@ impl ProcessorTrait for ParquetEventsProcessor {
     fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
+}
+
+pub fn process_transactions_parquet(
+    transactions: Vec<Transaction>,
+) -> (AHashMap<i64, i64>, Vec<Event>) {
+    let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
+
+    let mut events = vec![];
+    for txn in &transactions {
+        let txn_version = txn.version as i64;
+        let block_height = txn.block_height as i64;
+        let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
+        let size_info = match txn.size_info.as_ref() {
+            Some(size_info) => size_info,
+            None => {
+                warn!(version = txn.version, "Transaction size info not found");
+                continue;
+            },
+        };
+        let txn_data = match txn.txn_data.as_ref() {
+            Some(data) => data,
+            None => {
+                tracing::warn!(
+                    transaction_version = txn_version,
+                    "Transaction data doesn't exist"
+                );
+                PROCESSOR_UNKNOWN_TYPE_COUNT
+                    .with_label_values(&["ParquetEventsProcessor"])
+                    .inc();
+
+                continue;
+            },
+        };
+        let default = vec![];
+        let mut is_user_txn_type = false;
+        let raw_events = match txn_data {
+            TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
+            TxnData::Genesis(tx_inner) => &tx_inner.events,
+            TxnData::User(tx_inner) => {
+                is_user_txn_type = true;
+                &tx_inner.events
+            },
+            TxnData::Validator(txn) => &txn.events,
+            _ => &default,
+        };
+
+        let txn_events = ParquetEventModel::from_events(
+            raw_events,
+            txn_version,
+            block_height,
+            size_info.event_size_info.as_slice(),
+            block_timestamp,
+            is_user_txn_type,
+        );
+        transaction_version_to_struct_count
+            .entry(txn_version)
+            .and_modify(|e| *e += txn_events.len() as i64)
+            .or_insert(txn_events.len() as i64);
+
+        events.extend(txn_events);
+    }
+    (transaction_version_to_struct_count, events)
 }

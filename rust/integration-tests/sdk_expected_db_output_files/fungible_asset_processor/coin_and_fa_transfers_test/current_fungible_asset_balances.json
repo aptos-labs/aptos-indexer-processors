@@ -1,0 +1,90 @@
+[
+  {
+    "storage_id": "0x12aee8d4b8ba1ff0b7b943fe2db30bdde3f3d52f83912e92a90c4610e11c1412",
+    "owner_address": "0xaf1fbd1c118239498c0fec0e5cec54a50d03250fe1aca589a6b903566ba1d4db",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "114994000",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v1"
+  },
+  {
+    "storage_id": "0x2283606d1303cb8c6df599a6b7d0cec85873d747d5db2f2142b594c2db9d83ad",
+    "owner_address": "0xaf1fbd1c118239498c0fec0e5cec54a50d03250fe1aca589a6b903566ba1d4db",
+    "asset_type": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa::asset::USDC",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "162105637",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v1"
+  },
+  {
+    "storage_id": "0x234f0be57d6acfb2f0f19c17053617311a8d03c9ce358bdf9cd5c460e4a02b7c",
+    "owner_address": "0x4bf51972879e3b95c4781a5cdcb9e1ee24ef483e7d22f2d903626f126df62bd1",
+    "asset_type": "0x234f0be57d6acfb2f0f19c17053617311a8d03c9ce358bdf9cd5c460e4a02b7c",
+    "is_primary": false,
+    "is_frozen": false,
+    "amount": "1000",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v2"
+  },
+  {
+    "storage_id": "0x3e10c1bcedce2b6f6a51cf44682309fcb159151f4fcd8d1e5403cf5fa3d607b2",
+    "owner_address": "0x3b38735644d0be8ac37ebd84a1e42fa5c2487495ef8782f6c694b1a147f82426",
+    "asset_type": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "111198107496469",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v1"
+  },
+  {
+    "storage_id": "0x809c69006e5492c65a1d4b273c65318fb482bed7988c75c48b96d283263ba029",
+    "owner_address": "0x3b38735644d0be8ac37ebd84a1e42fa5c2487495ef8782f6c694b1a147f82426",
+    "asset_type": "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17fa::asset::USDC",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount": "2060898834867",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v1"
+  },
+  {
+    "storage_id": "0x89cee32338902b6f79f9c75c317d32ac061771817c0d5b0802f97ec44ebfc7d4",
+    "owner_address": "0x234f0be57d6acfb2f0f19c17053617311a8d03c9ce358bdf9cd5c460e4a02b7c",
+    "asset_type": "0x50fdfa97914bd00b656e3041e143f157c84931eb1ca7224b8a8570e7d5be70f2",
+    "is_primary": false,
+    "is_frozen": false,
+    "amount": "429891425615",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v2"
+  },
+  {
+    "storage_id": "0x9120a6a57b1463607f27c140b3a8c5542c74a2411d632eb6f25bab0b40a987a4",
+    "owner_address": "0x234f0be57d6acfb2f0f19c17053617311a8d03c9ce358bdf9cd5c460e4a02b7c",
+    "asset_type": "0xedc2704f2cef417a06d1756a04a16a9fa6faaed13af469be9cdfcac5a21a8e2e",
+    "is_primary": false,
+    "is_frozen": false,
+    "amount": "6184986629106",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v2"
+  },
+  {
+    "storage_id": "0x97325d3a5abbfe422b8dece076302efd20c0a2dc5c2a5b7954ba8cc203d2f08e",
+    "owner_address": "0x234f0be57d6acfb2f0f19c17053617311a8d03c9ce358bdf9cd5c460e4a02b7c",
+    "asset_type": "0xedc2704f2cef417a06d1756a04a16a9fa6faaed13af469be9cdfcac5a21a8e2e",
+    "is_primary": false,
+    "is_frozen": false,
+    "amount": "5880750526",
+    "last_transaction_timestamp": "2024-06-25T23:55:53",
+    "last_transaction_version": 999929475,
+    "token_standard": "v2"
+  }
+]

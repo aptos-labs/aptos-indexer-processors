@@ -1,0 +1,23 @@
+[
+  {
+    "public_key": "0x042f9041a53413f15777a369d4751e20d5009ef32b6625ab2cd41f97f2da49d84270a054f1b9c84d6961cc1f3d47d461c50005bfb26a82c358caa967000b81104c",
+    "public_key_type": "secp256k1_ecdsa",
+    "auth_key": "0x36f31938e6995bc4ef7d91ff0278520e4d5f66719d25288240783701f9fc2b8d",
+    "verified": true,
+    "last_transaction_version": 2200077800
+  },
+  {
+    "public_key": "0x1ea7665d2fe8fb111bf76df50ca1256d28513b51d32ff4644703cf5d3d3c7c1e",
+    "public_key_type": "ed25519",
+    "auth_key": "0x36f31938e6995bc4ef7d91ff0278520e4d5f66719d25288240783701f9fc2b8d",
+    "verified": true,
+    "last_transaction_version": 2200077800
+  },
+  {
+    "public_key": "0xeaba369227ebddfc4495a2cd741f5c04c7ed09da47acaf29ec50a806a3e882d3",
+    "public_key_type": "ed25519",
+    "auth_key": "0x36f31938e6995bc4ef7d91ff0278520e4d5f66719d25288240783701f9fc2b8d",
+    "verified": false,
+    "last_transaction_version": 2200077800
+  }
+]

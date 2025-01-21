@@ -3,7 +3,7 @@
 
 use crate::{
     config::IndexerGrpcHttp2Config,
-    db::common::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
+    db::postgres::models::{ledger_info::LedgerInfo, processor_status::ProcessorStatusQuery},
     gap_detectors::{
         create_gap_detector_status_tracker_loop, gap_detector::DefaultGapDetector,
         parquet_gap_detector::ParquetFileGapDetectorInner, GapDetector, ProcessingResult,
@@ -49,13 +49,13 @@ use crate::{
         database::{
             execute_with_better_error_conn, new_db_pool, run_pending_migrations, ArcDbPool,
         },
+        table_flags::TableFlags,
         util::{time_diff_since_pb_timestamp_in_secs, timestamp_to_iso, timestamp_to_unixtime},
     },
 };
 use ahash::AHashMap;
 use anyhow::{Context, Result};
 use aptos_moving_average::MovingAverage;
-use bitflags::bitflags;
 use kanal::AsyncSender;
 use std::{
     collections::HashSet,
@@ -64,67 +64,13 @@ use std::{
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 use url::Url;
+
 // this is how large the fetch queue should be. Each bucket should have a max of 80MB or so, so a batch
 // of 50 means that we could potentially have at least 4.8GB of data in memory at any given time and that we should provision
 // machines accordingly.
 
 pub const BUFFER_SIZE: usize = 300;
 pub const PROCESSOR_SERVICE_TYPE: &str = "processor";
-
-bitflags! {
-    #[derive(Debug, Clone, Copy)]
-    pub struct TableFlags: u64 {
-        const TRANSACTIONS = 1 << 0;
-        const WRITE_SET_CHANGES = 1 << 1;
-        const MOVE_RESOURCES = 1 << 2;
-        const TABLE_ITEMS = 1 << 3;
-        const TABLE_METADATAS = 1 << 4;
-        const MOVE_MODULES = 1 << 5;
-
-        // Fungible asset
-        const FUNGIBLE_ASSET_BALANCES = 1 << 6;
-        const CURRENT_FUNGIBLE_ASSET_BALANCES = 1 << 7;
-        const COIN_SUPPLY = 1 << 8;
-        const CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES = 1 << 24;
-
-        // Objects
-        const OBJECTS = 1 << 9;
-
-        // Ans
-        const CURRENT_ANS_LOOKUP = 1 << 10;
-        const CURRENT_ANS_PRIMARY_NAME = 1 << 11;
-        const ANS_PRIMARY_NAME_V2 = 1 << 12;
-        const ANS_LOOKUP = 1 << 13;
-        const ANS_PRIMARY_NAME = 1 << 14;
-
-        // Coin
-        const COIN_ACTIVITIES = 1 << 15;
-        const COIN_BALANCES = 1 << 16;
-        const CURRENT_COIN_BALANCES = 1 << 17;
-        const COIN_INFOS = 1 << 18;
-
-        // Token_v2 processor flags
-        const TOKEN_OWNERSHIPS_V2 = 1 << 19;
-        const TOKEN_DATAS_V2 = 1 << 20;
-        const COLLECTIONS_V2 = 1 << 21;
-        const CURRENT_TOKEN_V2_METADATA = 1 << 22;
-
-        // User transaction
-        const SIGNATURES = 1 << 23;
-    }
-}
-
-impl TableFlags {
-    pub fn from_set(set: &HashSet<String>) -> Self {
-        let mut flags = TableFlags::empty();
-        for table in set {
-            if let Some(flag) = TableFlags::from_name(table) {
-                flags |= flag;
-            }
-        }
-        flags
-    }
-}
 
 pub struct Worker {
     pub db_pool: ArcDbPool,
@@ -476,8 +422,8 @@ impl Worker {
                             .map(|t| t.version)
                             .unwrap_or_default();
                         let batch_last_txn_version = transactions_pb.end_version;
-                        let start_txn_timestamp = transactions_pb.start_txn_timestamp.clone();
-                        let end_txn_timestamp = transactions_pb.end_txn_timestamp.clone();
+                        let start_txn_timestamp = transactions_pb.start_txn_timestamp;
+                        let end_txn_timestamp = transactions_pb.end_txn_timestamp;
 
                         let start_txn_timestamp_unix = start_txn_timestamp
                             .as_ref()

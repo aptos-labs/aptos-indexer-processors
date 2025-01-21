@@ -7,7 +7,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::ans_models::{
+    db::postgres::models::ans_models::{
         ans_lookup::CurrentAnsPrimaryName,
         parquet_ans_lookup_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
     },
@@ -101,7 +101,7 @@ impl ProcessorTrait for ParquetAnsProcessor {
         end_version: u64,
         _db_chain_id: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
         let all_ans_primary_names_v2 = parse_ans(
@@ -124,7 +124,7 @@ impl ProcessorTrait for ParquetAnsProcessor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),
@@ -177,7 +177,7 @@ fn parse_ans(
             // 1. RenewNameEvents: helps to fill in metadata for name records with updated expiration time
             // 2. SetReverseLookupEvents: parse to get current_ans_primary_names
             for (event_index, event) in user_txn.events.iter().enumerate() {
-                if let Some((_, ans_lookup_v2)) =
+                if let Some((_, ans_primary_name_v2)) =
                     CurrentAnsPrimaryNameV2::parse_v2_primary_name_record_from_event(
                         event,
                         txn_version,
@@ -187,7 +187,7 @@ fn parse_ans(
                     )
                     .unwrap()
                 {
-                    all_ans_primary_names_v2.push(ans_lookup_v2);
+                    all_ans_primary_names_v2.push(ans_primary_name_v2);
                     transaction_version_to_struct_count
                         .entry(txn_version)
                         .and_modify(|e| *e += 1)

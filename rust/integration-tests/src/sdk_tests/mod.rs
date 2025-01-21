@@ -1,4 +1,4 @@
-use crate::diff_tests::remove_transaction_timestamp;
+use crate::diff_test_helper::remove_transaction_timestamp;
 use aptos_indexer_processor_sdk::traits::processor_trait::ProcessorTrait;
 use aptos_indexer_testing_framework::{
     database::{PostgresTestDatabase, TestDatabase},
@@ -7,15 +7,40 @@ use aptos_indexer_testing_framework::{
 use assert_json_diff::assert_json_eq;
 use diesel::{Connection, PgConnection};
 use serde_json::Value;
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
+#[cfg(test)]
+pub mod ans_processor_tests;
 
 #[cfg(test)]
 pub mod events_processor_tests;
 #[cfg(test)]
 pub mod fungible_asset_processor_tests;
+#[cfg(test)]
+pub mod token_v2_processor_tests;
+
+#[cfg(test)]
+pub mod account_transaction_processor_tests;
+
+#[cfg(test)]
+pub mod default_processor_tests;
+
+#[cfg(test)]
+pub mod objects_processor_tests;
+#[cfg(test)]
+pub mod stake_processor_tests;
+
+#[cfg(test)]
+pub mod account_restoration_processor_tests;
+#[cfg(test)]
+pub mod user_transaction_processor_tests;
 
 #[allow(dead_code)]
-pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files/";
+pub const DEFAULT_OUTPUT_FOLDER: &str = "sdk_expected_db_output_files";
 
 #[allow(dead_code)]
 pub fn read_and_parse_json(path: &str) -> anyhow::Result<Value> {
@@ -42,7 +67,10 @@ pub async fn setup_test_environment(
     let mut db = PostgresTestDatabase::new();
     db.setup().await.unwrap();
 
-    let test_context = SdkTestContext::new(transactions).await.unwrap();
+    let mut test_context = SdkTestContext::new(transactions);
+    if test_context.init_mock_grpc().await.is_err() {
+        panic!("Failed to initialize mock grpc");
+    };
 
     (db, test_context)
 }
@@ -53,13 +81,26 @@ pub fn validate_json(
     txn_version: u64,
     processor_name: &str,
     output_path: String,
+    file_name: Option<String>,
 ) -> anyhow::Result<()> {
     for (table_name, db_value) in db_values.iter_mut() {
-        // Generate the expected JSON file path for each table
-        let expected_file_path = Path::new(&output_path)
-            .join(processor_name)
-            .join(txn_version.to_string())
-            .join(format!("{}.json", table_name)); // File name format: processor_table_txnVersion.json
+        let expected_file_path = match file_name.clone() {
+            Some(custom_name) => {
+                PathBuf::from(&output_path)
+                    .join(processor_name)
+                    .join(custom_name.clone())
+                    .join(
+                        format!("{}.json", table_name), // Including table_name in the format
+                    )
+            },
+            None => {
+                // Default case: use table_name and txn_version to construct file name
+                Path::new(&output_path)
+                    .join(processor_name)
+                    .join(txn_version.to_string())
+                    .join(format!("{}.json", table_name)) // File name format: processor_table_txnVersion.json
+            },
+        };
 
         let mut expected_json = match read_and_parse_json(expected_file_path.to_str().unwrap()) {
             Ok(json) => json,
@@ -77,7 +118,10 @@ pub fn validate_json(
         remove_transaction_timestamp(db_value);
         remove_inserted_at(&mut expected_json);
         remove_transaction_timestamp(&mut expected_json);
-
+        println!(
+            "Diffing table: {}, diffing version: {}",
+            table_name, txn_version
+        );
         assert_json_eq!(db_value, expected_json);
     }
     Ok(())
@@ -90,7 +134,6 @@ pub async fn run_processor_test<F>(
     processor: impl ProcessorTrait,
     load_data: F,
     db_url: String,
-    txn_versions: Vec<i64>,
     generate_file_flag: bool,
     output_path: String,
     custom_file_name: Option<String>,
@@ -101,39 +144,39 @@ where
         + Sync
         + 'static,
 {
+    let txn_versions: Vec<i64> = test_context
+        .get_test_transaction_versions()
+        .into_iter()
+        .map(|v| v as i64)
+        .collect();
+
     let db_values = test_context
         .run(
             &processor,
-            txn_versions[0] as u64,
             generate_file_flag,
             output_path.clone(),
             custom_file_name,
             move || {
-                // TODO: might not need this.
-                let mut conn =
-                    PgConnection::establish(&db_url).expect("Failed to establish DB connection");
+                let mut conn = PgConnection::establish(&db_url).unwrap_or_else(|e| {
+                    eprintln!("[ERROR] Failed to establish DB connection: {:?}", e);
+                    panic!("Failed to establish DB connection: {:?}", e);
+                });
 
-                let starting_version = txn_versions[0];
-                let ending_version = txn_versions[txn_versions.len() - 1];
-
-                let db_values = match load_data(&mut conn, txn_versions) {
+                let db_values = match load_data(&mut conn, txn_versions.clone()) {
                     Ok(db_data) => db_data,
                     Err(e) => {
-                        eprintln!(
-                            "[ERROR] Failed to load data {}", e
-                        );
+                        eprintln!("[ERROR] Failed to load data {}", e);
                         return Err(e);
                     },
                 };
 
                 if db_values.is_empty() {
-                    eprintln!("[WARNING] No data found for starting txn version: {} and ending txn version {}", starting_version, ending_version);
+                    eprintln!("[WARNING] No data found for versions: {:?}", txn_versions);
                 }
 
                 Ok(db_values)
             },
         )
         .await?;
-
     Ok(db_values)
 }

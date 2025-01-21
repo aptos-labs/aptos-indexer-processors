@@ -3,17 +3,28 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::object_models::{
-        v2_object_utils::{ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata},
-        v2_objects::{CurrentObject, Object},
+    db::{
+        common::models::object_models::{
+            raw_v2_objects::{
+                CurrentObjectConvertible, ObjectConvertible, RawCurrentObject, RawObject,
+            },
+            v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+                Untransferable,
+            },
+        },
+        postgres::models::{
+            object_models::v2_objects::{CurrentObject, Object},
+            resources::FromWriteResource,
+        },
     },
     gap_detectors::ProcessingResult,
     schema,
     utils::{
-        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
-        util::standardize_address,
+        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool, DbContext},
+        table_flags::TableFlags,
+        util::{parse_timestamp, standardize_address},
     },
-    worker::TableFlags,
     IndexerGrpcProcessorConfig,
 };
 use ahash::AHashMap;
@@ -106,7 +117,7 @@ async fn insert_to_db(
     Ok(())
 }
 
-fn insert_objects_query(
+pub fn insert_objects_query(
     items_to_insert: Vec<Object>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -123,7 +134,7 @@ fn insert_objects_query(
     )
 }
 
-fn insert_current_objects_query(
+pub fn insert_current_objects_query(
     items_to_insert: Vec<CurrentObject>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
@@ -164,114 +175,31 @@ impl ProcessorTrait for ObjectsProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let processing_start = std::time::Instant::now();
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
-
-        let mut conn = self.get_conn().await;
+        let processing_start: std::time::Instant = std::time::Instant::now();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
+        let conn = self.get_conn().await;
         let query_retries = self.config.query_retries;
         let query_retry_delay_ms = self.config.query_retry_delay_ms;
 
-        // Moving object handling here because we need a single object
-        // map through transactions for lookups
-        let mut all_objects = vec![];
-        let mut all_current_objects = AHashMap::new();
-        let mut object_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
+        let db_connection = DbContext {
+            conn,
+            query_retries,
+            query_retry_delay_ms,
+        };
 
-        for txn in &transactions {
-            let txn_version = txn.version as i64;
-            let changes = &txn
-                .info
-                .as_ref()
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Transaction info doesn't exist! Transaction {}",
-                        txn_version
-                    )
-                })
-                .changes;
-
-            // First pass to get all the object cores
-            for wsc in changes.iter() {
-                if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                    let address = standardize_address(&wr.address.to_string());
-                    if let Some(object_with_metadata) =
-                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                    {
-                        // Object core is the first struct that we need to get
-                        object_metadata_helper.insert(address.clone(), ObjectAggregatedData {
-                            object: object_with_metadata,
-                            token: None,
-                            fungible_asset_store: None,
-                            // The following structs are unused in this processor
-                            fungible_asset_metadata: None,
-                            aptos_collection: None,
-                            fixed_supply: None,
-                            unlimited_supply: None,
-                            concurrent_supply: None,
-                            property_map: None,
-                            transfer_events: vec![],
-                            untransferable: None,
-                            fungible_asset_supply: None,
-                            concurrent_fungible_asset_supply: None,
-                            concurrent_fungible_asset_balance: None,
-                            token_identifier: None,
-                        });
-                    }
-                }
-            }
-
-            // Second pass to construct the object data
-            for (index, wsc) in changes.iter().enumerate() {
-                let index: i64 = index as i64;
-                match wsc.change.as_ref().unwrap() {
-                    Change::WriteResource(inner) => {
-                        if let Some((object, current_object)) = &Object::from_write_resource(
-                            inner,
-                            txn_version,
-                            index,
-                            &object_metadata_helper,
-                        )
-                        .unwrap()
-                        {
-                            all_objects.push(object.clone());
-                            all_current_objects
-                                .insert(object.object_address.clone(), current_object.clone());
-                        }
-                    },
-                    Change::DeleteResource(inner) => {
-                        // Passing all_current_objects into the function so that we can get the owner of the deleted
-                        // resource if it was handled in the same batch
-                        if let Some((object, current_object)) = Object::from_delete_resource(
-                            inner,
-                            txn_version,
-                            index,
-                            &all_current_objects,
-                            &mut conn,
-                            query_retries,
-                            query_retry_delay_ms,
-                        )
-                        .await
-                        .unwrap()
-                        {
-                            all_objects.push(object.clone());
-                            all_current_objects
-                                .insert(object.object_address.clone(), current_object.clone());
-                        }
-                    },
-                    _ => {},
-                };
-            }
-        }
-
-        // Sort by PK
-        let mut all_current_objects = all_current_objects
-            .into_values()
-            .collect::<Vec<CurrentObject>>();
-        all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
+        let (mut raw_all_objects, raw_all_current_objects) =
+            process_objects(transactions, &mut Some(db_connection)).await;
 
         if self.deprecated_tables.contains(TableFlags::OBJECTS) {
-            all_objects.clear();
+            raw_all_objects.clear();
         }
+
+        let postgres_objects: Vec<Object> =
+            raw_all_objects.into_iter().map(Object::from_raw).collect();
+        let postgres_current_objects: Vec<CurrentObject> = raw_all_current_objects
+            .into_iter()
+            .map(CurrentObject::from_raw)
+            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
@@ -281,7 +209,7 @@ impl ProcessorTrait for ObjectsProcessor {
             self.name(),
             start_version,
             end_version,
-            (&all_objects, &all_current_objects),
+            (&postgres_objects, &postgres_current_objects),
             &self.per_table_chunk_sizes,
         )
         .await;
@@ -313,4 +241,125 @@ impl ProcessorTrait for ObjectsProcessor {
     fn connection_pool(&self) -> &ArcDbPool {
         &self.connection_pool
     }
+}
+
+pub async fn process_objects(
+    transactions: Vec<Transaction>,
+    db_context: &mut Option<DbContext<'_>>,
+) -> (Vec<RawObject>, Vec<RawCurrentObject>) {
+    // Moving object handling here because we need a single object
+    // map through transactions for lookups
+    let mut all_objects = vec![];
+    let mut all_current_objects = AHashMap::new();
+    let mut object_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
+
+    for txn in &transactions {
+        let txn_version = txn.version as i64;
+        let changes = &txn
+            .info
+            .as_ref()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Transaction info doesn't exist! Transaction {}",
+                    txn_version
+                )
+            })
+            .changes;
+
+        let txn_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
+
+        // First pass to get all the object cores
+        for wsc in changes.iter() {
+            if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
+                let address = standardize_address(&wr.address.to_string());
+                if let Some(object_with_metadata) =
+                    ObjectWithMetadata::from_write_resource(wr).unwrap()
+                {
+                    // Object core is the first struct that we need to get
+                    object_metadata_helper.insert(address.clone(), ObjectAggregatedData {
+                        object: object_with_metadata,
+                        token: None,
+                        fungible_asset_store: None,
+                        // The following structs are unused in this processor
+                        fungible_asset_metadata: None,
+                        aptos_collection: None,
+                        fixed_supply: None,
+                        unlimited_supply: None,
+                        concurrent_supply: None,
+                        property_map: None,
+                        transfer_events: vec![],
+                        untransferable: None,
+                        fungible_asset_supply: None,
+                        concurrent_fungible_asset_supply: None,
+                        concurrent_fungible_asset_balance: None,
+                        token_identifier: None,
+                    });
+                }
+            }
+        }
+
+        // Second pass to get object metadata
+        for wsc in changes.iter() {
+            if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                let address = standardize_address(&write_resource.address.to_string());
+                if let Some(aggregated_data) = object_metadata_helper.get_mut(&address) {
+                    if let Some(untransferable) =
+                        Untransferable::from_write_resource(write_resource).unwrap()
+                    {
+                        aggregated_data.untransferable = Some(untransferable);
+                    }
+                }
+            }
+        }
+
+        // Second pass to construct the object data
+        for (index, wsc) in changes.iter().enumerate() {
+            let index: i64 = index as i64;
+            match wsc.change.as_ref().unwrap() {
+                Change::WriteResource(inner) => {
+                    if let Some((object, current_object)) = &RawObject::from_write_resource(
+                        inner,
+                        txn_version,
+                        index,
+                        &object_metadata_helper,
+                        txn_timestamp,
+                    )
+                    .unwrap()
+                    {
+                        all_objects.push(object.clone());
+                        all_current_objects
+                            .insert(object.object_address.clone(), current_object.clone());
+                    }
+                },
+                Change::DeleteResource(inner) => {
+                    // Passing all_current_objects into the function so that we can get the owner of the deleted
+                    // resource if it was handled in the same batch
+                    if let Some((object, current_object)) = RawObject::from_delete_resource(
+                        inner,
+                        txn_version,
+                        index,
+                        &all_current_objects,
+                        db_context,
+                        txn_timestamp,
+                    )
+                    .await
+                    .unwrap()
+                    {
+                        all_objects.push(object.clone());
+                        all_current_objects
+                            .insert(object.object_address.clone(), current_object.clone());
+                    }
+                },
+                _ => {},
+            };
+        }
+    }
+
+    // Sort by PK
+    let mut all_current_objects = all_current_objects
+        .into_values()
+        .collect::<Vec<RawCurrentObject>>();
+    all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
+
+    (all_objects, all_current_objects)
 }

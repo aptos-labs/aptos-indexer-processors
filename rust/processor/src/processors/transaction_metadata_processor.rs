@@ -3,7 +3,7 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::common::models::transaction_metadata_model::{
+    db::postgres::models::transaction_metadata_model::{
         event_size_info::EventSize, transaction_size_info::TransactionSize,
         write_set_size_info::WriteSetSize,
     },
@@ -205,7 +205,7 @@ impl ProcessorTrait for TransactionMetadataProcessor {
                     end_version,
                     processing_duration_in_secs,
                     db_insertion_duration_in_secs,
-                    last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
+                    last_transaction_timestamp: transactions.last().unwrap().timestamp,
                 },
             )),
             Err(e) => {

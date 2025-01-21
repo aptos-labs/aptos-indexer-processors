@@ -47,7 +47,7 @@ impl ProcessorTrait for MonitoringProcessor {
                 end_version,
                 processing_duration_in_secs: 0.0,
                 db_insertion_duration_in_secs: 0.0,
-                last_transaction_timestamp: transactions.last().unwrap().timestamp.clone(),
+                last_transaction_timestamp: transactions.last().unwrap().timestamp,
             },
         ))
     }

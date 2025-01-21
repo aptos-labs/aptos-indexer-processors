@@ -6,7 +6,7 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::default_models::{
+    db::parquet::models::default_models::{
         parquet_move_modules::MoveModule,
         parquet_move_resources::MoveResource,
         parquet_move_tables::TableItem,
@@ -150,12 +150,12 @@ impl ProcessorTrait for ParquetDefaultProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
 
         let (
             (move_resources, write_set_changes, transactions, table_items, move_modules),
             transaction_version_to_struct_count,
-        ) = tokio::task::spawn_blocking(move || process_transactions(transactions))
+        ) = tokio::task::spawn_blocking(move || process_transactions_parquet(transactions))
             .await
             .expect("Failed to spawn_blocking for TransactionModel::from_transactions");
 
@@ -200,7 +200,7 @@ impl ProcessorTrait for ParquetDefaultProcessor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),
@@ -213,7 +213,8 @@ impl ProcessorTrait for ParquetDefaultProcessor {
     }
 }
 
-pub fn process_transactions(
+// TODO: Remove transaction_version_to_struct_count after migration
+pub fn process_transactions_parquet(
     transactions: Vec<Transaction>,
 ) -> (
     (
@@ -226,11 +227,10 @@ pub fn process_transactions(
     AHashMap<i64, i64>,
 ) {
     let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
-    let (txns, _block_metadata_txns, write_set_changes, wsc_details) =
-        TransactionModel::from_transactions(
-            &transactions,
-            &mut transaction_version_to_struct_count,
-        );
+    let (txns, write_set_changes, wsc_details) = TransactionModel::from_transactions(
+        &transactions,
+        &mut transaction_version_to_struct_count,
+    );
 
     let mut move_modules = vec![];
     let mut move_resources = vec![];

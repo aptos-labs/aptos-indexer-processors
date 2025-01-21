@@ -7,13 +7,18 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::common::models::{
-        fungible_asset_models::{
-            parquet_coin_supply::CoinSupply,
-            parquet_v2_fungible_asset_balances::FungibleAssetBalance,
+    db::{
+        common::models::{
+            fungible_asset_models::raw_v2_fungible_asset_balances::{
+                FungibleAssetBalanceConvertible, RawFungibleAssetBalance,
+            },
+            object_models::v2_object_utils::{
+                ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+            },
         },
-        object_models::v2_object_utils::{
-            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        parquet::models::fungible_asset_models::parquet_v2_fungible_asset_balances::FungibleAssetBalance,
+        postgres::models::{
+            fungible_asset_models::parquet_coin_supply::CoinSupply, resources::FromWriteResource,
         },
     },
     gap_detectors::ProcessingResult,
@@ -112,10 +117,10 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
         end_version: u64,
         _: Option<u64>,
     ) -> anyhow::Result<ProcessingResult> {
-        let last_transaction_timestamp = transactions.last().unwrap().timestamp.clone();
+        let last_transaction_timestamp = transactions.last().unwrap().timestamp;
         let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
-        let (fungible_asset_balances, coin_supply) =
+        let (raw_fungible_asset_balances, coin_supply) =
             parse_v2_coin(&transactions, &mut transaction_version_to_struct_count).await;
 
         let parquet_coin_supply = ParquetDataGeneric { data: coin_supply };
@@ -124,6 +129,11 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
             .send(parquet_coin_supply)
             .await
             .map_err(|e| anyhow!("Failed to send to parquet manager: {}", e))?;
+
+        let fungible_asset_balances: Vec<FungibleAssetBalance> = raw_fungible_asset_balances
+            .into_iter()
+            .map(FungibleAssetBalance::from_raw)
+            .collect();
 
         let parquet_fungible_asset_balances = ParquetDataGeneric {
             data: fungible_asset_balances,
@@ -138,7 +148,7 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
             ParquetProcessingResult {
                 start_version: start_version as i64,
                 end_version: end_version as i64,
-                last_transaction_timestamp: last_transaction_timestamp.clone(),
+                last_transaction_timestamp,
                 txn_version_to_struct_count: Some(transaction_version_to_struct_count),
                 parquet_processed_structs: None,
                 table_name: "".to_string(),
@@ -154,7 +164,7 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
 async fn parse_v2_coin(
     transactions: &[Transaction],
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
-) -> (Vec<FungibleAssetBalance>, Vec<CoinSupply>) {
+) -> (Vec<RawFungibleAssetBalance>, Vec<CoinSupply>) {
     let mut fungible_asset_balances = vec![];
     let mut all_coin_supply = vec![];
 
@@ -177,9 +187,7 @@ async fn parse_v2_coin(
         // Need to do a first pass to get all the objects
         for wsc in transaction_info.changes.iter() {
             if let Change::WriteResource(wr) = wsc.change.as_ref().unwrap() {
-                if let Some(object) =
-                    ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
-                {
+                if let Some(object) = ObjectWithMetadata::from_write_resource(wr).unwrap() {
                     fungible_asset_object_helper.insert(
                         standardize_address(&wr.address.to_string()),
                         ObjectAggregatedData {
@@ -193,7 +201,7 @@ async fn parse_v2_coin(
 
         for (index, wsc) in transaction_info.changes.iter().enumerate() {
             if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                if let Some((balance, _, _)) = FungibleAssetBalance::get_v1_from_write_resource(
+                if let Some((balance, _, _)) = RawFungibleAssetBalance::get_v1_from_write_resource(
                     write_resource,
                     index as i64,
                     txn_version,
@@ -208,7 +216,7 @@ async fn parse_v2_coin(
                         .or_insert(1);
                 }
             } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap() {
-                if let Some((balance, _, _)) = FungibleAssetBalance::get_v1_from_delete_resource(
+                if let Some((balance, _, _)) = RawFungibleAssetBalance::get_v1_from_delete_resource(
                     delete_resource,
                     index as i64,
                     txn_version,
@@ -229,14 +237,13 @@ async fn parse_v2_coin(
         for (index, wsc) in transaction_info.changes.iter().enumerate() {
             match wsc.change.as_ref().unwrap() {
                 Change::WriteResource(write_resource) => {
-                    if let Some((balance, _)) = FungibleAssetBalance::get_v2_from_write_resource(
+                    if let Some((balance, _)) = RawFungibleAssetBalance::get_v2_from_write_resource(
                         write_resource,
                         index as i64,
                         txn_version,
                         txn_timestamp,
                         &fungible_asset_object_helper,
                     )
-                    .await
                     .unwrap_or_else(|e| {
                         tracing::error!(
                             transaction_version = txn_version,

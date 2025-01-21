@@ -17,7 +17,7 @@ on:
 
 jobs:
   Integration-tests:
-    runs-on: ubuntu-latest  # Ensure the correct runner is used
+    runs-on: runs-on,runner=2cpu-linux-x64,run-id=${{ github.run_id }}
 
     steps:
       - name: Checkout code
@@ -53,18 +53,59 @@ jobs:
       # Show Cargo.toml after the update
       - name: Show Cargo.toml After Update
         run: cat rust/Cargo.toml  # Correct path to the Cargo.toml file
-
+          
       # Ensure Cargo.lock is updated with the latest dependencies
-      - name: Update Dependencies
-        run: cargo update
+      - name: rust setup
+        run: |
+          sudo apt update && sudo apt install libdw-dev
+          cargo update
         working-directory: rust
 
-      - name: Install Dependencies and Run Linter
-        uses: ./.github/actions/dep_install_and_lint
+      # Cache Cargo
+      - name: Cache cargo
+        uses: actions/cache@v4
         with:
-          working-directory: rust
-
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
       # Run Integration Tests
       - name: Run Integration Tests
-        run: cargo test --manifest-path integration-tests/Cargo.toml
-        working-directory: rust
+        id: tests
+        continue-on-error: true
+        run: |
+          # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
+          cargo test sdk_tests -- --nocapture
+        working-directory: rust/integration-tests
+
+      # Run all Tests
+      - name: Run Sanity Tests
+        id: sanity-check
+        continue-on-error: true
+        run: |
+          cargo test regression_tests -- --nocapture
+        working-directory: rust/integration-tests
+      
+      - name: Fail if tests fail
+        if: ${{ steps.sanity-check.outcome == 'failure' && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update') }}
+        run: |
+          echo "Integration failed"
+          exit 1
+
+      - name: Send Slack Notification to oncall
+        if: ${{ steps.sanity-check.outcome == 'failure' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update') }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          # eco-infra-oncall channel.
+          channel-id: 'C0468USBLQJ'
+          slack-message: |
+            :warning: Tests failed on PR with indexer-sdk-update label
+            PR: ${{ github.event.pull_request.html_url }}
+            Author: ${{ github.event.pull_request.user.login }}
+            Title: ${{ github.event.pull_request.title }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
