@@ -39,6 +39,7 @@ pub type CoinType = String;
 // Primary key of the current_coin_balances table, i.e. (owner_address, coin_type)
 pub type CurrentCoinBalancePK = (OwnerAddress, CoinType);
 pub type EventToCoinType = AHashMap<EventGuidResource, CoinType>;
+pub type AddressToCoinType = AHashMap<String, String>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RawFungibleAssetActivity {
@@ -149,6 +150,7 @@ impl RawFungibleAssetActivity {
         entry_function_id_str: &Option<String>,
         event_to_coin_type: &EventToCoinType,
         event_index: i64,
+        address_to_coin_type: &AddressToCoinType,
     ) -> anyhow::Result<Option<Self>> {
         if let Some(inner) =
             CoinEvent::from_event(event.type_str.as_str(), &event.data, txn_version)?
@@ -185,14 +187,23 @@ impl RawFungibleAssetActivity {
                 };
                 // Given this mapping only contains coin type < 1000 length, we should not assume that the mapping exists.
                 // If it doesn't exist, skip.
+                // First try to get from event_to_coin_type mapping
                 match event_to_coin_type.get(&event_move_guid) {
                     Some(coin_type) => coin_type.clone(),
                     None => {
-                        tracing::warn!(
-                        "Could not find event in resources (CoinStore), version: {}, event guid: {:?}, mapping: {:?}",
-                        txn_version, event_move_guid, event_to_coin_type
-                    );
-                        return Ok(None);
+                        // If not found, try to get from address_to_coin_type mapping
+                        // This is temporary until we have a way to get the coin type from a new event
+                        match address_to_coin_type.get(&event_move_guid.addr) {
+                            Some(coin_type) => coin_type.clone(),
+                            None => {
+                                tracing::warn!(
+                                    "Could not find coin type from either event or address mapping, version: {}, event guid: {:?}",
+                                    txn_version,
+                                    event_move_guid
+                                );
+                                return Ok(None);
+                            },
+                        }
                     },
                 }
             };
