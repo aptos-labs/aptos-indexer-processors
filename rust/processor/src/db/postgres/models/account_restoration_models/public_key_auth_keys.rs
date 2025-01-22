@@ -5,6 +5,7 @@ use crate::schema::public_key_auth_keys::{self};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// Represents a row in the `public_key_auth_keys` table, mapping a single public key to the
 /// multi-key `auth_key` it is part of. This relationship can be many-to-many: a single `public_key`
 /// may map to multiple `auth_key` values (if used in different multi-key contexts),
