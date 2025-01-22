@@ -3,7 +3,7 @@
     "transaction_version": 5992795934,
     "event_index": -1,
     "owner_address": "0xd34ea8c6faa9d25a9f07504759c1d92bd5ad05af89062d57cf69dd4861fe3e3c",
-    "storage_id": "0x5120dc6832daa352228ba75c1e7e73f57a80b608c900a7060382516a5c035f20",
+    "storage_id": "0xf09710fcbf8de0c02a244b7523c59789eab9c69d5f3b13a6cecbf1127edc7698",
     "asset_type": "0x1::aptos_coin::AptosCoin",
     "is_frozen": null,
     "amount": "1200",
