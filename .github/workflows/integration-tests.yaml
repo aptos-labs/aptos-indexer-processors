@@ -76,7 +76,6 @@ jobs:
       # Run Integration Tests
       - name: Run Integration Tests
         id: tests
-        continue-on-error: true
         run: |
           # TODO: until we have more comprehensive cli parsers, we will need to run tests separately.
           cargo test sdk_tests -- --nocapture
