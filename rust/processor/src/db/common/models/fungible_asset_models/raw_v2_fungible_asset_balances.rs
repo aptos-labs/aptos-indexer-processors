@@ -366,7 +366,7 @@ impl RawFungibleAssetBalance {
                 };
                 // Create address to coin type mapping
                 let mut address_to_coin_type = AHashMap::new();
-                address_to_coin_type.insert(owner_address.clone(), coin_type.clone());
+                address_to_coin_type.extend([(owner_address.clone(), coin_type.clone())]);
                 return Ok(Some((
                     coin_balance,
                     current_coin_balance,
