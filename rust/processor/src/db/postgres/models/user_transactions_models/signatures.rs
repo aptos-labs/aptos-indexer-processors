@@ -9,7 +9,15 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
-    account_signature::Signature as AccountSignatureEnum, any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb}, signature::Signature as SignatureEnum, AbstractionSignature as AbstractionSignaturePb, AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature, MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb, Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb, SingleSender as SingleSenderPb
+    account_signature::Signature as AccountSignatureEnum,
+    any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb},
+    signature::Signature as SignatureEnum,
+    AbstractionSignature as AbstractionSignaturePb, AccountSignature as ProtoAccountSignature,
+    Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature,
+    MultiAgentSignature as ProtoMultiAgentSignature,
+    MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
+    Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
+    SingleSender as SingleSenderPb,
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -105,12 +113,9 @@ impl Signature {
                     AccountSignatureEnum::MultiKeySignature(_) => {
                         String::from("multi_key_signature")
                     },
-                    AccountSignatureEnum::Abstraction(_) => {
-                        String::from("abstraction_signature")
-                    }
+                    AccountSignatureEnum::Abstraction(_) => String::from("abstraction_signature"),
                 }
             },
-
         }
     }
 
@@ -310,7 +315,7 @@ impl Signature {
         // Skip parsing if unknow signagure is found.
         if s.signature.as_ref().is_none() {
             warn!(
-                transaction_version=transaction_version,
+                transaction_version = transaction_version,
                 "Unknown signature is found!"
             );
             return vec![];
@@ -357,18 +362,16 @@ impl Signature {
                 override_address,
             ),
             AccountSignatureEnum::Abstraction(sig) => {
-                vec![
-                    Self::parse_abstraction_signature(
-                        sig,
-                        sender,
-                        transaction_version,
-                        transaction_block_height,
-                        is_sender_primary,
-                        multi_agent_index,
-                        override_address,
-                    )
-                ]
-            }
+                vec![Self::parse_abstraction_signature(
+                    sig,
+                    sender,
+                    transaction_version,
+                    transaction_block_height,
+                    is_sender_primary,
+                    multi_agent_index,
+                    override_address,
+                )]
+            },
         }
     }
 

@@ -9,11 +9,11 @@ use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum,
     any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb},
     signature::Signature as SignatureEnum,
-    AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
-    FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
+    AbstractionSignature as AbstractionSignaturePb, AccountSignature as ProtoAccountSignature,
+    Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature,
+    MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
     Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
-    AbstractionSignature as AbstractionSignaturePb, 
     SingleSender as SingleSenderPb,
 };
 use serde::{Deserialize, Serialize};
@@ -301,7 +301,8 @@ impl Signature {
         if s.signature.is_none() {
             warn!(
                 transaction_version = transaction_version,
-                "Transaction signature is unknown");
+                "Transaction signature is unknown"
+            );
             return vec![];
         }
         let signature = s.signature.as_ref().unwrap();
@@ -588,15 +589,17 @@ impl Signature {
                 0,
                 None,
             ),
-            Some(AccountSignatureEnum::Abstraction(sig)) => vec![Self::parse_abstraction_signature(
-                sig,
-                sender,
-                transaction_version,
-                transaction_block_height,
-                true,
-                0,
-                None,
-            )],
+            Some(AccountSignatureEnum::Abstraction(sig)) => {
+                vec![Self::parse_abstraction_signature(
+                    sig,
+                    sender,
+                    transaction_version,
+                    transaction_block_height,
+                    true,
+                    0,
+                    None,
+                )]
+            },
             None => vec![],
         }
     }
