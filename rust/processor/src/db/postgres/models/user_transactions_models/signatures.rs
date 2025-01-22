@@ -12,9 +12,8 @@ use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum,
     any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb},
     signature::Signature as SignatureEnum,
-    AbstractionSignature as AbstractionSignaturePb, AccountSignature as ProtoAccountSignature,
-    Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature,
-    MultiAgentSignature as ProtoMultiAgentSignature,
+    AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
+    FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
     Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
     SingleSender as SingleSenderPb,
@@ -93,7 +92,14 @@ impl Signature {
         }
     }
 
-    pub fn get_signature_type(t: &TransactionSignaturePb) -> String {
+    pub fn get_signature_type(t: &TransactionSignaturePb, transaction_version: i64) -> String {
+        if t.signature.as_ref().is_none() {
+            warn!(
+                transaction_version = transaction_version,
+                "Transaction signature is unknown"
+            );
+            return String::from("unknown");
+        }
         match t.signature.as_ref().unwrap() {
             SignatureEnum::Ed25519(_) => String::from("ed25519_signature"),
             SignatureEnum::MultiEd25519(_) => String::from("multi_ed25519_signature"),
@@ -162,7 +168,6 @@ impl Signature {
     }
 
     fn parse_abstraction_signature(
-        _s: &AbstractionSignaturePb,
         sender: &String,
         transaction_version: i64,
         transaction_block_height: i64,
@@ -361,9 +366,8 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
-            AccountSignatureEnum::Abstraction(sig) => {
+            AccountSignatureEnum::Abstraction(_sig) => {
                 vec![Self::parse_abstraction_signature(
-                    sig,
                     sender,
                     transaction_version,
                     transaction_block_height,
@@ -622,8 +626,7 @@ impl Signature {
                 0,
                 None,
             ),
-            Some(AccountSignatureEnum::Abstraction(s)) => vec![Self::parse_abstraction_signature(
-                s,
+            Some(AccountSignatureEnum::Abstraction(_s)) => vec![Self::parse_abstraction_signature(
                 sender,
                 transaction_version,
                 transaction_block_height,

@@ -254,7 +254,7 @@ impl SignatureInfo {
         }
     }
 
-    fn from_transaction_signature(signature: &Signature) -> Option<Self> {
+    fn from_transaction_signature(signature: &Signature, transaction_version: i64) -> Option<Self> {
         let info = match signature {
             Signature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
             Signature::MultiEd25519(sigs) => {
@@ -267,7 +267,10 @@ impl SignatureInfo {
             Signature::SingleSender(single_sender) => {
                 let account_signature = single_sender.sender.as_ref().unwrap();
                 if account_signature.signature.is_none() {
-                    warn!("Transaction signature is unknown");
+                    warn!(
+                        transaction_version = transaction_version,
+                        "Transaction signature is unknown"
+                    );
                     return None;
                 }
                 let signature_info = match account_signature.signature.as_ref().unwrap() {
@@ -327,6 +330,7 @@ pub fn parse_account_restoration_models_from_transaction(
         TxnData::User(user_txn) => user_txn,
         _ => return None,
     };
+    let txn_version = txn.version as i64;
     let address = user_txn.request.as_ref()?.sender.clone();
     let signature_info = SignatureInfo::from_transaction_signature(
         user_txn
@@ -336,9 +340,9 @@ pub fn parse_account_restoration_models_from_transaction(
             .as_ref()?
             .signature
             .as_ref()?,
+        txn_version,
     )?;
     let auth_key = signature_info.auth_key().unwrap_or_default();
-    let txn_version = txn.version as i64;
 
     let auth_key_account_address = AuthKeyAccountAddress {
         auth_key: auth_key.clone(),

@@ -9,9 +9,8 @@ use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum,
     any_signature::{SignatureVariant, Type as AnySignatureTypeEnumPb},
     signature::Signature as SignatureEnum,
-    AbstractionSignature as AbstractionSignaturePb, AccountSignature as ProtoAccountSignature,
-    Ed25519Signature as Ed25519SignaturePB, FeePayerSignature as ProtoFeePayerSignature,
-    MultiAgentSignature as ProtoMultiAgentSignature,
+    AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
+    FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as MultiEd25519SignaturePb, MultiKeySignature as MultiKeySignaturePb,
     Signature as TransactionSignaturePb, SingleKeySignature as SingleKeySignaturePb,
     SingleSender as SingleSenderPb,
@@ -81,9 +80,12 @@ impl Signature {
         }
     }
 
-    pub fn get_signature_type(t: &TransactionSignaturePb) -> String {
+    pub fn get_signature_type(t: &TransactionSignaturePb, transaction_version: i64) -> String {
         if t.signature.is_none() {
-            warn!("Transaction signature is unknown");
+            warn!(
+                transaction_version = transaction_version,
+                "Transaction signature is unknown"
+            );
             return String::from("unknown");
         }
         match t.signature.as_ref().unwrap() {
@@ -94,7 +96,10 @@ impl Signature {
             SignatureEnum::SingleSender(sender) => {
                 let account_signature = sender.sender.as_ref().unwrap();
                 if account_signature.signature.is_none() {
-                    warn!("Transaction signature is unknown");
+                    warn!(
+                        transaction_version = transaction_version,
+                        "Transaction signature is unknown"
+                    );
                     return String::from("unknown");
                 }
                 let signature = account_signature.signature.as_ref().unwrap();
@@ -157,7 +162,6 @@ impl Signature {
     }
 
     fn parse_abstraction_signature(
-        _s: &AbstractionSignaturePb,
         sender: &String,
         transaction_version: i64,
         transaction_block_height: i64,
@@ -345,8 +349,7 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
-            AccountSignatureEnum::Abstraction(sig) => vec![Self::parse_abstraction_signature(
-                sig,
+            AccountSignatureEnum::Abstraction(_sig) => vec![Self::parse_abstraction_signature(
                 sender,
                 transaction_version,
                 transaction_block_height,
@@ -546,7 +549,10 @@ impl Signature {
         transaction_block_height: i64,
     ) -> Vec<Self> {
         if s.sender.is_none() {
-            warn!("Transaction signature is unknown");
+            warn!(
+                transaction_version = transaction_version,
+                "Transaction signature is unknown"
+            );
             return vec![];
         }
         let signature = s.sender.as_ref().unwrap();
@@ -589,9 +595,8 @@ impl Signature {
                 0,
                 None,
             ),
-            Some(AccountSignatureEnum::Abstraction(sig)) => {
+            Some(AccountSignatureEnum::Abstraction(_sig)) => {
                 vec![Self::parse_abstraction_signature(
-                    sig,
                     sender,
                     transaction_version,
                     transaction_block_height,
