@@ -180,7 +180,7 @@ pub trait CurrentUnifiedFungibleAssetBalanceConvertible {
     fn from_raw(raw_item: RawCurrentUnifiedFungibleAssetBalance) -> Self;
 }
 
-fn get_paired_metadata_address(coin_type_name: &str) -> String {
+pub fn get_paired_metadata_address(coin_type_name: &str) -> String {
     if coin_type_name == APTOS_COIN_TYPE_STR {
         APT_METADATA_ADDRESS_HEX.clone()
     } else {
@@ -203,42 +203,60 @@ pub fn get_primary_fungible_store_address(
 
 impl From<&RawCurrentFungibleAssetBalance> for RawCurrentUnifiedFungibleAssetBalance {
     fn from(cfab: &RawCurrentFungibleAssetBalance) -> Self {
-        if cfab.token_standard.as_str() == V2_STANDARD.borrow().as_str() {
-            let asset_type_v2 = cfab.asset_type.clone();
-            Self {
-                storage_id: cfab.storage_id.clone(),
-                owner_address: cfab.owner_address.clone(),
-                asset_type_v2: Some(asset_type_v2.clone()),
-                asset_type_v1: METADATA_TO_COIN_TYPE_MAPPING
-                    .get(asset_type_v2.as_str())
-                    .map(|s| s.to_string()),
-                is_primary: cfab.is_primary,
-                is_frozen: cfab.is_frozen,
-                amount_v1: None,
-                amount_v2: Some(cfab.amount.clone()),
-                last_transaction_version_v1: None,
-                last_transaction_version_v2: Some(cfab.last_transaction_version),
-                last_transaction_timestamp_v1: None,
-                last_transaction_timestamp_v2: Some(cfab.last_transaction_timestamp),
-            }
+        // Determine if this is a V2 token standard
+        let is_v2 = cfab.token_standard.as_str() == V2_STANDARD.borrow().as_str();
+
+        // For V2 tokens, asset_type_v2 is the original asset type
+        // For V1 tokens, asset_type_v2 is None
+        let asset_type_v2 = is_v2.then(|| cfab.asset_type.clone());
+
+        // For V2 tokens, look up V1 equivalent in mapping
+        // For V1 tokens, use original asset type
+        let asset_type_v1 = if is_v2 {
+            METADATA_TO_COIN_TYPE_MAPPING
+                .get(cfab.asset_type.as_str())
+                .map(|s| s.to_string())
         } else {
-            let metadata_addr = get_paired_metadata_address(&cfab.asset_type);
-            let pfs_addr = get_primary_fungible_store_address(&cfab.owner_address, &metadata_addr)
-                .expect("calculate pfs_address failed");
-            Self {
-                storage_id: pfs_addr,
-                owner_address: cfab.owner_address.clone(),
-                asset_type_v2: None,
-                asset_type_v1: Some(cfab.asset_type.clone()),
-                is_primary: true,
-                is_frozen: cfab.is_frozen,
-                amount_v1: Some(cfab.amount.clone()),
-                amount_v2: None,
-                last_transaction_version_v1: Some(cfab.last_transaction_version),
-                last_transaction_version_v2: None,
-                last_transaction_timestamp_v1: Some(cfab.last_transaction_timestamp),
-                last_transaction_timestamp_v2: None,
-            }
+            Some(cfab.asset_type.clone())
+        };
+
+        // V1 tokens are always primary, V2 tokens use the stored value
+        let is_primary = if is_v2 { cfab.is_primary } else { true };
+
+        // Amount and transaction details are stored in v1 or v2 fields based on token standard
+        let (amount_v1, amount_v2, version_v1, version_v2, timestamp_v1, timestamp_v2) = if is_v2 {
+            (
+                None,
+                Some(cfab.amount.clone()),
+                None,
+                Some(cfab.last_transaction_version),
+                None,
+                Some(cfab.last_transaction_timestamp),
+            )
+        } else {
+            (
+                Some(cfab.amount.clone()),
+                None,
+                Some(cfab.last_transaction_version),
+                None,
+                Some(cfab.last_transaction_timestamp),
+                None,
+            )
+        };
+
+        Self {
+            storage_id: cfab.storage_id.clone(),
+            owner_address: cfab.owner_address.clone(),
+            asset_type_v1,
+            asset_type_v2,
+            is_primary,
+            is_frozen: cfab.is_frozen,
+            amount_v1,
+            amount_v2,
+            last_transaction_version_v1: version_v1,
+            last_transaction_version_v2: version_v2,
+            last_transaction_timestamp_v1: timestamp_v1,
+            last_transaction_timestamp_v2: timestamp_v2,
         }
     }
 }
@@ -318,8 +336,10 @@ impl RawFungibleAssetBalance {
             );
             if let Some(coin_type) = coin_info_type.get_coin_type_below_max() {
                 let owner_address = standardize_address(delete_resource.address.as_str());
-                let storage_id =
-                    CoinInfoType::get_storage_id(coin_type.as_str(), owner_address.as_str());
+                // Storage id should be derived (for the FA migration)
+                let metadata_addr = get_paired_metadata_address(&coin_type);
+                let storage_id = get_primary_fungible_store_address(&owner_address, &metadata_addr)
+                    .expect("calculate primary fungible store failed");
                 let coin_balance = Self {
                     transaction_version: txn_version,
                     write_set_change_index,
@@ -372,8 +392,10 @@ impl RawFungibleAssetBalance {
             );
             if let Some(coin_type) = coin_info_type.get_coin_type_below_max() {
                 let owner_address = standardize_address(write_resource.address.as_str());
-                let storage_id =
-                    CoinInfoType::get_storage_id(coin_type.as_str(), owner_address.as_str());
+                // Storage id should be derived (for the FA migration)
+                let metadata_addr = get_paired_metadata_address(&coin_type);
+                let storage_id = get_primary_fungible_store_address(&owner_address, &metadata_addr)
+                    .expect("calculate primary fungible store failed");
                 let coin_balance = Self {
                     transaction_version: txn_version,
                     write_set_change_index,

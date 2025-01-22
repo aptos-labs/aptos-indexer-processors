@@ -219,13 +219,6 @@ impl CoinInfoType {
         hash_str(&self.coin_type.to_string())
     }
 
-    /// This function gets the hash of the owner address and the coin type, similar to
-    /// how token v2 gets the named object address for the fungible asset store.
-    pub fn get_storage_id(coin_type: &str, owner_address: &str) -> String {
-        let key = format!("{}::{}", owner_address, coin_type);
-        format!("0x{}", hash_str(&key))
-    }
-
     pub fn get_coin_type_trunc(&self) -> String {
         truncate_str(&self.coin_type, COIN_TYPE_HASH_LENGTH)
     }
