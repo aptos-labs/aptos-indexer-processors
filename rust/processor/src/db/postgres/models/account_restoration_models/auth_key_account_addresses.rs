@@ -5,6 +5,7 @@ use crate::schema::auth_key_account_addresses::{self};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// Represents a row in the `auth_key_account_addresses` table, which associates
 /// an authentication key with the corresponding account address.
 /// This mapping helps to track account address rotations by enabling discovery of the address

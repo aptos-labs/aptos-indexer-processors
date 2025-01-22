@@ -1,5 +1,5 @@
 use crate::models::fa_v2_models::{
-    CoinSupply, CurrentFungibleAssetBalance, FungibleAssetActivity, FungibleAssetBalance,
+    CoinSupply, CurrentUnifiedFungibleAssetBalance, FungibleAssetActivity, FungibleAssetBalance,
     FungibleAssetMetadataModel,
 };
 use anyhow::Result;
@@ -9,7 +9,7 @@ use diesel::{
     ExpressionMethods, RunQueryDsl,
 };
 use processor::schema::{
-    coin_supply::dsl as cs_dsl, current_fungible_asset_balances_legacy::dsl as cfab_dsl,
+    coin_supply::dsl as cs_dsl, current_fungible_asset_balances::dsl as cfab_dsl,
     fungible_asset_activities::dsl as faa_dsl, fungible_asset_balances::dsl as fab_dsl,
     fungible_asset_metadata::dsl as fam_dsl,
 };
@@ -59,10 +59,10 @@ pub fn load_data(
         serde_json::from_str(&fungible_asset_balances_json)?,
     );
 
-    let current_fungible_asset_balances_result = cfab_dsl::current_fungible_asset_balances_legacy
+    let current_fungible_asset_balances_result = cfab_dsl::current_fungible_asset_balances
         .filter(cfab_dsl::last_transaction_version.eq_any(&txn_versions))
-        .then_order_by(cfab_dsl::last_transaction_version.asc())
-        .load::<CurrentFungibleAssetBalance>(conn);
+        .then_order_by(cfab_dsl::storage_id.asc())
+        .load::<CurrentUnifiedFungibleAssetBalance>(conn);
     let all_current_fungible_asset_balances = current_fungible_asset_balances_result?;
     let current_fungible_asset_balances_json =
         serde_json::to_string_pretty(&all_current_fungible_asset_balances)?;

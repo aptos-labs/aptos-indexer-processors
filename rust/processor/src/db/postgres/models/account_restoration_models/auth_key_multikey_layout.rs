@@ -5,6 +5,7 @@ use crate::schema::auth_key_multikey_layout::{self};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// Represents a row in the `auth_key_multikey_layout` table, describing the composition of a multi-key
 /// authentication key (e.g., a set of public keys, their types and prefixes, and the signature threshold).
 /// This information is essential for reconstructing multi-key transaction authenticators.
