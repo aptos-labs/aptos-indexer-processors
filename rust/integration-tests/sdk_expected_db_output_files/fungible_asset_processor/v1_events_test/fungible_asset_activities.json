@@ -3,7 +3,7 @@
     "transaction_version": 508365567,
     "event_index": -1,
     "owner_address": "0xc8af29debf02369958769a77388c84a3040b9ffe9ba1f82c1c9f5c6dcb61030e",
-    "storage_id": "0x47d0667a73feb419078a317784f803b7daebd3f6150c783cf3cfd194b966cc15",
+    "storage_id": "0xaca1597fc6ce44af235deb562591c7ce90a13b50b0f55022434d8db61edc8e74",
     "asset_type": "0x1::aptos_coin::AptosCoin",
     "is_frozen": null,
     "amount": "67600",
