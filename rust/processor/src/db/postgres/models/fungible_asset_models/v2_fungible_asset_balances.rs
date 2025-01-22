@@ -178,7 +178,6 @@ impl CurrentFungibleAssetBalanceConvertible for CurrentFungibleAssetBalance {
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Default)]
 #[diesel(primary_key(storage_id))]
 #[diesel(table_name = current_fungible_asset_balances)]
-#[diesel(treat_none_as_null = true)]
 pub struct CurrentUnifiedFungibleAssetBalance {
     pub storage_id: String,
     pub owner_address: String,
