@@ -50,6 +50,7 @@ mod sdk_fungible_asset_processor_tests {
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
         IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
         IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
         IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
@@ -57,7 +58,6 @@ mod sdk_fungible_asset_processor_tests {
         IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
         IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
         IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
-        IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::fungible_asset_processor::FungibleAssetProcessor;
