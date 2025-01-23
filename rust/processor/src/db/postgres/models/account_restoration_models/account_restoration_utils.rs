@@ -12,6 +12,7 @@ use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignature, signature::Signature, transaction::TxnData,
     Transaction,
 };
+use tracing::warn;
 
 trait AuthKeyScheme {
     const SCHEME: u8;
@@ -253,7 +254,7 @@ impl SignatureInfo {
         }
     }
 
-    fn from_transaction_signature(signature: &Signature) -> Option<Self> {
+    fn from_transaction_signature(signature: &Signature, transaction_version: i64) -> Option<Self> {
         let info = match signature {
             Signature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
             Signature::MultiEd25519(sigs) => {
@@ -265,7 +266,13 @@ impl SignatureInfo {
             },
             Signature::SingleSender(single_sender) => {
                 let account_signature = single_sender.sender.as_ref().unwrap();
-
+                if account_signature.signature.is_none() {
+                    warn!(
+                        transaction_version = transaction_version,
+                        "Transaction signature is unknown"
+                    );
+                    return None;
+                }
                 let signature_info = match account_signature.signature.as_ref().unwrap() {
                     AccountSignature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
                     AccountSignature::MultiEd25519(sigs) => {
@@ -301,6 +308,7 @@ impl SignatureInfo {
                             .collect::<Vec<_>>();
                         Self::multi_key(threshold, prefixes, public_keys, verified)
                     },
+                    AccountSignature::Abstraction(_sig) => return None,
                 };
                 signature_info
             },
@@ -322,6 +330,7 @@ pub fn parse_account_restoration_models_from_transaction(
         TxnData::User(user_txn) => user_txn,
         _ => return None,
     };
+    let txn_version = txn.version as i64;
     let address = user_txn.request.as_ref()?.sender.clone();
     let signature_info = SignatureInfo::from_transaction_signature(
         user_txn
@@ -331,9 +340,9 @@ pub fn parse_account_restoration_models_from_transaction(
             .as_ref()?
             .signature
             .as_ref()?,
+        txn_version,
     )?;
     let auth_key = signature_info.auth_key().unwrap_or_default();
-    let txn_version = txn.version as i64;
 
     let auth_key_account_address = AuthKeyAccountAddress {
         auth_key: auth_key.clone(),

@@ -67,7 +67,7 @@ impl UserTransaction {
                     .unwrap()
                     .signature
                     .as_ref()
-                    .map(Signature::get_signature_type)
+                    .map(|sig| Signature::get_signature_type(sig, version))
                     .unwrap_or_default(),
                 sender: standardize_address(&user_request.sender),
                 sequence_number: user_request.sequence_number as i64,
