@@ -571,7 +571,11 @@ pub async fn parse_v2_coin(
             // This is because v1 events (deposit/withdraw) don't have coin type so the only way is to match
             // the event to the resource using the event guid
             let mut event_to_v1_coin_type: EventToCoinType = AHashMap::new();
-
+            // When coinstore is deleted we have no way of getting the mapping but hoping that there is
+            // only 1 coinstore deletion by owner address. This is a mapping between owner address and deleted coin type
+            // This is not ideal as we're assuming that there is only 1 coinstore deletion by owner address, this should be
+            // replaced by an event (although we still need to keep this mapping because blockchain)
+            let mut address_to_deleted_coin_type: AHashMap<String, String> = AHashMap::new();
             // Loop 1: to get all object addresses
             // Need to do a first pass to get all the object addresses and insert them into the helper
             for wsc in transaction_info.changes.iter() {
@@ -648,7 +652,7 @@ pub async fn parse_v2_coin(
                     }
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
-                    if let Some((balance, current_balance, event_to_coin)) =
+                    if let Some((balance, current_balance, single_deleted_coin_type)) =
                         RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
@@ -660,7 +664,7 @@ pub async fn parse_v2_coin(
                         fungible_asset_balances.push(balance);
                         current_fungible_asset_balances
                             .insert(current_balance.storage_id.clone(), current_balance.clone());
-                        event_to_v1_coin_type.extend(event_to_coin);
+                        address_to_deleted_coin_type.extend(single_deleted_coin_type);
                     }
                 }
             }
@@ -693,6 +697,7 @@ pub async fn parse_v2_coin(
                     &entry_function_id_str,
                     &event_to_v1_coin_type,
                     index as i64,
+                    &address_to_deleted_coin_type,
                 )
                 .unwrap_or_else(|e| {
                     tracing::error!(

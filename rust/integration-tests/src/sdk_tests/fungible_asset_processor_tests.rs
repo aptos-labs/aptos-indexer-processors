@@ -50,6 +50,7 @@ mod sdk_fungible_asset_processor_tests {
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
         IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
         IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
         IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
@@ -162,6 +163,15 @@ mod sdk_fungible_asset_processor_tests {
         process_single_testnet_fa_txns(
             IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
             Some("coin_v2_events".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_coin_store_deletion_no_event() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
+            Some("coin_store_deletion_no_event".to_string()),
         )
         .await;
     }

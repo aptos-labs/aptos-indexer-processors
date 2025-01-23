@@ -5,6 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
+use super::raw_v2_fungible_asset_activities::AddressToCoinType;
 use crate::{
     db::{
         common::models::{
@@ -324,7 +325,7 @@ impl RawFungibleAssetBalance {
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-    ) -> anyhow::Result<Option<(Self, RawCurrentFungibleAssetBalance, EventToCoinType)>> {
+    ) -> anyhow::Result<Option<(Self, RawCurrentFungibleAssetBalance, AddressToCoinType)>> {
         if let Some(CoinResource::CoinStoreDeletion) =
             &CoinResource::from_delete_resource(delete_resource, txn_version)?
         {
@@ -354,7 +355,7 @@ impl RawFungibleAssetBalance {
                 };
                 let current_coin_balance = RawCurrentFungibleAssetBalance {
                     storage_id,
-                    owner_address,
+                    owner_address: owner_address.clone(),
                     asset_type: coin_type.clone(),
                     is_primary: true,
                     is_frozen: false,
@@ -363,10 +364,13 @@ impl RawFungibleAssetBalance {
                     last_transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };
+                // Create address to coin type mapping
+                let mut address_to_coin_type = AHashMap::new();
+                address_to_coin_type.extend([(owner_address.clone(), coin_type.clone())]);
                 return Ok(Some((
                     coin_balance,
                     current_coin_balance,
-                    AHashMap::default(),
+                    address_to_coin_type,
                 )));
             }
         }
