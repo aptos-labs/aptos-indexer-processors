@@ -27,14 +27,14 @@ use crate::{
             },
         },
         postgres::models::{
-            coin_models::coin_supply::CoinSupply,
+            coin_models::{coin_supply::CoinSupply, coin_utils::EventGuidResource},
             fungible_asset_models::{
                 v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
                 v2_fungible_asset_balances::{
                     CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
                 },
                 v2_fungible_asset_to_coin_mappings::FungibleAssetToCoinMapping,
-                v2_fungible_asset_utils::FeeStatement,
+                v2_fungible_asset_utils::{CoinStoreDeletionEvent, FeeStatement},
                 v2_fungible_metadata::FungibleAssetMetadataModel,
             },
             resources::{FromWriteResource, V2FungibleAssetResource},
@@ -706,6 +706,35 @@ pub async fn parse_v2_coin(
                     fee_statement,
                 );
                 fungible_asset_activities.push(gas_event);
+            }
+
+            // The CoinStoreDeletionEvent, only need for v1 with migration
+            if user_request.is_some() {
+                let coin_store_deletion_event = events.iter().find_map(|event| {
+                    let event_type = event.type_str.as_str();
+                    CoinStoreDeletionEvent::from_event(event_type, &event.data, txn_version)
+                });
+                if let Some(coin_store_deletion) = coin_store_deletion_event {
+                    let addr = standardize_address(
+                        coin_store_deletion.event_handle_creation_address.as_str(),
+                    );
+                    let deposit_event_guid = EventGuidResource {
+                        addr: addr.clone(),
+                        creation_num: coin_store_deletion
+                            .deleted_deposit_event_handle_creation_number
+                            as i64,
+                    };
+                    let withdraw_event_guid = EventGuidResource {
+                        addr,
+                        creation_num: coin_store_deletion
+                            .deleted_withdraw_event_handle_creation_number
+                            as i64,
+                    };
+                    event_to_v1_coin_type
+                        .insert(deposit_event_guid, coin_store_deletion.coin_type.clone());
+                    event_to_v1_coin_type
+                        .insert(withdraw_event_guid, coin_store_deletion.coin_type);
+                };
             }
 
             // Loop 3 to handle events and collect additional metadata from events for v2
