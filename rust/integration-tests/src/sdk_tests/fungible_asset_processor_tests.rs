@@ -57,13 +57,13 @@ mod sdk_fungible_asset_processor_tests {
         },
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
-        IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_MAINNET_TXNS_1680592683_FA_MIGRATION_COIN_INFO,
         IMPORTED_MAINNET_TXNS_1737056775_COIN_TRANSFER_BURN_EVENT,
         IMPORTED_MAINNET_TXNS_1957950162_FA_MIGRATION_V2_STORE_ONLY,
         IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
         IMPORTED_MAINNET_TXNS_2308282694_ASSET_TYPE_V1_NULL,
         IMPORTED_MAINNET_TXNS_2308283617_ASSET_TYPE_V1_NULL_2,
+        IMPORTED_MAINNET_TXNS_2448304257_COINSTORE_DELETION_EVENT,
         IMPORTED_MAINNET_TXNS_255894550_STORAGE_REFUND,
         IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
         IMPORTED_MAINNET_TXNS_550582915_MULTIPLE_TRANSFER_EVENT,
@@ -178,17 +178,6 @@ mod sdk_fungible_asset_processor_tests {
         .await;
     }
 
-    /// Tests processing of coin v2 events
-    /// Validates the handling of updated coin event formats
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_fungible_asset_processor_coin_v2_events() {
-        process_single_batch_txns(
-            &[IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS],
-            Some("coin_v2_events".to_string()),
-        )
-        .await;
-    }
-
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_fungible_asset_processor_coin_store_deletion_no_event() {
         process_single_batch_txns(
@@ -288,6 +277,15 @@ mod sdk_fungible_asset_processor_tests {
                 IMPORTED_MAINNET_TXNS_2308283617_ASSET_TYPE_V1_NULL_2,
             ]],
             "asset_type_null",
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_fa_migration_with_coin_store_deletion() {
+        process_single_batch_txns(
+            &[IMPORTED_MAINNET_TXNS_2448304257_COINSTORE_DELETION_EVENT],
+            Some("migration_with_coin_store_deletion_event".to_string()),
         )
         .await;
     }

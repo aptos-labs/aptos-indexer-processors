@@ -1,0 +1,40 @@
+[
+  {
+    "storage_id": "0x35b5700571cbb1c340c5a2fa7e1ecc32fd8b4da273881c2728058bd4c2514895",
+    "owner_address": "0x2dcbc03740a6fa2efee926b9df329184cce357d0573bdab09930f4d48e61a4c8",
+    "asset_type_v2": null,
+    "asset_type_v1": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount_v1": "25361327420",
+    "amount_v2": null,
+    "amount": "25361327420",
+    "last_transaction_version_v1": 2448304257,
+    "last_transaction_version_v2": null,
+    "last_transaction_version": 2448304257,
+    "last_transaction_timestamp_v1": "2025-03-07T22:32:23",
+    "last_transaction_timestamp_v2": null,
+    "last_transaction_timestamp": "2025-03-07T22:32:23",
+    "token_standard": "v1",
+    "asset_type": "0x1::aptos_coin::AptosCoin"
+  },
+  {
+    "storage_id": "0xd5263bada2f6b752de987f5e8eca800ffb07f34c489633fc7eb46acea7cd5c37",
+    "owner_address": "0xf8e25f6c8ce40a15107fb4b4d288ca03dd434d057392f2ccb5fde505a300a0bf",
+    "asset_type_v2": "0x000000000000000000000000000000000000000000000000000000000000000a",
+    "asset_type_v1": "0x1::aptos_coin::AptosCoin",
+    "is_primary": true,
+    "is_frozen": false,
+    "amount_v1": "0",
+    "amount_v2": "49843000",
+    "amount": "49843000",
+    "last_transaction_version_v1": 2448304257,
+    "last_transaction_version_v2": 2448304257,
+    "last_transaction_version": 2448304257,
+    "last_transaction_timestamp_v1": "2025-03-07T22:32:23",
+    "last_transaction_timestamp_v2": "2025-03-07T22:32:23",
+    "last_transaction_timestamp": "2025-03-07T22:32:23",
+    "token_standard": "v1",
+    "asset_type": "0x1::aptos_coin::AptosCoin"
+  }
+]
