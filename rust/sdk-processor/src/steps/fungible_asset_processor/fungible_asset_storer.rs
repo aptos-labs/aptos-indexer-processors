@@ -80,7 +80,7 @@ impl Processable for FungibleAssetStorer {
         )>,
     ) -> Result<Option<TransactionContext<Self::Output>>, ProcessorError> {
         let (
-            fungible_asset_activities,
+            mut fungible_asset_activities,
             fungible_asset_metadata,
             mut fungible_asset_balances,
             mut current_fungible_asset_balances,
