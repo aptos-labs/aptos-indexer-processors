@@ -56,6 +56,7 @@ impl Processable for FungibleAssetExtractor {
             TransactionContext<(
                 Vec<FungibleAssetActivity>,
                 Vec<FungibleAssetMetadataModel>,
+                Vec<FungibleAssetBalance>,
                 (
                     Vec<CurrentUnifiedFungibleAssetBalance>,
                     Vec<CurrentUnifiedFungibleAssetBalance>,
