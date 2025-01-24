@@ -15,10 +15,7 @@ use processor::{
         coin_models::coin_supply::CoinSupply,
         fungible_asset_models::{
             v2_fungible_asset_activities::FungibleAssetActivity,
-            v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
-                FungibleAssetBalance,
-            },
+            v2_fungible_asset_balances::CurrentUnifiedFungibleAssetBalance,
             v2_fungible_metadata::FungibleAssetMetadataModel,
         },
     },
@@ -58,9 +55,10 @@ impl Processable for FungibleAssetStorer {
     type Input = (
         Vec<FungibleAssetActivity>,
         Vec<FungibleAssetMetadataModel>,
-        Vec<FungibleAssetBalance>,
-        Vec<CurrentFungibleAssetBalance>,
-        Vec<CurrentUnifiedFungibleAssetBalance>,
+        (
+            Vec<CurrentUnifiedFungibleAssetBalance>,
+            Vec<CurrentUnifiedFungibleAssetBalance>,
+        ),
         Vec<CoinSupply>,
     );
     type Output = ();
@@ -71,53 +69,32 @@ impl Processable for FungibleAssetStorer {
         input: TransactionContext<(
             Vec<FungibleAssetActivity>,
             Vec<FungibleAssetMetadataModel>,
-            Vec<FungibleAssetBalance>,
-            Vec<CurrentFungibleAssetBalance>,
-            Vec<CurrentUnifiedFungibleAssetBalance>,
+            (
+                Vec<CurrentUnifiedFungibleAssetBalance>,
+                Vec<CurrentUnifiedFungibleAssetBalance>,
+            ),
             Vec<CoinSupply>,
         )>,
     ) -> Result<Option<TransactionContext<Self::Output>>, ProcessorError> {
         let (
             fungible_asset_activities,
             fungible_asset_metadata,
-            mut fungible_asset_balances,
-            mut current_fungible_asset_balances,
-            current_unified_fungible_asset_balances,
+            (mut current_unified_fab_v1, mut current_unified_fab_v2),
             mut coin_supply,
         ) = input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
             self.processor_config.per_table_chunk_sizes.clone();
         // if flag turned on we need to not include any value in the table
-        let (unified_coin_balances, unified_fa_balances): (Vec<_>, Vec<_>) = if self
+        if self
             .deprecated_tables
             .contains(TableFlags::CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES)
         {
-            (vec![], vec![])
-        } else {
-            // Basically we need to split the current unified balances into v1 and v2
-            // by looking at whether asset_type_v2 is null (must be v1 if it's null)
-            // Note, we can't check asset_type_v1 is none because we're now filling asset_type_v1
-            // for certain assets
-            current_unified_fungible_asset_balances
-                .into_iter()
-                .partition(|x| x.asset_type_v2.is_none())
-        };
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::FUNGIBLE_ASSET_BALANCES)
-        {
-            fungible_asset_balances.clear();
+            current_unified_fab_v1.clear();
+            current_unified_fab_v2.clear();
         }
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::CURRENT_FUNGIBLE_ASSET_BALANCES)
-        {
-            current_fungible_asset_balances.clear();
-        }
-
+        let unified_coin_balances = current_unified_fab_v1;
+        let unified_fa_balances = current_unified_fab_v2;
         if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
             coin_supply.clear();
         }

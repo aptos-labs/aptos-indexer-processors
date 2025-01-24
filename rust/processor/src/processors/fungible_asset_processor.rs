@@ -10,10 +10,8 @@ use crate::{
                     FungibleAssetActivityConvertible, RawFungibleAssetActivity,
                 },
                 raw_v2_fungible_asset_balances::{
-                    CurrentFungibleAssetBalanceConvertible, CurrentFungibleAssetMapping,
-                    CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
-                    RawCurrentFungibleAssetBalance, RawCurrentUnifiedFungibleAssetBalance,
-                    RawFungibleAssetBalance,
+                    CurrentUnifiedFungibleAssetBalanceConvertible,
+                    RawCurrentUnifiedFungibleAssetBalance, RawFungibleAssetBalance,
                 },
                 raw_v2_fungible_metadata::{
                     FungibleAssetMetadataConvertible, FungibleAssetMetadataMapping,
@@ -28,10 +26,7 @@ use crate::{
             coin_models::coin_supply::CoinSupply,
             fungible_asset_models::{
                 v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
-                v2_fungible_asset_balances::{
-                    CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
-                    FungibleAssetBalance,
-                },
+                v2_fungible_asset_balances::CurrentUnifiedFungibleAssetBalance,
                 v2_fungible_asset_utils::FeeStatement,
                 v2_fungible_metadata::FungibleAssetMetadataModel,
             },
@@ -99,9 +94,7 @@ async fn insert_to_db(
     end_version: u64,
     fungible_asset_activities: &[FungibleAssetActivity],
     fungible_asset_metadata: &[FungibleAssetMetadataModel],
-    fungible_asset_balances: &[FungibleAssetBalance],
-    current_fungible_asset_balances: &[CurrentFungibleAssetBalance],
-    current_unified_fungible_asset_balances: (
+    (current_unified_fab_v1, current_unified_fab_v2): (
         &[CurrentUnifiedFungibleAssetBalance],
         &[CurrentUnifiedFungibleAssetBalance],
     ),
@@ -133,28 +126,10 @@ async fn insert_to_db(
             per_table_chunk_sizes,
         ),
     );
-    let fab = execute_in_chunks(
-        conn.clone(),
-        insert_fungible_asset_balances_query,
-        fungible_asset_balances,
-        get_config_table_chunk_size::<FungibleAssetBalance>(
-            "fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
-    let cfab = execute_in_chunks(
-        conn.clone(),
-        insert_current_fungible_asset_balances_query,
-        current_fungible_asset_balances,
-        get_config_table_chunk_size::<CurrentFungibleAssetBalance>(
-            "current_fungible_asset_balances",
-            per_table_chunk_sizes,
-        ),
-    );
     let cufab_v1 = execute_in_chunks(
         conn.clone(),
         insert_current_unified_fungible_asset_balances_v1_query,
-        current_unified_fungible_asset_balances.0,
+        current_unified_fab_v1,
         get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
             "current_unified_fungible_asset_balances",
             per_table_chunk_sizes,
@@ -163,7 +138,7 @@ async fn insert_to_db(
     let cufab_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_unified_fungible_asset_balances_v2_query,
-        current_unified_fungible_asset_balances.1,
+        current_unified_fab_v2,
         get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
             "current_unified_fungible_asset_balances",
             per_table_chunk_sizes,
@@ -175,11 +150,9 @@ async fn insert_to_db(
         coin_supply,
         get_config_table_chunk_size::<CoinSupply>("coin_supply", per_table_chunk_sizes),
     );
-    let (faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res) =
-        tokio::join!(faa, fam, fab, cfab, cufab_v1, cufab_v2, cs);
-    for res in [
-        faa_res, fam_res, fab_res, cfab_res, cufab1_res, cufab2_res, cs_res,
-    ] {
+    let (faa_res, fam_res, cufab1_res, cufab2_res, cs_res) =
+        tokio::join!(faa, fam, cufab_v1, cufab_v2, cs);
+    for res in [faa_res, fam_res, cufab1_res, cufab2_res, cs_res] {
         res?;
     }
 
@@ -237,53 +210,6 @@ pub fn insert_fungible_asset_metadata_query(
                 )
             ),
         Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
-    )
-}
-
-pub fn insert_fungible_asset_balances_query(
-    items_to_insert: Vec<FungibleAssetBalance>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::fungible_asset_balances::dsl::*;
-
-    (
-        diesel::insert_into(schema::fungible_asset_balances::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_nothing(),
-        None,
-    )
-}
-
-pub fn insert_current_fungible_asset_balances_query(
-    items_to_insert: Vec<CurrentFungibleAssetBalance>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_fungible_asset_balances_legacy::dsl::*;
-
-    (
-        diesel::insert_into(schema::current_fungible_asset_balances_legacy::table)
-            .values(items_to_insert)
-            .on_conflict(storage_id)
-            .do_update()
-            .set(
-                (
-                    owner_address.eq(excluded(owner_address)),
-                    asset_type.eq(excluded(asset_type)),
-                    is_primary.eq(excluded(is_primary)),
-                    is_frozen.eq(excluded(is_frozen)),
-                    amount.eq(excluded(amount)),
-                    last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
-                    last_transaction_version.eq(excluded(last_transaction_version)),
-                    token_standard.eq(excluded(token_standard)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )
-            ),
-        Some(" WHERE current_fungible_asset_balances_legacy.last_transaction_version <= excluded.last_transaction_version "),
     )
 }
 
@@ -382,9 +308,8 @@ impl ProcessorTrait for FungibleAssetProcessor {
         let (
             raw_fungible_asset_activities,
             raw_fungible_asset_metadata,
-            raw_fungible_asset_balances,
-            raw_current_fungible_asset_balances,
-            raw_current_unified_fungible_asset_balances,
+            _raw_fungible_asset_balances,
+            (raw_current_unified_fab_v1, raw_current_unified_fab_v2),
             mut coin_supply,
         ) = parse_v2_coin(&transactions).await;
 
@@ -400,56 +325,27 @@ impl ProcessorTrait for FungibleAssetProcessor {
                 .map(FungibleAssetMetadataModel::from_raw)
                 .collect();
 
-        let mut postgres_fungible_asset_balances: Vec<FungibleAssetBalance> =
-            raw_fungible_asset_balances
+        let mut postgres_current_unified_fab_v1: Vec<CurrentUnifiedFungibleAssetBalance> =
+            raw_current_unified_fab_v1
                 .into_iter()
-                .map(FungibleAssetBalance::from_raw)
+                .map(CurrentUnifiedFungibleAssetBalance::from_raw)
                 .collect();
-
-        let mut postgres_current_fungible_asset_balances: Vec<CurrentFungibleAssetBalance> =
-            raw_current_fungible_asset_balances
+        let mut postgres_current_unified_fab_v2: Vec<CurrentUnifiedFungibleAssetBalance> =
+            raw_current_unified_fab_v2
                 .into_iter()
-                .map(CurrentFungibleAssetBalance::from_raw)
+                .map(CurrentUnifiedFungibleAssetBalance::from_raw)
                 .collect();
-
-        let postgres_current_unified_fungible_asset_balances: Vec<
-            CurrentUnifiedFungibleAssetBalance,
-        > = raw_current_unified_fungible_asset_balances
-            .into_iter()
-            .map(CurrentUnifiedFungibleAssetBalance::from_raw)
-            .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
 
         // if flag turned on we need to not include any value in the table
-        let (coin_balance, fa_balance): (Vec<_>, Vec<_>) = if self
+        if self
             .deprecated_tables
             .contains(TableFlags::CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES)
         {
-            (vec![], vec![])
-        } else {
-            // Basically we need to split the current unified balances into v1 and v2
-            // by looking at whether asset_type_v2 is null (must be v1 if it's null)
-            // Note, we can't check asset_type_v1 is none because we're now filling asset_type_v1
-            // for certain assets
-            postgres_current_unified_fungible_asset_balances
-                .into_iter()
-                .partition(|x| x.asset_type_v2.is_none())
-        };
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::FUNGIBLE_ASSET_BALANCES)
-        {
-            postgres_fungible_asset_balances.clear();
-        }
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::CURRENT_FUNGIBLE_ASSET_BALANCES)
-        {
-            postgres_current_fungible_asset_balances.clear();
+            postgres_current_unified_fab_v1.clear();
+            postgres_current_unified_fab_v2.clear();
         }
 
         if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
@@ -463,9 +359,10 @@ impl ProcessorTrait for FungibleAssetProcessor {
             end_version,
             &postgres_fungible_asset_activities,
             &postgres_fungible_asset_metadata,
-            &postgres_fungible_asset_balances,
-            &postgres_current_fungible_asset_balances,
-            (&coin_balance, &fa_balance),
+            (
+                &postgres_current_unified_fab_v1,
+                &postgres_current_unified_fab_v2,
+            ),
             &coin_supply,
             &self.per_table_chunk_sizes,
         )
@@ -507,24 +404,24 @@ pub async fn parse_v2_coin(
     Vec<RawFungibleAssetActivity>,
     Vec<RawFungibleAssetMetadataModel>,
     Vec<RawFungibleAssetBalance>,
-    Vec<RawCurrentFungibleAssetBalance>,
-    Vec<RawCurrentUnifiedFungibleAssetBalance>,
+    (
+        Vec<RawCurrentUnifiedFungibleAssetBalance>,
+        Vec<RawCurrentUnifiedFungibleAssetBalance>,
+    ),
     Vec<CoinSupply>,
 ) {
-    let mut fungible_asset_activities = vec![];
-    let mut fungible_asset_balances = vec![];
-    let mut all_coin_supply = vec![];
-    let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = AHashMap::new();
+    let mut fungible_asset_activities: Vec<RawFungibleAssetActivity> = vec![];
+    let mut fungible_asset_balances: Vec<RawFungibleAssetBalance> = vec![];
+    let mut all_coin_supply: Vec<CoinSupply> = vec![];
     let mut fungible_asset_metadata: FungibleAssetMetadataMapping = AHashMap::new();
 
     let data: Vec<_> = transactions
         .par_iter()
         .map(|txn| {
             let mut fungible_asset_activities = vec![];
+            let mut fungible_asset_metadata = AHashMap::new();
             let mut fungible_asset_balances = vec![];
             let mut all_coin_supply = vec![];
-            let mut current_fungible_asset_balances: CurrentFungibleAssetMapping = AHashMap::new();
-            let mut fungible_asset_metadata: FungibleAssetMetadataMapping = AHashMap::new();
 
             // Get Metadata for fungible assets by object address
             let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = AHashMap::new();
@@ -539,7 +436,7 @@ pub async fn parse_v2_coin(
                 PROCESSOR_UNKNOWN_TYPE_COUNT
                     .with_label_values(&["FungibleAssetProcessor"])
                     .inc();
-                return (vec![], vec![], vec![], AHashMap::new(), AHashMap::new());
+                return (vec![], AHashMap::new(), vec![], vec![]);
             }
             let txn_data = txn.txn_data.as_ref().unwrap();
             let transaction_info = txn.info.as_ref().expect("Transaction info doesn't exist!");
@@ -596,7 +493,7 @@ pub async fn parse_v2_coin(
             // As an optimization, we also handle v1 balances in the process
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                    if let Some((balance, current_balance, event_to_coin)) =
+                    if let Some((balance, event_to_coin)) =
                         RawFungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
                             index as i64,
@@ -606,8 +503,6 @@ pub async fn parse_v2_coin(
                         .unwrap()
                     {
                         fungible_asset_balances.push(balance);
-                        current_fungible_asset_balances
-                            .insert(current_balance.storage_id.clone(), current_balance.clone());
                         event_to_v1_coin_type.extend(event_to_coin);
                     }
                     // Fill the v2 fungible_asset_object_helper. This is used to track which objects exist at each object address.
@@ -653,7 +548,7 @@ pub async fn parse_v2_coin(
                     }
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
-                    if let Some((balance, current_balance, single_deleted_coin_type)) =
+                    if let Some((balance, single_deleted_coin_type)) =
                         RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
@@ -663,8 +558,6 @@ pub async fn parse_v2_coin(
                         .unwrap()
                     {
                         fungible_asset_balances.push(balance);
-                        current_fungible_asset_balances
-                            .insert(current_balance.storage_id.clone(), current_balance.clone());
                         address_to_deleted_coin_type.extend(single_deleted_coin_type);
                     }
                 }
@@ -773,26 +666,22 @@ pub async fn parse_v2_coin(
                             fungible_asset_metadata
                                 .insert(fa_metadata.asset_type.clone(), fa_metadata);
                         }
-                        if let Some((balance, curr_balance)) =
-                            RawFungibleAssetBalance::get_v2_from_write_resource(
-                                write_resource,
-                                index as i64,
-                                txn_version,
-                                txn_timestamp,
-                                &fungible_asset_object_helper,
-                            )
-                            .unwrap_or_else(|e| {
-                                tracing::error!(
+                        if let Some(balance) = RawFungibleAssetBalance::get_v2_from_write_resource(
+                            write_resource,
+                            index as i64,
+                            txn_version,
+                            txn_timestamp,
+                            &fungible_asset_object_helper,
+                        )
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
                                     transaction_version = txn_version,
                                     index = index,
                                     error = ?e,
                                     "[Parser] error parsing fungible balance v2");
-                                panic!("[Parser] error parsing fungible balance v2");
-                            })
-                        {
+                            panic!("[Parser] error parsing fungible balance v2");
+                        }) {
                             fungible_asset_balances.push(balance);
-                            current_fungible_asset_balances
-                                .insert(curr_balance.storage_id.clone(), curr_balance);
                         }
                     },
                     Change::WriteTableItem(table_item) => {
@@ -812,46 +701,48 @@ pub async fn parse_v2_coin(
             }
             (
                 fungible_asset_activities,
+                fungible_asset_metadata,
                 fungible_asset_balances,
                 all_coin_supply,
-                current_fungible_asset_balances,
-                fungible_asset_metadata,
             )
         })
         .collect();
 
-    for (faa, fab, acs, cfab, fam) in data {
+    for (faa, fam, fab, acs) in data {
         fungible_asset_activities.extend(faa);
         fungible_asset_balances.extend(fab);
         all_coin_supply.extend(acs);
-        current_fungible_asset_balances.extend(cfab);
         fungible_asset_metadata.extend(fam);
     }
+
+    // Now we need to convert fab into current_unified_fungible_asset_balances v1 and v2
+    let (current_unified_fab_v1, current_unified_fab_v2) =
+        RawCurrentUnifiedFungibleAssetBalance::from_fungible_asset_balances(
+            &fungible_asset_balances,
+        );
 
     // Boilerplate after this
     // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
     let mut fungible_asset_metadata = fungible_asset_metadata
         .into_values()
         .collect::<Vec<RawFungibleAssetMetadataModel>>();
-    let mut current_fungible_asset_balances = current_fungible_asset_balances
+    let mut current_unified_fab_v1 = current_unified_fab_v1
         .into_values()
-        .collect::<Vec<RawCurrentFungibleAssetBalance>>();
+        .collect::<Vec<RawCurrentUnifiedFungibleAssetBalance>>();
+    let mut current_unified_fab_v2 = current_unified_fab_v2
+        .into_values()
+        .collect::<Vec<RawCurrentUnifiedFungibleAssetBalance>>();
 
     // Sort by PK
     fungible_asset_metadata.sort_by(|a, b| a.asset_type.cmp(&b.asset_type));
-    current_fungible_asset_balances.sort_by(|a, b| a.storage_id.cmp(&b.storage_id));
+    current_unified_fab_v1.sort_by(|a, b| a.storage_id.cmp(&b.storage_id));
+    current_unified_fab_v2.sort_by(|a, b| a.storage_id.cmp(&b.storage_id));
 
-    // Process the unified balance
-    let current_unified_fungible_asset_balances = current_fungible_asset_balances
-        .iter()
-        .map(RawCurrentUnifiedFungibleAssetBalance::from)
-        .collect::<Vec<_>>();
     (
         fungible_asset_activities,
         fungible_asset_metadata,
         fungible_asset_balances,
-        current_fungible_asset_balances,
-        current_unified_fungible_asset_balances,
+        (current_unified_fab_v1, current_unified_fab_v2),
         all_coin_supply,
     )
 }

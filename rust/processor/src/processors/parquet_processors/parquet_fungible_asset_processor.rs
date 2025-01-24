@@ -201,7 +201,7 @@ async fn parse_v2_coin(
 
         for (index, wsc) in transaction_info.changes.iter().enumerate() {
             if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                if let Some((balance, _, _)) = RawFungibleAssetBalance::get_v1_from_write_resource(
+                if let Some((balance, _)) = RawFungibleAssetBalance::get_v1_from_write_resource(
                     write_resource,
                     index as i64,
                     txn_version,
@@ -216,7 +216,7 @@ async fn parse_v2_coin(
                         .or_insert(1);
                 }
             } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap() {
-                if let Some((balance, _, _)) = RawFungibleAssetBalance::get_v1_from_delete_resource(
+                if let Some((balance, _)) = RawFungibleAssetBalance::get_v1_from_delete_resource(
                     delete_resource,
                     index as i64,
                     txn_version,
@@ -237,7 +237,7 @@ async fn parse_v2_coin(
         for (index, wsc) in transaction_info.changes.iter().enumerate() {
             match wsc.change.as_ref().unwrap() {
                 Change::WriteResource(write_resource) => {
-                    if let Some((balance, _)) = RawFungibleAssetBalance::get_v2_from_write_resource(
+                    if let Some(balance) = RawFungibleAssetBalance::get_v2_from_write_resource(
                         write_resource,
                         index as i64,
                         txn_version,
