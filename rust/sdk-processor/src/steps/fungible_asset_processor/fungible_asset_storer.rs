@@ -24,8 +24,7 @@ use processor::{
     processors::fungible_asset_processor::{
         insert_coin_supply_query, insert_current_unified_fungible_asset_balances_v1_query,
         insert_current_unified_fungible_asset_balances_v2_query,
-        insert_fungible_asset_activities_query, insert_fungible_asset_balances_query,
-        insert_fungible_asset_metadata_query,
+        insert_fungible_asset_activities_query, insert_fungible_asset_metadata_query,
     },
     utils::table_flags::TableFlags,
 };
