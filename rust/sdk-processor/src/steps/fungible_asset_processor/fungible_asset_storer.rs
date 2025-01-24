@@ -127,15 +127,6 @@ impl Processable for FungibleAssetStorer {
                 &per_table_chunk_sizes,
             ),
         );
-        let fab = execute_in_chunks(
-            self.conn_pool.clone(),
-            insert_fungible_asset_balances_query,
-            &fungible_asset_balances,
-            get_config_table_chunk_size::<FungibleAssetBalance>(
-                "fungible_asset_balances",
-                &per_table_chunk_sizes,
-            ),
-        );
         let cufab_v1 = execute_in_chunks(
             self.conn_pool.clone(),
             insert_current_unified_fungible_asset_balances_v1_query,
@@ -160,9 +151,9 @@ impl Processable for FungibleAssetStorer {
             &coin_supply,
             get_config_table_chunk_size::<CoinSupply>("coin_supply", &per_table_chunk_sizes),
         );
-        let (faa_res, fam_res, fab_res, cufab1_res, cufab2_res, cs_res) =
-            tokio::join!(faa, fam, fab, cufab_v1, cufab_v2, cs);
-        for res in [faa_res, fam_res, fab_res, cufab1_res, cufab2_res, cs_res] {
+        let (faa_res, fam_res, cufab1_res, cufab2_res, cs_res) =
+            tokio::join!(faa, fam, cufab_v1, cufab_v2, cs);
+        for res in [faa_res, fam_res, cufab1_res, cufab2_res, cs_res] {
             match res {
                 Ok(_) => {},
                 Err(e) => {
