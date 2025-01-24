@@ -198,7 +198,8 @@ pub fn insert_fungible_asset_activities_query(
         diesel::insert_into(schema::fungible_asset_activities::table)
             .values(items_to_insert)
             .on_conflict((transaction_version, event_index))
-            .do_nothing(),
+            .do_update()
+            .set(storage_id.eq(excluded(storage_id))),
         None,
     )
 }
