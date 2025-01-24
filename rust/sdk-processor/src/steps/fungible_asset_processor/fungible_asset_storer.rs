@@ -124,6 +124,13 @@ impl Processable for FungibleAssetStorer {
             coin_supply.clear();
         }
 
+        if self
+            .deprecated_tables
+            .contains(TableFlags::FUNGIBLE_ASSET_ACTIVITIES)
+        {
+            fungible_asset_activities.clear();
+        }
+        
         let faa = execute_in_chunks(
             self.conn_pool.clone(),
             insert_fungible_asset_activities_query,
