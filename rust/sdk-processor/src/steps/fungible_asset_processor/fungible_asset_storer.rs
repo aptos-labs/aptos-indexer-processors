@@ -15,14 +15,17 @@ use processor::{
         coin_models::coin_supply::CoinSupply,
         fungible_asset_models::{
             v2_fungible_asset_activities::FungibleAssetActivity,
-            v2_fungible_asset_balances::CurrentUnifiedFungibleAssetBalance,
+            v2_fungible_asset_balances::{
+                CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+            },
             v2_fungible_metadata::FungibleAssetMetadataModel,
         },
     },
     processors::fungible_asset_processor::{
         insert_coin_supply_query, insert_current_unified_fungible_asset_balances_v1_query,
         insert_current_unified_fungible_asset_balances_v2_query,
-        insert_fungible_asset_activities_query, insert_fungible_asset_metadata_query,
+        insert_fungible_asset_activities_query, insert_fungible_asset_balances_query,
+        insert_fungible_asset_metadata_query,
     },
     utils::table_flags::TableFlags,
 };
@@ -55,6 +58,7 @@ impl Processable for FungibleAssetStorer {
     type Input = (
         Vec<FungibleAssetActivity>,
         Vec<FungibleAssetMetadataModel>,
+        Vec<FungibleAssetBalance>,
         (
             Vec<CurrentUnifiedFungibleAssetBalance>,
             Vec<CurrentUnifiedFungibleAssetBalance>,
@@ -69,6 +73,7 @@ impl Processable for FungibleAssetStorer {
         input: TransactionContext<(
             Vec<FungibleAssetActivity>,
             Vec<FungibleAssetMetadataModel>,
+            Vec<FungibleAssetBalance>,
             (
                 Vec<CurrentUnifiedFungibleAssetBalance>,
                 Vec<CurrentUnifiedFungibleAssetBalance>,
@@ -79,6 +84,7 @@ impl Processable for FungibleAssetStorer {
         let (
             fungible_asset_activities,
             fungible_asset_metadata,
+            mut fungible_asset_balances,
             (mut current_unified_fab_v1, mut current_unified_fab_v2),
             mut coin_supply,
         ) = input.data;
@@ -88,13 +94,17 @@ impl Processable for FungibleAssetStorer {
         // if flag turned on we need to not include any value in the table
         if self
             .deprecated_tables
+            .contains(TableFlags::FUNGIBLE_ASSET_BALANCES)
+        {
+            fungible_asset_balances.clear();
+        }
+        if self
+            .deprecated_tables
             .contains(TableFlags::CURRENT_UNIFIED_FUNGIBLE_ASSET_BALANCES)
         {
             current_unified_fab_v1.clear();
             current_unified_fab_v2.clear();
         }
-        let unified_coin_balances = current_unified_fab_v1;
-        let unified_fa_balances = current_unified_fab_v2;
         if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
             coin_supply.clear();
         }
@@ -117,10 +127,19 @@ impl Processable for FungibleAssetStorer {
                 &per_table_chunk_sizes,
             ),
         );
+        let fab = execute_in_chunks(
+            self.conn_pool.clone(),
+            insert_fungible_asset_balances_query,
+            &fungible_asset_balances,
+            get_config_table_chunk_size::<FungibleAssetBalance>(
+                "fungible_asset_balances",
+                &per_table_chunk_sizes,
+            ),
+        );
         let cufab_v1 = execute_in_chunks(
             self.conn_pool.clone(),
             insert_current_unified_fungible_asset_balances_v1_query,
-            &unified_coin_balances,
+            &current_unified_fab_v1,
             get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
                 "current_unified_fungible_asset_balances",
                 &per_table_chunk_sizes,
@@ -129,7 +148,7 @@ impl Processable for FungibleAssetStorer {
         let cufab_v2 = execute_in_chunks(
             self.conn_pool.clone(),
             insert_current_unified_fungible_asset_balances_v2_query,
-            &unified_fa_balances,
+            &current_unified_fab_v2,
             get_config_table_chunk_size::<CurrentUnifiedFungibleAssetBalance>(
                 "current_unified_fungible_asset_balances",
                 &per_table_chunk_sizes,
@@ -141,9 +160,9 @@ impl Processable for FungibleAssetStorer {
             &coin_supply,
             get_config_table_chunk_size::<CoinSupply>("coin_supply", &per_table_chunk_sizes),
         );
-        let (faa_res, fam_res, cufab1_res, cufab2_res, cs_res) =
-            tokio::join!(faa, fam, cufab_v1, cufab_v2, cs);
-        for res in [faa_res, fam_res, cufab1_res, cufab2_res, cs_res] {
+        let (faa_res, fam_res, fab_res, cufab1_res, cufab2_res, cs_res) =
+            tokio::join!(faa, fam, fab, cufab_v1, cufab_v2, cs);
+        for res in [faa_res, fam_res, fab_res, cufab1_res, cufab2_res, cs_res] {
             match res {
                 Ok(_) => {},
                 Err(e) => {

@@ -26,7 +26,9 @@ use crate::{
             coin_models::coin_supply::CoinSupply,
             fungible_asset_models::{
                 v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
-                v2_fungible_asset_balances::CurrentUnifiedFungibleAssetBalance,
+                v2_fungible_asset_balances::{
+                    CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
+                },
                 v2_fungible_asset_utils::FeeStatement,
                 v2_fungible_metadata::FungibleAssetMetadataModel,
             },
@@ -210,6 +212,23 @@ pub fn insert_fungible_asset_metadata_query(
                 )
             ),
         Some(" WHERE fungible_asset_metadata.last_transaction_version <= excluded.last_transaction_version "),
+    )
+}
+
+pub fn insert_fungible_asset_balances_query(
+    items_to_insert: Vec<FungibleAssetBalance>,
+) -> (
+    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
+    Option<&'static str>,
+) {
+    use schema::fungible_asset_balances::dsl::*;
+
+    (
+        diesel::insert_into(schema::fungible_asset_balances::table)
+            .values(items_to_insert)
+            .on_conflict((transaction_version, write_set_change_index))
+            .do_nothing(),
+        None,
     )
 }
 

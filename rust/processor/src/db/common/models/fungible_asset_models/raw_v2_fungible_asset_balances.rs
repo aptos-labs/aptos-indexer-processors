@@ -11,7 +11,7 @@ use crate::{
         common::models::{
             fungible_asset_models::raw_v2_fungible_asset_activities::EventToCoinType,
             object_models::v2_object_utils::ObjectAggregatedDataMapping,
-            token_v2_models::v2_token_utils::{TokenStandard, V2_STANDARD},
+            token_v2_models::v2_token_utils::TokenStandard,
         },
         postgres::models::{
             coin_models::coin_utils::{CoinInfoType, CoinResource},
@@ -29,7 +29,7 @@ use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::{BigDecimal, Zero};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
+use std::str::FromStr;
 
 // Storage id
 pub type CurrentUnifiedFungibleAssetMapping =
@@ -197,16 +197,14 @@ impl RawCurrentUnifiedFungibleAssetBalance {
 
         for balance in fungible_asset_balances.iter() {
             let unified_balance = Self::from(balance);
-            match balance.token_standard.as_str() {
-                // V1 tokens
-                v1 if v1 == TokenStandard::V1.to_string() => {
+            match TokenStandard::from_str(&balance.token_standard).expect("Invalid token standard")
+            {
+                TokenStandard::V1 => {
                     v1_balances.insert(unified_balance.storage_id.clone(), unified_balance);
                 },
-                // V2 tokens
-                v2 if v2 == TokenStandard::V2.to_string() => {
+                TokenStandard::V2 => {
                     v2_balances.insert(unified_balance.storage_id.clone(), unified_balance);
                 },
-                _ => {},
             }
         }
         (v1_balances, v2_balances)
@@ -216,7 +214,10 @@ impl RawCurrentUnifiedFungibleAssetBalance {
 impl From<&RawFungibleAssetBalance> for RawCurrentUnifiedFungibleAssetBalance {
     fn from(fab: &RawFungibleAssetBalance) -> Self {
         // Determine if this is a V2 token standard
-        let is_v2 = fab.token_standard.as_str() == V2_STANDARD.borrow().as_str();
+        let is_v2 = matches!(
+            TokenStandard::from_str(&fab.token_standard).expect("Invalid token standard"),
+            TokenStandard::V2
+        );
 
         // For V2 tokens, asset_type_v2 is the original asset type
         // For V1 tokens, asset_type_v2 is None
