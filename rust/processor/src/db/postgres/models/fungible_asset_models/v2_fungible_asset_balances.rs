@@ -7,8 +7,7 @@
 
 use crate::{
     db::common::models::fungible_asset_models::raw_v2_fungible_asset_balances::{
-        CurrentFungibleAssetBalanceConvertible, CurrentUnifiedFungibleAssetBalanceConvertible,
-        FungibleAssetBalanceConvertible, RawCurrentFungibleAssetBalance,
+        CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
         RawCurrentUnifiedFungibleAssetBalance, RawFungibleAssetBalance,
     },
     schema::{
@@ -155,22 +154,6 @@ pub struct CurrentFungibleAssetBalance {
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub token_standard: String,
-}
-
-impl CurrentFungibleAssetBalanceConvertible for CurrentFungibleAssetBalance {
-    fn from_raw(raw_item: RawCurrentFungibleAssetBalance) -> Self {
-        Self {
-            storage_id: raw_item.storage_id,
-            owner_address: raw_item.owner_address,
-            asset_type: raw_item.asset_type,
-            is_primary: raw_item.is_primary,
-            is_frozen: raw_item.is_frozen,
-            amount: raw_item.amount,
-            last_transaction_version: raw_item.last_transaction_version,
-            last_transaction_timestamp: raw_item.last_transaction_timestamp,
-            token_standard: raw_item.token_standard,
-        }
-    }
 }
 
 /// Note that this used to be called current_unified_fungible_asset_balances_to_be_renamed

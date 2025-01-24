@@ -11,7 +11,7 @@ use crate::{
         common::models::{
             fungible_asset_models::raw_v2_fungible_asset_activities::EventToCoinType,
             object_models::v2_object_utils::ObjectAggregatedDataMapping,
-            token_v2_models::v2_token_utils::{TokenStandard, V2_STANDARD},
+            token_v2_models::v2_token_utils::TokenStandard,
         },
         postgres::models::{
             coin_models::coin_utils::{CoinInfoType, CoinResource},
@@ -29,12 +29,11 @@ use aptos_protos::transaction::v1::{DeleteResource, WriteResource};
 use bigdecimal::{BigDecimal, Zero};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
+use std::str::FromStr;
 
 // Storage id
-pub type CurrentFungibleAssetBalancePK = String;
-pub type CurrentFungibleAssetMapping =
-    AHashMap<CurrentFungibleAssetBalancePK, RawCurrentFungibleAssetBalance>;
+pub type CurrentUnifiedFungibleAssetMapping =
+    AHashMap<String, RawCurrentUnifiedFungibleAssetBalance>;
 
 lazy_static!(
      pub static ref METADATA_TO_COIN_TYPE_MAPPING: AHashMap<&'static str, &'static str> = vec![
@@ -141,23 +140,6 @@ pub trait FungibleAssetBalanceConvertible {
     fn from_raw(raw_item: RawFungibleAssetBalance) -> Self;
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RawCurrentFungibleAssetBalance {
-    pub storage_id: String,
-    pub owner_address: String,
-    pub asset_type: String,
-    pub is_primary: bool,
-    pub is_frozen: bool,
-    pub amount: BigDecimal,
-    pub last_transaction_version: i64,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub token_standard: String,
-}
-
-pub trait CurrentFungibleAssetBalanceConvertible {
-    fn from_raw(raw_item: RawCurrentFungibleAssetBalance) -> Self;
-}
-
 /// Note that this used to be called current_unified_fungible_asset_balances_to_be_renamed
 /// and was renamed to current_fungible_asset_balances to facilitate migration
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
@@ -202,56 +184,86 @@ pub fn get_primary_fungible_store_address(
     Ok(standardize_address(&hex::encode(sha3_256(&preimage))))
 }
 
-impl From<&RawCurrentFungibleAssetBalance> for RawCurrentUnifiedFungibleAssetBalance {
-    fn from(cfab: &RawCurrentFungibleAssetBalance) -> Self {
+impl RawCurrentUnifiedFungibleAssetBalance {
+    pub fn from_fungible_asset_balances(
+        fungible_asset_balances: &[RawFungibleAssetBalance],
+    ) -> (
+        CurrentUnifiedFungibleAssetMapping,
+        CurrentUnifiedFungibleAssetMapping,
+    ) {
+        // Dedupe fungible asset balances by storage_id, keeping latest version
+        let mut v1_balances: CurrentUnifiedFungibleAssetMapping = AHashMap::new();
+        let mut v2_balances: CurrentUnifiedFungibleAssetMapping = AHashMap::new();
+
+        for balance in fungible_asset_balances.iter() {
+            let unified_balance = Self::from(balance);
+            match TokenStandard::from_str(&balance.token_standard).expect("Invalid token standard")
+            {
+                TokenStandard::V1 => {
+                    v1_balances.insert(unified_balance.storage_id.clone(), unified_balance);
+                },
+                TokenStandard::V2 => {
+                    v2_balances.insert(unified_balance.storage_id.clone(), unified_balance);
+                },
+            }
+        }
+        (v1_balances, v2_balances)
+    }
+}
+
+impl From<&RawFungibleAssetBalance> for RawCurrentUnifiedFungibleAssetBalance {
+    fn from(fab: &RawFungibleAssetBalance) -> Self {
         // Determine if this is a V2 token standard
-        let is_v2 = cfab.token_standard.as_str() == V2_STANDARD.borrow().as_str();
+        let is_v2 = matches!(
+            TokenStandard::from_str(&fab.token_standard).expect("Invalid token standard"),
+            TokenStandard::V2
+        );
 
         // For V2 tokens, asset_type_v2 is the original asset type
         // For V1 tokens, asset_type_v2 is None
-        let asset_type_v2 = is_v2.then(|| cfab.asset_type.clone());
+        let asset_type_v2 = is_v2.then(|| fab.asset_type.clone());
 
         // For V2 tokens, look up V1 equivalent in mapping
         // For V1 tokens, use original asset type
         let asset_type_v1 = if is_v2 {
             METADATA_TO_COIN_TYPE_MAPPING
-                .get(cfab.asset_type.as_str())
+                .get(fab.asset_type.as_str())
                 .map(|s| s.to_string())
         } else {
-            Some(cfab.asset_type.clone())
+            Some(fab.asset_type.clone())
         };
 
         // V1 tokens are always primary, V2 tokens use the stored value
-        let is_primary = if is_v2 { cfab.is_primary } else { true };
+        let is_primary = if is_v2 { fab.is_primary } else { true };
 
         // Amount and transaction details are stored in v1 or v2 fields based on token standard
         let (amount_v1, amount_v2, version_v1, version_v2, timestamp_v1, timestamp_v2) = if is_v2 {
             (
                 None,
-                Some(cfab.amount.clone()),
+                Some(fab.amount.clone()),
                 None,
-                Some(cfab.last_transaction_version),
+                Some(fab.transaction_version),
                 None,
-                Some(cfab.last_transaction_timestamp),
+                Some(fab.transaction_timestamp),
             )
         } else {
             (
-                Some(cfab.amount.clone()),
+                Some(fab.amount.clone()),
                 None,
-                Some(cfab.last_transaction_version),
+                Some(fab.transaction_version),
                 None,
-                Some(cfab.last_transaction_timestamp),
+                Some(fab.transaction_timestamp),
                 None,
             )
         };
 
         Self {
-            storage_id: cfab.storage_id.clone(),
-            owner_address: cfab.owner_address.clone(),
+            storage_id: fab.storage_id.clone(),
+            owner_address: fab.owner_address.clone(),
             asset_type_v1,
             asset_type_v2,
             is_primary,
-            is_frozen: cfab.is_frozen,
+            is_frozen: fab.is_frozen,
             amount_v1,
             amount_v2,
             last_transaction_version_v1: version_v1,
@@ -270,7 +282,7 @@ impl RawFungibleAssetBalance {
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
-    ) -> anyhow::Result<Option<(Self, RawCurrentFungibleAssetBalance)>> {
+    ) -> anyhow::Result<Option<Self>> {
         if let Some(inner) = &FungibleAssetStore::from_write_resource(write_resource)? {
             let storage_id = standardize_address(write_resource.address.as_str());
             // Need to get the object of the store
@@ -302,18 +314,7 @@ impl RawFungibleAssetBalance {
                     transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V2.to_string(),
                 };
-                let current_coin_balance = RawCurrentFungibleAssetBalance {
-                    storage_id,
-                    owner_address,
-                    asset_type: asset_type.clone(),
-                    is_primary,
-                    is_frozen: inner.frozen,
-                    amount: concurrent_balance.unwrap_or_else(|| inner.balance.clone()),
-                    last_transaction_version: txn_version,
-                    last_transaction_timestamp: txn_timestamp,
-                    token_standard: TokenStandard::V2.to_string(),
-                };
-                return Ok(Some((coin_balance, current_coin_balance)));
+                return Ok(Some(coin_balance));
             }
         }
 
@@ -325,7 +326,7 @@ impl RawFungibleAssetBalance {
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-    ) -> anyhow::Result<Option<(Self, RawCurrentFungibleAssetBalance, AddressToCoinType)>> {
+    ) -> anyhow::Result<Option<(Self, AddressToCoinType)>> {
         if let Some(CoinResource::CoinStoreDeletion) =
             &CoinResource::from_delete_resource(delete_resource, txn_version)?
         {
@@ -353,25 +354,10 @@ impl RawFungibleAssetBalance {
                     transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };
-                let current_coin_balance = RawCurrentFungibleAssetBalance {
-                    storage_id,
-                    owner_address: owner_address.clone(),
-                    asset_type: coin_type.clone(),
-                    is_primary: true,
-                    is_frozen: false,
-                    amount: BigDecimal::zero(),
-                    last_transaction_version: txn_version,
-                    last_transaction_timestamp: txn_timestamp,
-                    token_standard: TokenStandard::V1.to_string(),
-                };
                 // Create address to coin type mapping
                 let mut address_to_coin_type = AHashMap::new();
                 address_to_coin_type.extend([(owner_address.clone(), coin_type.clone())]);
-                return Ok(Some((
-                    coin_balance,
-                    current_coin_balance,
-                    address_to_coin_type,
-                )));
+                return Ok(Some((coin_balance, address_to_coin_type)));
             }
         }
         Ok(None)
@@ -384,7 +370,7 @@ impl RawFungibleAssetBalance {
         write_set_change_index: i64,
         txn_version: i64,
         txn_timestamp: chrono::NaiveDateTime,
-    ) -> anyhow::Result<Option<(Self, RawCurrentFungibleAssetBalance, EventToCoinType)>> {
+    ) -> anyhow::Result<Option<(Self, EventToCoinType)>> {
         if let Some(CoinResource::CoinStoreResource(inner)) =
             &CoinResource::from_write_resource(write_resource, txn_version)?
         {
@@ -412,17 +398,6 @@ impl RawFungibleAssetBalance {
                     transaction_timestamp: txn_timestamp,
                     token_standard: TokenStandard::V1.to_string(),
                 };
-                let current_coin_balance = RawCurrentFungibleAssetBalance {
-                    storage_id,
-                    owner_address,
-                    asset_type: coin_type.clone(),
-                    is_primary: true,
-                    is_frozen: inner.frozen,
-                    amount: inner.coin.value.clone(),
-                    last_transaction_version: txn_version,
-                    last_transaction_timestamp: txn_timestamp,
-                    token_standard: TokenStandard::V1.to_string(),
-                };
                 let event_to_coin_mapping: EventToCoinType = AHashMap::from([
                     (
                         inner.withdraw_events.guid.id.get_standardized(),
@@ -430,11 +405,7 @@ impl RawFungibleAssetBalance {
                     ),
                     (inner.deposit_events.guid.id.get_standardized(), coin_type),
                 ]);
-                return Ok(Some((
-                    coin_balance,
-                    current_coin_balance,
-                    event_to_coin_mapping,
-                )));
+                return Ok(Some((coin_balance, event_to_coin_mapping)));
             }
         }
         Ok(None)

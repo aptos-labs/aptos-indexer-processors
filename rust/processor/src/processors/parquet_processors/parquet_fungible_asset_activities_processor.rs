@@ -229,7 +229,7 @@ async fn parse_activities(
             // As an optimization, we also handle v1 balances in the process
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                    if let Some((_, _, event_to_coin)) =
+                    if let Some((_, event_to_coin)) =
                         RawFungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
                             index as i64,
@@ -287,7 +287,7 @@ async fn parse_activities(
                     }
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
-                    if let Some((_, _, single_deleted_coin_type)) =
+                    if let Some((_, single_deleted_coin_type)) =
                         RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
