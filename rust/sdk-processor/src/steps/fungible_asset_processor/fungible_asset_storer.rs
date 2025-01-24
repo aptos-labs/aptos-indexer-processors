@@ -130,7 +130,7 @@ impl Processable for FungibleAssetStorer {
         {
             fungible_asset_activities.clear();
         }
-        
+
         let faa = execute_in_chunks(
             self.conn_pool.clone(),
             insert_fungible_asset_activities_query,
