@@ -80,7 +80,7 @@ impl Processable for FungibleAssetStorer {
         )>,
     ) -> Result<Option<TransactionContext<Self::Output>>, ProcessorError> {
         let (
-            fungible_asset_activities,
+            mut fungible_asset_activities,
             fungible_asset_metadata,
             mut fungible_asset_balances,
             mut current_fungible_asset_balances,
@@ -122,6 +122,13 @@ impl Processable for FungibleAssetStorer {
 
         if self.deprecated_tables.contains(TableFlags::COIN_SUPPLY) {
             coin_supply.clear();
+        }
+
+        if self
+            .deprecated_tables
+            .contains(TableFlags::FUNGIBLE_ASSET_ACTIVITIES)
+        {
+            fungible_asset_activities.clear();
         }
 
         let faa = execute_in_chunks(
