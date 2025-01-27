@@ -40,6 +40,8 @@ pub fn setup_stake_processor_config(
             transaction_stream_config,
             db_config,
             backfill_config: None,
+            bootstrap_config: None,
+            testing_config: None,
         },
         processor_name,
     )

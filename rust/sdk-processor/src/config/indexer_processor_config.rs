@@ -43,6 +43,8 @@ pub struct IndexerProcessorConfig {
     pub transaction_stream_config: TransactionStreamConfig,
     pub db_config: DbConfig,
     pub backfill_config: Option<BackfillConfig>,
+    pub bootstrap_config: Option<BootStrapConfig>,
+    pub testing_config: Option<TestingConfig>,
 }
 
 #[async_trait::async_trait]
@@ -155,5 +157,22 @@ impl RunnableConfig for IndexerProcessorConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BackfillConfig {
-    pub backfill_alias: String,
+    pub backfill_id: String,
+    pub initial_starting_version: u64,
+    pub ending_version: u64,
+    pub overwrite_checkpoint: bool,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootStrapConfig {
+    pub initial_starting_version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestingConfig {
+    pub override_starting_version: u64,
+    pub ending_version: u64
+}
+

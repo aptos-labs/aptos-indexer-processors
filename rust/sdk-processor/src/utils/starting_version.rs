@@ -142,33 +142,27 @@ async fn get_starting_version_from_db(
 
     if let Some(backfill_config) = &indexer_processor_config.backfill_config {
         let backfill_status_option = BackfillProcessorStatusQuery::get_by_processor(
-            &backfill_config.backfill_alias,
+            indexer_processor_config.processor_config.name(),
+            &backfill_config.backfill_id,
             &mut conn,
         )
         .await
         .context("Failed to query backfill_processor_status table.")?;
 
-        // Return None if there is no checkpoint or if the backfill is old (complete).
+        // Return None if there is no checkpoint, if the backfill is old (complete), or if overwrite_checkpoint is true.
         // Otherwise, return the checkpointed version + 1.
         if let Some(status) = backfill_status_option {
-            match status.backfill_status {
-                BackfillStatus::InProgress => {
-                    return Ok(Some(status.last_success_version as u64 + 1));
-                },
-                // If status is Complete, this is the start of a new backfill job.
-                BackfillStatus::Complete => {
+                // If status is Complete or overwrite_checkpoint is true, this is the start of a new backfill job.
+                if status.backfill_status == BackfillStatus::Complete || backfill_config.overwrite_checkpoint {
                     let backfill_alias = status.backfill_alias.clone();
-                    let backfill_end_version_mapped = status.backfill_end_version;
                     let status = BackfillProcessorStatus {
                         backfill_alias,
                         backfill_status: BackfillStatus::InProgress,
                         last_success_version: 0,
                         last_transaction_timestamp: None,
-                        backfill_start_version: indexer_processor_config
-                            .transaction_stream_config
-                            .starting_version
-                            .unwrap_or(0) as i64,
-                        backfill_end_version: backfill_end_version_mapped,
+                        backfill_start_version: backfill_config
+                            .initial_starting_version as i64,
+                        backfill_end_version: backfill_config.ending_version as i64,
                     };
                     execute_with_better_error(
                         conn_pool.clone(),
@@ -196,8 +190,9 @@ async fn get_starting_version_from_db(
                     )
                     .await?;
                     return Ok(None);
-                },
-            }
+                } else {
+                    return Ok(Some(status.last_success_version as u64 + 1));
+                }
         } else {
             return Ok(None);
         }
@@ -229,7 +224,7 @@ mod tests {
     use crate::{
         config::{
             db_config::{DbConfig, PostgresConfig},
-            indexer_processor_config::{BackfillConfig, IndexerProcessorConfig},
+            indexer_processor_config::{BackfillConfig, BootStrapConfig, TestingConfig, IndexerProcessorConfig},
             processor_config::{DefaultProcessorConfig, ProcessorConfig},
         },
         db::common::models::{
@@ -251,7 +246,7 @@ mod tests {
     fn create_indexer_config(
         db_url: String,
         backfill_config: Option<BackfillConfig>,
-        starting_version: Option<u64>,
+        initial_starting_version: Option<u64>,
     ) -> IndexerProcessorConfig {
         let default_processor_config = DefaultProcessorConfig {
             per_table_chunk_sizes: AHashMap::new(),
@@ -264,11 +259,18 @@ mod tests {
             db_pool_size: 100,
         };
         let db_config = DbConfig::PostgresConfig(postgres_config);
+        let bootstrap_config = Some(BootStrapConfig {
+            initial_starting_version: initial_starting_version.unwrap_or(0),
+        });
+        let testing_config = Some(TestingConfig {
+            override_starting_version: 0,
+            ending_version: 0,
+        });
         IndexerProcessorConfig {
             db_config,
             transaction_stream_config: TransactionStreamConfig {
                 indexer_grpc_data_service_address: Url::parse("https://test.com").unwrap(),
-                starting_version,
+                starting_version: None,
                 request_ending_version: None,
                 auth_token: "test".to_string(),
                 request_name_header: "test".to_string(),
@@ -280,6 +282,8 @@ mod tests {
             },
             processor_config,
             backfill_config,
+            bootstrap_config,
+            testing_config,
         }
     }
 
@@ -350,12 +354,15 @@ mod tests {
     #[allow(clippy::needless_return)]
     async fn test_backfill_get_starting_version_with_completed_checkpoint() {
         let mut db = PostgresTestDatabase::new();
-        let backfill_alias = "backfill_processor".to_string();
         db.setup().await.unwrap();
+        let backfill_id = "1".to_string();
         let indexer_processor_config = create_indexer_config(
             db.get_db_url(),
             Some(BackfillConfig {
-                backfill_alias: backfill_alias.clone(),
+                backfill_id: backfill_id.clone(),
+                initial_starting_version: 0,
+                ending_version: 10,
+                overwrite_checkpoint: false,
             }),
             None,
         );
@@ -365,12 +372,12 @@ mod tests {
         run_migrations(db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor::schema::backfill_processor_status::table)
             .values(BackfillProcessorStatus {
-                backfill_alias: backfill_alias.clone(),
+                backfill_alias: backfill_id.clone(),
                 backfill_status: BackfillStatus::Complete,
                 last_success_version: 10,
                 last_transaction_timestamp: None,
                 backfill_start_version: 0,
-                backfill_end_version: Some(10),
+                backfill_end_version: 10,
             })
             .execute(&mut conn_pool.clone().get().await.unwrap())
             .await
@@ -387,12 +394,15 @@ mod tests {
     #[allow(clippy::needless_return)]
     async fn test_backfill_get_starting_version_with_inprogress_checkpoint() {
         let mut db = PostgresTestDatabase::new();
-        let backfill_alias = "backfill_processor".to_string();
+        let backfill_id = "1".to_string();
         db.setup().await.unwrap();
         let indexer_processor_config = create_indexer_config(
             db.get_db_url(),
             Some(BackfillConfig {
-                backfill_alias: backfill_alias.clone(),
+                backfill_id: backfill_id.clone(),
+                initial_starting_version: 0,
+                ending_version: 10,
+                overwrite_checkpoint: false,
             }),
             None,
         );
@@ -402,12 +412,12 @@ mod tests {
         run_migrations(db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor::schema::backfill_processor_status::table)
             .values(BackfillProcessorStatus {
-                backfill_alias: backfill_alias.clone(),
+                backfill_alias: backfill_id.clone(),
                 backfill_status: BackfillStatus::InProgress,
                 last_success_version: 10,
                 last_transaction_timestamp: None,
                 backfill_start_version: 0,
-                backfill_end_version: Some(10),
+                backfill_end_version: 100,
             })
             .execute(&mut conn_pool.clone().get().await.unwrap())
             .await
@@ -418,6 +428,46 @@ mod tests {
             .unwrap();
 
         assert_eq!(starting_version, 11)
+    }
+
+    #[tokio::test]
+    #[allow(clippy::needless_return)]
+    async fn test_backfill_get_starting_version_with_inprogress_checkpoint_overwrite_checkpoint() {
+        let mut db = PostgresTestDatabase::new();
+        let backfill_id = "1".to_string();
+        db.setup().await.unwrap();
+        let indexer_processor_config = create_indexer_config(
+            db.get_db_url(),
+            Some(BackfillConfig {
+                backfill_id: backfill_id.clone(),
+                initial_starting_version: 0,
+                ending_version: 10,
+                overwrite_checkpoint: true,
+            }),
+            None,
+        );
+        let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
+            .await
+            .expect("Failed to create connection pool");
+        run_migrations(db.get_db_url(), conn_pool.clone()).await;
+        diesel::insert_into(processor::schema::backfill_processor_status::table)
+            .values(BackfillProcessorStatus {
+                backfill_alias: backfill_id.clone(),
+                backfill_status: BackfillStatus::InProgress,
+                last_success_version: 10,
+                last_transaction_timestamp: None,
+                backfill_start_version: 0,
+                backfill_end_version: 100,
+            })
+            .execute(&mut conn_pool.clone().get().await.unwrap())
+            .await
+            .expect("Failed to insert processor status");
+
+        let starting_version = get_starting_version(&indexer_processor_config, conn_pool)
+            .await
+            .unwrap();
+
+        assert_eq!(starting_version, 0)
     }
 
     #[tokio::test]
