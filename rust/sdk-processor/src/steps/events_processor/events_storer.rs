@@ -1,6 +1,5 @@
 use crate::{
     config::processor_config::DefaultProcessorConfig,
-    db::common::models::events_models::events::EventModel,
     utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
@@ -16,7 +15,7 @@ use diesel::{
     query_builder::QueryFragment,
     ExpressionMethods,
 };
-use processor::schema;
+use processor::{db::postgres::models::events_models::events::EventModel, schema};
 use tracing::debug;
 
 pub struct EventsStorer
@@ -66,12 +65,6 @@ impl Processable for EventsStorer {
         &mut self,
         events: TransactionContext<Vec<EventModel>>,
     ) -> Result<Option<TransactionContext<()>>, ProcessorError> {
-        // tracing::info!(
-        //     start_version = events.start_version,
-        //     end_version = events.end_version,
-        //     step_name = self.name(),
-        //     "Processing versions",
-        // );
         let per_table_chunk_sizes: AHashMap<String, usize> =
             self.processor_config.per_table_chunk_sizes.clone();
         let execute_res = execute_in_chunks(
