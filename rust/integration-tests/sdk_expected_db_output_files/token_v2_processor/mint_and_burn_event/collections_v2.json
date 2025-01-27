@@ -1,0 +1,20 @@
+[
+  {
+    "transaction_version": 445585423,
+    "write_set_change_index": 279,
+    "collection_id": "0xa3d9ad08adf8af8dc3bd6a4bdd910d2a1cc88bd5fbedae0ddaa3e89b260a785f",
+    "creator_address": "0xadeb45c274f9f4f535afe8957a8cf9ffecbd2b79026fba6c207111136d963f14",
+    "collection_name": "APTS",
+    "description": "",
+    "uri": "https://img.apt-20.com/?tick=APTS",
+    "current_supply": "364858",
+    "max_supply": null,
+    "total_minted_v2": "1026328",
+    "mutable_description": null,
+    "mutable_uri": null,
+    "table_handle_v1": null,
+    "token_standard": "v2",
+    "transaction_timestamp": "2024-02-10T08:54:40.450699",
+    "collection_properties": null
+  }
+]

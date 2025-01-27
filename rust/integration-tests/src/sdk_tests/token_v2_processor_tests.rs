@@ -67,6 +67,7 @@ mod sdk_token_v2_processor_tests {
         IMPORTED_MAINNET_TXNS_141135867_TOKEN_V1_OFFER,
         IMPORTED_MAINNET_TXNS_178179220_TOKEN_V1_MUTATE_EVENT,
         IMPORTED_MAINNET_TXNS_325355235_TOKEN_V2_UNLIMITED_SUPPLY_MINT,
+        IMPORTED_MAINNET_TXNS_445585423_TOKEN_MINT_AND_BURN_EVENT,
         IMPORTED_MAINNET_TXNS_453498957_TOKEN_V2_MINT_AND_TRANSFER_EVENT_V1,
         IMPORTED_MAINNET_TXNS_537250181_TOKEN_V2_FIXED_SUPPLY_MINT,
         IMPORTED_MAINNET_TXNS_578366445_TOKEN_V2_BURN_EVENT_V2,
@@ -357,6 +358,24 @@ mod sdk_token_v2_processor_tests {
         process_single_transaction(
             IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
             Some("test_token_v2_with_module_events".to_string()),
+        )
+        .await;
+    }
+
+    /**
+     * This test includes processing for the following:
+     * - Events
+     *      - 0x1::fungible_asset::MintEvent
+     *      - 0x1::fungible_asset::BurnEvent
+     * - Resources
+     *      - 0x1::fungible_asset::Supply
+     *      - 0x1::fungible_asset::Metadata
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_mint_and_burn_event() {
+        process_single_transaction(
+            IMPORTED_MAINNET_TXNS_445585423_TOKEN_MINT_AND_BURN_EVENT,
+            Some("mint_and_burn_event".to_string()),
         )
         .await;
     }
