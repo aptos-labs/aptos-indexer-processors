@@ -33,12 +33,11 @@ pub async fn get_starting_version(
             .await
             .context("Failed to get latest processed version from DB")?;
 
-    // If nothing checkpointed, return the `starting_version` from the config, or 0 if not set.
+    // If nothing checkpointed, return the `initial_starting_version` from the bootstrap config if it exists, or 0 if not set.
     Ok(latest_processed_version.unwrap_or(
         indexer_processor_config
-            .transaction_stream_config
-            .starting_version
-            .unwrap_or(0),
+            .bootstrap_config.clone()
+            .map_or(0, |config| config.initial_starting_version)
     ))
 }
 
@@ -52,19 +51,21 @@ pub async fn get_min_last_success_version_parquet(
     table_names: Vec<String>,
 ) -> Result<u64> {
     let min_processed_version = if indexer_processor_config.backfill_config.is_some() {
+        println!("backfill_config: {:?}", indexer_processor_config.backfill_config);
         get_starting_version_from_db(indexer_processor_config, conn_pool.clone())
             .await
             .context("Failed to get latest processed version from DB")?
     } else {
+        println!("table_names: {:?}", table_names);
         get_min_processed_version_from_db(conn_pool.clone(), table_names)
             .await
             .context("Failed to get minimum last success version from DB")?
     };
 
     let config_starting_version = indexer_processor_config
-        .transaction_stream_config
-        .starting_version
-        .unwrap_or(0);
+        .bootstrap_config   
+        .clone()
+        .map_or(0, |config| config.initial_starting_version);
 
     if let Some(min_processed_version) = min_processed_version {
         Ok(std::cmp::max(
@@ -110,6 +111,8 @@ async fn get_min_processed_version_from_db(
 
     let results = futures::future::join_all(queries).await;
 
+    println!("results: {:?}", results);
+
     // Collect results and find the minimum processed version
     let min_processed_version = results
         .into_iter()
@@ -139,7 +142,6 @@ async fn get_starting_version_from_db(
     conn_pool: ArcDbPool,
 ) -> Result<Option<u64>> {
     let mut conn = conn_pool.get().await?;
-
     if let Some(backfill_config) = &indexer_processor_config.backfill_config {
         let backfill_status_option = BackfillProcessorStatusQuery::get_by_processor(
             indexer_processor_config.processor_config.name(),
@@ -148,7 +150,7 @@ async fn get_starting_version_from_db(
         )
         .await
         .context("Failed to query backfill_processor_status table.")?;
-
+        println!("processor_name: {:?}", indexer_processor_config.processor_config.name());
         // Return None if there is no checkpoint, if the backfill is old (complete), or if overwrite_checkpoint is true.
         // Otherwise, return the checkpointed version + 1.
         if let Some(status) = backfill_status_option {
@@ -206,7 +208,7 @@ async fn get_starting_version_from_db(
     .context("Failed to query processor_status table.")?;
 
     // Return None if there is no checkpoint. Otherwise,
-    // return the higher of the checkpointed version + 1 and `starting_version`.
+    // return the higher of the checkpointed version and `starting_version`.
     Ok(status.map(|status| {
         std::cmp::max(
             status.last_success_version as u64,
@@ -336,7 +338,7 @@ mod tests {
         diesel::insert_into(processor_status::table)
             .values(ProcessorStatus {
                 processor: indexer_processor_config.processor_config.name().to_string(),
-                last_success_version: 10,
+                last_success_version: 12,
                 last_transaction_timestamp: None,
             })
             .execute(&mut conn_pool.clone().get().await.unwrap())
@@ -347,7 +349,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(starting_version, 11)
+        assert_eq!(starting_version, 12)
     }
 
     #[tokio::test]
@@ -394,12 +396,11 @@ mod tests {
     #[allow(clippy::needless_return)]
     async fn test_backfill_get_starting_version_with_inprogress_checkpoint() {
         let mut db = PostgresTestDatabase::new();
-        let backfill_id = "1".to_string();
         db.setup().await.unwrap();
         let indexer_processor_config = create_indexer_config(
             db.get_db_url(),
             Some(BackfillConfig {
-                backfill_id: backfill_id.clone(),
+                backfill_id: "1".to_string(),
                 initial_starting_version: 0,
                 ending_version: 10,
                 overwrite_checkpoint: false,
@@ -412,7 +413,7 @@ mod tests {
         run_migrations(db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor::schema::backfill_processor_status::table)
             .values(BackfillProcessorStatus {
-                backfill_alias: backfill_id.clone(),
+                backfill_alias: "events_processor_1".to_string(),
                 backfill_status: BackfillStatus::InProgress,
                 last_success_version: 10,
                 last_transaction_timestamp: None,
@@ -434,12 +435,11 @@ mod tests {
     #[allow(clippy::needless_return)]
     async fn test_backfill_get_starting_version_with_inprogress_checkpoint_overwrite_checkpoint() {
         let mut db = PostgresTestDatabase::new();
-        let backfill_id = "1".to_string();
         db.setup().await.unwrap();
         let indexer_processor_config = create_indexer_config(
             db.get_db_url(),
             Some(BackfillConfig {
-                backfill_id: backfill_id.clone(),
+                backfill_id: "1".to_string(),
                 initial_starting_version: 0,
                 ending_version: 10,
                 overwrite_checkpoint: true,
@@ -452,7 +452,7 @@ mod tests {
         run_migrations(db.get_db_url(), conn_pool.clone()).await;
         diesel::insert_into(processor::schema::backfill_processor_status::table)
             .values(BackfillProcessorStatus {
-                backfill_alias: backfill_id.clone(),
+                backfill_alias: "events_processor_1".to_string(),
                 backfill_status: BackfillStatus::InProgress,
                 last_success_version: 10,
                 last_transaction_timestamp: None,
