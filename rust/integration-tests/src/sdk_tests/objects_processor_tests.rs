@@ -3,7 +3,7 @@ use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
 use sdk_processor::{
     config::{
         db_config::{DbConfig, PostgresConfig},
-        indexer_processor_config::IndexerProcessorConfig,
+        indexer_processor_config::{IndexerProcessorConfig, ProcessorMode},
         processor_config::{DefaultProcessorConfig, ProcessorConfig},
     },
     processors::objects_processor::ObjectsProcessorConfig,
@@ -45,6 +45,7 @@ pub fn setup_objects_processor_config(
             backfill_config: None,
             bootstrap_config: None,
             testing_config: None,
+            mode: ProcessorMode::Default,
         },
         processor_name,
     )

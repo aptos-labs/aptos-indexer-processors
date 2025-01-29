@@ -1,6 +1,6 @@
 use super::database::ArcDbPool;
 use crate::{
-    config::indexer_processor_config::IndexerProcessorConfig,
+    config::indexer_processor_config::{IndexerProcessorConfig, ProcessorMode},
     db::common::models::{
         backfill_processor_status::{
             BackfillProcessorStatus, BackfillProcessorStatusQuery, BackfillStatus,
@@ -16,13 +16,17 @@ use processor::schema::backfill_processor_status;
 /// Get the appropriate starting version for the processor.
 ///
 /// If it is a regular processor, this will return the higher of the checkpointed version,
-/// or `staring_version` from the config, or 0 if not set.
+/// or `initial_starting_version` from the bootstrap config, or 0 if not set.
 ///
 /// If this is a backfill processor and threre is an in-progress backfill, this will return
 /// the checkpointed version + 1.
 ///
 /// If this is a backfill processor and there is not an in-progress backfill (i.e., no checkpoint or
-/// backfill status is COMPLETE), this will return `starting_version` from the config, or 0 if not set.
+/// backfill status is COMPLETE), this will return `intial_starting_version` from the backfill config, or 0 if not set.
+///
+/// If the backfill status is IN_PROGRESS, and `backfill_config.overwrite_checkpoint` is true, this will return 
+/// `initial_starting_version` from the backfill config, or 0 if not set. This allows users to restart a 
+/// backfill job if they want to.
 pub async fn get_starting_version(
     indexer_processor_config: &IndexerProcessorConfig,
     conn_pool: ArcDbPool,
@@ -51,12 +55,10 @@ pub async fn get_min_last_success_version_parquet(
     table_names: Vec<String>,
 ) -> Result<u64> {
     let min_processed_version = if indexer_processor_config.backfill_config.is_some() {
-        println!("backfill_config: {:?}", indexer_processor_config.backfill_config);
         get_starting_version_from_db(indexer_processor_config, conn_pool.clone())
             .await
             .context("Failed to get latest processed version from DB")?
     } else {
-        println!("table_names: {:?}", table_names);
         get_min_processed_version_from_db(conn_pool.clone(), table_names)
             .await
             .context("Failed to get minimum last success version from DB")?
@@ -111,8 +113,6 @@ async fn get_min_processed_version_from_db(
 
     let results = futures::future::join_all(queries).await;
 
-    println!("results: {:?}", results);
-
     // Collect results and find the minimum processed version
     let min_processed_version = results
         .into_iter()
@@ -142,15 +142,16 @@ async fn get_starting_version_from_db(
     conn_pool: ArcDbPool,
 ) -> Result<Option<u64>> {
     let mut conn = conn_pool.get().await?;
-    if let Some(backfill_config) = &indexer_processor_config.backfill_config {
-        let backfill_status_option = BackfillProcessorStatusQuery::get_by_processor(
-            indexer_processor_config.processor_config.name(),
-            &backfill_config.backfill_id,
+    match indexer_processor_config.mode {
+        ProcessorMode::Backfill => {
+            let backfill_config = indexer_processor_config.backfill_config.clone().unwrap();
+            let backfill_status_option = BackfillProcessorStatusQuery::get_by_processor(
+                indexer_processor_config.processor_config.name(),
+                &backfill_config.backfill_id,
             &mut conn,
         )
         .await
         .context("Failed to query backfill_processor_status table.")?;
-        println!("processor_name: {:?}", indexer_processor_config.processor_config.name());
         // Return None if there is no checkpoint, if the backfill is old (complete), or if overwrite_checkpoint is true.
         // Otherwise, return the checkpointed version + 1.
         if let Some(status) = backfill_status_option {
@@ -197,27 +198,33 @@ async fn get_starting_version_from_db(
                 }
         } else {
             return Ok(None);
-        }
-    }
-
-    let status = ProcessorStatusQuery::get_by_processor(
-        indexer_processor_config.processor_config.name(),
-        &mut conn,
-    )
+            }
+        },
+        ProcessorMode::Default => {
+            let status = ProcessorStatusQuery::get_by_processor(
+                indexer_processor_config.processor_config.name(),
+                &mut conn,
+            )
     .await
     .context("Failed to query processor_status table.")?;
 
     // Return None if there is no checkpoint. Otherwise,
-    // return the higher of the checkpointed version and `starting_version`.
+    // return the higher of the checkpointed version and `initialstarting_version`.
     Ok(status.map(|status| {
         std::cmp::max(
             status.last_success_version as u64,
             indexer_processor_config
-                .transaction_stream_config
-                .starting_version
-                .unwrap_or(0),
+                .bootstrap_config
+                .clone()
+                .map_or(0, |config| config.initial_starting_version),
         )
     }))
+        },
+        ProcessorMode::Testing => {
+            let testing_config = indexer_processor_config.testing_config.clone().unwrap();
+            Ok(Some(testing_config.override_starting_version))
+        },
+    }
 }
 
 #[cfg(test)]
@@ -226,7 +233,7 @@ mod tests {
     use crate::{
         config::{
             db_config::{DbConfig, PostgresConfig},
-            indexer_processor_config::{BackfillConfig, BootStrapConfig, TestingConfig, IndexerProcessorConfig},
+            indexer_processor_config::{BackfillConfig, BootStrapConfig, IndexerProcessorConfig, ProcessorMode, TestingConfig},
             processor_config::{DefaultProcessorConfig, ProcessorConfig},
         },
         db::common::models::{
@@ -249,6 +256,7 @@ mod tests {
         db_url: String,
         backfill_config: Option<BackfillConfig>,
         initial_starting_version: Option<u64>,
+        mode: ProcessorMode,
     ) -> IndexerProcessorConfig {
         let default_processor_config = DefaultProcessorConfig {
             per_table_chunk_sizes: AHashMap::new(),
@@ -286,6 +294,7 @@ mod tests {
             backfill_config,
             bootstrap_config,
             testing_config,
+            mode,
         }
     }
 
@@ -294,7 +303,7 @@ mod tests {
     async fn test_get_starting_version_no_checkpoint() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, None);
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, None, ProcessorMode::Default);
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
@@ -312,7 +321,7 @@ mod tests {
     async fn test_get_starting_version_no_checkpoint_with_start_ver() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(5));
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(5), ProcessorMode::Default);
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
@@ -330,7 +339,7 @@ mod tests {
     async fn test_get_starting_version_with_checkpoint() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, None);
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, None, ProcessorMode::Default);
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
@@ -367,6 +376,7 @@ mod tests {
                 overwrite_checkpoint: false,
             }),
             None,
+            ProcessorMode::Backfill,
         );
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
@@ -406,6 +416,7 @@ mod tests {
                 overwrite_checkpoint: false,
             }),
             None,
+            ProcessorMode::Backfill,
         );
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
@@ -445,6 +456,7 @@ mod tests {
                 overwrite_checkpoint: true,
             }),
             None,
+            ProcessorMode::Backfill,
         );
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
@@ -475,7 +487,7 @@ mod tests {
     async fn test_get_min_last_success_version_parquet_no_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0), ProcessorMode::Default);
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
@@ -499,7 +511,7 @@ mod tests {
     async fn test_get_min_last_success_version_parquet_with_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0), ProcessorMode::Default);
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
@@ -541,7 +553,7 @@ mod tests {
     async fn test_get_min_last_success_version_parquet_with_partial_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(5));
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(5), ProcessorMode::Default);
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");

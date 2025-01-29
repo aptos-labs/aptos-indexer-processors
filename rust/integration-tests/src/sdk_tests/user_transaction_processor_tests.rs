@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
 use sdk_processor::config::{
     db_config::{DbConfig, PostgresConfig},
-    indexer_processor_config::IndexerProcessorConfig,
+    indexer_processor_config::{IndexerProcessorConfig, ProcessorMode},
     processor_config::{DefaultProcessorConfig, ProcessorConfig},
 };
 use std::collections::HashSet;
@@ -35,6 +35,7 @@ pub fn setup_user_txn_processor_config(
             backfill_config: None,
             bootstrap_config: None,
             testing_config: None,
+            mode: ProcessorMode::Default,
         },
         processor_name,
     )
