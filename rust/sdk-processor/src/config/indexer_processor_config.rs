@@ -36,21 +36,16 @@ use serde::{Deserialize, Serialize};
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;
 pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 pub enum ProcessorMode {
     #[serde(rename = "default")]
+    #[default]
     Default,
     #[serde(rename = "backfill")]
     Backfill,
     #[serde(rename = "testing")]
     Testing,
-}
-
-impl Default for ProcessorMode {
-    fn default() -> Self {
-        ProcessorMode::Default
-    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -76,7 +71,9 @@ impl IndexerProcessorConfig {
             },
             ProcessorMode::Backfill => {
                 if self.backfill_config.is_none() {
-                    return Err("backfill_config must be present when mode is 'backfill'".to_string());
+                    return Err(
+                        "backfill_config must be present when mode is 'backfill'".to_string()
+                    );
                 }
             },
             ProcessorMode::Default => {},
@@ -245,6 +242,5 @@ pub struct BootStrapConfig {
 #[serde(deny_unknown_fields)]
 pub struct TestingConfig {
     pub override_starting_version: u64,
-    pub ending_version: u64
+    pub ending_version: u64,
 }
-

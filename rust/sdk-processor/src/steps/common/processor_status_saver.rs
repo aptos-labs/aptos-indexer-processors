@@ -27,7 +27,11 @@ pub fn get_processor_status_saver(
     if let Some(backfill_config) = config.backfill_config {
         let backfill_start_version = backfill_config.initial_starting_version;
         let backfill_end_version = backfill_config.ending_version;
-        let backfill_alias = format!("{}_{}", config.processor_config.name(), backfill_config.backfill_id);
+        let backfill_alias = format!(
+            "{}_{}",
+            config.processor_config.name(),
+            backfill_config.backfill_id
+        );
         ProcessorStatusSaverEnum::Backfill {
             conn_pool,
             backfill_alias,
