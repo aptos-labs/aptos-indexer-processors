@@ -541,7 +541,7 @@ mod tests {
     async fn test_get_min_last_success_version_parquet_with_partial_checkpoints() {
         let mut db = PostgresTestDatabase::new();
         db.setup().await.unwrap();
-        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(0));
+        let indexer_processor_config = create_indexer_config(db.get_db_url(), None, Some(5));
         let conn_pool = new_db_pool(db.get_db_url().as_str(), Some(10))
             .await
             .expect("Failed to create connection pool");
@@ -572,6 +572,6 @@ mod tests {
         .unwrap();
 
         // Since processor_2 has no checkpoint, the minimum version should be the starting version of processor_1
-        assert_eq!(min_version, 0);
+        assert_eq!(min_version, 15);
     }
 }
