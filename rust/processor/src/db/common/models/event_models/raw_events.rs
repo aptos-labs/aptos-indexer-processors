@@ -82,7 +82,7 @@ impl RawEvent {
             .collect::<Vec<Self>>()
     }
 
-    pub fn from_event(
+    fn from_event(
         event: &EventPB,
         txn_version: i64,
         txn_block_height: i64,

@@ -7,18 +7,8 @@ use crate::{
     db::{common::models::event_models::raw_events::RawEvent, parquet::ParquetConvertible},
 };
 use allocative_derive::Allocative;
-use lazy_static::lazy_static;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
-
-// This is for future proofing. TODO: change when events v2 comes
-const EVENT_VERSION: i8 = 1i8;
-
-lazy_static! {
-    pub static ref DEFAULT_ACCOUNT_ADDRESS: String = "NULL_ACCOUNT_ADDRESS".to_string();
-    pub static ref DEFAULT_EVENT_TYPE: String = "NULL_EVENT_TYPE".to_string();
-    pub static ref DEFAULT_EVENT_DATA: String = "NULL_EVENT_DATA".to_string();
-}
 
 #[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
 pub struct Event {
@@ -33,7 +23,6 @@ pub struct Event {
     pub indexed_type: String,
     pub type_tag_bytes: i64,
     pub total_bytes: i64,
-    pub event_version: i8,
     #[allocative(skip)]
     pub block_timestamp: chrono::NaiveDateTime,
 }
@@ -70,7 +59,6 @@ impl ParquetConvertible for RawEvent {
             indexed_type: self.indexed_type.clone(),
             type_tag_bytes: self.type_tag_bytes.unwrap_or(0),
             total_bytes: self.total_bytes.unwrap_or(0),
-            event_version: EVENT_VERSION,
             block_timestamp: self.block_timestamp.unwrap(),
         }
     }
