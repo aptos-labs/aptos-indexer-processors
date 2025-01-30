@@ -15,16 +15,16 @@ use processor::schema::backfill_processor_status;
 
 /// Get the appropriate starting version for the processor.
 ///
-/// If it is a regular (`mode == default`) processor, this will return the higher of the checkpointed version,
-/// or `initial_starting_version` from the bootstrap config, or 0 if not set.
+/// If it is a regular (`mode == default`) processor, this will return the higher of the (checkpointed version,
+/// `initial_starting_version` || 0) from the bootstrap config.
 ///
-/// If this is a backfill processor and threre is an in-progress backfill, this will return
+/// If this is a backfill processor and there is an in-progress backfill, this will return
 /// the checkpointed version + 1.
 ///
 /// If this is a backfill processor and there is not an in-progress backfill (i.e., no checkpoint or
 /// backfill status is COMPLETE), this will return `intial_starting_version` from the backfill config, or 0 if not set.
 ///
-/// If the backfill status is IN_PROGRESS, and `backfill_config.overwrite_checkpoint` is true, this will return
+/// If the backfill status is IN_PROGRESS, and `backfill_config.overwrite_checkpoint` is `true`, this will return
 /// `initial_starting_version` from the backfill config, or 0 if not set. This allows users to restart a
 /// backfill job if they want to.
 pub async fn get_starting_version(
