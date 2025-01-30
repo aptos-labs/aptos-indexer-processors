@@ -1,5 +1,5 @@
 use crate::{
-    config::{db_config::DbConfig, indexer_processor_config::IndexerProcessorConfig},
+    config::{db_config::DbConfig, indexer_processor_config::{IndexerProcessorConfig, ProcessorMode}},
     db::common::models::{
         backfill_processor_status::{BackfillProcessorStatus, BackfillStatus},
         processor_status::ProcessorStatus,
@@ -24,7 +24,9 @@ pub fn get_processor_status_saver(
     conn_pool: ArcDbPool,
     config: IndexerProcessorConfig,
 ) -> ProcessorStatusSaverEnum {
-    if let Some(backfill_config) = config.backfill_config {
+    match config.mode {
+    ProcessorMode::Backfill => {
+        let backfill_config = config.backfill_config.clone().unwrap();
         let backfill_start_version = backfill_config.initial_starting_version;
         let backfill_end_version = backfill_config.ending_version;
         let backfill_alias = format!(
@@ -38,7 +40,8 @@ pub fn get_processor_status_saver(
             backfill_start_version,
             backfill_end_version,
         }
-    } else {
+    },
+    _ => {
         let processor_name = config.processor_config.name().to_string();
         if let DbConfig::ParquetConfig(_) = config.db_config {
             ProcessorStatusSaverEnum::Parquet {
@@ -51,6 +54,7 @@ pub fn get_processor_status_saver(
                 processor_name,
             }
         }
+    }
     }
 }
 
