@@ -53,14 +53,18 @@ mod sdk_fungible_asset_processor_tests {
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
         IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_MAINNET_TXNS_1737056775_COIN_TRANSFER_BURN_EVENT,
         IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
+        IMPORTED_MAINNET_TXNS_255894550_STORAGE_REFUND,
         IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
+        IMPORTED_MAINNET_TXNS_550582915_MULTIPLE_TRANSFER_EVENT,
         IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
         IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
         IMPORTED_TESTNET_TXNS_2646510387_CONCURRENT_FA,
+        IMPORTED_TESTNET_TXNS_4462417704_SECONDARY_STORE_BURNT,
         IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
         IMPORTED_TESTNET_TXNS_5979639459_COIN_REGISTER,
-        IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES,
+        IMPORTED_TESTNET_TXNS_5992795934_FA_ACTIVITIES, IMPORTED_TESTNET_TXNS_646928741_NO_EVENTS,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
     use sdk_processor::processors::fungible_asset_processor::FungibleAssetProcessor;
@@ -161,6 +165,8 @@ mod sdk_fungible_asset_processor_tests {
         .await;
     }
 
+    /// Tests processing of coin v2 events
+    /// Validates the handling of updated coin event formats
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_fungible_asset_processor_coin_v2_events() {
         process_single_testnet_fa_txns(
@@ -175,6 +181,61 @@ mod sdk_fungible_asset_processor_tests {
         process_single_testnet_fa_txns(
             IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
             Some("coin_store_deletion_no_event".to_string()),
+        )
+        .await;
+    }
+
+    /// Tests processing of secondary store burn operations
+    /// Validates correct handling of burning tokens from secondary stores
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_secondary_store_burnt() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_4462417704_SECONDARY_STORE_BURNT,
+            Some("secondary_store_burnt".to_string()),
+        )
+        .await;
+    }
+
+    /// Tests gas event processing when no other events are present
+    /// Validates correct handling of isolated gas events
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_gas_event_when_events_is_empty() {
+        process_single_testnet_fa_txns(
+            IMPORTED_TESTNET_TXNS_646928741_NO_EVENTS,
+            Some("gas_event_when_events_is_empty".to_string()),
+        )
+        .await;
+    }
+
+    /// Tests processing of coin transfer burn events
+    /// Validates handling of burn operations during coin transfers
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_coin_transfer_burn_event() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_1737056775_COIN_TRANSFER_BURN_EVENT,
+            Some("coin_transfer_burn_event".to_string()),
+        )
+        .await;
+    }
+
+    /// Tests processing of multiple transfer events in a single transaction
+    /// Validates correct handling of batch transfers
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_multiple_transfer_event() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_550582915_MULTIPLE_TRANSFER_EVENT,
+            Some("multiple_transfer_event".to_string()),
+        )
+        .await;
+    }
+
+    /// Tests processing of storage refund operations
+    /// Validates correct handling of storage refund mechanics
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fungible_asset_processor_storage_refund() {
+        process_single_testnet_fa_txns(
+            IMPORTED_MAINNET_TXNS_255894550_STORAGE_REFUND,
+            Some("storage_refund".to_string()),
         )
         .await;
     }
