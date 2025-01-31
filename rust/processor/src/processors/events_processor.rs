@@ -4,7 +4,7 @@
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
-        common::models::event_models::raw_events::RawEvent,
+        common::models::event_models::raw_events::parse_events,
         postgres::models::events_models::events::EventPG,
     },
     gap_detectors::ProcessingResult,
@@ -155,7 +155,7 @@ impl ProcessorTrait for EventsProcessor {
 pub fn process_transactions(transactions: Vec<Transaction>) -> Vec<EventPG> {
     let mut events = vec![];
     for txn in &transactions {
-        let txn_events: Vec<EventPG> = RawEvent::from_transaction(txn, "EventsProcessor")
+        let txn_events: Vec<EventPG> = parse_events(txn, "EventsProcessor")
             .into_iter()
             .map(|e| e.into())
             .collect();

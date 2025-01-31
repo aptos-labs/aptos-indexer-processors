@@ -6,7 +6,7 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::db::{
-    common::models::event_models::raw_events::RawEvent,
+    common::models::event_models::raw_events::parse_events,
     postgres::models::events_models::events::EventPG,
 };
 use rayon::prelude::*;
@@ -28,7 +28,7 @@ impl Processable for EventsExtractor {
         let events: Vec<EventPG> = item
             .data
             .par_iter()
-            .map(|txn| RawEvent::from_transaction(txn, "EventsProcessor"))
+            .map(|txn| parse_events(txn, "EventsProcessor"))
             .flatten()
             .map(|e| e.into())
             .collect();

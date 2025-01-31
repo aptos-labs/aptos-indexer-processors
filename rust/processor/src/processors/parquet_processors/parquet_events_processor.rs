@@ -7,7 +7,7 @@ use crate::{
         ParquetProcessingResult,
     },
     db::{
-        common::models::event_models::raw_events::RawEvent,
+        common::models::event_models::raw_events::parse_events,
         parquet::models::event_models::parquet_events::EventPQ,
     },
     gap_detectors::ProcessingResult,
@@ -128,7 +128,7 @@ pub fn process_transactions_parquet(
     let mut events = vec![];
     for txn in &transactions {
         let txn_version = txn.version as i64;
-        let txn_events: Vec<EventPQ> = RawEvent::from_transaction(txn, "ParquetEventsProcessor")
+        let txn_events: Vec<EventPQ> = parse_events(txn, "ParquetEventsProcessor")
             .into_iter()
             .map(|e| e.into())
             .collect();

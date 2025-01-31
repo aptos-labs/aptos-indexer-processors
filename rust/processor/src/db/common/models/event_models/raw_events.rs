@@ -27,61 +27,6 @@ pub struct RawEvent {
 }
 
 impl RawEvent {
-    pub fn from_transaction(txn: &Transaction, processor_name: &str) -> Vec<RawEvent> {
-        let txn_version = txn.version as i64;
-        let block_height = txn.block_height as i64;
-        let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
-        let size_info = match txn.size_info.as_ref() {
-            Some(size_info) => Some(size_info),
-            None => {
-                warn!(version = txn.version, "Transaction size info not found");
-                None
-            },
-        };
-        let txn_data = match txn.txn_data.as_ref() {
-            Some(data) => data,
-            None => {
-                warn!(
-                    transaction_version = txn_version,
-                    "Transaction data doesn't exist"
-                );
-                PROCESSOR_UNKNOWN_TYPE_COUNT
-                    .with_label_values(&[processor_name])
-                    .inc();
-                return vec![];
-            },
-        };
-        let default = vec![];
-        let raw_events = match txn_data {
-            TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-            TxnData::Genesis(tx_inner) => &tx_inner.events,
-            TxnData::User(tx_inner) => &tx_inner.events,
-            TxnData::Validator(tx_inner) => &tx_inner.events,
-            _ => &default,
-        };
-
-        let event_size_info = size_info.map(|info| info.event_size_info.as_slice());
-
-        raw_events
-            .iter()
-            .enumerate()
-            .map(|(index, event)| {
-                // event_size_info will be used for user transactions only, no promises for other transactions.
-                // If event_size_info is missing due, it defaults to 0.
-                // No need to backfill as event_size_info is primarily for debugging user transactions.
-                let size_info = event_size_info.and_then(|infos| infos.get(index));
-                Self::from_event(
-                    event,
-                    txn_version,
-                    block_height,
-                    index as i64,
-                    size_info,
-                    Some(block_timestamp),
-                )
-            })
-            .collect::<Vec<Self>>()
-    }
-
     fn from_event(
         event: &EventPB,
         txn_version: i64,
@@ -111,4 +56,59 @@ impl RawEvent {
             total_bytes: Some(total_bytes),
         }
     }
+}
+
+pub fn parse_events(txn: &Transaction, processor_name: &str) -> Vec<RawEvent> {
+    let txn_version = txn.version as i64;
+    let block_height = txn.block_height as i64;
+    let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
+    let size_info = match txn.size_info.as_ref() {
+        Some(size_info) => Some(size_info),
+        None => {
+            warn!(version = txn.version, "Transaction size info not found");
+            None
+        },
+    };
+    let txn_data = match txn.txn_data.as_ref() {
+        Some(data) => data,
+        None => {
+            warn!(
+                transaction_version = txn_version,
+                "Transaction data doesn't exist"
+            );
+            PROCESSOR_UNKNOWN_TYPE_COUNT
+                .with_label_values(&[processor_name])
+                .inc();
+            return vec![];
+        },
+    };
+    let default = vec![];
+    let raw_events = match txn_data {
+        TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
+        TxnData::Genesis(tx_inner) => &tx_inner.events,
+        TxnData::User(tx_inner) => &tx_inner.events,
+        TxnData::Validator(tx_inner) => &tx_inner.events,
+        _ => &default,
+    };
+
+    let event_size_info = size_info.map(|info| info.event_size_info.as_slice());
+
+    raw_events
+        .iter()
+        .enumerate()
+        .map(|(index, event)| {
+            // event_size_info will be used for user transactions only, no promises for other transactions.
+            // If event_size_info is missing due, it defaults to 0.
+            // No need to backfill as event_size_info is primarily for debugging user transactions.
+            let size_info = event_size_info.and_then(|infos| infos.get(index));
+            RawEvent::from_event(
+                event,
+                txn_version,
+                block_height,
+                index as i64,
+                size_info,
+                Some(block_timestamp),
+            )
+        })
+        .collect::<Vec<RawEvent>>()
 }
