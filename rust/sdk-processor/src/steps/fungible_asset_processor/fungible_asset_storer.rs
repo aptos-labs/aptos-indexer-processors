@@ -18,6 +18,7 @@ use processor::{
             v2_fungible_asset_balances::{
                 CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
             },
+            v2_fungible_asset_to_coin_mappings::FungibleAssetToCoinMapping,
             v2_fungible_metadata::FungibleAssetMetadataModel,
         },
     },
@@ -25,6 +26,7 @@ use processor::{
         insert_coin_supply_query, insert_current_unified_fungible_asset_balances_v1_query,
         insert_current_unified_fungible_asset_balances_v2_query,
         insert_fungible_asset_activities_query, insert_fungible_asset_metadata_query,
+        insert_fungible_asset_to_coin_mappings_query,
     },
     utils::table_flags::TableFlags,
 };
@@ -63,6 +65,7 @@ impl Processable for FungibleAssetStorer {
             Vec<CurrentUnifiedFungibleAssetBalance>,
         ),
         Vec<CoinSupply>,
+        Vec<FungibleAssetToCoinMapping>,
     );
     type Output = ();
     type RunType = AsyncRunType;
@@ -78,6 +81,7 @@ impl Processable for FungibleAssetStorer {
                 Vec<CurrentUnifiedFungibleAssetBalance>,
             ),
             Vec<CoinSupply>,
+            Vec<FungibleAssetToCoinMapping>,
         )>,
     ) -> Result<Option<TransactionContext<Self::Output>>, ProcessorError> {
         let (
@@ -86,6 +90,7 @@ impl Processable for FungibleAssetStorer {
             mut fungible_asset_balances,
             (mut current_unified_fab_v1, mut current_unified_fab_v2),
             mut coin_supply,
+            coin_to_fa_mappings,
         ) = input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
@@ -150,9 +155,18 @@ impl Processable for FungibleAssetStorer {
             &coin_supply,
             get_config_table_chunk_size::<CoinSupply>("coin_supply", &per_table_chunk_sizes),
         );
-        let (faa_res, fam_res, cufab1_res, cufab2_res, cs_res) =
-            tokio::join!(faa, fam, cufab_v1, cufab_v2, cs);
-        for res in [faa_res, fam_res, cufab1_res, cufab2_res, cs_res] {
+        let fatcm = execute_in_chunks(
+            self.conn_pool.clone(),
+            insert_fungible_asset_to_coin_mappings_query,
+            &coin_to_fa_mappings,
+            get_config_table_chunk_size::<FungibleAssetToCoinMapping>(
+                "fungible_asset_to_coin_mappings",
+                &per_table_chunk_sizes,
+            ),
+        );
+        let (faa_res, fam_res, cufab1_res, cufab2_res, cs_res, fatcm_res) =
+            tokio::join!(faa, fam, cufab_v1, cufab_v2, cs, fatcm);
+        for res in [faa_res, fam_res, cufab1_res, cufab2_res, cs_res, fatcm_res] {
             match res {
                 Ok(_) => {},
                 Err(e) => {
