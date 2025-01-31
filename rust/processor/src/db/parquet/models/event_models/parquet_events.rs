@@ -4,14 +4,14 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{
     bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::{common::models::event_models::raw_events::RawEvent, parquet::ParquetConvertible},
+    db::common::models::event_models::raw_events::RawEvent,
 };
 use allocative_derive::Allocative;
 use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 #[derive(Allocative, Clone, Debug, Default, Deserialize, ParquetRecordWriter, Serialize)]
-pub struct Event {
+pub struct EventPQ {
     pub txn_version: i64,
     pub account_address: String,
     pub sequence_number: i64,
@@ -27,41 +27,37 @@ pub struct Event {
     pub block_timestamp: chrono::NaiveDateTime,
 }
 
-impl NamedTable for Event {
+impl NamedTable for EventPQ {
     const TABLE_NAME: &'static str = "events";
 }
 
-impl HasVersion for Event {
+impl HasVersion for EventPQ {
     fn version(&self) -> i64 {
         self.txn_version
     }
 }
 
-impl GetTimeStamp for Event {
+impl GetTimeStamp for EventPQ {
     fn get_timestamp(&self) -> chrono::NaiveDateTime {
         self.block_timestamp
     }
 }
 
-impl ParquetConvertible for RawEvent {
-    type ParquetModelType = Event;
-
-    fn to_parquet(&self) -> Self::ParquetModelType {
-        Event {
-            txn_version: self.transaction_version,
-            account_address: self.account_address.clone(),
-            sequence_number: self.sequence_number,
-            creation_number: self.creation_number,
-            block_height: self.transaction_block_height,
-            event_type: self.type_.clone(),
-            data: self.data.clone(),
-            event_index: self.event_index,
-            indexed_type: self.indexed_type.clone(),
-            type_tag_bytes: self.type_tag_bytes.unwrap_or(0),
-            total_bytes: self.total_bytes.unwrap_or(0),
-            block_timestamp: self.block_timestamp.unwrap(),
+impl From<RawEvent> for EventPQ {
+    fn from(raw_event: RawEvent) -> Self {
+        EventPQ {
+            txn_version: raw_event.transaction_version,
+            account_address: raw_event.account_address,
+            sequence_number: raw_event.sequence_number,
+            creation_number: raw_event.creation_number,
+            block_height: raw_event.transaction_block_height,
+            event_type: raw_event.type_,
+            data: raw_event.data,
+            event_index: raw_event.event_index,
+            indexed_type: raw_event.indexed_type,
+            type_tag_bytes: raw_event.type_tag_bytes.unwrap_or(0),
+            total_bytes: raw_event.total_bytes.unwrap_or(0),
+            block_timestamp: raw_event.block_timestamp.unwrap(),
         }
     }
 }
-
-pub type ParquetEventModel = Event;

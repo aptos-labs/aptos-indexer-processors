@@ -206,6 +206,9 @@ impl Transaction {
                     },
                     None => (None, None),
                 };
+                // For some older validator transactions, GRPC stubs out the raw events.
+                // We use the event size info as the source of truth to determine the number of events in the transaction.
+                // This inconsistency should only be temporary until all transaction events are backfilled in GRPC.
                 let num_events = len_event_size_info.unwrap_or(user_txn.events.len() as i64);
 
                 let serialized_payload =

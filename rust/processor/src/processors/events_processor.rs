@@ -5,7 +5,7 @@ use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
     db::{
         common::models::event_models::raw_events::RawEvent,
-        postgres::{models::events_models::events::EventModel, PostgresConvertible},
+        postgres::models::events_models::events::EventPG,
     },
     gap_detectors::ProcessingResult,
     schema,
@@ -53,7 +53,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    events: &[EventModel],
+    events: &[EventPG],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -66,14 +66,14 @@ async fn insert_to_db(
         conn,
         insert_events_query,
         events,
-        get_config_table_chunk_size::<EventModel>("events", per_table_chunk_sizes),
+        get_config_table_chunk_size::<EventPG>("events", per_table_chunk_sizes),
     )
     .await?;
     Ok(())
 }
 
 fn insert_events_query(
-    items_to_insert: Vec<EventModel>,
+    items_to_insert: Vec<EventPG>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -152,10 +152,13 @@ impl ProcessorTrait for EventsProcessor {
     }
 }
 
-pub fn process_transactions(transactions: Vec<Transaction>) -> Vec<EventModel> {
+pub fn process_transactions(transactions: Vec<Transaction>) -> Vec<EventPG> {
     let mut events = vec![];
     for txn in &transactions {
-        let txn_events = RawEvent::from_transaction(txn, "EventsProcessor").to_postgres();
+        let txn_events: Vec<EventPG> = RawEvent::from_transaction(txn, "EventsProcessor")
+            .into_iter()
+            .map(|e| e.into())
+            .collect();
         events.extend(txn_events);
     }
     events

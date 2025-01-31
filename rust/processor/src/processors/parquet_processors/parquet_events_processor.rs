@@ -8,7 +8,7 @@ use crate::{
     },
     db::{
         common::models::event_models::raw_events::RawEvent,
-        parquet::{models::event_models::parquet_events::Event, ParquetConvertible},
+        parquet::models::event_models::parquet_events::EventPQ,
     },
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
@@ -40,7 +40,7 @@ impl ParquetProcessorTrait for ParquetEventsProcessorConfig {
 
 pub struct ParquetEventsProcessor {
     connection_pool: ArcDbPool,
-    event_sender: AsyncSender<ParquetDataGeneric<Event>>,
+    event_sender: AsyncSender<ParquetDataGeneric<EventPQ>>,
 }
 
 impl ParquetEventsProcessor {
@@ -51,7 +51,7 @@ impl ParquetEventsProcessor {
     ) -> Self {
         config.set_google_credentials(config.google_application_credentials.clone());
 
-        let event_sender = create_parquet_handler_loop::<Event>(
+        let event_sender = create_parquet_handler_loop::<EventPQ>(
             new_gap_detector_sender.clone(),
             ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
@@ -122,13 +122,16 @@ impl ProcessorTrait for ParquetEventsProcessor {
 
 pub fn process_transactions_parquet(
     transactions: Vec<Transaction>,
-) -> (AHashMap<i64, i64>, Vec<Event>) {
+) -> (AHashMap<i64, i64>, Vec<EventPQ>) {
     let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
     let mut events = vec![];
     for txn in &transactions {
         let txn_version = txn.version as i64;
-        let txn_events = RawEvent::from_transaction(txn, "ParquetEventsProcessor").to_parquet();
+        let txn_events: Vec<EventPQ> = RawEvent::from_transaction(txn, "ParquetEventsProcessor")
+            .into_iter()
+            .map(|e| e.into())
+            .collect();
         transaction_version_to_struct_count
             .entry(txn_version)
             .and_modify(|e| *e += txn_events.len() as i64)

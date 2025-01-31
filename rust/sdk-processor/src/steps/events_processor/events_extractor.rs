@@ -7,7 +7,7 @@ use aptos_indexer_processor_sdk::{
 use async_trait::async_trait;
 use processor::db::{
     common::models::event_models::raw_events::RawEvent,
-    postgres::{models::events_models::events::EventModel, PostgresConvertible},
+    postgres::models::events_models::events::EventPG,
 };
 use rayon::prelude::*;
 
@@ -18,22 +18,22 @@ where
 #[async_trait]
 impl Processable for EventsExtractor {
     type Input = Vec<Transaction>;
-    type Output = Vec<EventModel>;
+    type Output = Vec<EventPG>;
     type RunType = AsyncRunType;
 
     async fn process(
         &mut self,
         item: TransactionContext<Vec<Transaction>>,
-    ) -> Result<Option<TransactionContext<Vec<EventModel>>>, ProcessorError> {
-        let events: Vec<_> = item
+    ) -> Result<Option<TransactionContext<Vec<EventPG>>>, ProcessorError> {
+        let events: Vec<EventPG> = item
             .data
             .par_iter()
             .map(|txn| RawEvent::from_transaction(txn, "EventsProcessor"))
             .flatten()
+            .map(|e| e.into())
             .collect();
-        let postgres_events = events.to_postgres();
         Ok(Some(TransactionContext {
-            data: postgres_events,
+            data: events,
             metadata: item.metadata,
         }))
     }

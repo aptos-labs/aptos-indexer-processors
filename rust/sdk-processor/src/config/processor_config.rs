@@ -23,7 +23,7 @@ use processor::{
             parquet_transactions::Transaction,
             parquet_write_set_changes::WriteSetChangeModel,
         },
-        event_models::parquet_events::Event as EventPQ,
+        event_models::parquet_events::EventPQ,
         fungible_asset_models::{
             parquet_v2_fungible_asset_activities::FungibleAssetActivity,
             parquet_v2_fungible_asset_balances::{
