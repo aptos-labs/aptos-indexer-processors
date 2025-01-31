@@ -234,12 +234,16 @@ pub struct BackfillConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Initial starting version for non-backfill processors. Processors will pick up where it left off
+/// if restarted. Read more in `starting_version.rs`
 pub struct BootStrapConfig {
     pub initial_starting_version: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+/// Use this config for testing. Processors will not use checkpoint and will
+/// always start from `override_starting_version`.
 pub struct TestingConfig {
     pub override_starting_version: u64,
     pub ending_version: u64,

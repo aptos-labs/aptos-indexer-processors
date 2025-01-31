@@ -33,7 +33,7 @@ pub async fn get_starting_version(
 ) -> Result<u64> {
     let mut conn = conn_pool.get().await?;
 
-    // Determine processor type. 
+    // Determine processor type.
     match indexer_processor_config.mode {
         ProcessorMode::Backfill => {
             let backfill_config = indexer_processor_config.backfill_config.clone().unwrap();
@@ -87,7 +87,7 @@ pub async fn get_starting_version(
                     .await?;
                     Ok(backfill_config.initial_starting_version)
                 } else {
-                    // `backfill_config.initial_starting_version` is NOT respected. 
+                    // `backfill_config.initial_starting_version` is NOT respected.
                     // Return the last success version + 1.
                     let starting_version = status.last_success_version as u64 + 1;
                     log_ascii_warning(starting_version);
@@ -125,7 +125,8 @@ pub async fn get_starting_version(
 }
 
 fn log_ascii_warning(version: u64) {
-    println!(r#"
+    println!(
+        r#"
  ██╗    ██╗ █████╗ ██████╗ ███╗   ██╗██╗███╗   ██╗ ██████╗ ██╗
  ██║    ██║██╔══██╗██╔══██╗████╗  ██║██║████╗  ██║██╔════╝ ██║
  ██║ █╗ ██║███████║██████╔╝██╔██╗ ██║██║██╔██╗ ██║██║  ███╗██║
@@ -136,7 +137,9 @@ fn log_ascii_warning(version: u64) {
 =================================================================
    This backfill job is resuming progress at version {}
 =================================================================
-"#, version);
+"#,
+        version
+    );
 }
 
 /// Get the appropriate minimum last success version for the parquet processors.

@@ -1,5 +1,8 @@
 use crate::{
-    config::{db_config::DbConfig, indexer_processor_config::{IndexerProcessorConfig, ProcessorMode}},
+    config::{
+        db_config::DbConfig,
+        indexer_processor_config::{IndexerProcessorConfig, ProcessorMode},
+    },
     db::common::models::{
         backfill_processor_status::{BackfillProcessorStatus, BackfillStatus},
         processor_status::ProcessorStatus,
@@ -25,36 +28,36 @@ pub fn get_processor_status_saver(
     config: IndexerProcessorConfig,
 ) -> ProcessorStatusSaverEnum {
     match config.mode {
-    ProcessorMode::Backfill => {
-        let backfill_config = config.backfill_config.clone().unwrap();
-        let backfill_start_version = backfill_config.initial_starting_version;
-        let backfill_end_version = backfill_config.ending_version;
-        let backfill_alias = format!(
-            "{}_{}",
-            config.processor_config.name(),
-            backfill_config.backfill_id
-        );
-        ProcessorStatusSaverEnum::Backfill {
-            conn_pool,
-            backfill_alias,
-            backfill_start_version,
-            backfill_end_version,
-        }
-    },
-    _ => {
-        let processor_name = config.processor_config.name().to_string();
-        if let DbConfig::ParquetConfig(_) = config.db_config {
-            ProcessorStatusSaverEnum::Parquet {
+        ProcessorMode::Backfill => {
+            let backfill_config = config.backfill_config.clone().unwrap();
+            let backfill_start_version = backfill_config.initial_starting_version;
+            let backfill_end_version = backfill_config.ending_version;
+            let backfill_alias = format!(
+                "{}_{}",
+                config.processor_config.name(),
+                backfill_config.backfill_id
+            );
+            ProcessorStatusSaverEnum::Backfill {
                 conn_pool,
-                processor_name,
+                backfill_alias,
+                backfill_start_version,
+                backfill_end_version,
             }
-        } else {
-            ProcessorStatusSaverEnum::Postgres {
-                conn_pool,
-                processor_name,
+        },
+        _ => {
+            let processor_name = config.processor_config.name().to_string();
+            if let DbConfig::ParquetConfig(_) = config.db_config {
+                ProcessorStatusSaverEnum::Parquet {
+                    conn_pool,
+                    processor_name,
+                }
+            } else {
+                ProcessorStatusSaverEnum::Postgres {
+                    conn_pool,
+                    processor_name,
+                }
             }
-        }
-    }
+        },
     }
 }
 
