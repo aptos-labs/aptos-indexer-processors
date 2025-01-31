@@ -48,7 +48,7 @@ lazy_static!(
    ("0x5eea0061714d46da0ccfd088df4fb1a2ea26c2421e592ade9dacc21cdb60e056", "0x1000000fa32d122c18a6a31c009ce5e71674f22d06a581bb0a15575e6addadcc::usda::USDA"),
    ("0x54fc0d5fa5ad975ede1bf8b1c892ae018745a1afd4a4da9b70bb6e5448509fc0", "0x5e156f1207d0ebfa19a9eeff00d62a282278fb8719f4fab3a586a0a2c0fffbea::coin::T"),
    ("0xc448a48da1ed6f6f378bb82ece996be8b5fc8dd1ea851ea2c023de17714dd747", "0x8d87a65ba30e09357fa2edea2c80dbac296e5dec2b18287113500b902942929d::celer_coin_manager::UsdtCoin"),
-   ("0x878370592f9129e14b76558689a4b570ad22678111df775befbfcbc9fb3d90ab", "0x5ae6789dd2fec1a9ec9cccfb3acaf12e93d432f0a3a42c92fe1a9d490b7bbc06::mkl_token::MKL"),
+//    ("0x878370592f9129e14b76558689a4b570ad22678111df775befbfcbc9fb3d90ab", "0x5ae6789dd2fec1a9ec9cccfb3acaf12e93d432f0a3a42c92fe1a9d490b7bbc06::mkl_token::MKL"),
    ("0x1912eb1a5f8f0d4c72c1687eb199b7f9d2df34da5931ec96830c557f7abaa0ad", "0x84d7aeef42d38a5ffc3ccef853e1b82e4958659d16a7de736a29c55fbbeb0114::staked_aptos_coin::StakedAptosCoin"),
    ("0xb5f9a9ff6f815150af83b96b15e4f85e4e3b9e92e3fd17a414cd755c4aa49513", "0x7c0322595a73b3fc53bb166f5783470afeb1ed9f46d1176db62139991505dc61::abel_coin::AbelCoin"),
    ("0x6704464238d73a679486420aab91a8a2a01feb9d700e8ba3332aa3e41d3eab62", "0xa2eda21a58856fda86451436513b867c97eecb4ba099da5775520e0f7492e852::coin::T"),
@@ -129,14 +129,20 @@ impl RawFungibleAssetToCoinMapping {
     /// Get the asset_type_v1 (coin type) from either the constant or the dynamic mapping
     pub fn get_asset_type_v1(
         asset_type_v2: &str,
-        coin_to_fa_mapping: Option<&FungibleAssetToCoinMappings>,
+        fa_to_coin_mapping: Option<&FungibleAssetToCoinMappings>,
     ) -> Option<String> {
         // First check if asset type exists in static mapping
         if let Some(&coin_type) = FA_TO_COIN_MAPPING.get(asset_type_v2) {
             return Some(coin_type.to_string());
         }
+        println!(
+            "AAA1 fa_to_coin_mapping: {:?} asset_type_v2: {:?}, {:?}",
+            fa_to_coin_mapping,
+            asset_type_v2,
+            fa_to_coin_mapping.and_then(|mapping| mapping.get(asset_type_v2).cloned())
+        );
         // If not found in static mapping, check dynamic mapping if provided
-        coin_to_fa_mapping.and_then(|mapping| mapping.get(asset_type_v2).cloned())
+        fa_to_coin_mapping.and_then(|mapping| mapping.get(asset_type_v2).cloned())
     }
 
     /// This should be triggered on startup only. After that we will use the mapping in memory.

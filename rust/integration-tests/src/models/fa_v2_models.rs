@@ -8,7 +8,7 @@ use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
 use processor::schema::{
     coin_supply, current_fungible_asset_balances, fungible_asset_activities,
-    fungible_asset_balances, fungible_asset_metadata,
+    fungible_asset_balances, fungible_asset_metadata, fungible_asset_to_coin_mappings,
 };
 use serde::{Deserialize, Serialize};
 
@@ -109,4 +109,13 @@ pub struct CoinSupply {
     pub transaction_timestamp: chrono::NaiveDateTime,
     pub transaction_epoch: i64,
     pub inserted_at: chrono::NaiveDateTime,
+}
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(coin_type))]
+#[diesel(table_name = fungible_asset_to_coin_mappings)]
+pub struct FungibleAssetToCoinMapping {
+    pub coin_type: String,
+    pub fungible_asset_metadata_address: String,
+    pub last_transaction_version: i64,
 }

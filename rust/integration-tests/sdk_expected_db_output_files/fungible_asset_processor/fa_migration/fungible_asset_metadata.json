@@ -1,0 +1,36 @@
+[
+  {
+    "asset_type": "0x5ae6789dd2fec1a9ec9cccfb3acaf12e93d432f0a3a42c92fe1a9d490b7bbc06::mkl_token::MKL",
+    "creator_address": "0x5ae6789dd2fec1a9ec9cccfb3acaf12e93d432f0a3a42c92fe1a9d490b7bbc06",
+    "name": "MKL",
+    "symbol": "MKL",
+    "decimals": 6,
+    "icon_uri": null,
+    "project_uri": null,
+    "last_transaction_version": 1680592683,
+    "last_transaction_timestamp": "2024-09-05T11:52:16",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v1",
+    "maximum_v2": null,
+    "is_token_v2": null,
+    "supply_v2": null
+  },
+  {
+    "asset_type": "0x878370592f9129e14b76558689a4b570ad22678111df775befbfcbc9fb3d90ab",
+    "creator_address": "0x000000000000000000000000000000000000000000000000000000000000000a",
+    "name": "MKL",
+    "symbol": "MKL",
+    "decimals": 6,
+    "icon_uri": "",
+    "project_uri": "",
+    "last_transaction_version": 1957950162,
+    "last_transaction_timestamp": "2024-11-23T22:32:30",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v2",
+    "maximum_v2": "340282366920938463463374607431768211455",
+    "is_token_v2": null,
+    "supply_v2": "96895109643615"
+  }
+]

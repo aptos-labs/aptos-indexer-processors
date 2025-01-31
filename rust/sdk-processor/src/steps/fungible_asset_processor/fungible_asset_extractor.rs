@@ -100,7 +100,6 @@ impl Processable for FungibleAssetExtractor {
         >,
         ProcessorError,
     > {
-        // get the new coin_to_fa_mapping from the transactions
         let new_fa_to_coin_mapping = get_fa_to_coin_mapping(&transactions.data).await;
         // Merge the mappings
         self.fa_to_coin_mapping.extend(new_fa_to_coin_mapping);

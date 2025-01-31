@@ -90,7 +90,7 @@ impl Processable for FungibleAssetStorer {
             mut fungible_asset_balances,
             (mut current_unified_fab_v1, mut current_unified_fab_v2),
             mut coin_supply,
-            coin_to_fa_mappings,
+            fa_to_coin_mappings,
         ) = input.data;
 
         let per_table_chunk_sizes: AHashMap<String, usize> =
@@ -158,7 +158,7 @@ impl Processable for FungibleAssetStorer {
         let fatcm = execute_in_chunks(
             self.conn_pool.clone(),
             insert_fungible_asset_to_coin_mappings_query,
-            &coin_to_fa_mappings,
+            &fa_to_coin_mappings,
             get_config_table_chunk_size::<FungibleAssetToCoinMapping>(
                 "fungible_asset_to_coin_mappings",
                 &per_table_chunk_sizes,

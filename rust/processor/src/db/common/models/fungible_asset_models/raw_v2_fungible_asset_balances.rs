@@ -137,6 +137,10 @@ impl RawCurrentUnifiedFungibleAssetBalance {
             TokenStandard::from_str(&fab.token_standard).expect("Invalid token standard"),
             TokenStandard::V2
         );
+        println!(
+            "is_v2: {:?}, token_standard: {:?}",
+            is_v2, fab.token_standard
+        );
 
         // For V2 tokens, asset_type_v2 is the original asset type
         // For V1 tokens, asset_type_v2 is None
