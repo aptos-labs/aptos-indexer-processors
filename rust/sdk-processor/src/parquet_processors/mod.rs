@@ -27,7 +27,7 @@ use processor::{
             parquet_transactions::Transaction as ParquetTransaction,
             parquet_write_set_changes::WriteSetChangeModel,
         },
-        event_models::parquet_events::Event,
+        event_models::parquet_events::EventPQ,
         fungible_asset_models::{
             parquet_v2_fungible_asset_activities::FungibleAssetActivity,
             parquet_v2_fungible_asset_balances::{
@@ -201,7 +201,7 @@ impl_parquet_trait!(
     ParquetTypeEnum::BlockMetadataTransactions
 );
 impl_parquet_trait!(TableMetadata, ParquetTypeEnum::TableMetadata);
-impl_parquet_trait!(Event, ParquetTypeEnum::Events);
+impl_parquet_trait!(EventPQ, ParquetTypeEnum::Events);
 impl_parquet_trait!(UserTransaction, ParquetTypeEnum::UserTransactions);
 impl_parquet_trait!(AnsPrimaryNameV2, ParquetTypeEnum::AnsPrimaryNameV2);
 impl_parquet_trait!(
@@ -274,7 +274,7 @@ pub enum ParquetTypeStructs {
     BlockMetadataTransaction(Vec<BlockMetadataTransaction>),
     TableMetadata(Vec<TableMetadata>),
     // Events
-    Event(Vec<Event>),
+    Event(Vec<EventPQ>),
     // User txn
     UserTransaction(Vec<UserTransaction>),
     // ANS types

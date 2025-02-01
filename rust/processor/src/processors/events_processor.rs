@@ -3,17 +3,17 @@
 
 use super::{DefaultProcessingResult, ProcessorName, ProcessorTrait};
 use crate::{
-    db::postgres::models::events_models::events::EventModel,
+    db::{
+        common::models::event_models::raw_events::parse_events,
+        postgres::models::events_models::events::EventPG,
+    },
     gap_detectors::ProcessingResult,
     schema,
-    utils::{
-        counters::PROCESSOR_UNKNOWN_TYPE_COUNT,
-        database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
-    },
+    utils::database::{execute_in_chunks, get_config_table_chunk_size, ArcDbPool},
 };
 use ahash::AHashMap;
 use anyhow::bail;
-use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
+use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{
     pg::{upsert::excluded, Pg},
@@ -53,7 +53,7 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    events: &[EventModel],
+    events: &[EventPG],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -66,14 +66,14 @@ async fn insert_to_db(
         conn,
         insert_events_query,
         events,
-        get_config_table_chunk_size::<EventModel>("events", per_table_chunk_sizes),
+        get_config_table_chunk_size::<EventPG>("events", per_table_chunk_sizes),
     )
     .await?;
     Ok(())
 }
 
 fn insert_events_query(
-    items_to_insert: Vec<EventModel>,
+    items_to_insert: Vec<EventPG>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -152,34 +152,13 @@ impl ProcessorTrait for EventsProcessor {
     }
 }
 
-pub fn process_transactions(transactions: Vec<Transaction>) -> Vec<EventModel> {
+pub fn process_transactions(transactions: Vec<Transaction>) -> Vec<EventPG> {
     let mut events = vec![];
     for txn in &transactions {
-        let txn_version = txn.version as i64;
-        let block_height = txn.block_height as i64;
-        let txn_data = match txn.txn_data.as_ref() {
-            Some(data) => data,
-            None => {
-                tracing::warn!(
-                    transaction_version = txn_version,
-                    "Transaction data doesn't exist"
-                );
-                PROCESSOR_UNKNOWN_TYPE_COUNT
-                    .with_label_values(&["EventsProcessor"])
-                    .inc();
-                continue;
-            },
-        };
-        let default = vec![];
-        let raw_events = match txn_data {
-            TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-            TxnData::Genesis(tx_inner) => &tx_inner.events,
-            TxnData::User(tx_inner) => &tx_inner.events,
-            TxnData::Validator(tx_inner) => &tx_inner.events,
-            _ => &default,
-        };
-
-        let txn_events = EventModel::from_events(raw_events, txn_version, block_height);
+        let txn_events: Vec<EventPG> = parse_events(txn, "EventsProcessor")
+            .into_iter()
+            .map(|e| e.into())
+            .collect();
         events.extend(txn_events);
     }
     events
