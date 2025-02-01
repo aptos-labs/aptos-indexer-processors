@@ -337,10 +337,10 @@ pub fn insert_fungible_asset_to_coin_mappings_query(
     (
         diesel::insert_into(schema::fungible_asset_to_coin_mappings::table)
             .values(items_to_insert)
-            .on_conflict(coin_type)
+            .on_conflict(fungible_asset_metadata_address)
             .do_update()
             .set((
-                fungible_asset_metadata_address.eq(excluded(fungible_asset_metadata_address)),
+                coin_type.eq(excluded(coin_type)),
                 last_transaction_version.eq(excluded(last_transaction_version)),
             )),
         Some(" WHERE fungible_asset_to_coin_mappings.last_transaction_version <= excluded.last_transaction_version "),

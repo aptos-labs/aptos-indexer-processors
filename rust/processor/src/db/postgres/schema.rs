@@ -218,16 +218,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    coin_to_fungible_asset_mappings (coin_type) {
-        #[max_length = 1000]
-        coin_type -> Varchar,
-        #[max_length = 66]
-        fungible_asset_metadata_address -> Varchar,
-        last_transaction_version -> Int8,
-    }
-}
-
-diesel::table! {
     collection_datas (collection_data_id_hash, transaction_version) {
         #[max_length = 64]
         collection_data_id_hash -> Varchar,
@@ -1369,7 +1359,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     coin_balances,
     coin_infos,
     coin_supply,
-    coin_to_fungible_asset_mappings,
     collection_datas,
     collections_v2,
     current_ans_lookup,

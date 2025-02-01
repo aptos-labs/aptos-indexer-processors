@@ -135,12 +135,6 @@ impl RawFungibleAssetToCoinMapping {
         if let Some(&coin_type) = FA_TO_COIN_MAPPING.get(asset_type_v2) {
             return Some(coin_type.to_string());
         }
-        println!(
-            "AAA1 fa_to_coin_mapping: {:?} asset_type_v2: {:?}, {:?}",
-            fa_to_coin_mapping,
-            asset_type_v2,
-            fa_to_coin_mapping.and_then(|mapping| mapping.get(asset_type_v2).cloned())
-        );
         // If not found in static mapping, check dynamic mapping if provided
         fa_to_coin_mapping.and_then(|mapping| mapping.get(asset_type_v2).cloned())
     }
