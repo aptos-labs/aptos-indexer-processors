@@ -52,9 +52,16 @@ impl FungibleAssetExtractor {
     }
 
     pub async fn bootstrap_fa_to_coin_mapping(&mut self, db_pool: ArcDbPool) -> Result<()> {
+        tracing::info!("Started bootstrapping fungible asset to coin mapping");
+        let start = std::time::Instant::now();
         let mut conn = db_pool.get().await?;
         let mapping = RawFungibleAssetToCoinMapping::get_all_mappings(&mut conn).await;
         self.fa_to_coin_mapping = mapping;
+        tracing::info!(
+            item_count = self.fa_to_coin_mapping.len(),
+            duration_ms = start.elapsed().as_millis(),
+            "Finished bootstrapping fungible asset to coin mapping"
+        );
         Ok(())
     }
 }
