@@ -50,8 +50,10 @@ use aptos_protos::transaction::v1::{transaction::TxnData, write_set_change::Chan
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use diesel::{
+    dsl::sql,
     pg::{upsert::excluded, Pg},
     query_builder::QueryFragment,
+    sql_types::{Nullable, Text},
     ExpressionMethods,
 };
 use rayon::prelude::*;
@@ -276,7 +278,8 @@ pub fn insert_current_unified_fungible_asset_balances_v2_query(
             .set(
                 (
                     owner_address.eq(excluded(owner_address)),
-                    asset_type_v1.eq(excluded(asset_type_v1)),
+                    // This guarantees that asset_type_v1 will not be overridden to null
+                    asset_type_v1.eq(sql::<Nullable<Text>>("COALESCE(EXCLUDED.asset_type_v1, current_fungible_asset_balances.asset_type_v1)")),
                     asset_type_v2.eq(excluded(asset_type_v2)),
                     is_primary.eq(excluded(is_primary)),
                     is_frozen.eq(excluded(is_frozen)),
