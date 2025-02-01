@@ -31,4 +31,4 @@ impl FungibleAssetToCoinMappingConvertible for FungibleAssetToCoinMapping {
             last_transaction_version: raw.last_transaction_version,
         }
     }
-} 
+}
