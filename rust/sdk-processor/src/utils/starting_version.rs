@@ -24,7 +24,7 @@ use processor::schema::backfill_processor_status;
 /// If this is a backfill processor and there is not an in-progress backfill (i.e., no checkpoint or
 /// backfill status is COMPLETE), this will return `intial_starting_version` from the backfill config, or 0 if not set.
 ///
-/// If the backfill status is IN_PROGRESS, and `backfill_config.overwrite_in_progress_checkpoint` is `true`, this will return
+/// If the backfill status is IN_PROGRESS, and `backfill_config.overwrite_checkpoint` is `true`, this will return
 /// `initial_starting_version` from the backfill config, or 0 if not set. This allows users to restart a
 /// backfill job if they want to.
 pub async fn get_starting_version(
@@ -44,12 +44,16 @@ pub async fn get_starting_version(
             )
             .await
             .context("Failed to query backfill_processor_status table.")?;
-            // Return None if there is no checkpoint, if the backfill is old (complete), or if overwrite_in_progress_checkpoint is true.
+            // Return None if there is no checkpoint, if the backfill is old (complete), or if overwrite_checkpoint is true.
             // Otherwise, return the checkpointed version + 1.
             if let Some(status) = backfill_status_option {
-                // If status is Complete or overwrite_in_progress_checkpoint is true, this is the start of a new backfill job.
-                if status.backfill_status == BackfillStatus::Complete
-                    || backfill_config.overwrite_in_progress_checkpoint
+
+                // If the backfill is complete and overwrite_checkpoint is false, return the ending_version to end the backfill.
+                if status.backfill_status == BackfillStatus::Complete && !backfill_config.overwrite_checkpoint {
+                    return Ok(backfill_config.ending_version);
+                }
+                // If status is Complete or overwrite_checkpoint is true, this is the start of a new backfill job.
+                if backfill_config.overwrite_checkpoint
                 {
                     let backfill_alias = status.backfill_alias.clone();
                     let status = BackfillProcessorStatus {
@@ -85,14 +89,15 @@ pub async fn get_starting_version(
                         None,
                     )
                     .await?;
-                    Ok(backfill_config.initial_starting_version)
-                } else {
-                    // `backfill_config.initial_starting_version` is NOT respected.
-                    // Return the last success version + 1.
-                    let starting_version = status.last_success_version as u64 + 1;
-                    log_ascii_warning(starting_version);
-                    Ok(starting_version)
-                }
+                    return Ok(backfill_config.initial_starting_version);
+                } 
+                
+                // `backfill_config.initial_starting_version` is NOT respected.
+                // Return the last success version + 1.
+                let starting_version = status.last_success_version as u64 + 1;
+                log_ascii_warning(starting_version);
+                Ok(starting_version)
+                
             } else {
                 Ok(backfill_config.initial_starting_version)
             }
@@ -392,7 +397,7 @@ mod tests {
                 backfill_id: backfill_id.clone(),
                 initial_starting_version: 0,
                 ending_version: 10,
-                overwrite_in_progress_checkpoint: false,
+                overwrite_checkpoint: false,
             }),
             None,
             None,
@@ -433,7 +438,7 @@ mod tests {
                 backfill_id: "1".to_string(),
                 initial_starting_version: 0,
                 ending_version: 10,
-                overwrite_in_progress_checkpoint: false,
+                overwrite_checkpoint: false,
             }),
             None,
             None,
@@ -474,7 +479,7 @@ mod tests {
                 backfill_id: "1".to_string(),
                 initial_starting_version: 3,
                 ending_version: 10,
-                overwrite_in_progress_checkpoint: true,
+                overwrite_checkpoint: true,
             }),
             None,
             None,
@@ -515,7 +520,7 @@ mod tests {
                 backfill_id: "1".to_string(),
                 initial_starting_version: 3,
                 ending_version: 10,
-                overwrite_in_progress_checkpoint: false,
+                overwrite_checkpoint: false,
             }),
             None,
             Some(3),
