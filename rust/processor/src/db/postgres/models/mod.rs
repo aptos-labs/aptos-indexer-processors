@@ -14,7 +14,5 @@ pub mod processor_status;
 pub mod property_map;
 pub mod resources;
 pub mod stake_models;
-pub mod token_models;
-pub mod token_v2_models;
 pub mod transaction_metadata_model;
 pub mod user_transactions_models;

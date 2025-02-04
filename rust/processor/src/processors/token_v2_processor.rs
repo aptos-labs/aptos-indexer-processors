@@ -8,25 +8,24 @@ use crate::{
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
+            token_models::{
+                token_claims::{
+                    CurrentTokenPendingClaim, PostgresCurrentTokenPendingClaim, TokenV1Claimed,
+                },
+                token_royalty::{CurrentTokenRoyaltyV1, PostgresCurrentTokenRoyaltyV1},
+                tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
+            },
             token_v2_models::{
-                raw_token_claims::{
-                    CurrentTokenPendingClaimConvertible, RawCurrentTokenPendingClaim,
-                    TokenV1Claimed,
+                v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
+                v2_token_activities::{PostgresTokenActivityV2, TokenActivityV2},
+                v2_token_datas::{
+                    CurrentTokenDataV2, CurrentTokenDataV2PK, PostgresCurrentTokenDataV2,
+                    TokenDataV2,
                 },
-                raw_v1_token_royalty::{
-                    CurrentTokenRoyaltyV1Convertible, RawCurrentTokenRoyaltyV1,
-                },
-                raw_v2_token_activities::{RawTokenActivityV2, TokenActivityV2Convertible},
-                raw_v2_token_datas::{
-                    CurrentTokenDataV2Convertible, RawCurrentTokenDataV2, RawTokenDataV2,
-                    TokenDataV2Convertible,
-                },
-                raw_v2_token_metadata::{
-                    CurrentTokenV2MetadataConvertible, RawCurrentTokenV2Metadata,
-                },
-                raw_v2_token_ownerships::{
-                    CurrentTokenOwnershipV2Convertible, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
-                    RawCurrentTokenOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
+                v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
+                v2_token_ownerships::{
+                    CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2,
+                    PostgresCurrentTokenOwnershipV2, TokenOwnershipV2,
                 },
                 v2_token_utils::{
                     Burn, BurnEvent, Mint, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
@@ -36,18 +35,6 @@ use crate::{
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
             resources::{FromWriteResource, V2TokenResource},
-            token_models::{
-                token_claims::CurrentTokenPendingClaim,
-                tokens::{CurrentTokenPendingClaimPK, TableHandleToOwner, TableMetadataForToken},
-            },
-            token_v2_models::{
-                v1_token_royalty::CurrentTokenRoyaltyV1,
-                v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
-                v2_token_activities::TokenActivityV2,
-                v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
-                v2_token_metadata::{CurrentTokenV2Metadata, CurrentTokenV2MetadataPK},
-                v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
-            },
         },
     },
     gap_detectors::ProcessingResult,
@@ -122,22 +109,18 @@ async fn insert_to_db(
     name: &'static str,
     start_version: u64,
     end_version: u64,
-    collections_v2: &[CollectionV2],
-    token_datas_v2: &[TokenDataV2],
-    token_ownerships_v2: &[TokenOwnershipV2],
     current_collections_v2: &[CurrentCollectionV2],
     (current_token_datas_v2, current_deleted_token_datas_v2): (
-        &[CurrentTokenDataV2],
-        &[CurrentTokenDataV2],
+        &[PostgresCurrentTokenDataV2],
+        &[PostgresCurrentTokenDataV2],
     ),
     (current_token_ownerships_v2, current_deleted_token_ownerships_v2): (
-        &[CurrentTokenOwnershipV2],
-        &[CurrentTokenOwnershipV2],
+        &[PostgresCurrentTokenOwnershipV2],
+        &[PostgresCurrentTokenOwnershipV2],
     ),
-    token_activities_v2: &[TokenActivityV2],
-    current_token_v2_metadata: &[CurrentTokenV2Metadata],
-    current_token_royalties_v1: &[CurrentTokenRoyaltyV1],
-    current_token_claims: &[CurrentTokenPendingClaim],
+    token_activities_v2: &[PostgresTokenActivityV2],
+    current_token_royalties_v1: &[PostgresCurrentTokenRoyaltyV1],
+    current_token_claims: &[PostgresCurrentTokenPendingClaim],
     per_table_chunk_sizes: &AHashMap<String, usize>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
@@ -147,27 +130,6 @@ async fn insert_to_db(
         "Inserting to db",
     );
 
-    let coll_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_collections_v2_query,
-        collections_v2,
-        get_config_table_chunk_size::<CollectionV2>("collections_v2", per_table_chunk_sizes),
-    );
-    let td_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_datas_v2_query,
-        token_datas_v2,
-        get_config_table_chunk_size::<TokenDataV2>("token_datas_v2", per_table_chunk_sizes),
-    );
-    let to_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_token_ownerships_v2_query,
-        token_ownerships_v2,
-        get_config_table_chunk_size::<TokenOwnershipV2>(
-            "token_ownerships_v2",
-            per_table_chunk_sizes,
-        ),
-    );
     let cc_v2 = execute_in_chunks(
         conn.clone(),
         insert_current_collections_v2_query,
@@ -181,7 +143,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_token_datas_v2_query,
         current_token_datas_v2,
-        get_config_table_chunk_size::<CurrentTokenDataV2>(
+        get_config_table_chunk_size::<PostgresCurrentTokenDataV2>(
             "current_token_datas_v2",
             per_table_chunk_sizes,
         ),
@@ -190,7 +152,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_deleted_token_datas_v2_query,
         current_deleted_token_datas_v2,
-        get_config_table_chunk_size::<CurrentTokenDataV2>(
+        get_config_table_chunk_size::<PostgresCurrentTokenDataV2>(
             "current_token_datas_v2",
             per_table_chunk_sizes,
         ),
@@ -199,7 +161,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_token_ownerships_v2_query,
         current_token_ownerships_v2,
-        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
+        get_config_table_chunk_size::<PostgresCurrentTokenOwnershipV2>(
             "current_token_ownerships_v2",
             per_table_chunk_sizes,
         ),
@@ -208,7 +170,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_deleted_token_ownerships_v2_query,
         current_deleted_token_ownerships_v2,
-        get_config_table_chunk_size::<CurrentTokenOwnershipV2>(
+        get_config_table_chunk_size::<PostgresCurrentTokenOwnershipV2>(
             "current_token_ownerships_v2",
             per_table_chunk_sizes,
         ),
@@ -217,17 +179,8 @@ async fn insert_to_db(
         conn.clone(),
         insert_token_activities_v2_query,
         token_activities_v2,
-        get_config_table_chunk_size::<TokenActivityV2>(
+        get_config_table_chunk_size::<PostgresTokenActivityV2>(
             "token_activities_v2",
-            per_table_chunk_sizes,
-        ),
-    );
-    let ct_v2 = execute_in_chunks(
-        conn.clone(),
-        insert_current_token_v2_metadatas_query,
-        current_token_v2_metadata,
-        get_config_table_chunk_size::<CurrentTokenV2Metadata>(
-            "current_token_v2_metadata",
             per_table_chunk_sizes,
         ),
     );
@@ -235,7 +188,7 @@ async fn insert_to_db(
         conn.clone(),
         insert_current_token_royalties_v1_query,
         current_token_royalties_v1,
-        get_config_table_chunk_size::<CurrentTokenRoyaltyV1>(
+        get_config_table_chunk_size::<PostgresCurrentTokenRoyaltyV1>(
             "current_token_royalty_v1",
             per_table_chunk_sizes,
         ),
@@ -244,41 +197,30 @@ async fn insert_to_db(
         conn,
         insert_current_token_claims_query,
         current_token_claims,
-        get_config_table_chunk_size::<CurrentTokenPendingClaim>(
+        get_config_table_chunk_size::<PostgresCurrentTokenPendingClaim>(
             "current_token_pending_claims",
             per_table_chunk_sizes,
         ),
     );
 
     let (
-        coll_v2_res,
-        td_v2_res,
-        to_v2_res,
         cc_v2_res,
         ctd_v2_res,
         cdtd_v2_res,
         cto_v2_res,
         cdto_v2_res,
         ta_v2_res,
-        ct_v2_res,
         ctr_v1_res,
         ctc_v1_res,
-    ) = tokio::join!(
-        coll_v2, td_v2, to_v2, cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ct_v2, ctr_v1,
-        ctc_v1
-    );
+    ) = tokio::join!(cc_v2, ctd_v2, cdtd_v2, cto_v2, cdto_v2, ta_v2, ctr_v1, ctc_v1);
 
     for res in [
-        coll_v2_res,
-        td_v2_res,
-        to_v2_res,
         cc_v2_res,
         ctd_v2_res,
         cdtd_v2_res,
         cto_v2_res,
         cdto_v2_res,
         ta_v2_res,
-        ct_v2_res,
         ctr_v1_res,
         ctc_v1_res,
     ] {
@@ -286,71 +228,6 @@ async fn insert_to_db(
     }
 
     Ok(())
-}
-
-pub fn insert_collections_v2_query(
-    items_to_insert: Vec<CollectionV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::collections_v2::dsl::*;
-    (
-        diesel::insert_into(schema::collections_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set((
-                collection_properties.eq(excluded(collection_properties)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        None,
-    )
-}
-
-pub fn insert_token_datas_v2_query(
-    items_to_insert: Vec<TokenDataV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::token_datas_v2::dsl::*;
-
-    (
-        diesel::insert_into(schema::token_datas_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set((
-                maximum.eq(excluded(maximum)),
-                supply.eq(excluded(supply)),
-                is_fungible_v2.eq(excluded(is_fungible_v2)),
-                inserted_at.eq(excluded(inserted_at)),
-                decimals.eq(excluded(decimals)),
-            )),
-        None,
-    )
-}
-
-pub fn insert_token_ownerships_v2_query(
-    items_to_insert: Vec<TokenOwnershipV2>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::token_ownerships_v2::dsl::*;
-
-    (
-        diesel::insert_into(schema::token_ownerships_v2::table)
-            .values(items_to_insert)
-            .on_conflict((transaction_version, write_set_change_index))
-            .do_update()
-            .set((
-                is_fungible_v2.eq(excluded(is_fungible_v2)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        None,
-    )
 }
 
 pub fn insert_current_collections_v2_query(
@@ -388,7 +265,7 @@ pub fn insert_current_collections_v2_query(
 }
 
 pub fn insert_current_token_datas_v2_query(
-    items_to_insert: Vec<CurrentTokenDataV2>,
+    items_to_insert: Vec<PostgresCurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -423,7 +300,7 @@ pub fn insert_current_token_datas_v2_query(
 }
 
 pub fn insert_current_deleted_token_datas_v2_query(
-    items_to_insert: Vec<CurrentTokenDataV2>,
+    items_to_insert: Vec<PostgresCurrentTokenDataV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -446,7 +323,7 @@ pub fn insert_current_deleted_token_datas_v2_query(
 }
 
 pub fn insert_current_token_ownerships_v2_query(
-    items_to_insert: Vec<CurrentTokenOwnershipV2>,
+    items_to_insert: Vec<PostgresCurrentTokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -475,7 +352,7 @@ pub fn insert_current_token_ownerships_v2_query(
 }
 
 pub fn insert_current_deleted_token_ownerships_v2_query(
-    items_to_insert: Vec<CurrentTokenOwnershipV2>,
+    items_to_insert: Vec<PostgresCurrentTokenOwnershipV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -499,7 +376,7 @@ pub fn insert_current_deleted_token_ownerships_v2_query(
 }
 
 pub fn insert_token_activities_v2_query(
-    items_to_insert: Vec<TokenActivityV2>,
+    items_to_insert: Vec<PostgresTokenActivityV2>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -519,31 +396,8 @@ pub fn insert_token_activities_v2_query(
     )
 }
 
-pub fn insert_current_token_v2_metadatas_query(
-    items_to_insert: Vec<CurrentTokenV2Metadata>,
-) -> (
-    impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
-    Option<&'static str>,
-) {
-    use schema::current_token_v2_metadata::dsl::*;
-
-    (
-        diesel::insert_into(schema::current_token_v2_metadata::table)
-            .values(items_to_insert)
-            .on_conflict((object_address, resource_type))
-            .do_update()
-            .set((
-                data.eq(excluded(data)),
-                state_key_hash.eq(excluded(state_key_hash)),
-                last_transaction_version.eq(excluded(last_transaction_version)),
-                inserted_at.eq(excluded(inserted_at)),
-            )),
-        Some(" WHERE current_token_v2_metadata.last_transaction_version <= excluded.last_transaction_version "),
-    )
-}
-
 pub fn insert_current_token_royalties_v1_query(
-    items_to_insert: Vec<CurrentTokenRoyaltyV1>,
+    items_to_insert: Vec<PostgresCurrentTokenRoyaltyV1>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -567,7 +421,7 @@ pub fn insert_current_token_royalties_v1_query(
 }
 
 pub fn insert_current_token_claims_query(
-    items_to_insert: Vec<CurrentTokenPendingClaim>,
+    items_to_insert: Vec<PostgresCurrentTokenPendingClaim>,
 ) -> (
     impl QueryFragment<Pg> + diesel::query_builder::QueryId + Send,
     Option<&'static str>,
@@ -627,16 +481,16 @@ impl ProcessorTrait for TokenV2Processor {
         };
         // Token V2 processing which includes token v1
         let (
-            mut collections_v2,
-            raw_token_datas_v2,
-            raw_token_ownerships_v2,
+            _,
+            _,
+            _,
             current_collections_v2,
             raw_current_token_datas_v2,
             raw_current_deleted_token_datas_v2,
             raw_current_token_ownerships_v2,
             raw_current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
-            raw_current_token_v2_metadata,
+            _,
             raw_current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
@@ -646,91 +500,55 @@ impl ProcessorTrait for TokenV2Processor {
         )
         .await;
 
-        let postgres_current_token_claims: Vec<CurrentTokenPendingClaim> = raw_current_token_claims
-            .into_iter()
-            .map(CurrentTokenPendingClaim::from_raw)
-            .collect();
+        let postgres_current_token_claims: Vec<PostgresCurrentTokenPendingClaim> =
+            raw_current_token_claims
+                .into_iter()
+                .map(PostgresCurrentTokenPendingClaim::from)
+                .collect();
 
-        let postgres_current_token_royalties_v1: Vec<CurrentTokenRoyaltyV1> =
+        let postgres_current_token_royalties_v1: Vec<PostgresCurrentTokenRoyaltyV1> =
             raw_current_token_royalties_v1
                 .into_iter()
-                .map(CurrentTokenRoyaltyV1::from_raw)
+                .map(PostgresCurrentTokenRoyaltyV1::from)
                 .collect();
 
-        let mut postgres_current_token_v2_metadata: Vec<CurrentTokenV2Metadata> =
-            raw_current_token_v2_metadata
+        let postgres_token_activities_v2: Vec<PostgresTokenActivityV2> = raw_token_activities_v2
+            .into_iter()
+            .map(PostgresTokenActivityV2::from)
+            .collect();
+
+        let postgres_current_token_datas_v2: Vec<PostgresCurrentTokenDataV2> =
+            raw_current_token_datas_v2
                 .into_iter()
-                .map(CurrentTokenV2Metadata::from_raw)
+                .map(PostgresCurrentTokenDataV2::from)
                 .collect();
 
-        let postgres_token_activities_v2: Vec<TokenActivityV2> = raw_token_activities_v2
-            .into_iter()
-            .map(TokenActivityV2::from_raw)
-            .collect();
-
-        let mut postgres_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
-            .into_iter()
-            .map(TokenDataV2::from_raw)
-            .collect();
-
-        let postgres_current_token_datas_v2: Vec<CurrentTokenDataV2> = raw_current_token_datas_v2
-            .into_iter()
-            .map(CurrentTokenDataV2::from_raw)
-            .collect();
-
-        let postgres_current_deleted_token_datas_v2: Vec<CurrentTokenDataV2> =
+        let postgres_current_deleted_token_datas_v2: Vec<PostgresCurrentTokenDataV2> =
             raw_current_deleted_token_datas_v2
                 .into_iter()
-                .map(CurrentTokenDataV2::from_raw)
+                .map(PostgresCurrentTokenDataV2::from)
                 .collect();
 
-        let mut postgres_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
-            .into_iter()
-            .map(TokenOwnershipV2::from_raw)
-            .collect();
-
-        let postgres_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+        let postgres_current_token_ownerships_v2: Vec<PostgresCurrentTokenOwnershipV2> =
             raw_current_token_ownerships_v2
                 .into_iter()
-                .map(CurrentTokenOwnershipV2::from_raw)
+                .map(PostgresCurrentTokenOwnershipV2::from)
                 .collect();
 
-        let postgres_current_deleted_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+        let postgres_current_deleted_token_ownerships_v2: Vec<PostgresCurrentTokenOwnershipV2> =
             raw_current_deleted_token_ownerships_v2
                 .into_iter()
-                .map(CurrentTokenOwnershipV2::from_raw)
+                .map(PostgresCurrentTokenOwnershipV2::from)
                 .collect();
 
         let processing_duration_in_secs = processing_start.elapsed().as_secs_f64();
         let db_insertion_start = std::time::Instant::now();
-
-        if self
-            .deprecated_tables
-            .contains(TableFlags::TOKEN_OWNERSHIPS_V2)
-        {
-            postgres_token_ownerships_v2.clear();
-        }
-        if self.deprecated_tables.contains(TableFlags::TOKEN_DATAS_V2) {
-            postgres_token_datas_v2.clear();
-        }
-        if self.deprecated_tables.contains(TableFlags::COLLECTIONS_V2) {
-            collections_v2.clear();
-        }
-        if self
-            .deprecated_tables
-            .contains(TableFlags::CURRENT_TOKEN_V2_METADATA)
-        {
-            postgres_current_token_v2_metadata.clear();
-        }
 
         let tx_result = insert_to_db(
             self.get_pool(),
             self.name(),
             start_version,
             end_version,
-            &collections_v2,
-            &postgres_token_datas_v2,
-            &postgres_token_ownerships_v2,
             &current_collections_v2,
             (
                 &postgres_current_token_datas_v2,
@@ -741,7 +559,6 @@ impl ProcessorTrait for TokenV2Processor {
                 &postgres_current_deleted_token_ownerships_v2,
             ),
             &postgres_token_activities_v2,
-            &postgres_current_token_v2_metadata,
             &postgres_current_token_royalties_v1,
             &postgres_current_token_claims,
             &self.per_table_chunk_sizes,
@@ -777,43 +594,23 @@ impl ProcessorTrait for TokenV2Processor {
     }
 }
 
-pub async fn parse_v2_token_for_parquet(
-    transactions: &[Transaction],
-    table_handle_to_owner: &TableHandleToOwner,
-) -> (
-    Vec<CollectionV2>,
-    Vec<RawTokenDataV2>,
-    Vec<RawTokenOwnershipV2>,
-    Vec<CurrentCollectionV2>,
-    Vec<RawCurrentTokenDataV2>,
-    Vec<RawCurrentTokenDataV2>,
-    Vec<RawCurrentTokenOwnershipV2>,
-    Vec<RawCurrentTokenOwnershipV2>, // deleted token ownerships
-    Vec<RawTokenActivityV2>,
-    Vec<RawCurrentTokenV2Metadata>,
-    Vec<RawCurrentTokenRoyaltyV1>,
-    Vec<RawCurrentTokenPendingClaim>,
-) {
-    parse_v2_token(transactions, table_handle_to_owner, &mut None).await
-}
-
 pub async fn parse_v2_token(
     transactions: &[Transaction],
     table_handle_to_owner: &TableHandleToOwner,
     db_context: &mut Option<DbContext<'_>>,
 ) -> (
     Vec<CollectionV2>,
-    Vec<RawTokenDataV2>,
-    Vec<RawTokenOwnershipV2>,
+    Vec<TokenDataV2>,
+    Vec<TokenOwnershipV2>,
     Vec<CurrentCollectionV2>,
-    Vec<RawCurrentTokenDataV2>,
-    Vec<RawCurrentTokenDataV2>,
-    Vec<RawCurrentTokenOwnershipV2>,
-    Vec<RawCurrentTokenOwnershipV2>, // deleted token ownerships
-    Vec<RawTokenActivityV2>,
-    Vec<RawCurrentTokenV2Metadata>,
-    Vec<RawCurrentTokenRoyaltyV1>,
-    Vec<RawCurrentTokenPendingClaim>,
+    Vec<CurrentTokenDataV2>,
+    Vec<CurrentTokenDataV2>,
+    Vec<CurrentTokenOwnershipV2>,
+    Vec<CurrentTokenOwnershipV2>, // deleted token ownerships
+    Vec<TokenActivityV2>,
+    Vec<CurrentTokenV2Metadata>,
+    Vec<CurrentTokenRoyaltyV1>,
+    Vec<CurrentTokenPendingClaim>,
 ) {
     // Token V2 and V1 combined
     let mut collections_v2 = vec![];
@@ -823,13 +620,13 @@ pub async fn parse_v2_token(
 
     let mut current_collections_v2: AHashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         AHashMap::new();
-    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenDataV2> =
+    let mut current_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         AHashMap::new();
-    let mut current_deleted_token_datas_v2: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenDataV2> =
+    let mut current_deleted_token_datas_v2: AHashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
         AHashMap::new();
     let mut current_token_ownerships_v2: AHashMap<
         CurrentTokenOwnershipV2PK,
-        RawCurrentTokenOwnershipV2,
+        CurrentTokenOwnershipV2,
     > = AHashMap::new();
     let mut current_deleted_token_ownerships_v2 = AHashMap::new();
     // Optimization to track prior ownership in case a token gets burned so we can lookup the ownership
@@ -839,16 +636,14 @@ pub async fn parse_v2_token(
     // we can still get the object core metadata for it
     let mut token_v2_metadata_helper: ObjectAggregatedDataMapping = AHashMap::new();
     // Basically token properties
-    let mut current_token_v2_metadata: AHashMap<
-        CurrentTokenV2MetadataPK,
-        RawCurrentTokenV2Metadata,
-    > = AHashMap::new();
-    let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, RawCurrentTokenRoyaltyV1> =
+    let mut current_token_v2_metadata: AHashMap<CurrentTokenV2MetadataPK, CurrentTokenV2Metadata> =
+        AHashMap::new();
+    let mut current_token_royalties_v1: AHashMap<CurrentTokenDataV2PK, CurrentTokenRoyaltyV1> =
         AHashMap::new();
     // migrating this from v1 token model as we don't have any replacement table for this
     let mut all_current_token_claims: AHashMap<
         CurrentTokenPendingClaimPK,
-        RawCurrentTokenPendingClaim,
+        CurrentTokenPendingClaim,
     > = AHashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
@@ -989,7 +784,7 @@ pub async fn parse_v2_token(
                     }
                 }
                 // handling all the token v1 events
-                if let Some(event) = RawTokenActivityV2::get_v1_from_parsed_event(
+                if let Some(event) = TokenActivityV2::get_v1_from_parsed_event(
                     event,
                     txn_version,
                     txn_timestamp,
@@ -1002,7 +797,7 @@ pub async fn parse_v2_token(
                     token_activities_v2.push(event);
                 }
                 // handling all the token v2 events
-                if let Some(event) = RawTokenActivityV2::get_nft_v2_from_parsed_event(
+                if let Some(event) = TokenActivityV2::get_nft_v2_from_parsed_event(
                     event,
                     txn_version,
                     txn_timestamp,
@@ -1048,7 +843,7 @@ pub async fn parse_v2_token(
                         }
 
                         if let Some((token_data, current_token_data)) =
-                            RawTokenDataV2::get_v1_from_write_table_item(
+                            TokenDataV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -1063,7 +858,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some(current_token_royalty) =
-                            RawCurrentTokenRoyaltyV1::get_v1_from_write_table_item(
+                            CurrentTokenRoyaltyV1::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 txn_timestamp,
@@ -1076,7 +871,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some((token_ownership, current_token_ownership)) =
-                            RawTokenOwnershipV2::get_v1_from_write_table_item(
+                            TokenOwnershipV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -1107,7 +902,7 @@ pub async fn parse_v2_token(
                             }
                         }
                         if let Some(current_token_token_claim) =
-                            RawCurrentTokenPendingClaim::from_write_table_item(
+                            CurrentTokenPendingClaim::from_write_table_item(
                                 table_item,
                                 txn_version,
                                 txn_timestamp,
@@ -1128,7 +923,7 @@ pub async fn parse_v2_token(
                     },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
-                            RawTokenOwnershipV2::get_v1_from_delete_table_item(
+                            TokenOwnershipV2::get_v1_from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -1159,7 +954,7 @@ pub async fn parse_v2_token(
                             }
                         }
                         if let Some(current_token_token_claim) =
-                            RawCurrentTokenPendingClaim::from_delete_table_item(
+                            CurrentTokenPendingClaim::from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 txn_timestamp,
@@ -1197,7 +992,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some((raw_token_data, current_token_data)) =
-                            RawTokenDataV2::get_v2_from_write_resource(
+                            TokenDataV2::get_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -1208,7 +1003,7 @@ pub async fn parse_v2_token(
                         {
                             // Add NFT ownership
                             let (mut ownerships, current_ownerships) =
-                                RawTokenOwnershipV2::get_nft_v2_from_token_data(
+                                TokenOwnershipV2::get_nft_v2_from_token_data(
                                     &raw_token_data,
                                     &token_v2_metadata_helper,
                                 )
@@ -1242,7 +1037,7 @@ pub async fn parse_v2_token(
                         // Add burned NFT handling for token datas (can probably be merged with below)
                         // This handles the case where token is burned but objectCore is still there
                         if let Some(deleted_token_data) =
-                            RawTokenDataV2::get_burned_nft_v2_from_write_resource(
+                            TokenDataV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 txn_timestamp,
@@ -1259,7 +1054,7 @@ pub async fn parse_v2_token(
                         // Add burned NFT handling
                         // This handles the case where token is burned but objectCore is still there
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            RawTokenOwnershipV2::get_burned_nft_v2_from_write_resource(
+                            TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -1293,14 +1088,13 @@ pub async fn parse_v2_token(
                         }
 
                         // Track token properties
-                        if let Some(token_metadata) =
-                            RawCurrentTokenV2Metadata::from_write_resource(
-                                resource,
-                                txn_version,
-                                &token_v2_metadata_helper,
-                                txn_timestamp,
-                            )
-                            .unwrap()
+                        if let Some(token_metadata) = CurrentTokenV2Metadata::from_write_resource(
+                            resource,
+                            txn_version,
+                            &token_v2_metadata_helper,
+                            txn_timestamp,
+                        )
+                        .unwrap()
                         {
                             current_token_v2_metadata.insert(
                                 (
@@ -1314,7 +1108,7 @@ pub async fn parse_v2_token(
                     Change::DeleteResource(resource) => {
                         // Add burned NFT handling for token datas (can probably be merged with below)
                         if let Some(deleted_token_data) =
-                            RawTokenDataV2::get_burned_nft_v2_from_delete_resource(
+                            TokenDataV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 txn_timestamp,
@@ -1329,7 +1123,7 @@ pub async fn parse_v2_token(
                             );
                         }
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            RawTokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
+                            TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -1373,25 +1167,25 @@ pub async fn parse_v2_token(
         .collect::<Vec<CurrentCollectionV2>>();
     let mut current_token_datas_v2 = current_token_datas_v2
         .into_values()
-        .collect::<Vec<RawCurrentTokenDataV2>>();
+        .collect::<Vec<CurrentTokenDataV2>>();
     let mut current_deleted_token_datas_v2 = current_deleted_token_datas_v2
         .into_values()
-        .collect::<Vec<RawCurrentTokenDataV2>>();
+        .collect::<Vec<CurrentTokenDataV2>>();
     let mut current_token_ownerships_v2 = current_token_ownerships_v2
         .into_values()
-        .collect::<Vec<RawCurrentTokenOwnershipV2>>();
+        .collect::<Vec<CurrentTokenOwnershipV2>>();
     let mut current_token_v2_metadata = current_token_v2_metadata
         .into_values()
-        .collect::<Vec<RawCurrentTokenV2Metadata>>();
+        .collect::<Vec<CurrentTokenV2Metadata>>();
     let mut current_deleted_token_ownerships_v2 = current_deleted_token_ownerships_v2
         .into_values()
-        .collect::<Vec<RawCurrentTokenOwnershipV2>>();
+        .collect::<Vec<CurrentTokenOwnershipV2>>();
     let mut current_token_royalties_v1 = current_token_royalties_v1
         .into_values()
-        .collect::<Vec<RawCurrentTokenRoyaltyV1>>();
+        .collect::<Vec<CurrentTokenRoyaltyV1>>();
     let mut all_current_token_claims = all_current_token_claims
         .into_values()
-        .collect::<Vec<RawCurrentTokenPendingClaim>>();
+        .collect::<Vec<CurrentTokenPendingClaim>>();
     // Sort by PK
     current_collections_v2.sort_by(|a, b| a.collection_id.cmp(&b.collection_id));
     current_deleted_token_datas_v2.sort_by(|a, b| a.token_data_id.cmp(&b.token_data_id));

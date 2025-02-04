@@ -6,18 +6,18 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::{
         common::models::{
             object_models::v2_object_utils::{ObjectAggregatedDataMapping, ObjectWithMetadata},
+            token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
             token_v2_models::{
-                raw_v2_token_datas::RawTokenDataV2,
+                v2_token_datas::TokenDataV2,
                 v2_token_utils::{TokenStandard, TokenV2Burned, DEFAULT_OWNER_ADDRESS},
             },
+            DEFAULT_NONE,
         },
-        postgres::models::{
-            resources::FromWriteResource,
-            token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
-        },
+        postgres::models::resources::FromWriteResource,
     },
     schema::current_token_ownerships_v2,
     utils::{
@@ -26,21 +26,24 @@ use crate::{
     },
 };
 use ahash::AHashMap;
+use allocative_derive::Allocative;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{
     DeleteResource, DeleteTableItem, WriteResource, WriteTableItem,
 };
-use bigdecimal::{BigDecimal, One, Zero};
+use bigdecimal::{BigDecimal, One, ToPrimitive, Zero};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
 pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Serialize)]
-pub struct RawTokenOwnershipV2 {
+pub struct TokenOwnershipV2 {
     pub transaction_version: i64,
     pub write_set_change_index: i64,
     pub token_data_id: String,
@@ -58,11 +61,11 @@ pub struct RawTokenOwnershipV2 {
 }
 
 pub trait TokenOwnershipV2Convertible {
-    fn from_raw(raw_item: RawTokenOwnershipV2) -> Self;
+    fn from_raw(raw_item: TokenOwnershipV2) -> Self;
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct RawCurrentTokenOwnershipV2 {
+pub struct CurrentTokenOwnershipV2 {
     pub token_data_id: String,
     pub property_version_v1: BigDecimal,
     pub owner_address: String,
@@ -78,7 +81,7 @@ pub struct RawCurrentTokenOwnershipV2 {
     pub non_transferrable_by_owner: Option<bool>,
 }
 
-impl Ord for RawCurrentTokenOwnershipV2 {
+impl Ord for CurrentTokenOwnershipV2 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.token_data_id
             .cmp(&other.token_data_id)
@@ -88,14 +91,14 @@ impl Ord for RawCurrentTokenOwnershipV2 {
     }
 }
 
-impl PartialOrd for RawCurrentTokenOwnershipV2 {
+impl PartialOrd for CurrentTokenOwnershipV2 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 pub trait CurrentTokenOwnershipV2Convertible {
-    fn from_raw(raw_item: RawCurrentTokenOwnershipV2) -> Self;
+    fn from_raw(raw_item: CurrentTokenOwnershipV2) -> Self;
 }
 
 // Facilitate tracking when a token is burned
@@ -125,15 +128,15 @@ pub struct CurrentTokenOwnershipV2Query {
     pub non_transferrable_by_owner: Option<bool>,
 }
 
-impl RawTokenOwnershipV2 {
+impl TokenOwnershipV2 {
     /// For nfts it's the same resources that we parse tokendatas from so we leverage the work done in there to get ownership data
     /// Vecs are returned because there could be multiple transfers in a single transaction and we need to document each one here.
     pub fn get_nft_v2_from_token_data(
-        token_data: &RawTokenDataV2,
+        token_data: &TokenDataV2,
         object_metadatas: &ObjectAggregatedDataMapping,
     ) -> anyhow::Result<(
         Vec<Self>,
-        AHashMap<CurrentTokenOwnershipV2PK, RawCurrentTokenOwnershipV2>,
+        AHashMap<CurrentTokenOwnershipV2PK, CurrentTokenOwnershipV2>,
     )> {
         let mut ownerships = vec![];
         let mut current_ownerships = AHashMap::new();
@@ -179,7 +182,7 @@ impl RawTokenOwnershipV2 {
                 owner_address.clone(),
                 storage_id.clone(),
             ),
-            RawCurrentTokenOwnershipV2 {
+            CurrentTokenOwnershipV2 {
                 token_data_id: token_data_id.clone(),
                 property_version_v1: BigDecimal::zero(),
                 owner_address,
@@ -228,7 +231,7 @@ impl RawTokenOwnershipV2 {
                     transfer_event.get_from_address(),
                     storage_id.clone(),
                 ),
-                RawCurrentTokenOwnershipV2 {
+                CurrentTokenOwnershipV2 {
                     token_data_id: token_data_id.clone(),
                     property_version_v1: BigDecimal::zero(),
                     // previous owner
@@ -260,7 +263,7 @@ impl RawTokenOwnershipV2 {
         tokens_burned: &TokenV2Burned,
         object_metadatas: &ObjectAggregatedDataMapping,
         db_context: &mut Option<DbContext<'_>>,
-    ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
+    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let token_data_id = standardize_address(&write_resource.address.to_string());
         if tokens_burned
             .get(&standardize_address(&token_data_id))
@@ -302,7 +305,7 @@ impl RawTokenOwnershipV2 {
                         transaction_timestamp: txn_timestamp,
                         non_transferrable_by_owner: Some(non_transferrable_by_owner),
                     },
-                    RawCurrentTokenOwnershipV2 {
+                    CurrentTokenOwnershipV2 {
                         token_data_id,
                         property_version_v1: BigDecimal::zero(),
                         owner_address,
@@ -343,7 +346,7 @@ impl RawTokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         db_context: &mut Option<DbContext<'_>>,
-    ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
+    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let token_address = standardize_address(&delete_resource.address.to_string());
         Self::get_burned_nft_v2_helper(
             &token_address,
@@ -365,7 +368,7 @@ impl RawTokenOwnershipV2 {
         prior_nft_ownership: &AHashMap<String, NFTOwnershipV2>,
         tokens_burned: &TokenV2Burned,
         db_context: &mut Option<DbContext<'_>>,
-    ) -> anyhow::Result<Option<(Self, RawCurrentTokenOwnershipV2)>> {
+    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
         let token_address = standardize_address(token_address);
         if let Some(burn_event) = tokens_burned.get(&token_address) {
             // 1. Try to lookup token address in burn event mapping
@@ -434,7 +437,7 @@ impl RawTokenOwnershipV2 {
                     transaction_timestamp: txn_timestamp,
                     non_transferrable_by_owner: None, // default
                 },
-                RawCurrentTokenOwnershipV2 {
+                CurrentTokenOwnershipV2 {
                     token_data_id,
                     property_version_v1: BigDecimal::zero(),
                     owner_address: previous_owner,
@@ -461,7 +464,7 @@ impl RawTokenOwnershipV2 {
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
-    ) -> anyhow::Result<Option<(Self, Option<RawCurrentTokenOwnershipV2>)>> {
+    ) -> anyhow::Result<Option<(Self, Option<CurrentTokenOwnershipV2>)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token = match TokenWriteSet::from_table_item_type(
@@ -488,7 +491,7 @@ impl RawTokenOwnershipV2 {
                     }
                     let owner_address = tm.get_owner_address();
                     (
-                        Some(RawCurrentTokenOwnershipV2 {
+                        Some(CurrentTokenOwnershipV2 {
                             token_data_id: token_data_id.clone(),
                             property_version_v1: token_id_struct.property_version.clone(),
                             owner_address: owner_address.clone(),
@@ -541,7 +544,7 @@ impl RawTokenOwnershipV2 {
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         table_handle_to_owner: &TableHandleToOwner,
-    ) -> anyhow::Result<Option<(Self, Option<RawCurrentTokenOwnershipV2>)>> {
+    ) -> anyhow::Result<Option<(Self, Option<CurrentTokenOwnershipV2>)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_token_id = match TokenWriteSet::from_table_item_type(
@@ -566,7 +569,7 @@ impl RawTokenOwnershipV2 {
                     }
                     let owner_address = tm.get_owner_address();
                     (
-                        Some(RawCurrentTokenOwnershipV2 {
+                        Some(CurrentTokenOwnershipV2 {
                             token_data_id: token_data_id.clone(),
                             property_version_v1: token_id_struct.property_version.clone(),
                             owner_address: owner_address.clone(),
@@ -654,5 +657,189 @@ impl CurrentTokenOwnershipV2Query {
             .filter(current_token_ownerships_v2::amount.gt(BigDecimal::zero()))
             .first::<Self>(conn)
             .await
+    }
+}
+
+/// This is the parquet version of CurrentTokenOwnershipV2
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
+)]
+pub struct ParquetTokenOwnershipV2 {
+    pub txn_version: i64,
+    pub write_set_change_index: i64,
+    pub token_data_id: String,
+    pub property_version_v1: u64,
+    pub owner_address: Option<String>,
+    pub storage_id: String,
+    pub amount: String, // this is a string representation of a bigdecimal
+    pub table_type_v1: Option<String>,
+    pub token_properties_mutated_v1: Option<String>,
+    pub is_soulbound_v2: Option<bool>,
+    pub token_standard: String,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
+    pub non_transferrable_by_owner: Option<bool>,
+}
+
+impl NamedTable for ParquetTokenOwnershipV2 {
+    const TABLE_NAME: &'static str = "token_ownerships_v2";
+}
+
+impl HasVersion for ParquetTokenOwnershipV2 {
+    fn version(&self) -> i64 {
+        self.txn_version
+    }
+}
+
+impl GetTimeStamp for ParquetTokenOwnershipV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
+}
+
+impl From<TokenOwnershipV2> for ParquetTokenOwnershipV2 {
+    fn from(raw_item: TokenOwnershipV2) -> Self {
+        Self {
+            txn_version: raw_item.transaction_version,
+            write_set_change_index: raw_item.write_set_change_index,
+            token_data_id: raw_item.token_data_id,
+            property_version_v1: raw_item.property_version_v1.to_u64().unwrap(),
+            owner_address: raw_item.owner_address,
+            storage_id: raw_item.storage_id,
+            amount: raw_item.amount.to_string(),
+            table_type_v1: raw_item.table_type_v1,
+            token_properties_mutated_v1: raw_item
+                .token_properties_mutated_v1
+                .map(|v| v.to_string()),
+            is_soulbound_v2: raw_item.is_soulbound_v2,
+            token_standard: raw_item.token_standard,
+            block_timestamp: raw_item.transaction_timestamp,
+            non_transferrable_by_owner: raw_item.non_transferrable_by_owner,
+        }
+    }
+}
+
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
+)]
+pub struct ParquetCurrentTokenOwnershipV2 {
+    pub token_data_id: String,
+    pub property_version_v1: u64, // BigDecimal,
+    pub owner_address: String,
+    pub storage_id: String,
+    pub amount: String, // BigDecimal,
+    pub table_type_v1: Option<String>,
+    pub token_properties_mutated_v1: Option<String>, // Option<serde_json::Value>,
+    pub is_soulbound_v2: Option<bool>,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub last_transaction_version: i64,
+    #[allocative(skip)]
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub non_transferrable_by_owner: Option<bool>,
+}
+
+impl NamedTable for ParquetCurrentTokenOwnershipV2 {
+    const TABLE_NAME: &'static str = "current_token_ownerships_v2";
+}
+
+impl HasVersion for ParquetCurrentTokenOwnershipV2 {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl GetTimeStamp for ParquetCurrentTokenOwnershipV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.last_transaction_timestamp
+    }
+}
+
+// Facilitate tracking when a token is burned
+impl From<CurrentTokenOwnershipV2> for ParquetCurrentTokenOwnershipV2 {
+    fn from(raw_item: CurrentTokenOwnershipV2) -> Self {
+        Self {
+            token_data_id: raw_item.token_data_id,
+            property_version_v1: raw_item.property_version_v1.to_u64().unwrap(),
+            owner_address: raw_item.owner_address,
+            storage_id: raw_item.storage_id,
+            amount: raw_item.amount.to_string(),
+            table_type_v1: raw_item.table_type_v1,
+            token_properties_mutated_v1: raw_item
+                .token_properties_mutated_v1
+                .and_then(|v| {
+                    canonical_json::to_string(&v)
+                        .map_err(|e| {
+                            error!("Failed to convert token_properties_mutated_v1: {:?}", e);
+                            e
+                        })
+                        .ok()
+                })
+                .or_else(|| Some(DEFAULT_NONE.to_string())),
+            is_soulbound_v2: raw_item.is_soulbound_v2,
+            token_standard: raw_item.token_standard,
+            is_fungible_v2: raw_item.is_fungible_v2,
+            last_transaction_version: raw_item.last_transaction_version,
+            last_transaction_timestamp: raw_item.last_transaction_timestamp,
+            non_transferrable_by_owner: raw_item.non_transferrable_by_owner,
+        }
+    }
+}
+
+/// This is the postgres version of CurrentTokenOwnershipV2
+#[derive(
+    Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
+)]
+#[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
+#[diesel(table_name = current_token_ownerships_v2)]
+pub struct PostgresCurrentTokenOwnershipV2 {
+    pub token_data_id: String,
+    pub property_version_v1: BigDecimal,
+    pub owner_address: String,
+    pub storage_id: String,
+    pub amount: BigDecimal,
+    pub table_type_v1: Option<String>,
+    pub token_properties_mutated_v1: Option<serde_json::Value>,
+    pub is_soulbound_v2: Option<bool>,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub non_transferrable_by_owner: Option<bool>,
+}
+
+impl Ord for PostgresCurrentTokenOwnershipV2 {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.token_data_id
+            .cmp(&other.token_data_id)
+            .then(self.property_version_v1.cmp(&other.property_version_v1))
+            .then(self.owner_address.cmp(&other.owner_address))
+            .then(self.storage_id.cmp(&other.storage_id))
+    }
+}
+
+impl PartialOrd for PostgresCurrentTokenOwnershipV2 {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl From<CurrentTokenOwnershipV2> for PostgresCurrentTokenOwnershipV2 {
+    fn from(raw_item: CurrentTokenOwnershipV2) -> Self {
+        Self {
+            token_data_id: raw_item.token_data_id,
+            property_version_v1: raw_item.property_version_v1,
+            owner_address: raw_item.owner_address,
+            storage_id: raw_item.storage_id,
+            amount: raw_item.amount,
+            table_type_v1: raw_item.table_type_v1,
+            token_properties_mutated_v1: raw_item.token_properties_mutated_v1,
+            is_soulbound_v2: raw_item.is_soulbound_v2,
+            token_standard: raw_item.token_standard,
+            is_fungible_v2: raw_item.is_fungible_v2,
+            last_transaction_version: raw_item.last_transaction_version,
+            last_transaction_timestamp: raw_item.last_transaction_timestamp,
+            non_transferrable_by_owner: raw_item.non_transferrable_by_owner,
+        }
     }
 }

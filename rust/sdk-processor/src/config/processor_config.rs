@@ -9,45 +9,51 @@ use crate::{
 use ahash::AHashMap;
 use processor::{
     bq_analytics::generic_parquet_processor::NamedTable,
-    db::parquet::models::{
-        account_transaction_models::parquet_account_transactions::AccountTransaction,
-        ans_models::{
-            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
-            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
-        },
-        default_models::{
-            parquet_block_metadata_transactions::BlockMetadataTransaction,
-            parquet_move_modules::MoveModule,
-            parquet_move_resources::MoveResource,
-            parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
-            parquet_transactions::Transaction,
-            parquet_write_set_changes::WriteSetChangeModel,
-        },
-        event_models::parquet_events::EventPQ,
-        fungible_asset_models::{
-            parquet_v2_fungible_asset_activities::FungibleAssetActivity,
-            parquet_v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
-                FungibleAssetBalance,
+    db::{
+        common::models::{
+            token_models::{
+                token_claims::ParquetCurrentTokenPendingClaim,
+                token_royalty::ParquetCurrentTokenRoyaltyV1,
             },
-            parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+            token_v2_models::{
+                v2_token_activities::ParquetTokenActivityV2,
+                v2_token_datas::{ParquetCurrentTokenDataV2, ParquetTokenDataV2},
+                v2_token_metadata::ParquetCurrentTokenV2Metadata,
+                v2_token_ownerships::{ParquetCurrentTokenOwnershipV2, ParquetTokenOwnershipV2},
+            },
         },
-        object_models::v2_objects::{CurrentObject, Object},
-        stake_models::{
-            parquet_delegator_activities::DelegatedStakingActivity,
-            parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
-            parquet_proposal_voters::ProposalVote,
+        parquet::models::{
+            account_transaction_models::parquet_account_transactions::AccountTransaction,
+            ans_models::{
+                ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+                ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
+            },
+            default_models::{
+                parquet_block_metadata_transactions::BlockMetadataTransaction,
+                parquet_move_modules::MoveModule,
+                parquet_move_resources::MoveResource,
+                parquet_move_tables::{CurrentTableItem, TableItem, TableMetadata},
+                parquet_transactions::Transaction,
+                parquet_write_set_changes::WriteSetChangeModel,
+            },
+            event_models::parquet_events::EventPQ,
+            fungible_asset_models::{
+                parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+                parquet_v2_fungible_asset_balances::{
+                    CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                    FungibleAssetBalance,
+                },
+                parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+            },
+            object_models::v2_objects::{CurrentObject, Object},
+            stake_models::{
+                parquet_delegator_activities::DelegatedStakingActivity,
+                parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
+                parquet_proposal_voters::ProposalVote,
+            },
+            transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
+            user_transaction_models::parquet_user_transactions::UserTransaction,
         },
-        token_v2_models::{
-            token_claims::CurrentTokenPendingClaim,
-            v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_token_activities::TokenActivityV2,
-            v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
-            v2_token_metadata::CurrentTokenV2Metadata,
-            v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
-        },
-        transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
-        user_transaction_models::parquet_user_transactions::UserTransaction,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -200,14 +206,14 @@ impl ProcessorConfig {
                 HashSet::from([AccountTransaction::TABLE_NAME.to_string()])
             },
             ProcessorName::ParquetTokenV2Processor => HashSet::from([
-                CurrentTokenPendingClaim::TABLE_NAME.to_string(),
-                CurrentTokenRoyaltyV1::TABLE_NAME.to_string(),
-                CurrentTokenV2Metadata::TABLE_NAME.to_string(),
-                TokenActivityV2::TABLE_NAME.to_string(),
-                TokenDataV2::TABLE_NAME.to_string(),
-                CurrentTokenDataV2::TABLE_NAME.to_string(),
-                TokenOwnershipV2::TABLE_NAME.to_string(),
-                CurrentTokenOwnershipV2::TABLE_NAME.to_string(),
+                ParquetCurrentTokenPendingClaim::TABLE_NAME.to_string(),
+                ParquetCurrentTokenRoyaltyV1::TABLE_NAME.to_string(),
+                ParquetCurrentTokenV2Metadata::TABLE_NAME.to_string(),
+                ParquetTokenActivityV2::TABLE_NAME.to_string(),
+                ParquetTokenDataV2::TABLE_NAME.to_string(),
+                ParquetCurrentTokenDataV2::TABLE_NAME.to_string(),
+                ParquetTokenOwnershipV2::TABLE_NAME.to_string(),
+                ParquetCurrentTokenOwnershipV2::TABLE_NAME.to_string(),
             ]),
             ProcessorName::ParquetObjectsProcessor => HashSet::from([
                 Object::TABLE_NAME.to_string(),

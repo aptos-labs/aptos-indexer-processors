@@ -6,24 +6,27 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::{
-        common::models::{
-            object_models::v2_object_utils::ObjectAggregatedDataMapping,
-            token_v2_models::{
-                raw_token_claims::TokenV1Claimed,
-                v2_token_utils::{TokenStandard, V2TokenEvent},
-            },
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    db::common::models::{
+        object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        token_models::{
+            token_claims::TokenV1Claimed,
+            token_utils::{TokenDataIdType, TokenEvent},
         },
-        postgres::models::token_models::token_utils::{TokenDataIdType, TokenEvent},
+        token_v2_models::v2_token_utils::{TokenStandard, V2TokenEvent},
     },
+    schema::token_activities_v2,
     utils::util::standardize_address,
 };
+use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::Event;
-use bigdecimal::{BigDecimal, One, Zero};
+use bigdecimal::{BigDecimal, One, ToPrimitive, Zero};
+use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RawTokenActivityV2 {
+pub struct TokenActivityV2 {
     pub transaction_version: i64,
     pub event_index: i64,
     pub event_account_address: String,
@@ -61,7 +64,7 @@ struct TokenActivityHelperV2 {
     pub event_type: String,
 }
 
-impl RawTokenActivityV2 {
+impl TokenActivityV2 {
     pub async fn get_nft_v2_from_parsed_event(
         event: &Event,
         txn_version: i64,
@@ -355,6 +358,108 @@ impl RawTokenActivityV2 {
     }
 }
 
-pub trait TokenActivityV2Convertible {
-    fn from_raw(raw_item: RawTokenActivityV2) -> Self;
+/// This is a parquet version of TokenActivityV2
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
+)]
+pub struct ParquetTokenActivityV2 {
+    pub txn_version: i64,
+    pub event_index: i64,
+    pub event_account_address: String,
+    pub token_data_id: String,
+    pub property_version_v1: u64, // BigDecimal
+    pub type_: String,
+    pub from_address: Option<String>,
+    pub to_address: Option<String>,
+    pub token_amount: String, // BigDecimal
+    pub before_value: Option<String>,
+    pub after_value: Option<String>,
+    pub entry_function_id_str: Option<String>,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    #[allocative(skip)]
+    pub block_timestamp: chrono::NaiveDateTime,
+}
+
+impl NamedTable for ParquetTokenActivityV2 {
+    const TABLE_NAME: &'static str = "token_activities_v2";
+}
+
+impl HasVersion for ParquetTokenActivityV2 {
+    fn version(&self) -> i64 {
+        self.txn_version
+    }
+}
+
+impl GetTimeStamp for ParquetTokenActivityV2 {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.block_timestamp
+    }
+}
+
+impl From<TokenActivityV2> for ParquetTokenActivityV2 {
+    fn from(raw_item: TokenActivityV2) -> Self {
+        Self {
+            txn_version: raw_item.transaction_version,
+            event_index: raw_item.event_index,
+            event_account_address: raw_item.event_account_address,
+            token_data_id: raw_item.token_data_id,
+            property_version_v1: raw_item.property_version_v1.to_u64().unwrap(),
+            type_: raw_item.type_,
+            from_address: raw_item.from_address,
+            to_address: raw_item.to_address,
+            token_amount: raw_item.token_amount.to_string(),
+            before_value: raw_item.before_value,
+            after_value: raw_item.after_value,
+            entry_function_id_str: raw_item.entry_function_id_str,
+            token_standard: raw_item.token_standard,
+            is_fungible_v2: raw_item.is_fungible_v2,
+            block_timestamp: raw_item.transaction_timestamp,
+        }
+    }
+}
+
+/// This is a postgres version of TokenActivityV2
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(transaction_version, event_index))]
+#[diesel(table_name = token_activities_v2)]
+pub struct PostgresTokenActivityV2 {
+    pub transaction_version: i64,
+    pub event_index: i64,
+    pub event_account_address: String,
+    pub token_data_id: String,
+    pub property_version_v1: BigDecimal,
+    pub type_: String,
+    pub from_address: Option<String>,
+    pub to_address: Option<String>,
+    pub token_amount: BigDecimal,
+    pub before_value: Option<String>,
+    pub after_value: Option<String>,
+    pub entry_function_id_str: Option<String>,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub transaction_timestamp: chrono::NaiveDateTime,
+}
+
+impl From<TokenActivityV2> for PostgresTokenActivityV2 {
+    fn from(raw_item: TokenActivityV2) -> Self {
+        Self {
+            transaction_version: raw_item.transaction_version,
+            event_index: raw_item.event_index,
+            event_account_address: raw_item.event_account_address,
+            token_data_id: raw_item.token_data_id,
+            property_version_v1: raw_item.property_version_v1,
+            type_: raw_item.type_,
+            from_address: raw_item.from_address,
+            to_address: raw_item.to_address,
+            token_amount: raw_item.token_amount,
+            before_value: raw_item.before_value,
+            after_value: raw_item.after_value,
+            entry_function_id_str: raw_item.entry_function_id_str,
+            token_standard: raw_item.token_standard,
+            is_fungible_v2: raw_item.is_fungible_v2,
+            transaction_timestamp: raw_item.transaction_timestamp,
+        }
+    }
 }

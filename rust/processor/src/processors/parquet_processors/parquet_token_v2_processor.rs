@@ -12,23 +12,18 @@ use crate::{
             object_models::v2_object_utils::{
                 ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
             },
+            token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
             token_v2_models::{
-                raw_v2_token_datas::{RawTokenDataV2, TokenDataV2Convertible},
-                raw_v2_token_ownerships::{
-                    NFTOwnershipV2, RawTokenOwnershipV2, TokenOwnershipV2Convertible,
-                },
+                v2_token_datas::{ParquetTokenDataV2, TokenDataV2},
+                v2_token_ownerships::{NFTOwnershipV2, ParquetTokenOwnershipV2, TokenOwnershipV2},
                 v2_token_utils::{
                     Burn, BurnEvent, MintEvent, TokenV2Burned, TokenV2Minted, TransferEvent,
                 },
             },
         },
-        parquet::models::token_v2_models::{
-            v2_token_datas::TokenDataV2, v2_token_ownerships::TokenOwnershipV2,
-        },
         postgres::models::{
             fungible_asset_models::v2_fungible_asset_utils::FungibleAssetMetadata,
             resources::{FromWriteResource, V2TokenResource},
-            token_models::tokens::{TableHandleToOwner, TableMetadataForToken},
         },
     },
     gap_detectors::ProcessingResult,
@@ -65,8 +60,8 @@ impl ParquetProcessorTrait for ParquetTokenV2ProcessorConfig {
 
 pub struct ParquetTokenV2Processor {
     connection_pool: ArcDbPool,
-    v2_token_datas_sender: AsyncSender<ParquetDataGeneric<TokenDataV2>>,
-    v2_token_ownerships_sender: AsyncSender<ParquetDataGeneric<TokenOwnershipV2>>,
+    v2_token_datas_sender: AsyncSender<ParquetDataGeneric<ParquetTokenDataV2>>,
+    v2_token_ownerships_sender: AsyncSender<ParquetDataGeneric<ParquetTokenOwnershipV2>>,
 }
 
 impl ParquetTokenV2Processor {
@@ -77,7 +72,7 @@ impl ParquetTokenV2Processor {
     ) -> Self {
         config.set_google_credentials(config.google_application_credentials.clone());
 
-        let v2_token_datas_sender = create_parquet_handler_loop::<TokenDataV2>(
+        let v2_token_datas_sender = create_parquet_handler_loop::<ParquetTokenDataV2>(
             new_gap_detector_sender.clone(),
             ProcessorName::ParquetTokenV2Processor.into(),
             config.bucket_name.clone(),
@@ -87,7 +82,7 @@ impl ParquetTokenV2Processor {
             config.parquet_upload_interval_in_secs(),
         );
 
-        let v2_token_ownerships_sender = create_parquet_handler_loop::<TokenOwnershipV2>(
+        let v2_token_ownerships_sender = create_parquet_handler_loop::<ParquetTokenOwnershipV2>(
             new_gap_detector_sender.clone(),
             ProcessorName::ParquetTokenV2Processor.into(),
             config.bucket_name.clone(),
@@ -143,9 +138,9 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         )
         .await;
 
-        let parquet_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+        let parquet_token_datas_v2: Vec<ParquetTokenDataV2> = raw_token_datas_v2
             .into_iter()
-            .map(TokenDataV2::from_raw)
+            .map(ParquetTokenDataV2::from)
             .collect();
 
         let token_data_v2_parquet_data = ParquetDataGeneric {
@@ -157,9 +152,9 @@ impl ProcessorTrait for ParquetTokenV2Processor {
             .await
             .context("Failed to send token data v2 parquet data")?;
 
-        let parquet_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+        let parquet_token_ownerships_v2: Vec<ParquetTokenOwnershipV2> = raw_token_ownerships_v2
             .into_iter()
-            .map(TokenOwnershipV2::from_raw)
+            .map(ParquetTokenOwnershipV2::from)
             .collect();
 
         let token_ownerships_v2_parquet_data = ParquetDataGeneric {
@@ -193,7 +188,7 @@ async fn parse_v2_token(
     table_handle_to_owner: &TableHandleToOwner,
     db_context: &mut Option<DbContext<'_>>,
     transaction_version_to_struct_count: &mut AHashMap<i64, i64>,
-) -> (Vec<RawTokenDataV2>, Vec<RawTokenOwnershipV2>) {
+) -> (Vec<TokenDataV2>, Vec<TokenOwnershipV2>) {
     // Token V2 and V1 combined
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
@@ -334,7 +329,7 @@ async fn parse_v2_token(
                 match wsc.change.as_ref().unwrap() {
                     Change::WriteTableItem(table_item) => {
                         if let Some((raw_token_data, _)) =
-                            RawTokenDataV2::get_v1_from_write_table_item(
+                            TokenDataV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -349,7 +344,7 @@ async fn parse_v2_token(
                                 .or_insert(1);
                         }
                         if let Some((token_ownership, current_token_ownership)) =
-                            RawTokenOwnershipV2::get_v1_from_write_table_item(
+                            TokenOwnershipV2::get_v1_from_write_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -377,7 +372,7 @@ async fn parse_v2_token(
                     },
                     Change::DeleteTableItem(table_item) => {
                         if let Some((token_ownership, current_token_ownership)) =
-                            RawTokenOwnershipV2::get_v1_from_delete_table_item(
+                            TokenOwnershipV2::get_v1_from_delete_table_item(
                                 table_item,
                                 txn_version,
                                 wsc_index,
@@ -405,7 +400,7 @@ async fn parse_v2_token(
                     },
                     Change::WriteResource(resource) => {
                         if let Some((raw_token_data, _current_token_data)) =
-                            RawTokenDataV2::get_v2_from_write_resource(
+                            TokenDataV2::get_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -415,12 +410,11 @@ async fn parse_v2_token(
                             .unwrap()
                         {
                             // Add NFT ownership
-                            let (mut ownerships, _) =
-                                RawTokenOwnershipV2::get_nft_v2_from_token_data(
-                                    &raw_token_data,
-                                    &token_v2_metadata_helper,
-                                )
-                                .unwrap();
+                            let (mut ownerships, _) = TokenOwnershipV2::get_nft_v2_from_token_data(
+                                &raw_token_data,
+                                &token_v2_metadata_helper,
+                            )
+                            .unwrap();
                             if let Some(current_nft_ownership) = ownerships.first() {
                                 // Note that the first element in ownerships is the current ownership. We need to cache
                                 // it in prior_nft_ownership so that moving forward if we see a burn we'll know
@@ -447,7 +441,7 @@ async fn parse_v2_token(
                         }
                         // Add burned NFT handling
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            RawTokenOwnershipV2::get_burned_nft_v2_from_write_resource(
+                            TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
@@ -477,7 +471,7 @@ async fn parse_v2_token(
                     },
                     Change::DeleteResource(resource) => {
                         if let Some((nft_ownership, current_nft_ownership)) =
-                            RawTokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
+                            TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
                                 resource,
                                 txn_version,
                                 wsc_index,
