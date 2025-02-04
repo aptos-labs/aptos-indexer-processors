@@ -229,7 +229,7 @@ pub struct BackfillConfig {
     pub backfill_id: String,
     pub initial_starting_version: u64,
     pub ending_version: u64,
-    pub overwrite_checkpoint: bool,
+    pub overwrite_in_progress_checkpoint: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -23,10 +23,19 @@ If you want to index a custom contract, we recommend using the [Quickstart Guide
         processor_config:
             type: "fungible_asset_processor"
             channel_size: 100
+        backfill_config:
+            backfill_id: "123"
+            initial_starting_version: 42
+            ending_version: 100042
+            overwrite_in_progress_checkpoint: false
+        testing_config:
+            override_starting_version: 111111
+            ending_version: 222222
+        bootstrap_config:
+            initial_starting_version: 123456789
+        mode: "testing"
         transaction_stream_config:
             indexer_grpc_data_service_address: "https://grpc.mainnet.aptoslabs.com:443"
-            starting_version: 0
-            # request_ending_version: 1409805
             auth_token: "{AUTH_TOKEN}"
             request_name_header: "fungible_asset_processor"
         db_config:
@@ -40,11 +49,25 @@ If you want to index a custom contract, we recommend using the [Quickstart Guide
     - `type`: which processor to run
     - `channel_size`: size of channel in between steps
     - Individual processors may have different configuration required. See the full list of configs [here](https://github.com/aptos-labs/aptos-indexer-processors/blob/main/rust/sdk-processor/src/config/processor_config.rs#L89).
+
+- `backfill_config`
+    - `backfill_id`: appended to `processor_type` for a unique backfill identifier
+    - `initial_starting_version`: processor starts here unless there is a greater checkpointed version
+    - `ending_version`: ending version of the backfill
+    - `overwrite_in_progress_checkpoint`: overwrite the in-progress checkpoint if true
+
+- `testing_config`
+    - `override_starting_version`: starting version of the testing. always starts from this version
+    - `ending_version`: ending version of the testing
+
+- `bootstrap_config` used for regular processors (non-backfill) 
+    - `initial_starting_version`: processor starts here unless there is a greater checkpointed version
+
+- `mode`: `default` (default), `testing` or `backfill` 
+
 - `transaction_stream_config`
     - `indexer_grpc_data_service_address`: Data service non-TLS endpoint address.
     - `auth_token`: Auth token used for connection.
-    - `starting_version`: start processor at starting_version.
-    - `request_ending_version`: stop processor after ending_version.
     - `request_name_header`: request name header to append to the grpc request; name of the processor
     - `additional_headers`: addtional headers to append to the grpc request
     - `indexer_grpc_http2_ping_interval_in_secs`: client-side grpc HTTP2 ping interval.
