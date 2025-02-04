@@ -54,7 +54,7 @@ If you want to index a custom contract, we recommend using the [Quickstart Guide
     - `backfill_id`: appended to `processor_type` for a unique backfill identifier
     - `initial_starting_version`: processor starts here unless there is a greater checkpointed version
     - `ending_version`: ending version of the backfill
-    - `overwrite_checkpoint`: overwrite the in-progress checkpoint if true
+    - `overwrite_checkpoint`: overwrite checkpoints if it exists, restarting the backfill from `initial_starting_version`.
 
 - `testing_config`
     - `override_starting_version`: starting version of the testing. always starts from this version
