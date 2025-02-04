@@ -2,6 +2,7 @@ use crate::{
     parquet_processors::{ParquetTypeEnum, ParquetTypeStructs},
     utils::parquet_extractor_helper::add_to_map_if_opted_in_for_backfill,
 };
+use ahash::AHashMap;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
@@ -14,6 +15,9 @@ use processor::{
         common::models::fungible_asset_models::{
             raw_v2_fungible_asset_activities::FungibleAssetActivityConvertible,
             raw_v2_fungible_asset_balances::FungibleAssetBalanceConvertible,
+            raw_v2_fungible_asset_to_coin_mappings::{
+                FungibleAssetToCoinMappings, RawFungibleAssetToCoinMapping,
+            },
             raw_v2_fungible_metadata::FungibleAssetMetadataConvertible,
         },
         parquet::models::fungible_asset_models::{
@@ -22,8 +26,8 @@ use processor::{
             parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
         },
     },
-    processors::fungible_asset_processor::parse_v2_coin,
-    utils::table_flags::TableFlags,
+    processors::fungible_asset_processor::{get_fa_to_coin_mapping, parse_v2_coin},
+    utils::{database::ArcDbPool, table_flags::TableFlags},
 };
 use std::collections::HashMap;
 use tracing::debug;
@@ -34,6 +38,23 @@ where
     Self: Processable + Send + Sized + 'static,
 {
     pub opt_in_tables: TableFlags,
+    pub fa_to_coin_mapping: FungibleAssetToCoinMappings,
+}
+
+impl ParquetFungibleAssetExtractor {
+    pub fn new(opt_in_tables: TableFlags) -> Self {
+        Self {
+            opt_in_tables,
+            fa_to_coin_mapping: AHashMap::new(),
+        }
+    }
+
+    pub async fn bootstrap_fa_to_coin_mapping(&mut self, db_pool: ArcDbPool) -> anyhow::Result<()> {
+        let mut conn = db_pool.get().await?;
+        let mapping = RawFungibleAssetToCoinMapping::get_all_mappings(&mut conn).await;
+        self.fa_to_coin_mapping = mapping;
+        Ok(())
+    }
 }
 
 type ParquetTypeMap = HashMap<ParquetTypeEnum, ParquetTypeStructs>;
@@ -48,13 +69,19 @@ impl Processable for ParquetFungibleAssetExtractor {
         &mut self,
         transactions: TransactionContext<Self::Input>,
     ) -> anyhow::Result<Option<TransactionContext<ParquetTypeMap>>, ProcessorError> {
+        // get the new fa_to_coin_mapping from the transactions
+        let new_fa_to_coin_mapping = get_fa_to_coin_mapping(&transactions.data).await;
+        // Merge the mappings
+        self.fa_to_coin_mapping.extend(new_fa_to_coin_mapping);
+
         let (
             raw_fungible_asset_activities,
             raw_fungible_asset_metadata,
             raw_fungible_asset_balances,
-            (_raw_current_unified_fab_v1, _raw_current_unified_fab_v2),
+            _,
             _raw_coin_supply,
-        ) = parse_v2_coin(&transactions.data).await;
+            _raw_fa_to_coin_mappings,
+        ) = parse_v2_coin(&transactions.data, Some(&self.fa_to_coin_mapping)).await;
 
         let parquet_fungible_asset_activities: Vec<FungibleAssetActivity> =
             raw_fungible_asset_activities

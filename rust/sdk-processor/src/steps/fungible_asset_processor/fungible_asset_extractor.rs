@@ -1,3 +1,6 @@
+use crate::utils::database::ArcDbPool;
+use ahash::AHashMap;
+use anyhow::Result;
 use aptos_indexer_processor_sdk::{
     aptos_protos::transaction::v1::Transaction,
     traits::{async_step::AsyncRunType, AsyncStep, NamedStep, Processable},
@@ -12,6 +15,10 @@ use processor::{
             raw_v2_fungible_asset_balances::{
                 CurrentUnifiedFungibleAssetBalanceConvertible, FungibleAssetBalanceConvertible,
             },
+            raw_v2_fungible_asset_to_coin_mappings::{
+                FungibleAssetToCoinMappingConvertible, FungibleAssetToCoinMappings,
+                RawFungibleAssetToCoinMapping,
+            },
             raw_v2_fungible_metadata::FungibleAssetMetadataConvertible,
         },
         postgres::models::{
@@ -21,17 +28,49 @@ use processor::{
                 v2_fungible_asset_balances::{
                     CurrentUnifiedFungibleAssetBalance, FungibleAssetBalance,
                 },
+                v2_fungible_asset_to_coin_mappings::FungibleAssetToCoinMapping,
                 v2_fungible_metadata::FungibleAssetMetadataModel,
             },
         },
     },
-    processors::fungible_asset_processor::parse_v2_coin,
+    processors::fungible_asset_processor::{get_fa_to_coin_mapping, parse_v2_coin},
 };
 
 /// Extracts fungible asset events, metadata, balances, and v1 supply from transactions
 pub struct FungibleAssetExtractor
 where
-    Self: Sized + Send + 'static, {}
+    Self: Sized + Send + 'static,
+{
+    pub fa_to_coin_mapping: FungibleAssetToCoinMappings,
+}
+
+impl FungibleAssetExtractor {
+    pub fn new() -> Self {
+        Self {
+            fa_to_coin_mapping: AHashMap::new(),
+        }
+    }
+
+    pub async fn bootstrap_fa_to_coin_mapping(&mut self, db_pool: ArcDbPool) -> Result<()> {
+        tracing::info!("Started bootstrapping fungible asset to coin mapping");
+        let start = std::time::Instant::now();
+        let mut conn = db_pool.get().await?;
+        let mapping = RawFungibleAssetToCoinMapping::get_all_mappings(&mut conn).await;
+        self.fa_to_coin_mapping = mapping;
+        tracing::info!(
+            item_count = self.fa_to_coin_mapping.len(),
+            duration_ms = start.elapsed().as_millis(),
+            "Finished bootstrapping fungible asset to coin mapping"
+        );
+        Ok(())
+    }
+}
+
+impl Default for FungibleAssetExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[async_trait]
 impl Processable for FungibleAssetExtractor {
@@ -45,6 +84,7 @@ impl Processable for FungibleAssetExtractor {
             Vec<CurrentUnifiedFungibleAssetBalance>,
         ),
         Vec<CoinSupply>,
+        Vec<FungibleAssetToCoinMapping>,
     );
     type RunType = AsyncRunType;
 
@@ -62,17 +102,22 @@ impl Processable for FungibleAssetExtractor {
                     Vec<CurrentUnifiedFungibleAssetBalance>,
                 ),
                 Vec<CoinSupply>,
+                Vec<FungibleAssetToCoinMapping>,
             )>,
         >,
         ProcessorError,
     > {
+        let new_fa_to_coin_mapping = get_fa_to_coin_mapping(&transactions.data).await;
+        // Merge the mappings
+        self.fa_to_coin_mapping.extend(new_fa_to_coin_mapping);
         let (
             raw_fungible_asset_activities,
             raw_fungible_asset_metadata,
             raw_fungible_asset_balances,
             (raw_current_unified_fab_v1, raw_current_unified_fab_v2),
             coin_supply,
-        ) = parse_v2_coin(&transactions.data).await;
+            fa_to_coin_mappings,
+        ) = parse_v2_coin(&transactions.data, Some(&self.fa_to_coin_mapping)).await;
 
         let postgres_fungible_asset_activities: Vec<FungibleAssetActivity> =
             raw_fungible_asset_activities
@@ -102,6 +147,10 @@ impl Processable for FungibleAssetExtractor {
                 .into_iter()
                 .map(CurrentUnifiedFungibleAssetBalance::from_raw)
                 .collect();
+        let postgres_fa_to_coin_mappings: Vec<FungibleAssetToCoinMapping> = fa_to_coin_mappings
+            .into_iter()
+            .map(FungibleAssetToCoinMapping::from_raw)
+            .collect();
 
         Ok(Some(TransactionContext {
             data: (
@@ -113,6 +162,7 @@ impl Processable for FungibleAssetExtractor {
                     postgres_current_unified_fab_v2,
                 ),
                 coin_supply,
+                postgres_fa_to_coin_mappings,
             ),
             metadata: transactions.metadata,
         }))
