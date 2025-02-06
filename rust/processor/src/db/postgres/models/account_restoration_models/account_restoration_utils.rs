@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignature, signature::Signature, transaction::TxnData,
-    Transaction,
+    MultiEd25519Signature, Transaction, UserTransactionRequest,
 };
 
 trait AuthKeyScheme {
@@ -27,8 +27,7 @@ impl AuthKeyScheme for Ed25519AuthKeyScheme {
     const SCHEME: u8 = 0x00;
 
     fn auth_key(&self) -> Option<String> {
-        let mut preimage = self.public_key.clone();
-        preimage.push(Self::SCHEME);
+        let preimage = self.public_key.clone();
         Some(format!("0x{}", hex::encode(sha3_256(&preimage))))
     }
 }
@@ -88,6 +87,20 @@ impl AnyPublicKeyType {
     }
 }
 
+fn get_auth_key_preimage_for_public_key(
+    key_type: &AnyPublicKeyType,
+    public_key: Vec<u8>,
+) -> Vec<u8> {
+    let mut preimage = vec![key_type.to_u8()];
+    match key_type {
+        AnyPublicKeyType::Ed25519 => preimage.push(0x20),
+        AnyPublicKeyType::Secp256k1Ecdsa => preimage.push(0x41),
+        _ => {},
+    }
+    preimage.extend_from_slice(&public_key);
+    preimage
+}
+
 struct SingleKeyAuthKeyScheme {
     key_type: Option<AnyPublicKeyType>,
     public_key: Vec<u8>,
@@ -98,8 +111,8 @@ impl AuthKeyScheme for SingleKeyAuthKeyScheme {
 
     fn auth_key(&self) -> Option<String> {
         if let Some(key_type) = &self.key_type {
-            let mut preimage = vec![key_type.to_u8()];
-            preimage.extend_from_slice(&self.public_key);
+            let mut preimage =
+                get_auth_key_preimage_for_public_key(key_type, self.public_key.clone());
             preimage.push(Self::SCHEME);
             Some(format!("0x{}", hex::encode(sha3_256(&preimage))))
         } else {
@@ -131,12 +144,15 @@ impl AuthKeyScheme for MultiKeyAuthKeyScheme {
         let mut preimage = vec![total_keys];
 
         for (key_type, public_key) in self.key_types.iter().zip(&self.public_keys) {
-            preimage.push(key_type.expect("should not be None").to_u8());
-            preimage.extend_from_slice(public_key);
+            preimage.extend_from_slice(&get_auth_key_preimage_for_public_key(
+                &key_type.expect("should not be None"),
+                public_key.clone(),
+            ));
         }
 
         preimage.push(self.threshold.try_into().ok()?);
         preimage.push(Self::SCHEME);
+        println!("preimage: {:?}", hex::encode(preimage.clone()));
         Some(format!("0x{}", hex::encode(sha3_256(&preimage))))
     }
 }
@@ -159,6 +175,15 @@ impl SignatureInfo {
             public_keys,
             verified,
         })
+    }
+
+    fn multi_ed25519_from_transaction_signature(signature: &MultiEd25519Signature) -> Self {
+        let mut verified = vec![false; signature.public_keys.len()];
+        signature
+            .public_key_indices
+            .iter()
+            .for_each(|idx| verified[*idx as usize] = true);
+        Self::multi_ed25519(signature.threshold, signature.public_keys.clone(), verified)
     }
 
     fn single_key(key_type: Option<i32>, public_key: Vec<u8>) -> Self {
@@ -253,171 +278,289 @@ impl SignatureInfo {
         }
     }
 
-    fn from_transaction_signature(signature: &Signature) -> Option<Self> {
-        let info = match signature {
-            Signature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
-            Signature::MultiEd25519(sigs) => {
+    fn from_account_signature(account_signature: &AccountSignature) -> Self {
+        match account_signature {
+            AccountSignature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
+            AccountSignature::MultiEd25519(sig) => {
+                Self::multi_ed25519_from_transaction_signature(sig)
+            },
+            AccountSignature::SingleKeySignature(sig) => Self::single_key(
+                Self::any_public_key_type_prefix(sig.public_key.as_ref().unwrap().r#type),
+                sig.public_key.as_ref().unwrap().public_key.clone(),
+            ),
+            AccountSignature::MultiKeySignature(sigs) => {
                 let mut verified = vec![false; sigs.public_keys.len()];
-                sigs.public_key_indices
+                sigs.signatures.iter().for_each(|idx_sig| {
+                    let idx = idx_sig.index as usize;
+                    if idx < verified.len() {
+                        verified[idx] = true;
+                    }
+                });
+
+                let threshold = sigs.signatures_required;
+                let prefixes = sigs
+                    .public_keys
                     .iter()
-                    .for_each(|idx| verified[*idx as usize] = true);
-                Self::multi_ed25519(sigs.threshold, sigs.signatures.clone(), verified)
+                    .map(|pk| Self::any_public_key_type_prefix(pk.r#type))
+                    .collect::<Vec<_>>();
+                let public_keys = sigs
+                    .public_keys
+                    .iter()
+                    .map(|pk| pk.public_key.clone())
+                    .collect::<Vec<_>>();
+                Self::multi_key(threshold, prefixes, public_keys, verified)
             },
-            Signature::SingleSender(single_sender) => {
-                let account_signature = single_sender.sender.as_ref().unwrap();
+        }
+    }
+}
 
-                let signature_info = match account_signature.signature.as_ref().unwrap() {
-                    AccountSignature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
-                    AccountSignature::MultiEd25519(sigs) => {
-                        let mut verified = vec![false; sigs.public_keys.len()];
-                        sigs.public_key_indices
-                            .iter()
-                            .for_each(|idx| verified[*idx as usize] = true);
-                        Self::multi_ed25519(sigs.threshold, sigs.public_keys.clone(), verified)
-                    },
-                    AccountSignature::SingleKeySignature(sig) => Self::single_key(
-                        Self::any_public_key_type_prefix(sig.public_key.as_ref().unwrap().r#type),
-                        sig.public_key.as_ref().unwrap().public_key.clone(),
-                    ),
-                    AccountSignature::MultiKeySignature(sigs) => {
-                        let mut verified = vec![false; sigs.public_keys.len()];
-                        sigs.signatures.iter().for_each(|idx_sig| {
-                            let idx = idx_sig.index as usize;
-                            if idx < verified.len() {
-                                verified[idx] = true;
-                            }
-                        });
+fn get_signature_infos_from_user_txn_request(
+    user_txn_request: &UserTransactionRequest,
+) -> Vec<(String, SignatureInfo)> {
+    let signature = match &user_txn_request.signature {
+        Some(sig) => match &sig.signature {
+            Some(s) => s,
+            None => return vec![],
+        },
+        None => return vec![],
+    };
+    let sender_address = user_txn_request.sender.clone();
+    match signature {
+        Signature::Ed25519(sig) => vec![(
+            sender_address,
+            SignatureInfo::ed25519(sig.public_key.clone()),
+        )],
+        Signature::MultiEd25519(sig) => vec![(
+            sender_address,
+            SignatureInfo::multi_ed25519_from_transaction_signature(sig),
+        )],
+        Signature::SingleSender(single_sender) => {
+            let account_signature = single_sender
+                .sender
+                .as_ref()
+                .unwrap()
+                .signature
+                .as_ref()
+                .unwrap();
+            vec![(
+                sender_address,
+                SignatureInfo::from_account_signature(account_signature),
+            )]
+        },
+        Signature::FeePayer(sig) => {
+            let account_signature = sig.sender.as_ref().unwrap().signature.as_ref().unwrap();
+            let fee_payer_address = sig.fee_payer_address.clone();
+            let fee_payer_signature = sig
+                .fee_payer_signer
+                .as_ref()
+                .unwrap()
+                .signature
+                .as_ref()
+                .unwrap();
 
-                        let threshold = sigs.signatures_required;
-                        let prefixes = sigs
-                            .public_keys
-                            .iter()
-                            .map(|pk| Self::any_public_key_type_prefix(pk.r#type))
-                            .collect::<Vec<_>>();
-                        let public_keys = sigs
-                            .public_keys
-                            .iter()
-                            .map(|pk| pk.public_key.clone())
-                            .collect::<Vec<_>>();
-                        Self::multi_key(threshold, prefixes, public_keys, verified)
-                    },
-                };
-                signature_info
-            },
-            _ => return None, // TODO: Handle `MultiAgent` and `FeePayer` cases
-        };
-
-        Some(info)
+            let mut signature_infos = vec![
+                (
+                    sender_address,
+                    SignatureInfo::from_account_signature(account_signature),
+                ),
+                (
+                    fee_payer_address,
+                    SignatureInfo::from_account_signature(fee_payer_signature),
+                ),
+            ];
+            for (address, signature) in sig
+                .secondary_signer_addresses
+                .iter()
+                .zip(sig.secondary_signers.iter())
+            {
+                signature_infos.push((
+                    address.clone(),
+                    SignatureInfo::from_account_signature(signature.signature.as_ref().unwrap()),
+                ));
+            }
+            signature_infos
+        },
+        _ => vec![], // TODO: Handle `MultiAgent`
     }
 }
 
 pub fn parse_account_restoration_models_from_transaction(
     txn: &Transaction,
-) -> Option<(
+) -> Vec<(
     AuthKeyAccountAddress,
     Vec<PublicKeyAuthKey>,
     Option<AuthKeyMultikeyLayout>,
 )> {
-    let user_txn = match txn.txn_data.as_ref()? {
-        TxnData::User(user_txn) => user_txn,
-        _ => return None,
+    let user_txn = match txn.txn_data.as_ref() {
+        Some(TxnData::User(user_txn)) => user_txn,
+        _ => return vec![],
     };
-    let address = user_txn.request.as_ref()?.sender.clone();
-    let signature_info = SignatureInfo::from_transaction_signature(
-        user_txn
-            .request
-            .as_ref()?
-            .signature
-            .as_ref()?
-            .signature
-            .as_ref()?,
-    )?;
-    let auth_key = signature_info.auth_key().unwrap_or_default();
-    let txn_version = txn.version as i64;
-
-    let auth_key_account_address = AuthKeyAccountAddress {
-        auth_key: auth_key.clone(),
-        address,
-        verified: true,
-        last_transaction_version: txn_version,
+    let user_txn_request = match &user_txn.request {
+        Some(req) => req,
+        None => return vec![],
     };
+    let signature_infos = get_signature_infos_from_user_txn_request(user_txn_request);
 
-    let (auth_key_multikey_layout, public_key_auth_keys) = if signature_info.is_multikey() {
-        let multikey_layouts = signature_info
-            .multikey_public_keys()
-            .iter()
-            .zip(signature_info.multikey_key_types().iter())
-            .map(|(pk, prefix)| {
-                let pk_with_prefix = prefix.map_or_else(
-                    || pk.clone(),
-                    |key_type| {
-                        let mut extended = vec![key_type.to_u8()]; // Public key type prefix
-                        extended.extend(pk);
-                        extended
-                    },
-                );
-                format!("0x{}", hex::encode(pk_with_prefix))
-            })
-            .collect::<Vec<_>>();
+    let mut results = vec![];
+    for (address, signature_info) in signature_infos {
+        let auth_key = signature_info.auth_key().unwrap_or_default();
+        let txn_version = txn.version as i64;
 
-        let multikey_pk_types = match &signature_info {
-            SignatureInfo::MultiEd25519(_) => {
-                vec![String::from("ed25519"); multikey_layouts.len()]
-            },
-            SignatureInfo::MultiKey(scheme) => scheme
-                .key_types
+        let auth_key_account_address = AuthKeyAccountAddress {
+            auth_key: auth_key.clone(),
+            address: address.clone(),
+            verified: true,
+            last_transaction_version: txn_version,
+        };
+
+        let (auth_key_multikey_layout, public_key_auth_keys) = if signature_info.is_multikey() {
+            let multikey_layouts = signature_info
+                .multikey_public_keys()
                 .iter()
-                .map(|maybe_key_type| match maybe_key_type {
-                    Some(key_type) => key_type.key_type_string(),
-                    None => String::new(),
+                .zip(signature_info.multikey_key_types().iter())
+                .map(|(pk, prefix)| {
+                    let pk_with_prefix = prefix.map_or_else(
+                        || pk.clone(),
+                        |key_type| {
+                            let mut extended = vec![key_type.to_u8()]; // Public key type prefix
+                            extended.extend(pk);
+                            extended
+                        },
+                    );
+                    format!("0x{}", hex::encode(pk_with_prefix))
                 })
-                .collect(),
-            _ => vec![],
+                .collect::<Vec<_>>();
+
+            let multikey_pk_types = match &signature_info {
+                SignatureInfo::MultiEd25519(_) => {
+                    vec![String::from("ed25519"); multikey_layouts.len()]
+                },
+                SignatureInfo::MultiKey(scheme) => scheme
+                    .key_types
+                    .iter()
+                    .map(|maybe_key_type| match maybe_key_type {
+                        Some(key_type) => key_type.key_type_string(),
+                        None => String::new(),
+                    })
+                    .collect(),
+                _ => vec![],
+            };
+
+            let multikey_verified = signature_info.multikey_verified();
+            let multikey_threshold = signature_info.multikey_threshold();
+
+            let multikey_layout_with_prefixes = match serde_json::to_value(&multikey_layouts) {
+                Ok(value) => value,
+                Err(_) => {
+                    results.push((auth_key_account_address, vec![], None));
+                    continue;
+                },
+            };
+
+            let mut public_key_auth_keys = vec![];
+            for ((pk, pk_type), verified) in signature_info
+                .multikey_public_keys()
+                .iter()
+                .zip(multikey_pk_types.iter())
+                .zip(multikey_verified.iter())
+            {
+                public_key_auth_keys.push(PublicKeyAuthKey {
+                    public_key: format!("0x{}", hex::encode(pk)),
+                    public_key_type: pk_type.clone(),
+                    auth_key: auth_key.clone(),
+                    verified: *verified,
+                    last_transaction_version: txn_version,
+                });
+            }
+
+            (
+                Some(AuthKeyMultikeyLayout {
+                    auth_key: auth_key.clone(),
+                    signatures_required: multikey_threshold.expect("should not be None") as i64,
+                    multikey_layout_with_prefixes,
+                    multikey_type: signature_info.signature_type_string(),
+                    last_transaction_version: txn_version,
+                }),
+                public_key_auth_keys,
+            )
+        } else {
+            (None, vec![])
         };
 
-        let multikey_verified = signature_info.multikey_verified();
-        let multikey_threshold = signature_info.multikey_threshold();
-
-        let multikey_layout_with_prefixes = match serde_json::to_value(&multikey_layouts) {
-            Ok(value) => value,
-            Err(_) => {
-                return Some((auth_key_account_address, vec![], None));
-            },
-        };
-
-        let mut public_key_auth_keys = vec![];
-        for ((pk, pk_type), verified) in signature_info
-            .multikey_public_keys()
-            .iter()
-            .zip(multikey_pk_types.iter())
-            .zip(multikey_verified.iter())
-        {
-            public_key_auth_keys.push(PublicKeyAuthKey {
-                public_key: format!("0x{}", hex::encode(pk)),
-                public_key_type: pk_type.clone(),
-                auth_key: auth_key.clone(),
-                verified: *verified,
-                last_transaction_version: txn_version,
-            });
-        }
-
-        (
-            Some(AuthKeyMultikeyLayout {
-                auth_key: auth_key.clone(),
-                signatures_required: multikey_threshold.expect("should not be None") as i64,
-                multikey_layout_with_prefixes,
-                multikey_type: signature_info.signature_type_string(),
-                last_transaction_version: txn_version,
-            }),
+        results.push((
+            auth_key_account_address,
             public_key_auth_keys,
-        )
-    } else {
-        (None, vec![])
-    };
+            auth_key_multikey_layout,
+        ));
+    }
 
-    Some((
-        auth_key_account_address,
-        public_key_auth_keys,
-        auth_key_multikey_layout,
-    ))
+    results
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::schema::auth_key_account_addresses::auth_key;
+
+    use super::*;
+
+    #[test]
+    fn test_signature_info_auth_key_single_key() {
+        let pk = hex::decode("c5eba39b323f488de5087353914f7149af93a260011a595ba568ec6f86003dc1")
+            .unwrap();
+        let signature_info = SignatureInfo::single_key(Some(0x00), pk.clone().into());
+
+        let authkey: String =
+            "0x64d95d138a390d9d83f2da145e9d5024c64df039cc10f97b1cc80f5b354aaa50".to_string();
+
+        assert_eq!(signature_info.auth_key(), Some(authkey));
+    }
+
+    #[test]
+    fn test_signature_info_auth_key_ed25519() {
+        let pk = hex::decode("318faf561f46763de18eae3f882d93bedf750aa69a149753c9ce53b8fdf3658800")
+            .unwrap();
+        let signature_info = SignatureInfo::ed25519(pk.clone().into());
+
+        let authkey: String =
+            "0x5b6321ccc88aaabd9851287755b4cf7dc56e58ee30a54db6e2f61494cbda7a47".to_string();
+
+        assert_eq!(signature_info.auth_key(), Some(authkey));
+    }
+
+    #[test]
+    fn test_signature_info_auth_key_multi_key() {
+        let pk1 = hex::decode("4b00b5e1bd5738bc744bb59e25e5050e8c9aedfbd4ea20f994d9c6753adebc59")
+            .unwrap();
+        let pk2 = hex::decode("9f38f6a18300f77d652627abf8eedacae756748c145e1dfcd8ee3b62c8d189ad")
+            .unwrap();
+        let pk3 = hex::decode("95e2326a4d53ea79b6b97d8ed0b97dbf257cb34e80681031ed358176c36cd00f")
+            .unwrap();
+        let signature_info =
+            SignatureInfo::multi_ed25519(2, vec![pk1, pk2, pk3], vec![true, true, true]);
+
+        let authkey: String =
+            "0x4f63487b2133fbca2c4fe1cb4aeb4ef1386d8a1ffd12a62bc3d82de0c04a8578".to_string();
+
+        assert_eq!(signature_info.auth_key(), Some(authkey));
+    }
+
+    #[test]
+    fn test_signature_info_auth_key_multi_ed25519() {
+        let pk1 = hex::decode("f7a77d79ec5966e81bdd13d49b13f192e298e2ab7bcef1dc59f5bbcc901b93b0")
+            .unwrap();
+        let pk2 = hex::decode("6e390d64f6e34ef6c9755d33b47f914621129bd9a2e55ad3752e2179fcbf27d9")
+            .unwrap();
+        let pk3 = hex::decode("046d2ab40ad4efcacce374fdd32b552d440b93c640a02bd2db18780527a05ef55e2fa41510e016342d1bc47af1112c2ec040005eed482ce74bdb7dbc5138261354").unwrap();
+        let signature_info = SignatureInfo::multi_key(
+            2,
+            vec![Some(0x00), Some(0x00), Some(0x01)],
+            vec![pk1, pk2, pk3],
+            vec![true, true, true],
+        );
+
+        let authkey: String =
+            "0xc244c6fc130ee5d1def33f4c37402d795e2e2124fb3c925c542af36c2b1667bf".to_string();
+
+        assert_eq!(signature_info.auth_key(), Some(authkey));
+    }
 }
