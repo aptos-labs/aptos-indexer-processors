@@ -1,0 +1,19 @@
+[
+  {
+    "asset_type": "0x0d4c938456b88884e2b8ca56c7003ccefb4acd0c4f2bca8342c8290b97dca085",
+    "creator_address": "0x8933313486d5ee6b7102254d4e4e692e339127e8561d9c8a405b196a79193ca1",
+    "name": "mirage dollar",
+    "symbol": "mUSD",
+    "decimals": 8,
+    "icon_uri": "https://static.mirage.money/assets/mUSD.svg",
+    "project_uri": "https://mirage.money",
+    "last_transaction_version": 4462417704,
+    "last_transaction_timestamp": "2024-07-10T19:03:31",
+    "supply_aggregator_table_handle_v1": null,
+    "supply_aggregator_table_key_v1": null,
+    "token_standard": "v2",
+    "maximum_v2": "340282366920938463463374607431768211455",
+    "is_token_v2": null,
+    "supply_v2": "11613950859225"
+  }
+]

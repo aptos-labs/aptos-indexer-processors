@@ -1,0 +1,18 @@
+[
+  {
+    "transaction_version": 1680592683,
+    "coin_type_hash": "91ceb1308a98389691e05158b07ed5f079ab78461a6bb8d5a4054b1bb5cb8bb6",
+    "coin_type": "0x1::aptos_coin::AptosCoin",
+    "supply": "111442820397688086",
+    "transaction_timestamp": "2024-09-05T11:52:16",
+    "transaction_epoch": 8371
+  },
+  {
+    "transaction_version": 1957950162,
+    "coin_type_hash": "91ceb1308a98389691e05158b07ed5f079ab78461a6bb8d5a4054b1bb5cb8bb6",
+    "coin_type": "0x1::aptos_coin::AptosCoin",
+    "supply": "112743621173497128",
+    "transaction_timestamp": "2024-11-23T22:32:30",
+    "transaction_epoch": 9331
+  }
+]

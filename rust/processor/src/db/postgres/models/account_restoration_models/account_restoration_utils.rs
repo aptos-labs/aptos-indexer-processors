@@ -12,6 +12,7 @@ use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignature, signature::Signature, transaction::TxnData,
     MultiEd25519Signature, Transaction, UserTransactionRequest,
 };
+use tracing::warn;
 
 trait AuthKeyScheme {
     const SCHEME: u8;
@@ -278,7 +279,7 @@ impl SignatureInfo {
         }
     }
 
-    fn from_account_signature(account_signature: &AccountSignature) -> Self {
+    fn from_account_signature(account_signature: &AccountSignature,  transaction_version: i64) -> Self {
         match account_signature {
             AccountSignature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
             AccountSignature::MultiEd25519(sig) => {
@@ -310,12 +311,16 @@ impl SignatureInfo {
                     .collect::<Vec<_>>();
                 Self::multi_key(threshold, prefixes, public_keys, verified)
             },
+            AccountSignature::Abstraction(_sig) => return None,
+
         }
     }
 }
 
 fn get_signature_infos_from_user_txn_request(
     user_txn_request: &UserTransactionRequest,
+    transaction_version: i64
+  
 ) -> Vec<(String, SignatureInfo)> {
     let signature = match &user_txn_request.signature {
         Some(sig) => match &sig.signature {
@@ -335,10 +340,18 @@ fn get_signature_infos_from_user_txn_request(
             SignatureInfo::multi_ed25519_from_transaction_signature(sig),
         )],
         Signature::SingleSender(single_sender) => {
-            let account_signature = single_sender
+            let sender_signature = single_sender
                 .sender
                 .as_ref()
-                .unwrap()
+                .unwrap();
+          if sender_signature.signature.is_none() {
+                    warn!(
+                        transaction_version = transaction_version,
+                        "Transaction signature is unknown"
+                    );
+                    return None;
+                }
+          let account_signature = sender_signature;
                 .signature
                 .as_ref()
                 .unwrap();
@@ -399,7 +412,8 @@ pub fn parse_account_restoration_models_from_transaction(
         Some(req) => req,
         None => return vec![],
     };
-    let signature_infos = get_signature_infos_from_user_txn_request(user_txn_request);
+    let txn_version = txn.version as i64;
+    let signature_infos = get_signature_infos_from_user_txn_request(user_txn_request, txn_version);
 
     let mut results = vec![];
     for (address, signature_info) in signature_infos {

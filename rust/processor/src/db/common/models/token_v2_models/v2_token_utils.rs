@@ -18,15 +18,13 @@ use ahash::{AHashMap, AHashSet};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{Event, WriteResource};
 use bigdecimal::BigDecimal;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Formatter};
+use std::{
+    fmt::{self, Formatter},
+    str::FromStr,
+};
 
 pub const DEFAULT_OWNER_ADDRESS: &str = "unknown";
-
-lazy_static! {
-    pub static ref V2_STANDARD: String = TokenStandard::V2.to_string();
-}
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 /// Maps address to burn event. If it's an old event previous_owner will be empty
@@ -47,6 +45,18 @@ impl fmt::Display for TokenStandard {
             TokenStandard::V2 => "v2",
         };
         write!(f, "{}", res)
+    }
+}
+
+impl FromStr for TokenStandard {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "v1" => TokenStandard::V1,
+            "v2" => TokenStandard::V2,
+            _ => return Err(anyhow::anyhow!("Invalid token standard: {}", s)),
+        })
     }
 }
 

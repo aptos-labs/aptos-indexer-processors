@@ -7,8 +7,8 @@ use bigdecimal::BigDecimal;
 use diesel::{Identifiable, Insertable, Queryable};
 use field_count::FieldCount;
 use processor::schema::{
-    coin_supply, current_fungible_asset_balances_legacy, fungible_asset_activities,
-    fungible_asset_balances, fungible_asset_metadata,
+    coin_supply, current_fungible_asset_balances, fungible_asset_activities,
+    fungible_asset_balances, fungible_asset_metadata, fungible_asset_to_coin_mappings,
 };
 use serde::{Deserialize, Serialize};
 
@@ -54,41 +54,27 @@ pub struct FungibleAssetBalance {
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(storage_id))]
-#[diesel(table_name = current_fungible_asset_balances_legacy)]
-pub struct CurrentFungibleAssetBalance {
+#[diesel(table_name = current_fungible_asset_balances)]
+pub struct CurrentUnifiedFungibleAssetBalance {
     pub storage_id: String,
     pub owner_address: String,
-    pub asset_type: String,
+    pub asset_type_v2: Option<String>,
+    pub asset_type_v1: Option<String>,
     pub is_primary: bool,
     pub is_frozen: bool,
+    pub amount_v1: Option<BigDecimal>,
+    pub amount_v2: Option<BigDecimal>,
     pub amount: BigDecimal,
-    pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub last_transaction_version: i64,
-    pub token_standard: String,
+    pub last_transaction_version_v1: Option<i64>,
+    pub last_transaction_version_v2: Option<i64>,
+    pub last_transaction_version: Option<i64>,
+    pub last_transaction_timestamp_v1: Option<chrono::NaiveDateTime>,
+    pub last_transaction_timestamp_v2: Option<chrono::NaiveDateTime>,
+    pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,
     pub inserted_at: chrono::NaiveDateTime,
+    pub asset_type: String,
+    pub token_standard: String,
 }
-
-// #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable, Default)]
-// #[diesel(primary_key(storage_id))]
-// #[diesel(table_name = current_fungible_asset_balances)]
-// pub struct CurrentUnifiedFungibleAssetBalance {
-//     pub storage_id: String,
-//     pub owner_address: String,
-//     pub asset_type: Option<String>,
-//     pub coin_type: Option<String>,  // Changed from asset_type_v1/v2 to match schema
-//     pub is_primary: Option<bool>,
-//     pub is_frozen: bool,
-//     pub amount_v1: Option<BigDecimal>,
-//     pub amount_v2: Option<BigDecimal>,
-//     pub amount: Option<BigDecimal>,  // Added amount field to match schema
-//     pub last_transaction_version_v1: Option<i64>,
-//     pub last_transaction_version_v2: Option<i64>,
-//     pub last_transaction_version: Option<i64>,  // Added to match schema
-//     pub last_transaction_timestamp_v1: Option<chrono::NaiveDateTime>,
-//     pub last_transaction_timestamp_v2: Option<chrono::NaiveDateTime>,
-//     pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,  // Added to match schema
-//     pub inserted_at: chrono::NaiveDateTime,
-// }
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(asset_type))]
@@ -123,4 +109,13 @@ pub struct CoinSupply {
     pub transaction_timestamp: chrono::NaiveDateTime,
     pub transaction_epoch: i64,
     pub inserted_at: chrono::NaiveDateTime,
+}
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(coin_type))]
+#[diesel(table_name = fungible_asset_to_coin_mappings)]
+pub struct FungibleAssetToCoinMapping {
+    pub coin_type: String,
+    pub fungible_asset_metadata_address: String,
+    pub last_transaction_version: i64,
 }

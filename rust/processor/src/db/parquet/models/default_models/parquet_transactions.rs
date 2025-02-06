@@ -183,6 +183,8 @@ impl Transaction {
             .expect("Txn Timestamp is invalid!");
 
         let txn_size_info = transaction.size_info.as_ref();
+        let len_event_size_info =
+            txn_size_info.map(|size_info| size_info.event_size_info.len() as i64);
 
         match txn_data {
             TxnData::User(user_txn) => {
@@ -204,6 +206,10 @@ impl Transaction {
                     },
                     None => (None, None),
                 };
+                // For some older validator transactions, GRPC stubs out the raw events.
+                // We use the event size info as the source of truth to determine the number of events in the transaction.
+                // This inconsistency should only be temporary until all transaction events are backfilled in GRPC.
+                let num_events = len_event_size_info.unwrap_or(user_txn.events.len() as i64);
 
                 let serialized_payload =
                     payload_cleaned.map(|payload| canonical_json::to_string(&payload).unwrap());
@@ -214,7 +220,7 @@ impl Transaction {
                         payload_type,
                         txn_version,
                         transaction_type,
-                        user_txn.events.len() as i64,
+                        num_events,
                         block_height,
                         epoch,
                         block_timestamp,
@@ -239,6 +245,7 @@ impl Transaction {
                     payload_cleaned.map(|payload| canonical_json::to_string(&payload).unwrap());
 
                 let payload_type = None;
+                let num_events = len_event_size_info.unwrap_or(genesis_txn.events.len() as i64);
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
@@ -246,7 +253,7 @@ impl Transaction {
                         payload_type,
                         txn_version,
                         transaction_type,
-                        genesis_txn.events.len() as i64,
+                        num_events,
                         block_height,
                         epoch,
                         block_timestamp,
@@ -263,6 +270,8 @@ impl Transaction {
                     block_height,
                     block_timestamp,
                 );
+                let num_events =
+                    len_event_size_info.unwrap_or(block_metadata_txn.events.len() as i64);
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
@@ -270,7 +279,7 @@ impl Transaction {
                         None,
                         txn_version,
                         transaction_type,
-                        block_metadata_txn.events.len() as i64,
+                        num_events,
                         block_height,
                         epoch,
                         block_timestamp,
@@ -303,6 +312,7 @@ impl Transaction {
                     block_height,
                     block_timestamp,
                 );
+                let num_events = len_event_size_info.unwrap_or(inner.events.len() as i64);
                 (
                     Self::from_transaction_info_with_data(
                         transaction_info,
@@ -310,7 +320,7 @@ impl Transaction {
                         None,
                         txn_version,
                         transaction_type,
-                        inner.events.len() as i64,
+                        num_events,
                         block_height,
                         epoch,
                         block_timestamp,

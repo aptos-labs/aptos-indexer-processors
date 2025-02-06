@@ -204,6 +204,11 @@ async fn parse_activities(
             // This is because v1 events (deposit/withdraw) don't have coin type so the only way is to match
             // the event to the resource using the event guid
             let mut event_to_v1_coin_type: EventToCoinType = AHashMap::new();
+            // When coinstore is deleted we have no way of getting the mapping but hoping that there is
+            // only 1 coinstore deletion by owner address. This is a mapping between owner address and deleted coin type
+            // This is not ideal as we're assuming that there is only 1 coinstore deletion by owner address, this should be
+            // replaced by an event (although we still need to keep this mapping because blockchain)
+            let mut address_to_deleted_coin_type: AHashMap<String, String> = AHashMap::new();
 
             // First loop to get all objects
             // Need to do a first pass to get all the objects
@@ -224,7 +229,7 @@ async fn parse_activities(
             // As an optimization, we also handle v1 balances in the process
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
-                    if let Some((_, _, event_to_coin)) =
+                    if let Some((_, event_to_coin)) =
                         RawFungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
                             index as i64,
@@ -282,7 +287,7 @@ async fn parse_activities(
                     }
                 } else if let Change::DeleteResource(delete_resource) = wsc.change.as_ref().unwrap()
                 {
-                    if let Some((_, _, event_to_coin)) =
+                    if let Some((_, single_deleted_coin_type)) =
                         RawFungibleAssetBalance::get_v1_from_delete_resource(
                             delete_resource,
                             index as i64,
@@ -291,7 +296,7 @@ async fn parse_activities(
                         )
                         .unwrap()
                     {
-                        event_to_v1_coin_type.extend(event_to_coin);
+                        address_to_deleted_coin_type.extend(single_deleted_coin_type);
                     }
                 }
             }
@@ -328,6 +333,7 @@ async fn parse_activities(
                     &entry_function_id_str,
                     &event_to_v1_coin_type,
                     index as i64,
+                    &address_to_deleted_coin_type,
                 )
                 .unwrap_or_else(|e| {
                     tracing::error!(

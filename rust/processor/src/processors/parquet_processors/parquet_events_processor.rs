@@ -6,19 +6,21 @@ use crate::{
         create_parquet_handler_loop, generic_parquet_processor::ParquetDataGeneric,
         ParquetProcessingResult,
     },
-    db::parquet::models::event_models::parquet_events::{Event, ParquetEventModel},
+    db::{
+        common::models::event_models::raw_events::parse_events,
+        parquet::models::event_models::parquet_events::EventPQ,
+    },
     gap_detectors::ProcessingResult,
     processors::{parquet_processors::ParquetProcessorTrait, ProcessorName, ProcessorTrait},
-    utils::{counters::PROCESSOR_UNKNOWN_TYPE_COUNT, database::ArcDbPool, util::parse_timestamp},
+    utils::database::ArcDbPool,
 };
 use ahash::AHashMap;
 use anyhow::Context;
-use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
+use aptos_protos::transaction::v1::Transaction;
 use async_trait::async_trait;
 use kanal::AsyncSender;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, time::Duration};
-use tracing::warn;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ParquetEventsProcessorConfig {
@@ -38,7 +40,7 @@ impl ParquetProcessorTrait for ParquetEventsProcessorConfig {
 
 pub struct ParquetEventsProcessor {
     connection_pool: ArcDbPool,
-    event_sender: AsyncSender<ParquetDataGeneric<Event>>,
+    event_sender: AsyncSender<ParquetDataGeneric<EventPQ>>,
 }
 
 impl ParquetEventsProcessor {
@@ -49,7 +51,7 @@ impl ParquetEventsProcessor {
     ) -> Self {
         config.set_google_credentials(config.google_application_credentials.clone());
 
-        let event_sender = create_parquet_handler_loop::<Event>(
+        let event_sender = create_parquet_handler_loop::<EventPQ>(
             new_gap_detector_sender.clone(),
             ProcessorName::ParquetDefaultProcessor.into(),
             config.bucket_name.clone(),
@@ -120,56 +122,16 @@ impl ProcessorTrait for ParquetEventsProcessor {
 
 pub fn process_transactions_parquet(
     transactions: Vec<Transaction>,
-) -> (AHashMap<i64, i64>, Vec<Event>) {
+) -> (AHashMap<i64, i64>, Vec<EventPQ>) {
     let mut transaction_version_to_struct_count: AHashMap<i64, i64> = AHashMap::new();
 
     let mut events = vec![];
     for txn in &transactions {
         let txn_version = txn.version as i64;
-        let block_height = txn.block_height as i64;
-        let block_timestamp = parse_timestamp(txn.timestamp.as_ref().unwrap(), txn_version);
-        let size_info = match txn.size_info.as_ref() {
-            Some(size_info) => size_info,
-            None => {
-                warn!(version = txn.version, "Transaction size info not found");
-                continue;
-            },
-        };
-        let txn_data = match txn.txn_data.as_ref() {
-            Some(data) => data,
-            None => {
-                tracing::warn!(
-                    transaction_version = txn_version,
-                    "Transaction data doesn't exist"
-                );
-                PROCESSOR_UNKNOWN_TYPE_COUNT
-                    .with_label_values(&["ParquetEventsProcessor"])
-                    .inc();
-
-                continue;
-            },
-        };
-        let default = vec![];
-        let mut is_user_txn_type = false;
-        let raw_events = match txn_data {
-            TxnData::BlockMetadata(tx_inner) => &tx_inner.events,
-            TxnData::Genesis(tx_inner) => &tx_inner.events,
-            TxnData::User(tx_inner) => {
-                is_user_txn_type = true;
-                &tx_inner.events
-            },
-            TxnData::Validator(txn) => &txn.events,
-            _ => &default,
-        };
-
-        let txn_events = ParquetEventModel::from_events(
-            raw_events,
-            txn_version,
-            block_height,
-            size_info.event_size_info.as_slice(),
-            block_timestamp,
-            is_user_txn_type,
-        );
+        let txn_events: Vec<EventPQ> = parse_events(txn, "ParquetEventsProcessor")
+            .into_iter()
+            .map(|e| e.into())
+            .collect();
         transaction_version_to_struct_count
             .entry(txn_version)
             .and_modify(|e| *e += txn_events.len() as i64)

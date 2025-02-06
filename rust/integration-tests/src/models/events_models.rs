@@ -9,9 +9,7 @@ use processor::schema::events;
 use serde::{Deserialize, Serialize};
 /**
 * Event model
-* this is created // b/c there is inserated_at field which isn't defined in the Event struct, we can't just load the events directly without specifying the fields.
-        // TODO: make this more generic to load all fields, then we should be able to run tests for all processor in one test case.
-
+* this is created b/c there is inserated_at field which isn't defined in the Event struct, we can't just load the events directly without specifying the fields.
 */
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize, Queryable)]
 #[diesel(primary_key(transaction_version, event_index))]
