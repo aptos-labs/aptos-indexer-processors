@@ -279,16 +279,16 @@ impl SignatureInfo {
         }
     }
 
-    fn from_account_signature(account_signature: &AccountSignature,  transaction_version: i64) -> Self {
+    fn from_account_signature(account_signature: &AccountSignature) -> Option<Self> {
         match account_signature {
-            AccountSignature::Ed25519(sig) => Self::ed25519(sig.public_key.clone()),
+            AccountSignature::Ed25519(sig) => Some(Self::ed25519(sig.public_key.clone())),
             AccountSignature::MultiEd25519(sig) => {
-                Self::multi_ed25519_from_transaction_signature(sig)
+                Some(Self::multi_ed25519_from_transaction_signature(sig))
             },
-            AccountSignature::SingleKeySignature(sig) => Self::single_key(
+            AccountSignature::SingleKeySignature(sig) => Some(Self::single_key(
                 Self::any_public_key_type_prefix(sig.public_key.as_ref().unwrap().r#type),
                 sig.public_key.as_ref().unwrap().public_key.clone(),
-            ),
+            )),
             AccountSignature::MultiKeySignature(sigs) => {
                 let mut verified = vec![false; sigs.public_keys.len()];
                 sigs.signatures.iter().for_each(|idx_sig| {
@@ -309,18 +309,16 @@ impl SignatureInfo {
                     .iter()
                     .map(|pk| pk.public_key.clone())
                     .collect::<Vec<_>>();
-                Self::multi_key(threshold, prefixes, public_keys, verified)
+                Some(Self::multi_key(threshold, prefixes, public_keys, verified))
             },
-            AccountSignature::Abstraction(_sig) => return None,
-
+            AccountSignature::Abstraction(_sig) => None,
         }
     }
 }
 
 fn get_signature_infos_from_user_txn_request(
     user_txn_request: &UserTransactionRequest,
-    transaction_version: i64
-  
+    transaction_version: i64,
 ) -> Vec<(String, SignatureInfo)> {
     let signature = match &user_txn_request.signature {
         Some(sig) => match &sig.signature {
@@ -340,26 +338,23 @@ fn get_signature_infos_from_user_txn_request(
             SignatureInfo::multi_ed25519_from_transaction_signature(sig),
         )],
         Signature::SingleSender(single_sender) => {
-            let sender_signature = single_sender
-                .sender
-                .as_ref()
-                .unwrap();
-          if sender_signature.signature.is_none() {
-                    warn!(
-                        transaction_version = transaction_version,
-                        "Transaction signature is unknown"
-                    );
-                    return None;
-                }
-          let account_signature = sender_signature;
-                .signature
-                .as_ref()
-                .unwrap();
-            vec![(
-                sender_address,
-                SignatureInfo::from_account_signature(account_signature),
-            )]
+            let sender_signature = single_sender.sender.as_ref().unwrap();
+            if sender_signature.signature.is_none() {
+                warn!(
+                    transaction_version = transaction_version,
+                    "Transaction signature is unknown"
+                );
+                return vec![];
+            };
+            let account_signature = sender_signature.signature.as_ref().unwrap();
+
+            if let Some(sender_info) = SignatureInfo::from_account_signature(account_signature) {
+                vec![(sender_address, sender_info)]
+            } else {
+                vec![]
+            }
         },
+
         Signature::FeePayer(sig) => {
             let account_signature = sig.sender.as_ref().unwrap().signature.as_ref().unwrap();
             let fee_payer_address = sig.fee_payer_address.clone();
@@ -371,25 +366,30 @@ fn get_signature_infos_from_user_txn_request(
                 .as_ref()
                 .unwrap();
 
-            let mut signature_infos = vec![
-                (
-                    sender_address,
-                    SignatureInfo::from_account_signature(account_signature),
-                ),
-                (
-                    fee_payer_address,
-                    SignatureInfo::from_account_signature(fee_payer_signature),
-                ),
-            ];
-            for (address, signature) in sig
+            let mut signature_infos = vec![];
+
+            // Add sender signature if valid
+            if let Some(sender_info) = SignatureInfo::from_account_signature(account_signature) {
+                signature_infos.push((sender_address, sender_info));
+            }
+
+            // Add fee payer signature if valid
+            if let Some(fee_payer_info) = SignatureInfo::from_account_signature(fee_payer_signature)
+            {
+                signature_infos.push((fee_payer_address, fee_payer_info));
+            }
+
+            // Add secondary signer signatures
+            for (address, signer) in sig
                 .secondary_signer_addresses
                 .iter()
                 .zip(sig.secondary_signers.iter())
             {
-                signature_infos.push((
-                    address.clone(),
-                    SignatureInfo::from_account_signature(signature.signature.as_ref().unwrap()),
-                ));
+                if let Some(signature) = signer.signature.as_ref() {
+                    if let Some(signature_info) = SignatureInfo::from_account_signature(signature) {
+                        signature_infos.push((address.clone(), signature_info));
+                    }
+                }
             }
             signature_infos
         },
