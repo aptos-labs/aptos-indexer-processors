@@ -47,14 +47,14 @@ pub async fn get_starting_version(
             // Return None if there is no checkpoint, if the backfill is old (complete), or if overwrite_checkpoint is true.
             // Otherwise, return the checkpointed version + 1.
             if let Some(status) = backfill_status_option {
-
                 // If the backfill is complete and overwrite_checkpoint is false, return the ending_version to end the backfill.
-                if status.backfill_status == BackfillStatus::Complete && !backfill_config.overwrite_checkpoint {
+                if status.backfill_status == BackfillStatus::Complete
+                    && !backfill_config.overwrite_checkpoint
+                {
                     return Ok(backfill_config.ending_version);
                 }
                 // If status is Complete or overwrite_checkpoint is true, this is the start of a new backfill job.
-                if backfill_config.overwrite_checkpoint
-                {
+                if backfill_config.overwrite_checkpoint {
                     let backfill_alias = status.backfill_alias.clone();
                     let status = BackfillProcessorStatus {
                         backfill_alias,
@@ -90,14 +90,13 @@ pub async fn get_starting_version(
                     )
                     .await?;
                     return Ok(backfill_config.initial_starting_version);
-                } 
-                
+                }
+
                 // `backfill_config.initial_starting_version` is NOT respected.
                 // Return the last success version + 1.
                 let starting_version = status.last_success_version as u64 + 1;
                 log_ascii_warning(starting_version);
                 Ok(starting_version)
-                
             } else {
                 Ok(backfill_config.initial_starting_version)
             }
