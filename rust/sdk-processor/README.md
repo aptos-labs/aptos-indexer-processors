@@ -23,17 +23,8 @@ If you want to index a custom contract, we recommend using the [Quickstart Guide
         processor_config:
             type: "fungible_asset_processor"
             channel_size: 100
-        backfill_config:
-            backfill_id: "123"
-            initial_starting_version: 42
-            ending_version: 100042
-            overwrite_checkpoint: false
-        testing_config:
-            override_starting_version: 111111
-            ending_version: 222222
         bootstrap_config:
-            initial_starting_version: 123456789
-        mode: "testing"
+            initial_starting_version: 0
         transaction_stream_config:
             indexer_grpc_data_service_address: "https://grpc.mainnet.aptoslabs.com:443"
             auth_token: "{AUTH_TOKEN}"
@@ -50,20 +41,21 @@ If you want to index a custom contract, we recommend using the [Quickstart Guide
     - `channel_size`: size of channel in between steps
     - Individual processors may have different configuration required. See the full list of configs [here](https://github.com/aptos-labs/aptos-indexer-processors/blob/main/rust/sdk-processor/src/config/processor_config.rs#L89).
 
-- `backfill_config`
+- `backfill_config` (optional)
     - `backfill_id`: appended to `processor_type` for a unique backfill identifier
     - `initial_starting_version`: processor starts here unless there is a greater checkpointed version
     - `ending_version`: ending version of the backfill
     - `overwrite_checkpoint`: overwrite checkpoints if it exists, restarting the backfill from `initial_starting_version`.
 
-- `testing_config`
+- `testing_config` (optional)
     - `override_starting_version`: starting version of the testing. always starts from this version
     - `ending_version`: ending version of the testing
 
-- `bootstrap_config` used for regular processors (non-backfill) 
-    - `initial_starting_version`: processor starts here unless there is a greater checkpointed version
+- `bootstrap_config` (optional) used for regular, non-backfill, processors
+    - `initial_starting_version`: processor starts here unless there is a greater checkpointed version. 
 
-- `mode`: `default` (default), `testing` or `backfill` 
+- `mode`: (optional) `default`, `testing` or `backfill`. Set to `default` if no mode specified. If backfill/testing/bootstrap
+configs are not specified, processor will start from 0 or the last successfully processed version.
 
 - `transaction_stream_config`
     - `indexer_grpc_data_service_address`: Data service non-TLS endpoint address.
