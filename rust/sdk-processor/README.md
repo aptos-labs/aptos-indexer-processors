@@ -54,8 +54,7 @@ If you want to index a custom contract, we recommend using the [Quickstart Guide
 - `bootstrap_config` (optional) used for regular, non-backfill, processors
     - `initial_starting_version`: processor starts here unless there is a greater checkpointed version. 
 
-- `mode`: (optional) `default`, `testing` or `backfill`. Set to `default` if no mode specified. If backfill/testing/bootstrap
-configs are not specified, processor will start from 0 or the last successfully processed version.
+- `mode`: (optional) `default`, `testing` or `backfill`. Set to `default` if no mode specified. If backfill/testing/bootstrap configs are not specified, processor will start from 0 or the last successfully processed version.
 
 - `transaction_stream_config`
     - `indexer_grpc_data_service_address`: Data service non-TLS endpoint address.
