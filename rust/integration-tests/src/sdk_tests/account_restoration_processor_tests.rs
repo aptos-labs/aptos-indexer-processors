@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
 use sdk_processor::config::{
     db_config::{DbConfig, PostgresConfig},
-    indexer_processor_config::{IndexerProcessorConfig, TestingConfig, ProcessorMode},
+    indexer_processor_config::{IndexerProcessorConfig, ProcessorMode, TestingConfig},
     processor_config::{DefaultProcessorConfig, ProcessorConfig},
 };
 use std::collections::HashSet;
