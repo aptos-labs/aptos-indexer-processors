@@ -28,7 +28,8 @@ impl AuthKeyScheme for Ed25519AuthKeyScheme {
     const SCHEME: u8 = 0x00;
 
     fn auth_key(&self) -> Option<String> {
-        let preimage = self.public_key.clone();
+        let mut preimage = self.public_key.clone();
+        preimage.push(Self::SCHEME);
         Some(format!("0x{}", hex::encode(sha3_256(&preimage))))
     }
 }
@@ -531,12 +532,12 @@ mod tests {
 
     #[test]
     fn test_signature_info_auth_key_ed25519() {
-        let pk = hex::decode("318faf561f46763de18eae3f882d93bedf750aa69a149753c9ce53b8fdf3658800")
+        let pk = hex::decode("6bfcf20b8379714e4964c8d4571f37b580bedec3f7d158c2fbfe2f062b0a38ee")
             .unwrap();
         let signature_info = SignatureInfo::ed25519(pk.clone().into());
 
         let authkey: String =
-            "0x5b6321ccc88aaabd9851287755b4cf7dc56e58ee30a54db6e2f61494cbda7a47".to_string();
+            "0x96e02acc341cae64968049bb933359c08181f82820bfdf71f31c2778e4636c7a".to_string();
 
         assert_eq!(signature_info.auth_key(), Some(authkey));
     }
