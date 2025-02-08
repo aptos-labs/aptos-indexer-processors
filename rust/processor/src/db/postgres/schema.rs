@@ -882,6 +882,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    fungible_asset_to_coin_mappings (fungible_asset_metadata_address) {
+        #[max_length = 66]
+        fungible_asset_metadata_address -> Varchar,
+        #[max_length = 1000]
+        coin_type -> Varchar,
+        last_transaction_version -> Int8,
+    }
+}
+
+diesel::table! {
     indexer_status (db) {
         #[max_length = 50]
         db -> Varchar,
@@ -1382,6 +1392,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     fungible_asset_activities,
     fungible_asset_balances,
     fungible_asset_metadata,
+    fungible_asset_to_coin_mappings,
     indexer_status,
     ledger_infos,
     move_modules,

@@ -132,9 +132,10 @@ impl ProcessorTrait for ParquetFungibleAssetProcessor {
         .await?;
 
         let backfill_table = set_backfill_table_flag(parquet_processor_config.backfill_table);
-        let parquet_fa_extractor = ParquetFungibleAssetExtractor {
-            opt_in_tables: backfill_table,
-        };
+        let mut parquet_fa_extractor = ParquetFungibleAssetExtractor::new(backfill_table);
+        parquet_fa_extractor
+            .bootstrap_fa_to_coin_mapping(self.db_pool.clone())
+            .await?;
 
         let gcs_client =
             initialize_gcs_client(parquet_db_config.google_application_credentials.clone()).await;

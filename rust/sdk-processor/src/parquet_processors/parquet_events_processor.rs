@@ -31,7 +31,7 @@ use aptos_indexer_processor_sdk::{
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::parquet::models::event_models::parquet_events::Event as EventPQ,
+    db::parquet::models::event_models::parquet_events::EventPQ,
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, info};

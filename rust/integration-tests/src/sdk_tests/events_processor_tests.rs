@@ -59,6 +59,7 @@ mod tests {
         IMPORTED_DEVNET_TXNS_78753811_COIN_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_DEVNET_TXNS_78753831_TOKEN_V1_MINT_TRANSFER_WITH_V2_EVENTS,
         IMPORTED_DEVNET_TXNS_78753832_TOKEN_V2_MINT_TRANSFER_WITH_V2_EVENTS,
+        IMPORTED_MAINNET_TXNS_554229017_EVENTS_WITH_NO_EVENT_SIZE_INFO,
         IMPORTED_TESTNET_TXNS_1255836496_V2_FA_METADATA_, IMPORTED_TESTNET_TXNS_1_GENESIS,
         IMPORTED_TESTNET_TXNS_278556781_V1_COIN_REGISTER_FA_METADATA,
         IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT, IMPORTED_TESTNET_TXNS_3_EMPTY_TXN,
@@ -158,6 +159,19 @@ mod tests {
         .await;
     }
 
+    // This is a test for the validator txn with missing events
+    // This happens because we did not fully backfill validator txn events
+    // so GRPC can return a txn with event size info but no events
+    // We expect no events parsed
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mainnet_events_processor_validator_txn_missing_events() {
+        process_single_mainnet_event_txn(
+            IMPORTED_MAINNET_TXNS_554229017_EVENTS_WITH_NO_EVENT_SIZE_INFO, // this is misnamed, but it's the validatortxn with missing events
+            Some("validator_txn_missing_events".to_string()),
+        )
+        .await;
+    }
+
     // Example 2: Test for multiple transactions handling
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn testnet_events_processor_db_output_scenario_testing() {
@@ -223,6 +237,10 @@ mod tests {
 
     async fn process_single_testnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
         process_single_event_txn(txn, test_case_name, "imported_testnet_txns").await
+    }
+
+    async fn process_single_mainnet_event_txn(txn: &[u8], test_case_name: Option<String>) {
+        process_single_event_txn(txn, test_case_name, "imported_mainnet_txns").await
     }
 
     // Helper function to abstract out the single transaction processing

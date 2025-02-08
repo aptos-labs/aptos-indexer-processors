@@ -115,7 +115,11 @@ impl ProcessorTrait for FungibleAssetProcessor {
             ..self.config.transaction_stream_config.clone()
         })
         .await?;
-        let fa_extractor = FungibleAssetExtractor {};
+
+        let mut fa_extractor = FungibleAssetExtractor::new();
+        fa_extractor
+            .bootstrap_fa_to_coin_mapping(self.db_pool.clone())
+            .await?;
         let fa_storer = FungibleAssetStorer::new(
             self.db_pool.clone(),
             processor_config.clone(),
