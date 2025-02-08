@@ -8,3 +8,4 @@ server_config:
   postgres_connection_string: postgresql://postgres:@localhost:5432/default_processor
   indexer_grpc_data_service_address: http://127.0.0.1:50051
   auth_token: AUTH_TOKEN
+  

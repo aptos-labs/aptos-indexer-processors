@@ -1,7 +1,7 @@
 use crate::{
     config::{
         db_config::DbConfig,
-        indexer_processor_config::IndexerProcessorConfig,
+        indexer_processor_config::{IndexerProcessorConfig, ProcessorMode},
         processor_config::{DefaultProcessorConfig, ProcessorConfig},
     },
     steps::{
@@ -113,6 +113,19 @@ impl ProcessorTrait for AnsProcessor {
         // Define processor steps.
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
+            request_ending_version: match self.config.mode {
+                ProcessorMode::Default => None,
+                ProcessorMode::Backfill => self
+                    .config
+                    .backfill_config
+                    .as_ref()
+                    .map(|c| c.ending_version),
+                ProcessorMode::Testing => self
+                    .config
+                    .testing_config
+                    .as_ref()
+                    .map(|c| c.ending_version),
+            },
             ..self.config.transaction_stream_config.clone()
         })
         .await?;

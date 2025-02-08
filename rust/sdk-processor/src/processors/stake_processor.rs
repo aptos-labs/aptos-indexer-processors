@@ -2,7 +2,8 @@ use crate::{
     config::{
         db_config::DbConfig,
         indexer_processor_config::{
-            IndexerProcessorConfig, QUERY_DEFAULT_RETRIES, QUERY_DEFAULT_RETRY_DELAY_MS,
+            IndexerProcessorConfig, ProcessorMode, QUERY_DEFAULT_RETRIES,
+            QUERY_DEFAULT_RETRY_DELAY_MS,
         },
         processor_config::{DefaultProcessorConfig, ProcessorConfig},
     },
@@ -122,6 +123,19 @@ impl ProcessorTrait for StakeProcessor {
         // Define processor steps
         let transaction_stream = TransactionStreamStep::new(TransactionStreamConfig {
             starting_version: Some(starting_version),
+            request_ending_version: match self.config.mode {
+                ProcessorMode::Default => None,
+                ProcessorMode::Backfill => self
+                    .config
+                    .backfill_config
+                    .as_ref()
+                    .map(|c| c.ending_version),
+                ProcessorMode::Testing => self
+                    .config
+                    .testing_config
+                    .as_ref()
+                    .map(|c| c.ending_version),
+            },
             ..self.config.transaction_stream_config.clone()
         })
         .await?;

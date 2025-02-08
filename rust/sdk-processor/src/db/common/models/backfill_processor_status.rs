@@ -59,7 +59,7 @@ pub struct BackfillProcessorStatus {
     pub last_success_version: i64,
     pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,
     pub backfill_start_version: i64,
-    pub backfill_end_version: Option<i64>,
+    pub backfill_end_version: i64,
 }
 
 #[derive(AsChangeset, Debug, Queryable)]
@@ -72,14 +72,16 @@ pub struct BackfillProcessorStatusQuery {
     pub last_updated: chrono::NaiveDateTime,
     pub last_transaction_timestamp: Option<chrono::NaiveDateTime>,
     pub backfill_start_version: i64,
-    pub backfill_end_version: Option<i64>,
+    pub backfill_end_version: i64,
 }
 
 impl BackfillProcessorStatusQuery {
     pub async fn get_by_processor(
-        backfill_alias: &str,
+        processor_type: &str,
+        backfill_id: &str,
         conn: &mut DbPoolConnection<'_>,
     ) -> diesel::QueryResult<Option<Self>> {
+        let backfill_alias = format!("{}_{}", processor_type, backfill_id);
         backfill_processor_status::table
             .filter(backfill_processor_status::backfill_alias.eq(backfill_alias))
             .first::<Self>(conn)

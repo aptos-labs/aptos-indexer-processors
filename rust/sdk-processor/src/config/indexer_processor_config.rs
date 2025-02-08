@@ -36,13 +36,84 @@ use serde::{Deserialize, Serialize};
 pub const QUERY_DEFAULT_RETRIES: u32 = 5;
 pub const QUERY_DEFAULT_RETRY_DELAY_MS: u64 = 500;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[serde(deny_unknown_fields)]
+pub enum ProcessorMode {
+    #[serde(rename = "default")]
+    #[default]
+    Default,
+    #[serde(rename = "backfill")]
+    Backfill,
+    #[serde(rename = "testing")]
+    Testing,
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerProcessorConfig {
     pub processor_config: ProcessorConfig,
     pub transaction_stream_config: TransactionStreamConfig,
     pub db_config: DbConfig,
     pub backfill_config: Option<BackfillConfig>,
+    pub bootstrap_config: Option<BootStrapConfig>,
+    pub testing_config: Option<TestingConfig>,
+    #[serde(default)]
+    pub mode: ProcessorMode,
+}
+
+impl IndexerProcessorConfig {
+    fn validate(&self) -> Result<(), String> {
+        match self.mode {
+            ProcessorMode::Testing => {
+                if self.testing_config.is_none() {
+                    return Err("testing_config must be present when mode is 'testing'".to_string());
+                }
+            },
+            ProcessorMode::Backfill => {
+                if self.backfill_config.is_none() {
+                    return Err(
+                        "backfill_config must be present when mode is 'backfill'".to_string()
+                    );
+                }
+            },
+            ProcessorMode::Default => {},
+        }
+        Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for IndexerProcessorConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Inner {
+            processor_config: ProcessorConfig,
+            transaction_stream_config: TransactionStreamConfig,
+            db_config: DbConfig,
+            backfill_config: Option<BackfillConfig>,
+            bootstrap_config: Option<BootStrapConfig>,
+            testing_config: Option<TestingConfig>,
+            #[serde(default)]
+            mode: ProcessorMode,
+        }
+
+        let inner = Inner::deserialize(deserializer)?;
+        let config = IndexerProcessorConfig {
+            processor_config: inner.processor_config,
+            transaction_stream_config: inner.transaction_stream_config,
+            db_config: inner.db_config,
+            backfill_config: inner.backfill_config,
+            bootstrap_config: inner.bootstrap_config,
+            testing_config: inner.testing_config,
+            mode: inner.mode,
+        };
+
+        config.validate().map_err(serde::de::Error::custom)?;
+        Ok(config)
+    }
 }
 
 #[async_trait::async_trait]
@@ -155,5 +226,25 @@ impl RunnableConfig for IndexerProcessorConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BackfillConfig {
-    pub backfill_alias: String,
+    pub backfill_id: String,
+    pub initial_starting_version: u64,
+    pub ending_version: u64,
+    pub overwrite_checkpoint: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+/// Initial starting version for non-backfill processors. Processors will pick up where it left off
+/// if restarted. Read more in `starting_version.rs`
+pub struct BootStrapConfig {
+    pub initial_starting_version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+/// Use this config for testing. Processors will not use checkpoint and will
+/// always start from `override_starting_version`.
+pub struct TestingConfig {
+    pub override_starting_version: u64,
+    pub ending_version: u64,
 }

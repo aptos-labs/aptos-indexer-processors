@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
 use sdk_processor::config::{
     db_config::{DbConfig, PostgresConfig},
-    indexer_processor_config::IndexerProcessorConfig,
+    indexer_processor_config::{IndexerProcessorConfig, ProcessorMode, TestingConfig},
     processor_config::{DefaultProcessorConfig, ProcessorConfig},
 };
 use std::collections::HashSet;
@@ -26,6 +26,11 @@ pub fn setup_account_restoration_processor_config(
 
     let processor_config = ProcessorConfig::AccountRestorationProcessor(default_processor_config);
 
+    let testing_config: TestingConfig = TestingConfig {
+        override_starting_version: transaction_stream_config.starting_version.unwrap(),
+        ending_version: transaction_stream_config.request_ending_version.unwrap(),
+    };
+
     let processor_name = processor_config.name();
     (
         IndexerProcessorConfig {
@@ -33,6 +38,9 @@ pub fn setup_account_restoration_processor_config(
             transaction_stream_config,
             db_config,
             backfill_config: None,
+            bootstrap_config: None,
+            testing_config: Some(testing_config),
+            mode: ProcessorMode::Testing,
         },
         processor_name,
     )

@@ -6,6 +6,6 @@ CREATE TABLE backfill_processor_status (
     last_updated TIMESTAMP NOT NULL DEFAULT NOW(),
     last_transaction_timestamp TIMESTAMP NULL,
     backfill_start_version BIGINT NOT NULL,
-    backfill_end_version BIGINT NULL,
+    backfill_end_version BIGINT NOT NULL,
     PRIMARY KEY (backfill_alias)
 );

@@ -1,5 +1,8 @@
 use crate::{
-    config::{db_config::DbConfig, indexer_processor_config::IndexerProcessorConfig},
+    config::{
+        db_config::DbConfig,
+        indexer_processor_config::{IndexerProcessorConfig, ProcessorMode},
+    },
     db::common::models::{
         backfill_processor_status::{BackfillProcessorStatus, BackfillStatus},
         processor_status::ProcessorStatus,
@@ -24,30 +27,37 @@ pub fn get_processor_status_saver(
     conn_pool: ArcDbPool,
     config: IndexerProcessorConfig,
 ) -> ProcessorStatusSaverEnum {
-    if let Some(backfill_config) = config.backfill_config {
-        let txn_stream_cfg = config.transaction_stream_config;
-        let backfill_start_version = txn_stream_cfg.starting_version;
-        let backfill_end_version = txn_stream_cfg.request_ending_version;
-        let backfill_alias = backfill_config.backfill_alias.clone();
-        ProcessorStatusSaverEnum::Backfill {
-            conn_pool,
-            backfill_alias,
-            backfill_start_version,
-            backfill_end_version,
-        }
-    } else {
-        let processor_name = config.processor_config.name().to_string();
-        if let DbConfig::ParquetConfig(_) = config.db_config {
-            ProcessorStatusSaverEnum::Parquet {
+    match config.mode {
+        ProcessorMode::Backfill => {
+            let backfill_config = config.backfill_config.clone().unwrap();
+            let backfill_start_version = backfill_config.initial_starting_version;
+            let backfill_end_version = backfill_config.ending_version;
+            let backfill_alias = format!(
+                "{}_{}",
+                config.processor_config.name(),
+                backfill_config.backfill_id
+            );
+            ProcessorStatusSaverEnum::Backfill {
                 conn_pool,
-                processor_name,
+                backfill_alias,
+                backfill_start_version,
+                backfill_end_version,
             }
-        } else {
-            ProcessorStatusSaverEnum::Postgres {
-                conn_pool,
-                processor_name,
+        },
+        _ => {
+            let processor_name = config.processor_config.name().to_string();
+            if let DbConfig::ParquetConfig(_) = config.db_config {
+                ProcessorStatusSaverEnum::Parquet {
+                    conn_pool,
+                    processor_name,
+                }
+            } else {
+                ProcessorStatusSaverEnum::Postgres {
+                    conn_pool,
+                    processor_name,
+                }
             }
-        }
+        },
     }
 }
 
@@ -59,8 +69,8 @@ pub enum ProcessorStatusSaverEnum {
     Backfill {
         conn_pool: ArcDbPool,
         backfill_alias: String,
-        backfill_start_version: Option<u64>,
-        backfill_end_version: Option<u64>,
+        backfill_start_version: u64,
+        backfill_end_version: u64,
     },
     Parquet {
         conn_pool: ArcDbPool,
@@ -154,21 +164,18 @@ impl ProcessorStatusSaverEnum {
                 backfill_end_version,
             } => {
                 let lst_success_version = last_success_batch.metadata.end_version as i64;
-                let backfill_status = if backfill_end_version.is_some_and(|backfill_end_version| {
-                    lst_success_version >= backfill_end_version as i64
-                }) {
+                let backfill_status = if lst_success_version >= *backfill_end_version as i64 {
                     BackfillStatus::Complete
                 } else {
                     BackfillStatus::InProgress
                 };
-                let backfill_end_version_mapped = backfill_end_version.map(|v| v as i64);
                 let status = BackfillProcessorStatus {
                     backfill_alias: backfill_alias.clone(),
                     backfill_status,
                     last_success_version: lst_success_version,
                     last_transaction_timestamp: end_timestamp,
-                    backfill_start_version: backfill_start_version.unwrap_or(0) as i64,
-                    backfill_end_version: backfill_end_version_mapped,
+                    backfill_start_version: *backfill_start_version as i64,
+                    backfill_end_version: *backfill_end_version as i64,
                 };
                 execute_with_better_error(
                     conn_pool.clone(),
