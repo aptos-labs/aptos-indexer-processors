@@ -3,7 +3,7 @@ use aptos_indexer_testing_framework::sdk_test_context::SdkTestContext;
 use sdk_processor::{
     config::{
         db_config::{DbConfig, PostgresConfig},
-        indexer_processor_config::{IndexerProcessorConfig, ProcessorMode, BootStrapConfig},
+        indexer_processor_config::{IndexerProcessorConfig, ProcessorMode, TestingConfig},
         processor_config::{DefaultProcessorConfig, ProcessorConfig},
     },
     processors::token_v2_processor::TokenV2ProcessorConfig,
@@ -36,8 +36,9 @@ pub fn setup_token_v2_processor_config(
     let processor_config = ProcessorConfig::TokenV2Processor(token_v2_processor_config);
 
     let processor_name = processor_config.name();
-    let bootstrap_config = BootStrapConfig {
-        initial_starting_version: test_context.get_request_start_version(),
+    let testing_config: TestingConfig = TestingConfig {
+        override_starting_version: transaction_stream_config.starting_version.unwrap(),
+        ending_version: transaction_stream_config.request_ending_version.unwrap(),
     };
 
     (
@@ -46,9 +47,9 @@ pub fn setup_token_v2_processor_config(
             transaction_stream_config,
             db_config,
             backfill_config: None,
-            bootstrap_config: Some(bootstrap_config),
-            testing_config: None,
-            mode: ProcessorMode::Default,
+            bootstrap_config: None,
+            testing_config: Some(testing_config),
+            mode: ProcessorMode::Testing,
         },
         processor_name,
     )
