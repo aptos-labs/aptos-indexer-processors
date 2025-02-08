@@ -10,26 +10,17 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::{
-        common::models::token_v2_models::{
-            raw_token_claims::CurrentTokenPendingClaimConvertible,
-            raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
-            raw_v2_token_activities::TokenActivityV2Convertible,
-            raw_v2_token_datas::{CurrentTokenDataV2Convertible, TokenDataV2Convertible},
-            raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
-            raw_v2_token_ownerships::{
-                CurrentTokenOwnershipV2Convertible, TokenOwnershipV2Convertible,
-            },
+    db::common::models::{
+        token_models::{
+            token_claims::ParquetCurrentTokenPendingClaim,
+            token_royalty::ParquetCurrentTokenRoyaltyV1, tokens::TableMetadataForToken,
         },
-        parquet::models::token_v2_models::{
-            token_claims::CurrentTokenPendingClaim,
-            v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_token_activities::TokenActivityV2,
-            v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
-            v2_token_metadata::CurrentTokenV2Metadata,
-            v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
+        token_v2_models::{
+            v2_token_activities::ParquetTokenActivityV2,
+            v2_token_datas::{ParquetCurrentTokenDataV2, ParquetTokenDataV2},
+            v2_token_metadata::ParquetCurrentTokenV2Metadata,
+            v2_token_ownerships::{ParquetCurrentTokenOwnershipV2, ParquetTokenOwnershipV2},
         },
-        postgres::models::token_models::tokens::TableMetadataForToken,
     },
     processors::token_v2_processor::parse_v2_token,
     utils::table_flags::TableFlags,
@@ -77,59 +68,61 @@ impl Processable for ParquetTokenV2Extractor {
             raw_current_token_claims,
         ) = parse_v2_token(&transactions.data, &table_handle_to_owner, &mut None).await;
 
-        let parquet_current_token_claims: Vec<CurrentTokenPendingClaim> = raw_current_token_claims
-            .into_iter()
-            .map(CurrentTokenPendingClaim::from_raw)
-            .collect();
+        let parquet_current_token_claims: Vec<ParquetCurrentTokenPendingClaim> =
+            raw_current_token_claims
+                .into_iter()
+                .map(ParquetCurrentTokenPendingClaim::from)
+                .collect();
 
-        let parquet_current_token_royalties_v1: Vec<CurrentTokenRoyaltyV1> =
+        let parquet_current_token_royalties_v1: Vec<ParquetCurrentTokenRoyaltyV1> =
             raw_current_token_royalties_v1
                 .into_iter()
-                .map(CurrentTokenRoyaltyV1::from_raw)
+                .map(ParquetCurrentTokenRoyaltyV1::from)
                 .collect();
 
-        let parquet_current_token_v2_metadata: Vec<CurrentTokenV2Metadata> =
+        let parquet_current_token_v2_metadata: Vec<ParquetCurrentTokenV2Metadata> =
             raw_current_token_v2_metadata
                 .into_iter()
-                .map(CurrentTokenV2Metadata::from_raw)
+                .map(ParquetCurrentTokenV2Metadata::from)
                 .collect();
 
-        let parquet_token_activities_v2: Vec<TokenActivityV2> = raw_token_activities_v2
+        let parquet_token_activities_v2: Vec<ParquetTokenActivityV2> = raw_token_activities_v2
             .into_iter()
-            .map(TokenActivityV2::from_raw)
+            .map(ParquetTokenActivityV2::from)
             .collect();
 
-        let parquet_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
+        let parquet_token_datas_v2: Vec<ParquetTokenDataV2> = raw_token_datas_v2
             .into_iter()
-            .map(TokenDataV2::from_raw)
+            .map(ParquetTokenDataV2::from)
             .collect();
 
-        let parquet_current_token_datas_v2: Vec<CurrentTokenDataV2> = raw_current_token_datas_v2
-            .into_iter()
-            .map(CurrentTokenDataV2::from_raw)
-            .collect();
+        let parquet_current_token_datas_v2: Vec<ParquetCurrentTokenDataV2> =
+            raw_current_token_datas_v2
+                .into_iter()
+                .map(ParquetCurrentTokenDataV2::from)
+                .collect();
 
-        let parquet_deleted_current_token_datss_v2: Vec<CurrentTokenDataV2> =
+        let parquet_deleted_current_token_datss_v2: Vec<ParquetCurrentTokenDataV2> =
             raw_current_deleted_token_datas_v2
                 .into_iter()
-                .map(CurrentTokenDataV2::from_raw)
+                .map(ParquetCurrentTokenDataV2::from)
                 .collect();
 
-        let parquet_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
+        let parquet_token_ownerships_v2: Vec<ParquetTokenOwnershipV2> = raw_token_ownerships_v2
             .into_iter()
-            .map(TokenOwnershipV2::from_raw)
+            .map(ParquetTokenOwnershipV2::from)
             .collect();
 
-        let parquet_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+        let parquet_current_token_ownerships_v2: Vec<ParquetCurrentTokenOwnershipV2> =
             raw_current_token_ownerships_v2
                 .into_iter()
-                .map(CurrentTokenOwnershipV2::from_raw)
+                .map(ParquetCurrentTokenOwnershipV2::from)
                 .collect();
 
-        let parquet_deleted_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+        let parquet_deleted_current_token_ownerships_v2: Vec<ParquetCurrentTokenOwnershipV2> =
             raw_current_deleted_token_ownerships_v2
                 .into_iter()
-                .map(CurrentTokenOwnershipV2::from_raw)
+                .map(ParquetCurrentTokenOwnershipV2::from)
                 .collect();
 
         // Print the size of each extracted data type
@@ -167,7 +160,7 @@ impl Processable for ParquetTokenV2Extractor {
         );
 
         // We are merging these two tables, b/c they are essentially the same table
-        let mut combined_current_token_datas_v2: Vec<CurrentTokenDataV2> = Vec::new();
+        let mut combined_current_token_datas_v2: Vec<ParquetCurrentTokenDataV2> = Vec::new();
         parquet_current_token_datas_v2
             .iter()
             .for_each(|x| combined_current_token_datas_v2.push(x.clone()));
@@ -175,7 +168,8 @@ impl Processable for ParquetTokenV2Extractor {
             .iter()
             .for_each(|x| combined_current_token_datas_v2.push(x.clone()));
 
-        let mut merged_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> = Vec::new();
+        let mut merged_current_token_ownerships_v2: Vec<ParquetCurrentTokenOwnershipV2> =
+            Vec::new();
         parquet_current_token_ownerships_v2
             .iter()
             .for_each(|x| merged_current_token_ownerships_v2.push(x.clone()));

@@ -6,67 +6,79 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
-    db::postgres::models::{
-        object_models::v2_object_utils::ObjectAggregatedDataMapping,
-        token_models::{
-            collection_datas::CollectionData,
-            token_utils::{CollectionDataIdType, TokenWriteSet},
-            tokens::TableHandleToOwner,
+    db::{
+        common::models::{
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            token_models::{
+                collection_datas::CollectionData,
+                token_utils::{CollectionDataIdType, TokenWriteSet},
+                tokens::TableHandleToOwner,
+            },
+            token_v2_models::v2_token_utils::{Collection, TokenStandard},
         },
-        token_v2_models::{
-            v2_collections::CreatorFromCollectionTableV1,
-            v2_token_utils::{TokenStandard, V2TokenResource},
-        },
+        postgres::models::resources::FromWriteResource,
     },
+    schema::{collections_v2, current_collections_v2},
     utils::{database::DbPoolConnection, util::standardize_address},
 };
-use allocative_derive::Allocative;
 use anyhow::Context;
 use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
-use diesel::{sql_query, sql_types::Text};
+use diesel::{prelude::*, sql_query, sql_types::Text};
 use diesel_async::RunQueryDsl;
 use field_count::FieldCount;
-use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
-)]
+// PK of current_collections_v2, i.e. collection_id
+pub type CurrentCollectionV2PK = String;
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(transaction_version, write_set_change_index))]
+#[diesel(table_name = collections_v2)]
 pub struct CollectionV2 {
-    pub txn_version: i64,
+    pub transaction_version: i64,
     pub write_set_change_index: i64,
     pub collection_id: String,
     pub creator_address: String,
     pub collection_name: String,
     pub description: String,
     pub uri: String,
-    pub current_supply: String,
-    pub max_supply: Option<String>,
-    pub total_minted_v2: Option<String>,
+    pub current_supply: BigDecimal,
+    pub max_supply: Option<BigDecimal>,
+    pub total_minted_v2: Option<BigDecimal>,
+    pub mutable_description: Option<bool>,
+    pub mutable_uri: Option<bool>,
+    pub table_handle_v1: Option<String>,
+    pub collection_properties: Option<serde_json::Value>,
+    pub token_standard: String,
+    pub transaction_timestamp: chrono::NaiveDateTime,
+}
+
+#[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
+#[diesel(primary_key(collection_id))]
+#[diesel(table_name = current_collections_v2)]
+pub struct CurrentCollectionV2 {
+    pub collection_id: String,
+    pub creator_address: String,
+    pub collection_name: String,
+    pub description: String,
+    pub uri: String,
+    pub current_supply: BigDecimal,
+    pub max_supply: Option<BigDecimal>,
+    pub total_minted_v2: Option<BigDecimal>,
     pub mutable_description: Option<bool>,
     pub mutable_uri: Option<bool>,
     pub table_handle_v1: Option<String>,
     pub token_standard: String,
-    #[allocative(skip)]
-    pub block_timestamp: chrono::NaiveDateTime,
+    pub collection_properties: Option<serde_json::Value>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 
-impl NamedTable for CollectionV2 {
-    const TABLE_NAME: &'static str = "collection_v2";
-}
-
-impl HasVersion for CollectionV2 {
-    fn version(&self) -> i64 {
-        self.txn_version
-    }
-}
-
-impl GetTimeStamp for CollectionV2 {
-    fn get_timestamp(&self) -> chrono::NaiveDateTime {
-        self.block_timestamp
-    }
+#[derive(Debug, QueryableByName)]
+pub struct CreatorFromCollectionTableV1 {
+    #[diesel(sql_type = Text)]
+    pub creator_address: String,
 }
 
 impl CollectionV2 {
@@ -76,27 +88,14 @@ impl CollectionV2 {
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
         object_metadatas: &ObjectAggregatedDataMapping,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = crate::db::postgres::models::default_models::move_resources::MoveResource::get_outer_type_from_write_resource(write_resource);
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = crate::db::postgres::models::default_models::move_resources::MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let V2TokenResource::Collection(inner) = &V2TokenResource::from_resource(
-            &type_str,
-            resource.data.as_ref().unwrap(),
-            txn_version,
-        )? {
+    ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
+        if let Some(inner) = Collection::from_write_resource(write_resource)? {
             let (mut current_supply, mut max_supply, mut total_minted_v2) =
                 (BigDecimal::zero(), None, None);
             let (mut mutable_description, mut mutable_uri) = (None, None);
-            if let Some(object_data) = object_metadatas.get(&resource.address) {
+            let mut collection_properties = serde_json::Value::Null;
+            let address = standardize_address(&write_resource.address);
+            if let Some(object_data) = object_metadatas.get(&address) {
                 // Getting supply data (prefer fixed supply over unlimited supply although they should never appear at the same time anyway)
                 let fixed_supply = object_data.fixed_supply.as_ref();
                 let unlimited_supply = object_data.unlimited_supply.as_ref();
@@ -135,34 +134,60 @@ impl CollectionV2 {
                     mutable_description = Some(collection.mutable_description);
                     mutable_uri = Some(collection.mutable_uri);
                 }
+
+                collection_properties = object_data
+                    .property_map
+                    .as_ref()
+                    .map(|m| m.inner.clone())
+                    .unwrap_or(collection_properties);
             } else {
                 // ObjectCore should not be missing, returning from entire function early
                 return Ok(None);
             }
 
-            let collection_id = resource.address.clone();
+            let collection_id = address;
             let creator_address = inner.get_creator_address();
             let collection_name = inner.get_name_trunc();
             let description = inner.description.clone();
             let uri = inner.get_uri_trunc();
 
-            Ok(Some(Self {
-                txn_version,
-                write_set_change_index,
-                collection_id: collection_id.clone(),
-                creator_address: creator_address.clone(),
-                collection_name: collection_name.clone(),
-                description: description.clone(),
-                uri: uri.clone(),
-                current_supply: current_supply.to_string(),
-                max_supply: Some(max_supply.clone().unwrap().clone().to_string()),
-                total_minted_v2: Some(total_minted_v2.clone().unwrap().clone().to_string()),
-                mutable_description,
-                mutable_uri,
-                table_handle_v1: None,
-                token_standard: TokenStandard::V2.to_string(),
-                block_timestamp: txn_timestamp,
-            }))
+            Ok(Some((
+                Self {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    collection_id: collection_id.clone(),
+                    creator_address: creator_address.clone(),
+                    collection_name: collection_name.clone(),
+                    description: description.clone(),
+                    uri: uri.clone(),
+                    current_supply: current_supply.clone(),
+                    max_supply: max_supply.clone(),
+                    total_minted_v2: total_minted_v2.clone(),
+                    mutable_description,
+                    mutable_uri,
+                    table_handle_v1: None,
+                    collection_properties: Some(collection_properties.clone()),
+                    token_standard: TokenStandard::V2.to_string(),
+                    transaction_timestamp: txn_timestamp,
+                },
+                CurrentCollectionV2 {
+                    collection_id,
+                    creator_address,
+                    collection_name,
+                    description,
+                    uri,
+                    current_supply,
+                    max_supply,
+                    total_minted_v2,
+                    mutable_description,
+                    mutable_uri,
+                    table_handle_v1: None,
+                    token_standard: TokenStandard::V2.to_string(),
+                    collection_properties: Some(collection_properties),
+                    last_transaction_version: txn_version,
+                    last_transaction_timestamp: txn_timestamp,
+                },
+            )))
         } else {
             Ok(None)
         }
@@ -177,7 +202,7 @@ impl CollectionV2 {
         conn: &mut DbPoolConnection<'_>,
         query_retries: u32,
         query_retry_delay_ms: u64,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> anyhow::Result<Option<(Self, CurrentCollectionV2)>> {
         let table_item_data = table_item.data.as_ref().unwrap();
 
         let maybe_collection_data = match TokenWriteSet::from_table_item_type(
@@ -239,23 +264,43 @@ impl CollectionV2 {
             let collection_name = collection_data.get_name_trunc();
             let uri = collection_data.get_uri_trunc();
 
-            Ok(Some(Self {
-                txn_version,
-                write_set_change_index,
-                collection_id: collection_id.clone(),
-                creator_address: collection_id_struct.creator.clone(),
-                collection_name: collection_name.clone(),
-                description: collection_data.description.clone(),
-                uri: uri.clone(),
-                current_supply: collection_data.supply.to_string(),
-                max_supply: Some(collection_data.maximum.to_string()),
-                total_minted_v2: None,
-                mutable_uri: Some(collection_data.mutability_config.uri),
-                mutable_description: Some(collection_data.mutability_config.description),
-                table_handle_v1: Some(table_handle.clone()),
-                token_standard: TokenStandard::V1.to_string(),
-                block_timestamp: txn_timestamp,
-            }))
+            Ok(Some((
+                Self {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    collection_id: collection_id.clone(),
+                    creator_address: collection_id_struct.creator.clone(),
+                    collection_name: collection_name.clone(),
+                    description: collection_data.description.clone(),
+                    uri: uri.clone(),
+                    current_supply: collection_data.supply.clone(),
+                    max_supply: Some(collection_data.maximum.clone()),
+                    total_minted_v2: None,
+                    mutable_uri: Some(collection_data.mutability_config.uri),
+                    mutable_description: Some(collection_data.mutability_config.description),
+                    table_handle_v1: Some(table_handle.clone()),
+                    token_standard: TokenStandard::V1.to_string(),
+                    transaction_timestamp: txn_timestamp,
+                    collection_properties: Some(serde_json::Value::Null),
+                },
+                CurrentCollectionV2 {
+                    collection_id,
+                    creator_address: collection_id_struct.creator,
+                    collection_name,
+                    description: collection_data.description,
+                    uri,
+                    current_supply: collection_data.supply,
+                    max_supply: Some(collection_data.maximum.clone()),
+                    total_minted_v2: None,
+                    mutable_uri: Some(collection_data.mutability_config.uri),
+                    mutable_description: Some(collection_data.mutability_config.description),
+                    table_handle_v1: Some(table_handle),
+                    token_standard: TokenStandard::V1.to_string(),
+                    collection_properties: Some(serde_json::Value::Null),
+                    last_transaction_version: txn_version,
+                    last_transaction_timestamp: txn_timestamp,
+                },
+            )))
         } else {
             Ok(None)
         }

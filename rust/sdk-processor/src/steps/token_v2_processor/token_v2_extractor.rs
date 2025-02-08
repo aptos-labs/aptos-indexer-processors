@@ -7,27 +7,16 @@ use aptos_indexer_processor_sdk::{
 };
 use async_trait::async_trait;
 use processor::{
-    db::{
-        common::models::token_v2_models::{
-            raw_token_claims::CurrentTokenPendingClaimConvertible,
-            raw_v1_token_royalty::CurrentTokenRoyaltyV1Convertible,
-            raw_v2_token_activities::TokenActivityV2Convertible,
-            raw_v2_token_datas::{CurrentTokenDataV2Convertible, TokenDataV2Convertible},
-            raw_v2_token_metadata::CurrentTokenV2MetadataConvertible,
-            raw_v2_token_ownerships::{
-                CurrentTokenOwnershipV2Convertible, TokenOwnershipV2Convertible,
-            },
+    db,
+    db::common::models::{
+        token_models::{
+            token_claims::PostgresCurrentTokenPendingClaim,
+            token_royalty::PostgresCurrentTokenRoyaltyV1, tokens::TableMetadataForToken,
         },
-        postgres::models::{
-            token_models::{token_claims::CurrentTokenPendingClaim, tokens::TableMetadataForToken},
-            token_v2_models::{
-                v1_token_royalty::CurrentTokenRoyaltyV1,
-                v2_collections::{CollectionV2, CurrentCollectionV2},
-                v2_token_activities::TokenActivityV2,
-                v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
-                v2_token_metadata::CurrentTokenV2Metadata,
-                v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
-            },
+        token_v2_models::{
+            v2_collections::CurrentCollectionV2, v2_token_activities::PostgresTokenActivityV2,
+            v2_token_datas::PostgresCurrentTokenDataV2,
+            v2_token_ownerships::PostgresCurrentTokenOwnershipV2,
         },
     },
     processors::token_v2_processor::parse_v2_token,
@@ -58,18 +47,14 @@ impl TokenV2Extractor {
 impl Processable for TokenV2Extractor {
     type Input = Vec<Transaction>;
     type Output = (
-        Vec<CollectionV2>,
-        Vec<TokenDataV2>,
-        Vec<TokenOwnershipV2>,
         Vec<CurrentCollectionV2>,
-        Vec<CurrentTokenDataV2>,
-        Vec<CurrentTokenDataV2>,
-        Vec<CurrentTokenOwnershipV2>,
-        Vec<CurrentTokenOwnershipV2>,
-        Vec<TokenActivityV2>,
-        Vec<CurrentTokenV2Metadata>,
-        Vec<CurrentTokenRoyaltyV1>,
-        Vec<CurrentTokenPendingClaim>,
+        Vec<PostgresCurrentTokenDataV2>,
+        Vec<PostgresCurrentTokenDataV2>,
+        Vec<PostgresCurrentTokenOwnershipV2>,
+        Vec<PostgresCurrentTokenOwnershipV2>,
+        Vec<PostgresTokenActivityV2>,
+        Vec<PostgresCurrentTokenRoyaltyV1>,
+        Vec<PostgresCurrentTokenPendingClaim>,
     );
     type RunType = AsyncRunType;
 
@@ -79,18 +64,14 @@ impl Processable for TokenV2Extractor {
     ) -> Result<
         Option<
             TransactionContext<(
-                Vec<CollectionV2>,     // TODO: Deprecate this
-                Vec<TokenDataV2>,      // TODO: Deprecate this
-                Vec<TokenOwnershipV2>, // TODO: Deprecate this
                 Vec<CurrentCollectionV2>,
-                Vec<CurrentTokenDataV2>,
-                Vec<CurrentTokenDataV2>,
-                Vec<CurrentTokenOwnershipV2>,
-                Vec<CurrentTokenOwnershipV2>,
-                Vec<TokenActivityV2>,
-                Vec<CurrentTokenV2Metadata>,
-                Vec<CurrentTokenRoyaltyV1>,
-                Vec<CurrentTokenPendingClaim>,
+                Vec<PostgresCurrentTokenDataV2>,
+                Vec<PostgresCurrentTokenDataV2>,
+                Vec<PostgresCurrentTokenOwnershipV2>,
+                Vec<PostgresCurrentTokenOwnershipV2>,
+                Vec<PostgresTokenActivityV2>,
+                Vec<PostgresCurrentTokenRoyaltyV1>,
+                Vec<PostgresCurrentTokenPendingClaim>,
             )>,
         >,
         ProcessorError,
@@ -115,16 +96,16 @@ impl Processable for TokenV2Extractor {
         };
 
         let (
-            collections_v2,
-            raw_token_datas_v2,
-            raw_token_ownerships_v2,
+            _,
+            _,
+            _,
             current_collections_v2,
             raw_current_token_datas_v2,
             raw_current_deleted_token_datas_v2,
             raw_current_token_ownerships_v2,
             raw_current_deleted_token_ownerships_v2,
             raw_token_activities_v2,
-            raw_current_token_v2_metadata,
+            _,
             raw_current_token_royalties_v1,
             raw_current_token_claims,
         ) = parse_v2_token(
@@ -134,73 +115,55 @@ impl Processable for TokenV2Extractor {
         )
         .await;
 
-        let postgres_current_token_claims: Vec<CurrentTokenPendingClaim> = raw_current_token_claims
-            .into_iter()
-            .map(CurrentTokenPendingClaim::from_raw)
-            .collect();
+        let postgres_current_token_claims: Vec<PostgresCurrentTokenPendingClaim> =
+            raw_current_token_claims
+                .into_iter()
+                .map(PostgresCurrentTokenPendingClaim::from)
+                .collect();
 
-        let postgres_current_token_royalties_v1: Vec<CurrentTokenRoyaltyV1> =
+        let postgres_current_token_royalties_v1: Vec<PostgresCurrentTokenRoyaltyV1> =
             raw_current_token_royalties_v1
                 .into_iter()
-                .map(CurrentTokenRoyaltyV1::from_raw)
+                .map(PostgresCurrentTokenRoyaltyV1::from)
                 .collect();
 
-        let postgres_current_token_v2_metadata: Vec<CurrentTokenV2Metadata> =
-            raw_current_token_v2_metadata
+        let postgres_token_activities_v2: Vec<PostgresTokenActivityV2> = raw_token_activities_v2
+            .into_iter()
+            .map(PostgresTokenActivityV2::from)
+            .collect();
+
+        let postgres_current_token_datas_v2: Vec<PostgresCurrentTokenDataV2> =
+            raw_current_token_datas_v2
                 .into_iter()
-                .map(CurrentTokenV2Metadata::from_raw)
+                .map(PostgresCurrentTokenDataV2::from)
                 .collect();
 
-        let postgres_token_activities_v2: Vec<TokenActivityV2> = raw_token_activities_v2
-            .into_iter()
-            .map(TokenActivityV2::from_raw)
-            .collect();
-
-        let postgres_token_datas_v2: Vec<TokenDataV2> = raw_token_datas_v2
-            .into_iter()
-            .map(TokenDataV2::from_raw)
-            .collect();
-
-        let postgres_current_token_datas_v2: Vec<CurrentTokenDataV2> = raw_current_token_datas_v2
-            .into_iter()
-            .map(CurrentTokenDataV2::from_raw)
-            .collect();
-
-        let postgress_current_deleted_token_datas_v2: Vec<CurrentTokenDataV2> =
+        let postgress_current_deleted_token_datas_v2: Vec<PostgresCurrentTokenDataV2> =
             raw_current_deleted_token_datas_v2
                 .into_iter()
-                .map(CurrentTokenDataV2::from_raw)
+                .map(PostgresCurrentTokenDataV2::from)
                 .collect();
 
-        let postgres_token_ownerships_v2: Vec<TokenOwnershipV2> = raw_token_ownerships_v2
-            .into_iter()
-            .map(TokenOwnershipV2::from_raw)
-            .collect();
-
-        let postgres_current_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+        let postgres_current_token_ownerships_v2: Vec<PostgresCurrentTokenOwnershipV2> =
             raw_current_token_ownerships_v2
                 .into_iter()
-                .map(CurrentTokenOwnershipV2::from_raw)
+                .map(PostgresCurrentTokenOwnershipV2::from)
                 .collect();
 
-        let postgres_current_deleted_token_ownerships_v2: Vec<CurrentTokenOwnershipV2> =
+        let postgres_current_deleted_token_ownerships_v2: Vec<PostgresCurrentTokenOwnershipV2> =
             raw_current_deleted_token_ownerships_v2
                 .into_iter()
-                .map(CurrentTokenOwnershipV2::from_raw)
+                .map(PostgresCurrentTokenOwnershipV2::from)
                 .collect();
 
         Ok(Some(TransactionContext {
             data: (
-                collections_v2,
-                postgres_token_datas_v2,
-                postgres_token_ownerships_v2,
                 current_collections_v2,
                 postgres_current_token_datas_v2,
                 postgress_current_deleted_token_datas_v2,
                 postgres_current_token_ownerships_v2,
                 postgres_current_deleted_token_ownerships_v2,
                 postgres_token_activities_v2,
-                postgres_current_token_v2_metadata,
                 postgres_current_token_royalties_v1,
                 postgres_current_token_claims,
             ),
