@@ -22,7 +22,7 @@ use processor::schema::backfill_processor_status;
 /// the checkpointed version + 1.
 ///
 /// If this is a backfill processor and there is not an in-progress backfill (i.e., no checkpoint or
-/// backfill status is COMPLETE), this will return `intial_starting_version` from the backfill config, or 0 if not set.
+/// backfill status is COMPLETE), this will return `intial_starting_version` from the backfill config.
 ///
 /// If the backfill status is IN_PROGRESS, and `backfill_config.overwrite_checkpoint` is `true`, this will return
 /// `initial_starting_version` from the backfill config, or 0 if not set. This allows users to restart a
