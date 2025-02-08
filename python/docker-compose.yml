@@ -1,9 +1,11 @@
-version: '3'
+version: "3.8"
 services:
   index-processor:
     build: .
     environment:
       DB_CONNECTION_URI: postgresql://postgres:postgres@db:5432/postgres
+    networks:
+      - shared
     depends_on:
       - db
     volumes:
@@ -13,7 +15,15 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    networks:
+      - shared
     volumes:
       - db-data:/var/lib/postgresql/data
+
+networks:
+  shared:
+    external: true
+    name: "aptos-docker-compose-shared"
+
 volumes:
   db-data:
