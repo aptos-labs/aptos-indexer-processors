@@ -67,6 +67,7 @@ mod sdk_user_txn_processor_tests {
         IMPORTED_MAINNET_TXNS_590098441_USER_TXN_SINGLE_SENDER_ED25519,
         IMPORTED_MAINNET_TXNS_685_USER_TXN_ED25519,
         IMPORTED_MAINNET_TXNS_976087151_USER_TXN_SINGLE_SENDER_KEYLESS,
+        IMPORTED_TESTNET_TXNS_6616059810_ACCOUNT_ABSTRACTION_AUTHENTICATOR,
         IMPORTED_TESTNET_TXNS_769222973_MULTISIG,
     };
     use aptos_indexer_testing_framework::{cli_parser::get_test_config, database::TestDatabase};
@@ -131,6 +132,15 @@ mod sdk_user_txn_processor_tests {
         process_single_transactions(
             IMPORTED_MAINNET_TXNS_590098441_USER_TXN_SINGLE_SENDER_ED25519,
             Some("test_single_sender_ed25519".to_string()),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_single_sender_account_abstraction() {
+        process_single_transactions(
+            IMPORTED_TESTNET_TXNS_6616059810_ACCOUNT_ABSTRACTION_AUTHENTICATOR,
+            Some("test_single_sender_account_abstraction".to_string()),
         )
         .await;
     }

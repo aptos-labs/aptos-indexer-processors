@@ -1,0 +1,15 @@
+[
+  {
+    "transaction_version": 6616059810,
+    "multi_agent_index": 0,
+    "multi_sig_index": 0,
+    "transaction_block_height": 427367446,
+    "signer": "0x272c396814beae314a32108c27ff33d845b064b667bde67483e5c6572c8dcf80",
+    "is_sender_primary": true,
+    "type_": "abstraction_signature",
+    "public_key": "Not implemented",
+    "signature": "Not implemented",
+    "threshold": 1,
+    "public_key_indices": []
+  }
+]
