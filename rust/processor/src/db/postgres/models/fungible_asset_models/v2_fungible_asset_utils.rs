@@ -5,9 +5,8 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use crate::{
-    db::{
-        common::models::token_v2_models::v2_token_utils::ResourceReference,
-        postgres::models::token_models::token_utils::URI_LENGTH,
+    db::common::models::{
+        token_models::token_utils::URI_LENGTH, token_v2_models::v2_token_utils::ResourceReference,
     },
     utils::util::{deserialize_from_string, truncate_str, Aggregator},
 };
