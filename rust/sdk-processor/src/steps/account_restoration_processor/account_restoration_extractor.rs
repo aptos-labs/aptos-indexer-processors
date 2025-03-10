@@ -33,7 +33,7 @@ impl Processable for AccountRestorationExtractor {
         let results: Vec<_> = transactions
             .data
             .par_iter()
-            .filter_map(parse_account_restoration_models_from_transaction)
+            .flat_map(parse_account_restoration_models_from_transaction)
             .collect();
 
         let (auth_key_account_addresses, multikey_outputs): (Vec<_>, Vec<_>) =
