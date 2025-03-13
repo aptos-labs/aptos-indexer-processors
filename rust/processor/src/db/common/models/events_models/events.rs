@@ -85,11 +85,15 @@ pub struct EventContext {
     pub coin_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fa_asset_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fa_account_address: Option<String>,
 }
 
 impl EventContext {
     pub fn is_empty(&self) -> bool {
-        self.coin_type.is_none() && self.fa_asset_type.is_none()
+        self.coin_type.is_none()
+            && self.fa_asset_type.is_none()
+            && self.fa_account_address.is_none()
     }
 }
 

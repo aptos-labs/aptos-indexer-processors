@@ -221,6 +221,7 @@ impl ProcessorTrait for EventStreamProcessor {
                         "[Parser] error parsing fungible asset activity v2");
                     panic!("[Parser] error parsing fungible asset activity v2");
                 }) {
+                    context.fa_account_address = Some(v2_activity.owner_address.clone());
                     context.fa_asset_type = Some(v2_activity.asset_type.clone());
                 }
 
