@@ -8,12 +8,15 @@ use crate::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             v2_fungible_asset_balances::FungibleAssetBalance,
         },
+        object_models::v2_object_utils::{
+            ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
+        },
     },
     processors::{DefaultProcessingResult, ProcessingResult, ProcessorName, ProcessorTrait},
     utils::{
         database::ArcDbPool,
         in_memory_cache::InMemoryCache,
-        util::{get_entry_function_from_user_request, parse_timestamp},
+        util::{get_entry_function_from_user_request, parse_timestamp, standardize_address},
     },
 };
 use ahash::AHashMap;
@@ -87,8 +90,12 @@ impl ProcessorTrait for EventStreamProcessor {
             // the event to the resource using the event guid
             let mut event_to_v1_coin_type: EventToCoinType = AHashMap::new();
 
+            // Mapping of object address to FA metadata address
+            let mut fungible_asset_object_helper: ObjectAggregatedDataMapping = AHashMap::new();
+
             for (index, wsc) in transaction_info.changes.iter().enumerate() {
                 if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                    // coin type mapping
                     if let Some((_balance, _current_balance, event_to_coin)) =
                         FungibleAssetBalance::get_v1_from_write_resource(
                             write_resource,
@@ -100,12 +107,28 @@ impl ProcessorTrait for EventStreamProcessor {
                     {
                         event_to_v1_coin_type.extend(event_to_coin);
                     }
+
+                    // object address to FA metadata address mapping
+                    if let Some(object) =
+                        ObjectWithMetadata::from_write_resource(write_resource, txn_version)
+                            .unwrap()
+                    {
+                        fungible_asset_object_helper.insert(
+                            standardize_address(&write_resource.address.to_string()),
+                            ObjectAggregatedData {
+                                object,
+                                ..ObjectAggregatedData::default()
+                            },
+                        );
+                    }
                 }
             }
 
             let mut event_context = AHashMap::new();
             for (index, event) in raw_events.iter().enumerate() {
-                // Only support v1 for now
+                let mut context = EventContext::default();
+
+                // Coin context
                 if let Some(v1_activity) = FungibleAssetActivity::get_v1_from_event(
                     event,
                     txn_version,
@@ -123,9 +146,33 @@ impl ProcessorTrait for EventStreamProcessor {
                         "[Parser] error parsing fungible asset activity v1");
                     panic!("[Parser] error parsing fungible asset activity v1");
                 }) {
-                    event_context.insert((txn_version, index as i64), EventContext {
-                        coin_type: v1_activity.asset_type.clone(),
-                    });
+                    context.coin_type = Some(v1_activity.asset_type.clone());
+                }
+
+                // FA context
+                if let Some(v2_activity) = FungibleAssetActivity::get_v2_from_event(
+                    event,
+                    txn_version,
+                    block_height,
+                    txn_timestamp,
+                    index as i64,
+                    &entry_function_id_str,
+                    &fungible_asset_object_helper,
+                )
+                .unwrap_or_else(|e| {
+                    tracing::error!(
+                        transaction_version = txn_version,
+                        index = index,
+                        error = ?e,
+                        "[Parser] error parsing fungible asset activity v2");
+                    panic!("[Parser] error parsing fungible asset activity v2");
+                }) {
+                    context.fa_asset_type = Some(v2_activity.asset_type.clone());
+                }
+
+                // Add context to event if not empty
+                if !context.is_empty() {
+                    event_context.insert((txn_version, index as i64), context);
                 }
             }
 

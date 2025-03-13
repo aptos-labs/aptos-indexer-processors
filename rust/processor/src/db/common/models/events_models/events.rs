@@ -79,9 +79,16 @@ impl Event {
 // Prevent conflicts with other things named `Event`
 pub type EventModel = Event;
 
-#[derive(Clone, Debug, GetSize, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, GetSize, Deserialize, Serialize, Eq, PartialEq)]
 pub struct EventContext {
-    pub coin_type: String,
+    pub coin_type: Option<String>,
+    pub fa_asset_type: Option<String>,
+}
+
+impl EventContext {
+    pub fn is_empty(&self) -> bool {
+        self.coin_type.is_none() && self.fa_asset_type.is_none()
+    }
 }
 
 #[derive(Clone, Debug, GetSize, Serialize, Deserialize, Eq, PartialEq)]

@@ -624,7 +624,6 @@ async fn parse_v2_coin(
                 &entry_function_id_str,
                 &fungible_asset_object_helper,
             )
-            .await
             .unwrap_or_else(|e| {
                 tracing::error!(
                     transaction_version = txn_version,
