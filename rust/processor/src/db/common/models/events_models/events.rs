@@ -81,7 +81,9 @@ pub type EventModel = Event;
 
 #[derive(Clone, Debug, Default, GetSize, Deserialize, Serialize, Eq, PartialEq)]
 pub struct EventContext {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub coin_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fa_asset_type: Option<String>,
 }
 
