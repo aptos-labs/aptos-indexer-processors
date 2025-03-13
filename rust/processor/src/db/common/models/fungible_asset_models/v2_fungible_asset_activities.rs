@@ -72,27 +72,58 @@ impl FungibleAssetActivity {
         if let Some(fa_event) =
             &FungibleAssetEvent::from_event(event_type.as_str(), &event.data, txn_version)?
         {
-            let storage_id = standardize_address(&event.key.as_ref().unwrap().account_address);
+            let (storage_id, is_frozen, amount) = match fa_event {
+                FungibleAssetEvent::WithdrawEvent(inner) => (
+                    standardize_address(&event.key.as_ref().unwrap().account_address),
+                    None,
+                    Some(inner.amount.clone()),
+                ),
+                FungibleAssetEvent::DepositEvent(inner) => (
+                    standardize_address(&event.key.as_ref().unwrap().account_address),
+                    None,
+                    Some(inner.amount.clone()),
+                ),
+                FungibleAssetEvent::FrozenEvent(inner) => (
+                    standardize_address(&event.key.as_ref().unwrap().account_address),
+                    Some(inner.frozen),
+                    None,
+                ),
+                FungibleAssetEvent::WithdrawEventV2(inner) => (
+                    standardize_address(&inner.store),
+                    None,
+                    Some(inner.amount.clone()),
+                ),
+                FungibleAssetEvent::DepositEventV2(inner) => (
+                    standardize_address(&inner.store),
+                    None,
+                    Some(inner.amount.clone()),
+                ),
+                FungibleAssetEvent::FrozenEventV2(inner) => {
+                    (standardize_address(&inner.store), Some(inner.frozen), None)
+                },
+            };
 
-            // The event account address will also help us find fungible store which tells us where to find
-            // the metadata
-            if let Some(object_metadata) = object_aggregated_data_mapping.get(&storage_id) {
-                let object_core = &object_metadata.object.object_core;
-                let fungible_asset = object_metadata.fungible_asset_store.as_ref().unwrap();
-                let asset_type = fungible_asset.metadata.get_reference_address();
+            // Lookup the event address in the object_aggregated_data_mapping to get additional metadata
+            // The events are emitted on the address of the fungible store.
+            let maybe_object_metadata = object_aggregated_data_mapping.get(&storage_id);
+            // Get the store's owner address from ObjectCore.
+            // The ObjectCore might not exist in the transaction if the object got deleted in the same transaction
+            let maybe_owner_address = maybe_object_metadata
+                .map(|metadata| &metadata.object.object_core)
+                .map(|object_core| object_core.get_owner_address());
+            // Get the store's asset type
+            // The FungibleStore might not exist in the transaction if it's a secondary store that got burnt in the same transaction
+            let maybe_asset_type = maybe_object_metadata
+                .and_then(|metadata| metadata.fungible_asset_store.as_ref())
+                .map(|fa| fa.metadata.get_reference_address());
 
-                let (is_frozen, amount) = match fa_event {
-                    FungibleAssetEvent::WithdrawEvent(inner) => (None, Some(inner.amount.clone())),
-                    FungibleAssetEvent::DepositEvent(inner) => (None, Some(inner.amount.clone())),
-                    FungibleAssetEvent::FrozenEvent(inner) => (Some(inner.frozen), None),
-                };
-
+            if let Some(asset_type) = maybe_asset_type {
                 return Ok(Some(Self {
                     transaction_version: txn_version,
                     event_index,
-                    owner_address: object_core.get_owner_address(),
+                    owner_address: maybe_owner_address.unwrap_or_default(),
                     storage_id: storage_id.clone(),
-                    asset_type: asset_type.clone(),
+                    asset_type,
                     is_frozen,
                     amount,
                     type_: event_type.clone(),
@@ -107,6 +138,7 @@ impl FungibleAssetActivity {
                 }));
             }
         }
+
         Ok(None)
     }
 

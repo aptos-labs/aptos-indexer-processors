@@ -14,11 +14,20 @@ use crate::{
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
+use const_format::formatcp;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 const FUNGIBLE_ASSET_LENGTH: usize = 32;
 const FUNGIBLE_ASSET_SYMBOL: usize = 10;
+
+pub const TYPE_FUNGIBLE_ASSET_SUPPLY: &str = formatcp!("{COIN_ADDR}::fungible_asset::Supply");
+pub const TYPE_CONCURRENT_FUNGIBLE_ASSET_SUPPLY: &str =
+    formatcp!("{COIN_ADDR}::fungible_asset::ConcurrentSupply");
+pub const TYPE_FUNGIBLE_ASSET_METADATA: &str = formatcp!("{COIN_ADDR}::fungible_asset::Metadata");
+pub const TYPE_FUNGIBLE_ASSET_STORE: &str = formatcp!("{COIN_ADDR}::fungible_asset::FungibleStore");
+pub const TYPE_CONCURRENT_FUNGIBLE_ASSET_BALANCE: &str =
+    formatcp!("{COIN_ADDR}::fungible_asset::ConcurrentFungibleBalance");
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FeeStatement {
@@ -275,12 +284,32 @@ pub struct FrozenEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositEventV2 {
+    pub store: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawEventV2 {
+    pub store: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FrozenEventV2 {
+    pub store: String,
+    pub frozen: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2FungibleAssetResource {
+    ConcurrentFungibleAssetBalance(ConcurrentFungibleAssetBalance),
+    ConcurrentFungibleAssetSupply(ConcurrentFungibleAssetSupply),
     FungibleAssetMetadata(FungibleAssetMetadata),
     FungibleAssetStore(FungibleAssetStore),
     FungibleAssetSupply(FungibleAssetSupply),
-    ConcurrentFungibleAssetSupply(ConcurrentFungibleAssetSupply),
-    ConcurrentFungibleAssetBalance(ConcurrentFungibleAssetBalance),
 }
 
 impl V2FungibleAssetResource {
@@ -332,12 +361,55 @@ impl V2FungibleAssetResource {
             txn_version, data_type
         ))
     }
+
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_write_resource(write_resource);
+        Ok(match type_str.as_str() {
+            TYPE_CONCURRENT_FUNGIBLE_ASSET_BALANCE => {
+                ConcurrentFungibleAssetBalance::from_write_resource(write_resource, txn_version)
+                    .ok()
+                    .flatten()
+                    .map(Self::ConcurrentFungibleAssetBalance)
+            },
+            TYPE_CONCURRENT_FUNGIBLE_ASSET_SUPPLY => {
+                ConcurrentFungibleAssetSupply::from_write_resource(write_resource, txn_version)
+                    .ok()
+                    .flatten()
+                    .map(Self::ConcurrentFungibleAssetSupply)
+            },
+            TYPE_FUNGIBLE_ASSET_METADATA => {
+                FungibleAssetMetadata::from_write_resource(write_resource, txn_version)
+                    .ok()
+                    .flatten()
+                    .map(Self::FungibleAssetMetadata)
+            },
+            TYPE_FUNGIBLE_ASSET_STORE => {
+                FungibleAssetStore::from_write_resource(write_resource, txn_version)
+                    .ok()
+                    .flatten()
+                    .map(Self::FungibleAssetStore)
+            },
+            TYPE_FUNGIBLE_ASSET_SUPPLY => {
+                FungibleAssetSupply::from_write_resource(write_resource, txn_version)
+                    .ok()
+                    .flatten()
+                    .map(Self::FungibleAssetSupply)
+            },
+            _ => return Ok(None),
+        })
+    }
 }
 
 pub enum FungibleAssetEvent {
     DepositEvent(DepositEvent),
     WithdrawEvent(WithdrawEvent),
     FrozenEvent(FrozenEvent),
+    DepositEventV2(DepositEventV2),
+    WithdrawEventV2(WithdrawEventV2),
+    FrozenEventV2(FrozenEventV2),
 }
 
 impl FungibleAssetEvent {
@@ -351,6 +423,15 @@ impl FungibleAssetEvent {
             },
             "0x1::fungible_asset::FrozenEvent" => {
                 serde_json::from_str(data).map(|inner| Some(Self::FrozenEvent(inner)))
+            },
+            "0x1::fungible_asset::Deposit" => {
+                serde_json::from_str(data).map(|inner| Some(Self::DepositEventV2(inner)))
+            },
+            "0x1::fungible_asset::Withdraw" => {
+                serde_json::from_str(data).map(|inner| Some(Self::WithdrawEventV2(inner)))
+            },
+            "0x1::fungible_asset::Frozen" => {
+                serde_json::from_str(data).map(|inner| Some(Self::FrozenEventV2(inner)))
             },
             _ => Ok(None),
         }

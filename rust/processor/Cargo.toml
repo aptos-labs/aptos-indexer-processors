@@ -24,6 +24,7 @@ bigdecimal = { workspace = true }
 bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+const_format = { workspace = true }
 dashmap = { workspace = true }
 diesel = { workspace = true }
 diesel-async = { workspace = true }

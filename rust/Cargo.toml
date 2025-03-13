@@ -31,6 +31,7 @@ bigdecimal = { version = "0.4.0", features = ["serde"] }
 bitflags = "2.5.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+const_format = "0.2.33"
 dashmap = "5.2.0"
 # Do NOT enable the postgres feature here, it is conditionally enabled in a feature
 # block in the Cargo.toml file for the processor crate.

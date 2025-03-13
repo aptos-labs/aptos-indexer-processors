@@ -7,6 +7,7 @@ use crate::{
         fungible_asset_models::{
             v2_fungible_asset_activities::{EventToCoinType, FungibleAssetActivity},
             v2_fungible_asset_balances::FungibleAssetBalance,
+            v2_fungible_asset_utils::V2FungibleAssetResource,
         },
         object_models::v2_object_utils::{
             ObjectAggregatedData, ObjectAggregatedDataMapping, ObjectWithMetadata,
@@ -124,6 +125,59 @@ impl ProcessorTrait for EventStreamProcessor {
                 }
             }
 
+            // Loop 2: Get the metadata relevant to parse v1 coin and v2 fungible asset.
+            // As an optimization, we also handle v1 balances in the process
+            for wsc in transaction_info.changes.iter() {
+                if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
+                    // Fill the v2 fungible_asset_object_helper. This is used to track which objects exist at each object address.
+                    // The data will be used to reconstruct the full data in Loop 4.
+                    let address = standardize_address(&write_resource.address.to_string());
+                    if let Some(aggregated_data) = fungible_asset_object_helper.get_mut(&address) {
+                        if let Some(v2_fungible_asset_resource) =
+                            V2FungibleAssetResource::from_write_resource(
+                                write_resource,
+                                txn_version,
+                            )
+                            .unwrap()
+                        {
+                            match v2_fungible_asset_resource {
+                                V2FungibleAssetResource::FungibleAssetMetadata(
+                                    fungible_asset_metadata,
+                                ) => {
+                                    aggregated_data.fungible_asset_metadata =
+                                        Some(fungible_asset_metadata);
+                                },
+                                V2FungibleAssetResource::FungibleAssetStore(
+                                    fungible_asset_store,
+                                ) => {
+                                    aggregated_data.fungible_asset_store =
+                                        Some(fungible_asset_store);
+                                },
+                                V2FungibleAssetResource::FungibleAssetSupply(
+                                    fungible_asset_supply,
+                                ) => {
+                                    aggregated_data.fungible_asset_supply =
+                                        Some(fungible_asset_supply);
+                                },
+                                V2FungibleAssetResource::ConcurrentFungibleAssetSupply(
+                                    concurrent_fungible_asset_supply,
+                                ) => {
+                                    aggregated_data.concurrent_fungible_asset_supply =
+                                        Some(concurrent_fungible_asset_supply);
+                                },
+                                V2FungibleAssetResource::ConcurrentFungibleAssetBalance(
+                                    concurrent_fungible_asset_balance,
+                                ) => {
+                                    aggregated_data.concurrent_fungible_asset_balance =
+                                        Some(concurrent_fungible_asset_balance);
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Loop 3 to handle events and collect additional metadata from events for v2
             let mut event_context = AHashMap::new();
             for (index, event) in raw_events.iter().enumerate() {
                 let mut context = EventContext::default();

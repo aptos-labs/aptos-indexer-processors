@@ -105,6 +105,7 @@ pub struct EventStreamMessage {
     pub indexed_type: String,
     #[get_size(size = 12)]
     pub transaction_timestamp: chrono::NaiveDateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<EventContext>,
 }
 
