@@ -6,26 +6,34 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
     db::{
-        common::models::object_models::v2_object_utils::ObjectAggregatedDataMapping,
+        common::models::{
+            object_models::v2_object_utils::ObjectAggregatedDataMapping,
+            token_models::token_utils::NAME_LENGTH, DEFAULT_NONE,
+        },
         postgres::models::{
             default_models::move_resources::MoveResource,
             resources::{COIN_ADDR, TOKEN_ADDR, TOKEN_V2_ADDR},
-            token_models::token_utils::NAME_LENGTH,
         },
     },
+    schema::current_token_v2_metadata,
     utils::util::{standardize_address, truncate_str},
 };
+use allocative_derive::Allocative;
 use anyhow::Context;
 use aptos_protos::transaction::v1::WriteResource;
+use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::error;
 
 // PK of current_objects, i.e. object_address, resource_type
 pub type CurrentTokenV2MetadataPK = (String, String);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct RawCurrentTokenV2Metadata {
+pub struct CurrentTokenV2Metadata {
     pub object_address: String,
     pub resource_type: String,
     pub data: Value,
@@ -34,20 +42,20 @@ pub struct RawCurrentTokenV2Metadata {
     pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 
-impl Ord for RawCurrentTokenV2Metadata {
+impl Ord for CurrentTokenV2Metadata {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.object_address
             .cmp(&other.object_address)
             .then(self.resource_type.cmp(&other.resource_type))
     }
 }
-impl PartialOrd for RawCurrentTokenV2Metadata {
+impl PartialOrd for CurrentTokenV2Metadata {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl RawCurrentTokenV2Metadata {
+impl CurrentTokenV2Metadata {
     /// Parsing unknown resources with 0x4::token::Token
     pub fn from_write_resource(
         write_resource: &WriteResource,
@@ -77,7 +85,7 @@ impl RawCurrentTokenV2Metadata {
                 }
 
                 let resource_type = truncate_str(&resource.type_, NAME_LENGTH);
-                return Ok(Some(RawCurrentTokenV2Metadata {
+                return Ok(Some(CurrentTokenV2Metadata {
                     object_address,
                     resource_type,
                     data: resource
@@ -93,6 +101,47 @@ impl RawCurrentTokenV2Metadata {
     }
 }
 
-pub trait CurrentTokenV2MetadataConvertible {
-    fn from_raw(raw_item: RawCurrentTokenV2Metadata) -> Self;
+/// This is the parquet version of CurrentTokenV2Metadata
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
+)]
+pub struct ParquetCurrentTokenV2Metadata {
+    pub object_address: String,
+    pub resource_type: String,
+    pub data: String,
+    pub state_key_hash: String,
+    pub last_transaction_version: i64,
+    #[allocative(skip)]
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+}
+impl NamedTable for ParquetCurrentTokenV2Metadata {
+    const TABLE_NAME: &'static str = "current_token_v2_metadata";
+}
+
+impl HasVersion for ParquetCurrentTokenV2Metadata {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl GetTimeStamp for ParquetCurrentTokenV2Metadata {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.last_transaction_timestamp
+    }
+}
+
+impl From<CurrentTokenV2Metadata> for ParquetCurrentTokenV2Metadata {
+    fn from(raw_item: CurrentTokenV2Metadata) -> Self {
+        Self {
+            object_address: raw_item.object_address,
+            resource_type: raw_item.resource_type,
+            data: canonical_json::to_string(&raw_item.data).unwrap_or_else(|_| {
+                error!("Failed to serialize data to JSON: {:?}", raw_item.data);
+                DEFAULT_NONE.to_string()
+            }),
+            state_key_hash: raw_item.state_key_hash,
+            last_transaction_version: raw_item.last_transaction_version,
+            last_transaction_timestamp: raw_item.last_transaction_timestamp,
+        }
+    }
 }
