@@ -101,7 +101,7 @@ async fn insert_to_db(
     end_version: u64,
     current_stake_pool_voters: &[CurrentStakingPoolVoter],
     proposal_votes: &[ProposalVote],
-    delegator_actvities: &[DelegatedStakingActivity],
+    delegator_activities: &[DelegatedStakingActivity],
     delegator_balances: &[DelegatorBalance],
     current_delegator_balances: &[CurrentDelegatorBalance],
     delegator_pools: &[DelegatorPool],
@@ -135,7 +135,7 @@ async fn insert_to_db(
     let da = execute_in_chunks(
         conn.clone(),
         insert_delegator_activities_query,
-        delegator_actvities,
+        delegator_activities,
         get_config_table_chunk_size::<DelegatedStakingActivity>(
             "delegated_staking_activities",
             per_table_chunk_sizes,
