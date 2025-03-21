@@ -58,7 +58,7 @@ jobs:
       - name: rust setup
         run: |
           sudo apt update && sudo apt install libdw-dev
-          cargo update
+          cargo update -p aptos-indexer-test-transactions
         working-directory: rust
 
       # Cache Cargo
