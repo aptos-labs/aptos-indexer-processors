@@ -18,7 +18,7 @@ use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
 const FUNGIBLE_ASSET_LENGTH: usize = 32;
-const FUNGIBLE_ASSET_SYMBOL: usize = 10;
+const FUNGIBLE_ASSET_SYMBOL: usize = 32;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FeeStatement {

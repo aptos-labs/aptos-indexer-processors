@@ -36,7 +36,7 @@ impl CoinInfoResource {
     }
 
     pub fn get_symbol_trunc(&self) -> String {
-        truncate_str(&self.symbol, 10)
+        truncate_str(&self.symbol, 32)
     }
 
     /// Getting the table item location of the supply aggregator
