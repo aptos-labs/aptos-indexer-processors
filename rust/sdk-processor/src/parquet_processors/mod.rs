@@ -96,7 +96,6 @@ const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
         strum(serialize_all = "snake_case")
     )
 )]
-
 // TODO: Rename this to ParquetTableEnum as this reflects the table name rather than the type name
 // which is written in plural form.
 pub enum ParquetTypeEnum {
