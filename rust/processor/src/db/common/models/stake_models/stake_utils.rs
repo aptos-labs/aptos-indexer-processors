@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db::postgres::models::{
-        default_models::move_resources::MoveResource, token_models::token_utils::Table,
+    db::{
+        common::models::token_models::token_utils::Table,
+        postgres::models::default_models::move_resources::MoveResource,
     },
     utils::util::{deserialize_from_string, standardize_address},
 };
