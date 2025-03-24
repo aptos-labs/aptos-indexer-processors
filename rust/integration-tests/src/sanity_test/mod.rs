@@ -8,7 +8,6 @@ use sdk_processor::processors::{
     default_processor::DefaultProcessor, events_processor::EventsProcessor,
     fungible_asset_processor::FungibleAssetProcessor, objects_processor::ObjectsProcessor,
     stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
-    user_transaction_processor::UserTransactionProcessor,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -22,7 +21,6 @@ pub enum ProcessorWrapper {
     DefaultProcessor(DefaultProcessor),
     ObjectsProcessor(ObjectsProcessor),
     StakeProcessor(StakeProcessor),
-    UserTransactionProcessor(UserTransactionProcessor),
     TokenV2Processor(TokenV2Processor),
     AccountTransactionsProcessor(AccountTransactionsProcessor),
 }
@@ -105,18 +103,6 @@ impl ProcessorWrapper {
                 .await
             },
             ProcessorWrapper::StakeProcessor(processor) => {
-                run_processor_test(
-                    test_context,
-                    processor,
-                    db_values_fn,
-                    db_url.clone(),
-                    diff_flag,
-                    output_path.clone(),
-                    None,
-                )
-                .await
-            },
-            ProcessorWrapper::UserTransactionProcessor(processor) => {
                 run_processor_test(
                     test_context,
                     processor,

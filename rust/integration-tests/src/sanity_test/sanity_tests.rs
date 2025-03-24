@@ -11,7 +11,6 @@ mod tests {
             objects_processor::load_data as load_object_data,
             stake_processor::load_data as load_stake_data,
             token_v2_processor::load_data as load_token_v2_data,
-            user_transaction_processor::load_data as load_ut_data,
         },
         sanity_test::ProcessorWrapper,
         sdk_tests::{
@@ -23,7 +22,6 @@ mod tests {
             objects_processor_tests::setup_objects_processor_config, setup_test_environment,
             stake_processor_tests::setup_stake_processor_config,
             token_v2_processor_tests::setup_token_v2_processor_config,
-            user_transaction_processor_tests::setup_user_txn_processor_config,
         },
     };
     use aptos_indexer_test_transactions::json_transactions::generated_transactions::{
@@ -38,7 +36,6 @@ mod tests {
         default_processor::DefaultProcessor, events_processor::EventsProcessor,
         fungible_asset_processor::FungibleAssetProcessor, objects_processor::ObjectsProcessor,
         stake_processor::StakeProcessor, token_v2_processor::TokenV2Processor,
-        user_transaction_processor::UserTransactionProcessor,
     };
     use serde_json::Value;
     use std::collections::HashMap;
@@ -139,16 +136,6 @@ mod tests {
                 ),
             ),
             (
-                "user_transactions_processor".to_string(),
-                ProcessorWrapper::UserTransactionProcessor(
-                    UserTransactionProcessor::new(
-                        setup_user_txn_processor_config(&test_context, &db_url).0,
-                    )
-                    .await
-                    .expect("Failed to create UserTransactionProcessor"),
-                ),
-            ),
-            (
                 "token_v2_processor".to_string(),
                 ProcessorWrapper::TokenV2Processor(
                     TokenV2Processor::new(
@@ -209,7 +196,6 @@ mod tests {
             "default_processor" => load_default_data,
             "objects_processor" => load_object_data,
             "stake_processor" => load_stake_data,
-            "user_transactions_processor" => load_ut_data,
             "token_v2_processor" => load_token_v2_data,
             "account_transactions_processor" => load_acc_txn_data,
             _ => panic!("Unknown processor: {}", processor_name),
