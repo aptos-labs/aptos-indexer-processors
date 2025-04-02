@@ -31,13 +31,17 @@ use aptos_indexer_processor_sdk::{
 use parquet::schema::types::Type;
 use processor::{
     bq_analytics::generic_parquet_processor::HasParquetSchema,
-    db::parquet::models::token_v2_models::{
-        token_claims::CurrentTokenPendingClaim,
-        v1_token_royalty::CurrentTokenRoyaltyV1,
-        v2_token_activities::TokenActivityV2,
-        v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
-        v2_token_metadata::CurrentTokenV2Metadata,
-        v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
+    db::common::models::{
+        token_models::{
+            token_claims::ParquetCurrentTokenPendingClaim,
+            token_royalty::ParquetCurrentTokenRoyaltyV1,
+        },
+        token_v2_models::{
+            v2_token_activities::ParquetTokenActivityV2,
+            v2_token_datas::{ParquetCurrentTokenDataV2, ParquetTokenDataV2},
+            v2_token_metadata::ParquetCurrentTokenV2Metadata,
+            v2_token_ownerships::{ParquetCurrentTokenOwnershipV2, ParquetTokenOwnershipV2},
+        },
     },
 };
 use std::{collections::HashMap, sync::Arc};
@@ -146,32 +150,32 @@ impl ProcessorTrait for ParquetTokenV2Processor {
         let parquet_type_to_schemas: HashMap<ParquetTypeEnum, Arc<Type>> = [
             (
                 ParquetTypeEnum::CurrentTokenPendingClaims,
-                CurrentTokenPendingClaim::schema(),
+                ParquetCurrentTokenPendingClaim::schema(),
             ),
             (
                 ParquetTypeEnum::CurrentTokenRoyaltiesV1,
-                CurrentTokenRoyaltyV1::schema(),
+                ParquetCurrentTokenRoyaltyV1::schema(),
             ),
             (
                 ParquetTypeEnum::CurrentTokenV2Metadata,
-                CurrentTokenV2Metadata::schema(),
+                ParquetCurrentTokenV2Metadata::schema(),
             ),
             (
                 ParquetTypeEnum::TokenActivitiesV2,
-                TokenActivityV2::schema(),
+                ParquetTokenActivityV2::schema(),
             ),
-            (ParquetTypeEnum::TokenDatasV2, TokenDataV2::schema()),
+            (ParquetTypeEnum::TokenDatasV2, ParquetTokenDataV2::schema()),
             (
                 ParquetTypeEnum::CurrentTokenDatasV2,
-                CurrentTokenDataV2::schema(),
+                ParquetCurrentTokenDataV2::schema(),
             ),
             (
                 ParquetTypeEnum::TokenOwnershipsV2,
-                TokenOwnershipV2::schema(),
+                ParquetTokenOwnershipV2::schema(),
             ),
             (
                 ParquetTypeEnum::CurrentTokenOwnershipsV2,
-                CurrentTokenOwnershipV2::schema(),
+                ParquetCurrentTokenOwnershipV2::schema(),
             ),
         ]
         .into_iter()

@@ -6,15 +6,20 @@
 #![allow(clippy::unused_unit)]
 
 use crate::{
-    db::{
-        common::models::token_v2_models::raw_v2_token_activities::TokenActivityHelperV1,
-        postgres::models::token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
+    bq_analytics::generic_parquet_processor::{GetTimeStamp, HasVersion, NamedTable},
+    db::common::models::{
+        token_models::{token_utils::TokenWriteSet, tokens::TableHandleToOwner},
+        token_v2_models::v2_token_activities::TokenActivityHelperV1,
     },
+    schema::current_token_pending_claims,
     utils::util::standardize_address,
 };
 use ahash::AHashMap;
+use allocative_derive::Allocative;
 use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
-use bigdecimal::{BigDecimal, Zero};
+use bigdecimal::{BigDecimal, ToPrimitive, Zero};
+use field_count::FieldCount;
+use parquet_derive::ParquetRecordWriter;
 use serde::{Deserialize, Serialize};
 
 // Map to keep track of the metadata of token offers that were claimed. The key is the token data id of the offer.
@@ -22,7 +27,7 @@ use serde::{Deserialize, Serialize};
 pub type TokenV1Claimed = AHashMap<String, TokenActivityHelperV1>;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct RawCurrentTokenPendingClaim {
+pub struct CurrentTokenPendingClaim {
     pub token_data_id_hash: String,
     pub property_version: BigDecimal,
     pub from_address: String,
@@ -39,7 +44,7 @@ pub struct RawCurrentTokenPendingClaim {
     pub collection_id: String,
 }
 
-impl Ord for RawCurrentTokenPendingClaim {
+impl Ord for CurrentTokenPendingClaim {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.token_data_id_hash
             .cmp(&other.token_data_id_hash)
@@ -49,13 +54,13 @@ impl Ord for RawCurrentTokenPendingClaim {
     }
 }
 
-impl PartialOrd for RawCurrentTokenPendingClaim {
+impl PartialOrd for CurrentTokenPendingClaim {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl RawCurrentTokenPendingClaim {
+impl CurrentTokenPendingClaim {
     /// Token claim is stored in a table in the offerer's account. The key is token_offer_id (token_id + to address)
     /// and value is token (token_id + amount)
     pub fn from_write_table_item(
@@ -210,6 +215,124 @@ impl RawCurrentTokenPendingClaim {
     }
 }
 
-pub trait CurrentTokenPendingClaimConvertible {
-    fn from_raw(raw_item: RawCurrentTokenPendingClaim) -> Self;
+/// This is a parquet version of CurrentTokenPendingClaim
+#[derive(
+    Allocative, Clone, Debug, Default, Deserialize, FieldCount, ParquetRecordWriter, Serialize,
+)]
+pub struct ParquetCurrentTokenPendingClaim {
+    pub token_data_id_hash: String,
+    pub property_version: u64,
+    pub from_address: String,
+    pub to_address: String,
+    pub collection_data_id_hash: String,
+    pub creator_address: String,
+    pub collection_name: String,
+    pub name: String,
+    pub amount: String, // String format of BigDecimal
+    pub table_handle: String,
+    pub last_transaction_version: i64,
+    #[allocative(skip)]
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub token_data_id: String,
+    pub collection_id: String,
+}
+
+impl NamedTable for ParquetCurrentTokenPendingClaim {
+    const TABLE_NAME: &'static str = "current_token_pending_claims";
+}
+
+impl HasVersion for ParquetCurrentTokenPendingClaim {
+    fn version(&self) -> i64 {
+        self.last_transaction_version
+    }
+}
+
+impl GetTimeStamp for ParquetCurrentTokenPendingClaim {
+    fn get_timestamp(&self) -> chrono::NaiveDateTime {
+        self.last_transaction_timestamp
+    }
+}
+
+impl From<CurrentTokenPendingClaim> for ParquetCurrentTokenPendingClaim {
+    fn from(raw_item: CurrentTokenPendingClaim) -> Self {
+        Self {
+            token_data_id_hash: raw_item.token_data_id_hash,
+            property_version: raw_item
+                .property_version
+                .to_u64()
+                .expect("Failed to convert property_version to u64"),
+            from_address: raw_item.from_address,
+            to_address: raw_item.to_address,
+            collection_data_id_hash: raw_item.collection_data_id_hash,
+            creator_address: raw_item.creator_address,
+            collection_name: raw_item.collection_name,
+            name: raw_item.name,
+            amount: raw_item.amount.to_string(), // (assuming amount is non-critical)
+            table_handle: raw_item.table_handle,
+            last_transaction_version: raw_item.last_transaction_version,
+            last_transaction_timestamp: raw_item.last_transaction_timestamp,
+            token_data_id: raw_item.token_data_id,
+            collection_id: raw_item.collection_id,
+        }
+    }
+}
+
+/// This is a postgres version of CurrentTokenPendingClaim
+#[derive(
+    Clone, Debug, Deserialize, Eq, FieldCount, Identifiable, Insertable, PartialEq, Serialize,
+)]
+#[diesel(primary_key(token_data_id_hash, property_version, from_address, to_address))]
+#[diesel(table_name = current_token_pending_claims)]
+pub struct PostgresCurrentTokenPendingClaim {
+    pub token_data_id_hash: String,
+    pub property_version: BigDecimal,
+    pub from_address: String,
+    pub to_address: String,
+    pub collection_data_id_hash: String,
+    pub creator_address: String,
+    pub collection_name: String,
+    pub name: String,
+    pub amount: BigDecimal,
+    pub table_handle: String,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub token_data_id: String,
+    pub collection_id: String,
+}
+
+impl Ord for PostgresCurrentTokenPendingClaim {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.token_data_id_hash
+            .cmp(&other.token_data_id_hash)
+            .then(self.property_version.cmp(&other.property_version))
+            .then(self.from_address.cmp(&other.from_address))
+            .then(self.to_address.cmp(&other.to_address))
+    }
+}
+
+impl PartialOrd for PostgresCurrentTokenPendingClaim {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl From<CurrentTokenPendingClaim> for PostgresCurrentTokenPendingClaim {
+    fn from(raw_item: CurrentTokenPendingClaim) -> Self {
+        Self {
+            token_data_id_hash: raw_item.token_data_id_hash,
+            property_version: raw_item.property_version,
+            from_address: raw_item.from_address,
+            to_address: raw_item.to_address,
+            collection_data_id_hash: raw_item.collection_data_id_hash,
+            creator_address: raw_item.creator_address,
+            collection_name: raw_item.collection_name,
+            name: raw_item.name,
+            amount: raw_item.amount,
+            table_handle: raw_item.table_handle,
+            last_transaction_version: raw_item.last_transaction_version,
+            last_transaction_timestamp: raw_item.last_transaction_timestamp,
+            token_data_id: raw_item.token_data_id,
+            collection_id: raw_item.collection_id,
+        }
+    }
 }

@@ -12,46 +12,52 @@ use enum_dispatch::enum_dispatch;
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GcsClientConfig};
 use parquet::schema::types::Type;
 use processor::{
-    db::parquet::models::{
-        account_transaction_models::parquet_account_transactions::AccountTransaction,
-        ans_models::{
-            ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
-            ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
-        },
-        default_models::{
-            parquet_block_metadata_transactions::BlockMetadataTransaction,
-            parquet_move_modules::MoveModule,
-            parquet_move_resources::MoveResource,
-            parquet_move_tables::{CurrentTableItem, TableItem},
-            parquet_table_metadata::TableMetadata,
-            parquet_transactions::Transaction as ParquetTransaction,
-            parquet_write_set_changes::WriteSetChangeModel,
-        },
-        event_models::parquet_events::EventPQ,
-        fungible_asset_models::{
-            parquet_v2_fungible_asset_activities::FungibleAssetActivity,
-            parquet_v2_fungible_asset_balances::{
-                CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
-                FungibleAssetBalance,
+    db::{
+        common::models::{
+            token_models::{
+                token_claims::ParquetCurrentTokenPendingClaim,
+                token_royalty::ParquetCurrentTokenRoyaltyV1,
             },
-            parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+            token_v2_models::{
+                v2_token_activities::ParquetTokenActivityV2,
+                v2_token_datas::{ParquetCurrentTokenDataV2, ParquetTokenDataV2},
+                v2_token_metadata::ParquetCurrentTokenV2Metadata,
+                v2_token_ownerships::{ParquetCurrentTokenOwnershipV2, ParquetTokenOwnershipV2},
+            },
         },
-        object_models::v2_objects::{CurrentObject, Object},
-        stake_models::{
-            parquet_delegator_activities::DelegatedStakingActivity,
-            parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
-            parquet_proposal_voters::ProposalVote,
+        parquet::models::{
+            account_transaction_models::parquet_account_transactions::AccountTransaction,
+            ans_models::{
+                ans_lookup_v2::{AnsLookupV2, CurrentAnsLookupV2},
+                ans_primary_name_v2::{AnsPrimaryNameV2, CurrentAnsPrimaryNameV2},
+            },
+            default_models::{
+                parquet_block_metadata_transactions::BlockMetadataTransaction,
+                parquet_move_modules::MoveModule,
+                parquet_move_resources::MoveResource,
+                parquet_move_tables::{CurrentTableItem, TableItem},
+                parquet_table_metadata::TableMetadata,
+                parquet_transactions::Transaction as ParquetTransaction,
+                parquet_write_set_changes::WriteSetChangeModel,
+            },
+            event_models::parquet_events::EventPQ,
+            fungible_asset_models::{
+                parquet_v2_fungible_asset_activities::FungibleAssetActivity,
+                parquet_v2_fungible_asset_balances::{
+                    CurrentFungibleAssetBalance, CurrentUnifiedFungibleAssetBalance,
+                    FungibleAssetBalance,
+                },
+                parquet_v2_fungible_metadata::FungibleAssetMetadataModel,
+            },
+            object_models::v2_objects::{CurrentObject, Object},
+            stake_models::{
+                parquet_delegator_activities::DelegatedStakingActivity,
+                parquet_delegator_balances::{CurrentDelegatorBalance, DelegatorBalance},
+                parquet_proposal_voters::ProposalVote,
+            },
+            transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
+            user_transaction_models::parquet_user_transactions::UserTransaction,
         },
-        token_v2_models::{
-            token_claims::CurrentTokenPendingClaim,
-            v1_token_royalty::CurrentTokenRoyaltyV1,
-            v2_token_activities::TokenActivityV2,
-            v2_token_datas::{CurrentTokenDataV2, TokenDataV2},
-            v2_token_metadata::CurrentTokenV2Metadata,
-            v2_token_ownerships::{CurrentTokenOwnershipV2, TokenOwnershipV2},
-        },
-        transaction_metadata_model::parquet_write_set_size_info::WriteSetSize,
-        user_transaction_models::parquet_user_transactions::UserTransaction,
     },
     utils::table_flags::TableFlags,
 };
@@ -223,29 +229,32 @@ impl_parquet_trait!(
 impl_parquet_trait!(WriteSetSize, ParquetTypeEnum::WriteSetSize);
 impl_parquet_trait!(AccountTransaction, ParquetTypeEnum::AccountTransactions);
 impl_parquet_trait!(
-    CurrentTokenPendingClaim,
+    ParquetCurrentTokenPendingClaim,
     ParquetTypeEnum::CurrentTokenPendingClaims
 );
 impl_parquet_trait!(
-    CurrentTokenRoyaltyV1,
+    ParquetCurrentTokenRoyaltyV1,
     ParquetTypeEnum::CurrentTokenRoyaltiesV1
 );
 impl_parquet_trait!(
-    CurrentTokenV2Metadata,
+    ParquetCurrentTokenV2Metadata,
     ParquetTypeEnum::CurrentTokenV2Metadata
 );
-impl_parquet_trait!(TokenActivityV2, ParquetTypeEnum::TokenActivitiesV2);
+impl_parquet_trait!(ParquetTokenActivityV2, ParquetTypeEnum::TokenActivitiesV2);
 impl_parquet_trait!(
     CurrentAnsPrimaryNameV2,
     ParquetTypeEnum::CurrentAnsPrimaryNameV2
 );
 impl_parquet_trait!(AnsLookupV2, ParquetTypeEnum::AnsLookupV2);
 impl_parquet_trait!(CurrentAnsLookupV2, ParquetTypeEnum::CurrentAnsLookupV2);
-impl_parquet_trait!(TokenDataV2, ParquetTypeEnum::TokenDatasV2);
-impl_parquet_trait!(CurrentTokenDataV2, ParquetTypeEnum::CurrentTokenDatasV2);
-impl_parquet_trait!(TokenOwnershipV2, ParquetTypeEnum::TokenOwnershipsV2);
+impl_parquet_trait!(ParquetTokenDataV2, ParquetTypeEnum::TokenDatasV2);
 impl_parquet_trait!(
-    CurrentTokenOwnershipV2,
+    ParquetCurrentTokenDataV2,
+    ParquetTypeEnum::CurrentTokenDatasV2
+);
+impl_parquet_trait!(ParquetTokenOwnershipV2, ParquetTypeEnum::TokenOwnershipsV2);
+impl_parquet_trait!(
+    ParquetCurrentTokenOwnershipV2,
     ParquetTypeEnum::CurrentTokenOwnershipsV2
 );
 impl_parquet_trait!(
@@ -292,14 +301,14 @@ pub enum ParquetTypeStructs {
     // account txn
     AccountTransaction(Vec<AccountTransaction>),
     // Token V2
-    CurrentTokenPendingClaim(Vec<CurrentTokenPendingClaim>),
-    CurrentTokenRoyaltyV1(Vec<CurrentTokenRoyaltyV1>),
-    CurrentTokenV2Metadata(Vec<CurrentTokenV2Metadata>),
-    TokenActivityV2(Vec<TokenActivityV2>),
-    TokenDataV2(Vec<TokenDataV2>),
-    CurrentTokenDataV2(Vec<CurrentTokenDataV2>),
-    TokenOwnershipV2(Vec<TokenOwnershipV2>),
-    CurrentTokenOwnershipV2(Vec<CurrentTokenOwnershipV2>),
+    CurrentTokenPendingClaim(Vec<ParquetCurrentTokenPendingClaim>),
+    CurrentTokenRoyaltyV1(Vec<ParquetCurrentTokenRoyaltyV1>),
+    CurrentTokenV2Metadata(Vec<ParquetCurrentTokenV2Metadata>),
+    TokenActivityV2(Vec<ParquetTokenActivityV2>),
+    TokenDataV2(Vec<ParquetTokenDataV2>),
+    CurrentTokenDataV2(Vec<ParquetCurrentTokenDataV2>),
+    TokenOwnershipV2(Vec<ParquetTokenOwnershipV2>),
+    CurrentTokenOwnershipV2(Vec<ParquetCurrentTokenOwnershipV2>),
     // Stake
     DelegatedStakingActivity(Vec<DelegatedStakingActivity>),
     CurrentDelegatorBalance(Vec<CurrentDelegatorBalance>),
