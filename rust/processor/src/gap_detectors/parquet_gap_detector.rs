@@ -134,7 +134,7 @@ impl GapDetectorTrait for ParquetFileGapDetectorInner {
         });
 
         if result.start_version == -1 {
-            // meaning we didn't really upload anything but we stil lwould like to update the map to reduce memory usage.
+            // meaning we didn't really upload anything but we still would like to update the map to reduce memory usage.
             self.update_next_version_to_process(self.max_version, &result.table_name);
             return Ok(GapDetectorResult::ParquetFileGapDetectorResult(
                 ParquetFileGapDetectorResult {
