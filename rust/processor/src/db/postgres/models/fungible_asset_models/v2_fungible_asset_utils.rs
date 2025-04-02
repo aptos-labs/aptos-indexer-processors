@@ -21,6 +21,35 @@ const FUNGIBLE_ASSET_LENGTH: usize = 32;
 const FUNGIBLE_ASSET_SYMBOL: usize = 32;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CoinStoreDeletionEvent {
+    pub coin_type: String,
+    pub event_handle_creation_address: String,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub deleted_deposit_event_handle_creation_number: u64,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub deleted_withdraw_event_handle_creation_number: u64,
+}
+
+impl CoinStoreDeletionEvent {
+    pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Option<Self> {
+        if data_type == "0x1::coin::CoinStoreDeletion" {
+            let coin_store_deletion: CoinStoreDeletionEvent = serde_json::from_str(data)
+                .unwrap_or_else(|_| {
+                    tracing::error!(
+                        transaction_version = txn_version,
+                        data = data,
+                        "failed to parse event for coin store deletion"
+                    );
+                    panic!();
+                });
+            Some(coin_store_deletion)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FeeStatement {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub storage_fee_refund_octas: u64,
