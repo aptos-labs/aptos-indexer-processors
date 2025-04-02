@@ -4,7 +4,6 @@
 > 
 > - [aptos-indexer-processors-v2](https://github.com/aptos-labs/aptos-indexer-processors-v2) for processors
 > - [aptos-indexer-processor-sdk](https://github.com/aptos-labs/aptos-indexer-processor-sdk) for processor-sdk
-> - [aptos-indexer-processor-example](https://github.com/aptos-labs/aptos-indexer-processor-example) for processor sdk quickstart
 
 
 [![codecov](https://codecov.io/gh/aptos-labs/aptos-indexer-processors/graph/badge.svg?token=yOKOnndthm)](https://codecov.io/gh/aptos-labs/aptos-indexer-processors)
