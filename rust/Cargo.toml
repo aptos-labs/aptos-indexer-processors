@@ -76,10 +76,6 @@ google-cloud-pubsub = "0.18.0"
 hex = "0.4.3"
 itertools = "0.12.1"
 indexmap = { version = "2.7.0", features = ["serde"] }
-jemallocator = { version = "0.5.0", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
 json-structural-diff = "0.1.0"
 assert-json-diff = "2.0.2"
 kanal = { version = "0.1.0-pre8", features = ["async"] }
