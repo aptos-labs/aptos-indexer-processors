@@ -7,6 +7,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 # cancel redundant builds
 concurrency:
   # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
@@ -17,8 +20,12 @@ concurrency:
 jobs:
   Python:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/python-setup
         with:
           pyproject_directory: python
@@ -27,8 +34,12 @@ jobs:
 
   Rust:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
       - name: Install deps and run linter
         run: |
           sudo apt update && sudo apt install libdw-dev

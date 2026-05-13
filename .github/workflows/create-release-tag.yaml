@@ -14,9 +14,11 @@ on:
 jobs:
   create-tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0  # Fetch all history for all tags and branches
 
@@ -58,7 +60,7 @@ jobs:
           git push origin "$new_tag"
       # TODO: roll docker image release into this workflow.
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           tag_name: aptos-indexer-processors-v${{ steps.generate_version.outputs.new_version }}
           name: Release ${{ steps.generate_version.outputs.new_version }}

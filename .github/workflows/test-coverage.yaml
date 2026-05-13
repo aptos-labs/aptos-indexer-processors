@@ -11,6 +11,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
@@ -25,10 +28,13 @@ jobs:
   rust-unit-coverage:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+          persist-credentials: false
 
       - name: rust setup
         run: |
@@ -54,7 +60,7 @@ jobs:
         working-directory: rust
       - run: ls -R
         working-directory: rust
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lcov_unit
           path: rust/lcov_unit.info
@@ -62,12 +68,16 @@ jobs:
   upload-to-codecov:
     runs-on: ubuntu-latest
     continue-on-error: true # Don't fail if the codecov upload fails
+    permissions:
+      contents: read
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     needs: [ rust-unit-coverage ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: lcov_unit
       - run: ls -R

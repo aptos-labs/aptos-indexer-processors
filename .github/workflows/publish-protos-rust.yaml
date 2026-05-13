@@ -15,10 +15,13 @@ on:
 jobs:
   publish-crate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
+          persist-credentials: false
 
       - uses: ./.github/actions/rust-setup
 
@@ -40,14 +43,14 @@ jobs:
         run: echo "Version of crate in repo matches version on crates.io, exiting..." && exit 1
 
       # Generate code from the proto files.
-      - uses: arduino/setup-protoc@v2
+      - uses: arduino/setup-protoc@a8b67ba40b37d35169e222f3bb352603327985b6 # v2.1.0
       - name: Install rust prost plugins
         run: |
           cargo install protoc-gen-prost
           cargo install protoc-gen-prost-serde
           cargo install protoc-gen-prost-crate
           cargo install protoc-gen-tonic
-      - uses: bufbuild/buf-setup-action@v1.24.0
+      - uses: bufbuild/buf-setup-action@d5f79ca09dab494736bae6976ce973d76d8853e1 # v1.24.0
       - run: buf generate --template buf.rust.gen.yaml
 
       # Publish the crate.

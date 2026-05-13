@@ -18,4 +18,8 @@ jobs:
       processor_language: ${{ matrix.language }}
       version_tag: ${{ github.ref_name }}
       GIT_SHA: ${{ github.sha }}
-    secrets: inherit
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      ENV_DOCKERHUB_USERNAME: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
+      ENV_DOCKERHUB_PASSWORD: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
