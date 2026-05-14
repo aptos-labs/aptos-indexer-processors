@@ -9,10 +9,14 @@ jobs:
 
   nightly-run:
     runs-on: runs-on,runner=2cpu-linux-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
 
       - name: Install Dependencies and Run Linter
         uses: ./.github/actions/dep_install_and_lint

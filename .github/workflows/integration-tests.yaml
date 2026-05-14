@@ -18,12 +18,15 @@ on:
 jobs:
   Integration-tests:
     runs-on: runs-on,runner=2cpu-linux-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: ${{ github.head_ref }} # check out the code from the pull request branch:
+          persist-credentials: false
 
       # Install toml-cli using cargo
       - name: Install toml-cli
@@ -36,17 +39,18 @@ jobs:
       # Update aptos-system-utils dependency using toml-cli
       - name: Update aptos-system-utils dependency
         if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
+        env:
+          COMMIT_HASH: ${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
         run: |
-          COMMIT_HASH=${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
           echo "Updating aptos-system-utils dependency in Cargo.toml to use commit hash $COMMIT_HASH"
           toml set rust/Cargo.toml workspace.dependencies.aptos-system-utils.rev "$COMMIT_HASH" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
       # Update aptos-indexer-test-transactions dependency using toml-cli
       - name: Update aptos-indexer-test-transactions dependency
         if: ${{ github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch' }}
+        env:
+          COMMIT_HASH: ${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
         run: |
-          COMMIT_HASH=${{ github.event.client_payload.commit_hash || github.event.inputs.commit_hash }}
-
           echo "Updating aptos-indexer-test-transactions dependency in Cargo.toml to use commit hash $COMMIT_HASH"
           toml set rust/Cargo.toml workspace.dependencies.aptos-indexer-test-transactions.rev "$COMMIT_HASH" > Cargo.tmp && mv Cargo.tmp rust/Cargo.toml
 
@@ -63,7 +67,7 @@ jobs:
 
       # Cache Cargo
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/
@@ -97,7 +101,7 @@ jobs:
 
       - name: Send Slack Notification to oncall
         if: ${{ steps.sanity-check.outcome == 'failure' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update') }}
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117 # v1.24.0
         with:
           # eco-infra-oncall channel.
           channel-id: 'C0468USBLQJ'
