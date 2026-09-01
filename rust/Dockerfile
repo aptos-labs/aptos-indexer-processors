@@ -10,7 +10,11 @@ COPY --link . /app
 
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libdw-dev libpq-dev lld
 ENV CARGO_NET_GIT_FETCH_WITH_CLI true
-RUN cargo build --locked --release -p processor
+# --no-default-features drops the `libpq` feature (diesel/postgres). With it enabled,
+# Worker::run_migrations opens a second, synchronous libpq connection, which fails against
+# AlloyDB managed pgBouncer in transaction mode with `unnamed prepared statement does not
+# exist`. Without it, migrations reuse the async pool connection that already works.
+RUN cargo build --locked --release -p processor --no-default-features
 RUN cp target/release/processor /usr/local/bin
 RUN cargo build --locked --release -p indexer-metrics
 RUN cp target/release/indexer-metrics /usr/local/bin
